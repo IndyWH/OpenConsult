@@ -31,7 +31,4 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 - User accounts with roles (doctor, admin, observer) — role provides context and controls access.
 - A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
 
-## 3. Architecture overview
-
-Everything runs on one Linux machine (target: RTX 4090, 96 GB RAM).
 See PROJECT_PLAN.md for the full plan.
