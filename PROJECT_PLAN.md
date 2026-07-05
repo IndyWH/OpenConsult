@@ -28,7 +28,8 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 7. The doctor reviews, edits, and signs off the note. Only then is it saved as final.
 
 **Around the edges:**
-- User accounts with roles (doctor, admin, observer) — role provides context and controls access.
+- User accounts with roles (doctor, receptionist, admin) — role provides context, shapes the interface, and controls access.
+- **Two role-specific views mirroring a real Sri Lankan GP surgery:** a **front-desk view** for the receptionist (register patients, manage today's queue) and a **consulting view** for the doctor (open the queue, start a session). The receptionist can manage patients and the queue but cannot open transcripts or clinical notes.
 - A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
 
 ## 3. Architecture overview
@@ -92,8 +93,9 @@ Browser (mic + UI)
 
 ## 5. Data model (first cut)
 
-- **User** — name, role (doctor / admin / observer), credentials
+- **User** — name, role (doctor / receptionist / admin), credentials
 - **Patient** — synthetic demographics only
+- **QueueEntry** — patient added to today's queue by the receptionist; ordered list, status: `waiting → in consultation → done` (matches the walk-in, take-a-number flow of a typical SL surgery rather than calendar slots)
 - **Consultation** — belongs to a patient and a doctor; status: `live → processing → finalised`
 - **TranscriptSegment** — rough live segments (timestamped, no speaker)
 - **FinalTranscript** — diarised, role-attributed; Sinhala and English versions
@@ -130,9 +132,9 @@ Build the pgvector store over guideline content; generate the investigations lis
 Benchmark existing Sinhala Whisper fine-tunes on the mock recordings (word error rate, and how they handle code-switched English terms). Fine-tune Whisper on the 4090 if existing models fall short. Add the translation step; store dual-language transcripts.
 *Done when:* a Sinhala mock consultation produces a usable English note.
 
-**Phase 6 — Users, patients, audit, polish**
-Registration/roles, patient records, audit log, Docker Compose packaging, demo script for the interview.
-*Done when:* a stranger can run the demo end-to-end from the README.
+**Phase 6 — Users, roles, front desk, audit, polish**
+Registration and roles (doctor / receptionist / admin) with role-specific views: the receptionist's **front-desk view** (register patients, manage today's queue) and the doctor's **consulting view** (pick a patient from the queue, start the session). Role-based access enforced — the receptionist cannot open transcripts or notes. Plus patient records, audit log, Docker Compose packaging, and a demo script for the interview: *receptionist registers and queues a patient → doctor opens the queue and consults → live transcript + CDS → signed-off note in the record.*
+*Done when:* a stranger can run the two-role demo end-to-end from the README.
 
 Phases 1–2 are sequential; 3, 4, and 5 are largely independent after that, so they can be reordered by interest.
 
@@ -155,7 +157,7 @@ encryption at rest for the database and audio files, role-based access control, 
 
 ## 9. Out of scope for v1
 
-Live (streaming) diarisation · more than two speakers · prescription generation · EHR/EMR integration · mobile app · Tamil language support (a natural v2 candidate for Sri Lanka).
+Live (streaming) diarisation · more than two speakers · prescription generation · calendar-based appointment scheduling, patient self-booking, and SMS reminders (the queue covers v1) · EHR/EMR integration · mobile app · Tamil language support (a natural v2 candidate for Sri Lanka).
 
 ## 10. Roadmap ideas beyond v1
 
@@ -163,6 +165,7 @@ Live (streaming) diarisation · more than two speakers · prescription generatio
 - Evaluation paper: code-switched Sinhala clinical ASR benchmark
 - Tamil support (Sri Lanka's second consultation language)
 - Sri Lankan national guideline corpus for the RAG layer
+- Proper appointment scheduling (calendar slots, patient self-booking, SMS reminders)
 
 ---
 
