@@ -63,6 +63,8 @@ async def simulate(script_path: Path, turns_per_update: int) -> None:
 
         print(f"--- after turn {min(cut, len(turns))}/{len(turns)}  "
               f"({elapsed:.1f}s)  [{delta}]")
+        for u in new_assessment.get("urgent_actions", []):
+            print(f"  !! URGENT: {u['action']} — {u['reason']}")
         for d in new_assessment["differentials"]:
             print(f"  dx: ({d['likelihood']:>8}) {d['condition']} — {d['rationale']}")
         for q in new_assessment["questions_to_ask"]:

@@ -57,6 +57,13 @@
   .likelihood.low { background: #55555522; color: inherit; opacity: .8; }
   .rationale { display: block; opacity: .6; font-size: .82rem; }
   #cds .idle { opacity: .5; font-style: italic; }
+  .urgent {
+    border: 2px solid #d32f2f; background: #d32f2f14; border-radius: 8px;
+    padding: .6rem .75rem; margin-bottom: 1rem;
+  }
+  .urgent h2 { color: #d32f2f; margin-top: 0 !important; }
+  .urgent li { font-weight: 600; }
+  .urgent .rationale { font-weight: 400; }
 </style>
 </head>
 <body>
@@ -138,6 +145,18 @@ function el(tag, className, text) {
 
 function renderCDS(a) {
   cdsEl.innerHTML = '';
+  if (a.urgent_actions && a.urgent_actions.length) {
+    const box = el('div', 'urgent');
+    box.appendChild(el('h2', null, '⚠ Urgent actions'));
+    const uList = el('ul');
+    for (const u of a.urgent_actions) {
+      const li = el('li', null, u.action);
+      li.appendChild(el('span', 'rationale', u.reason));
+      uList.appendChild(li);
+    }
+    box.appendChild(uList);
+    cdsEl.appendChild(box);
+  }
   cdsEl.appendChild(el('h2', null, 'Differential diagnosis'));
   const dxList = el('ul');
   for (const d of a.differentials) {

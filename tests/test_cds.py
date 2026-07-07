@@ -36,7 +36,14 @@ def test_cds_update_returns_valid_assessment():
     )
     assessment = asyncio.run(engine.update(transcript, previous=None))
 
-    assert set(assessment) == {"differentials", "questions_to_ask", "signs_to_check"}
+    assert set(assessment) == {
+        "reasoning",
+        "differentials",
+        "questions_to_ask",
+        "signs_to_check",
+        "urgency_check",
+        "urgent_actions",
+    }
     assert 1 <= len(assessment["differentials"]) <= 5
     conditions = " ".join(d["condition"].lower() for d in assessment["differentials"])
     assert "angina" in conditions or "coronary" in conditions or "cardiac" in conditions

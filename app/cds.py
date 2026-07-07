@@ -33,6 +33,9 @@ CDS_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K
 CDS_SCHEMA = {
     "type": "object",
     "properties": {
+        # First field on purpose: the model reasons here before committing to
+        # the clinical fields. Not shown in the UI; kept for the audit trail.
+        "reasoning": {"type": "string"},
         "differentials": {
             "type": "array",
             "maxItems": 5,
@@ -48,8 +51,30 @@ CDS_SCHEMA = {
         },
         "questions_to_ask": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
         "signs_to_check": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
+        # Forced checkpoint generated immediately before urgent_actions: the
+        # model must answer the urgency question before filling the alarm.
+        "urgency_check": {"type": "string"},
+        "urgent_actions": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["action", "reason"],
+            },
+        },
     },
-    "required": ["differentials", "questions_to_ask", "signs_to_check"],
+    "required": [
+        "reasoning",
+        "differentials",
+        "questions_to_ask",
+        "signs_to_check",
+        "urgency_check",
+        "urgent_actions",
+    ],
 }
 
 SYSTEM_PROMPT = """\
@@ -60,7 +85,10 @@ especially medication names — interpret plausible mis-transcriptions \
 charitably (e.g. "nucleoside 80 in the morning" in a diabetes review most \
 likely means gliclazide 80 mg).
 
-Maintain a working assessment with three parts:
+Fill the `reasoning` field FIRST, before everything else: think through \
+what is new in the transcript since your previous assessment, what it \
+changes, and explicitly whether any time-critical condition now warrants \
+urgent action. Keep it under 150 words. Then produce the assessment:
 1. differentials — up to 5 diagnoses, MOST LIKELY FIRST, each with a short \
 rationale grounded in what was actually said.
 2. questions_to_ask — up to 4 questions the doctor has NOT yet asked that \
@@ -68,6 +96,19 @@ would best narrow the differential. Remove a question once the transcript \
 shows it was asked or answered.
 3. signs_to_check — up to 4 focused examination findings worth checking. \
 Remove one once the transcript shows it was examined.
+4. urgency_check — answer in one or two sentences, on EVERY update: could \
+any differential on your list, at ANY likelihood, be a condition where \
+delay causes serious harm (possible ACS or new angina, dengue, meningitis, \
+severe asthma, sepsis, GI bleeding)? If yes, what immediate step does it \
+demand, and does the transcript already show that step done or arranged?
+5. urgent_actions — populated directly from your urgency_check: each \
+time-critical step that should happen during or immediately after THIS \
+consultation and is not yet done or arranged — e.g. bedside ECG, same-day \
+specialist referral, hospital admission, emergency treatment. Concretely: \
+new exertional chest pain in an adult with cardiac risk factors warrants \
+an ECG at this visit — keep it here until the transcript shows it done or \
+arranged. Leave EMPTY for routine and chronic-disease presentations; do \
+not pad it.
 
 REVISION RULES — you are REVISING your previous assessment, not writing a \
 new one:
