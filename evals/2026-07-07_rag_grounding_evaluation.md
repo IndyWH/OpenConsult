@@ -99,13 +99,38 @@ per source. This also *sharpened refusals* — condition-name queries are
 crisper than sentence queries, dropping TIA's top similarity from 0.47 to
 0.35.
 
+## Clinical fidelity spot-check (project owner, 2026-07-07)
+
+A doctor's spot-check of the system's outputs, ahead of the formal
+fidelity evaluation:
+
+- **Chest-pain summary vs cited passages:** claims verified against the
+  passages they cite. One fidelity drift found — the aspirin qualifier.
+  CG95 1.2.3 reads "a single loading dose of 300 mg aspirin … **unless
+  there is clear evidence that they are allergic to it**"; the summary
+  rendered this "**unless contraindicated**". A broadening paraphrase:
+  clinically conservative in direction (contraindication ⊇ allergy), but
+  not faithful to the passage — and qualifier paraphrase is precisely the
+  class of drift a fidelity evaluation must catch, since a *narrowing*
+  paraphrase of the same kind would be dangerous.
+- **Refusal behaviour, live:** on the TIA mock consultation the guidelines
+  panel declined with the provenance line shown, while the urgency alarm
+  fired independently — correct separation of the two layers (urgency is
+  judged from the transcript; guideline summaries refuse when the corpus
+  lacks coverage; neither blocks the other).
+
+**Decision:** formal claim-by-claim fidelity evaluation deferred to the
+end-of-project review, alongside the script-02 dengue boundary case from
+the urgency evaluation.
+
 ## Limitations
 
 - Corpus coverage is deliberately narrow (the five test-case topics);
   breadth of the refusal boundary is sampled at only four points.
 - Summaries are checked for citation validity, not clinical fidelity to
-  the cited passages — that audit needs the doctor (project owner) and is
-  the natural next evaluation.
+  the cited passages. A spot-check (see above) found one qualifier
+  paraphrase; the formal claim-by-claim audit is deferred to the
+  end-of-project review.
 - Single embedding model, no reranker; the NG28-vs-CG173 finding suggests
   a reranking stage would help as the corpus grows.
 - n=1 per case, deterministic (temperature 0, seed 42).
