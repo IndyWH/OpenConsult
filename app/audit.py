@@ -1,0 +1,69 @@
+"""Audit log (Phase 6): who viewed/edited/approved/acknowledged what, when.
+
+Append-only. Every clinically meaningful action writes a row; the
+existing urgent_ack_at column on consultation remains as the quick-read
+flag, with the who/when detail folded in here.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+
+import psycopg
+from dotenv import load_dotenv
+
+load_dotenv()
+DATABASE_URL = os.getenv("DATABASE_URL", "")
+
+SCHEMA_SQL = """
+CREATE TABLE IF NOT EXISTS audit_event (
+    id serial PRIMARY KEY,
+    at timestamptz NOT NULL DEFAULT now(),
+    user_id int REFERENCES app_user(id),
+    action text NOT NULL,
+    subject_type text,
+    subject_id int,
+    detail jsonb
+);
+CREATE INDEX IF NOT EXISTS audit_event_subject_idx
+    ON audit_event (subject_type, subject_id);
+"""
+
+
+def ensure_schema() -> None:
+    with psycopg.connect(DATABASE_URL) as conn:
+        conn.execute(SCHEMA_SQL)
+
+
+async def log(
+    user_id: int | None,
+    action: str,
+    subject_type: str | None = None,
+    subject_id: int | None = None,
+    detail: dict | None = None,
+) -> None:
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        await conn.execute(
+            "INSERT INTO audit_event (user_id, action, subject_type, subject_id, detail)"
+            " VALUES (%s, %s, %s, %s, %s)",
+            (user_id, action, subject_type, subject_id,
+             json.dumps(detail) if detail else None),
+        )
+
+
+async def recent(limit: int = 200) -> list[dict]:
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT a.at, u.username, u.role, a.action, a.subject_type,"
+                " a.subject_id, a.detail"
+                " FROM audit_event a LEFT JOIN app_user u ON u.id = a.user_id"
+                " ORDER BY a.id DESC LIMIT %s", (limit,),
+            )
+        ).fetchall()
+    return [
+        {"at": str(r[0]), "username": r[1], "role": r[2], "action": r[3],
+         "subject_type": r[4], "subject_id": r[5], "detail": r[6]}
+        for r in rows
+    ]

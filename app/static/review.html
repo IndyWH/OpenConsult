@@ -75,7 +75,7 @@
 <body>
 <div class="banner">⚠️ Research/educational prototype — not a medical device. All AI
 output is a draft requiring doctor review and sign-off.</div>
-<h1>Consultation note review</h1>
+<h1 id="pageTitle">Consultation note review</h1>
 <div id="status"></div>
 
 <div id="processing"><span class="spinner"></span>Finalising: re-transcribing,
@@ -107,6 +107,7 @@ identifying speakers, drafting the note… this takes a minute or two.</div>
   </div>
 </div>
 
+<script src="/static/nav.js"></script>
 <script>
 const cid = location.pathname.split('/').pop();
 const statusEl = document.getElementById('status');
@@ -145,6 +146,7 @@ function renderTranscript() {
     div.appendChild(document.createTextNode(' '));
     const body = el('span', 'ttext', t.text);
     body.addEventListener('dblclick', () => {
+      if (state.status === 'approved') return;
       body.contentEditable = 'true'; body.focus();
     });
     body.addEventListener('blur', async () => {
@@ -224,9 +226,26 @@ async function refresh() {
     return;
   }
   contentEl.style.display = '';
+  if (state.patient_name) {
+    document.getElementById('pageTitle').textContent =
+      'Consultation note review — ' + state.patient_name;
+  }
   renderUrgentBanner();
   renderTranscript();
   renderNote();
+  applyReadOnly();
+}
+
+function applyReadOnly() {
+  // Approved = signed record: no edits, no regeneration, copy still allowed.
+  const locked = state.status === 'approved';
+  document.getElementById('approve').style.display = locked ? 'none' : '';
+  document.getElementById('regen').style.display = locked ? 'none' : '';
+  document.getElementById('swap').style.display = locked ? 'none' : '';
+  if (locked) {
+    for (const t of noteEl.querySelectorAll('.text')) t.contentEditable = 'false';
+    for (const t of transcriptEl.querySelectorAll('.ttext')) t.contentEditable = 'false';
+  }
 }
 
 function renderUrgentBanner() {

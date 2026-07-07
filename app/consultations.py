@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS consultation (
 );
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS urgent_actions jsonb;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS urgent_ack_at timestamptz;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS patient_id int;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS doctor_id int;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -58,12 +60,37 @@ async def _conn() -> psycopg.AsyncConnection:
     return await psycopg.AsyncConnection.connect(DATABASE_URL)
 
 
-async def create_consultation() -> int:
+async def create_consultation(
+    patient_id: int | None = None, doctor_id: int | None = None
+) -> int:
     async with await _conn() as conn:
         row = await (
-            await conn.execute("INSERT INTO consultation DEFAULT VALUES RETURNING id")
+            await conn.execute(
+                "INSERT INTO consultation (patient_id, doctor_id)"
+                " VALUES (%s, %s) RETURNING id",
+                (patient_id, doctor_id),
+            )
         ).fetchone()
         return row[0]
+
+
+async def list_consultations() -> list[dict]:
+    """Worklist rows: no clinical content — safe for all logged-in roles."""
+    async with await _conn() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT c.id, c.started_at, c.status, p.name, u.display_name"
+                " FROM consultation c"
+                " LEFT JOIN patient p ON p.id = c.patient_id"
+                " LEFT JOIN app_user u ON u.id = c.doctor_id"
+                " ORDER BY c.id DESC"
+            )
+        ).fetchall()
+    return [
+        {"id": r[0], "started_at": str(r[1])[:16], "status": r[2],
+         "patient_name": r[3] or "—", "doctor_name": r[4] or "—"}
+        for r in rows
+    ]
 
 
 async def set_status(cid: int, status: str, *, audio_path: str | None = None,
@@ -80,9 +107,10 @@ async def get_consultation(cid: int) -> dict | None:
     async with await _conn() as conn:
         row = await (
             await conn.execute(
-                "SELECT id, started_at, status, audio_path, error,"
-                " urgent_actions, urgent_ack_at"
-                " FROM consultation WHERE id = %s", (cid,),
+                "SELECT c.id, c.started_at, c.status, c.audio_path, c.error,"
+                " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name"
+                " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
+                " WHERE c.id = %s", (cid,),
             )
         ).fetchone()
     if row is None:
@@ -95,6 +123,8 @@ async def get_consultation(cid: int) -> dict | None:
         "error": row[4],
         "urgent_actions": row[5] or [],
         "urgent_ack_at": str(row[6]) if row[6] else None,
+        "patient_id": row[7],
+        "patient_name": row[8],
     }
 
 

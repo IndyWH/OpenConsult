@@ -51,7 +51,23 @@ uv sync
 uv run uvicorn app.main:app --reload
 ```
 
-Then open http://127.0.0.1:8000 — you should see a hello-world JSON response.
+Then open http://127.0.0.1:8000/login and register two accounts — one
+receptionist, one doctor (the first account ever registered becomes
+admin). The two-role demo flow, per the plan:
+
+1. **Receptionist** → *Today* tab: add a synthetic patient to the walk-in
+   queue (reorder with ↑/↓ while waiting).
+2. **Doctor** → *Today* tab: click **Start consultation** on a waiting
+   patient → the live consultation page opens, tied to that patient.
+3. Consult (speak), press **Stop** → the queue entry completes, the note
+   pipeline runs, and the review page opens.
+4. Review, acknowledge any urgency banner, **Approve** → the consultation
+   is archived read-only in the *Consultations* tab.
+
+Role boundaries are enforced server-side: the receptionist manages the
+queue but gets 403s on transcripts, notes, and review pages. Admins get
+an *Audit* tab (who viewed/edited/approved/acknowledged what, when).
+
 Interactive API docs live at http://127.0.0.1:8000/docs.
 
 **Live transcription (Phase 1):** open http://127.0.0.1:8000/live, click

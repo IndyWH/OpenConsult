@@ -7,6 +7,7 @@ patient/consultation views described in PROJECT_PLAN.md.
 
 import asyncio
 import contextlib
+import json
 import logging
 import os
 from pathlib import Path
@@ -17,9 +18,11 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from fastapi import Depends
 from pydantic import BaseModel
 
-from app import consultations
+from app import audit, auth, consultations, frontdesk
+from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
 from app.live import PROCESS_INTERVAL_S, LiveSession
@@ -45,7 +48,10 @@ RECORDINGS_DIR = Path(os.getenv("RECORDINGS_DIR", "data/recordings"))
 async def lifespan(app: FastAPI):
     # Load the Whisper model once, before serving traffic (takes a second or
     # two from the local cache; the first ever run downloads the model).
+    auth.ensure_schema()
+    frontdesk.ensure_schema()
     consultations.ensure_schema()
+    audit.ensure_schema()
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
     app.state.cds_engine = CDSEngine()
@@ -67,26 +73,173 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+# ------------------------------------------------------------ auth & pages
+
+class RegisterBody(BaseModel):
+    username: str
+    password: str
+    display_name: str
+    role: str  # doctor | receptionist (first user becomes admin)
+
+
+class LoginBody(BaseModel):
+    username: str
+    password: str
+
+
+@app.get("/login")
+def login_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "login.html")
+
+
+@app.get("/register")
+def register_page() -> FileResponse:
+    return FileResponse(STATIC_DIR / "login.html")  # same page, two forms
+
+
+@app.post("/api/register")
+async def register(body: RegisterBody) -> JSONResponse:
+    if body.role not in ("doctor", "receptionist"):
+        return JSONResponse(status_code=400, content={"error": "role must be doctor or receptionist"})
+    if len(body.password) < 8:
+        return JSONResponse(status_code=400, content={"error": "password too short (min 8)"})
+    try:
+        user = await auth.create_user(body.username, body.password, body.display_name, body.role)
+    except Exception:
+        return JSONResponse(status_code=409, content={"error": "username already taken"})
+    await audit.log(user["id"], "user.registered", "user", user["id"], {"role": user["role"]})
+    response = JSONResponse(content={"ok": True, "user": user})
+    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
+    return response
+
+
+@app.post("/api/login")
+async def login(body: LoginBody) -> JSONResponse:
+    user = await auth.authenticate(body.username, body.password)
+    if user is None:
+        return JSONResponse(status_code=401, content={"error": "invalid credentials"})
+    await audit.log(user["id"], "user.login", "user", user["id"])
+    response = JSONResponse(content={"ok": True, "user": user})
+    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
+    return response
+
+
+@app.post("/api/logout")
+async def logout() -> JSONResponse:
+    response = JSONResponse(content={"ok": True})
+    response.delete_cookie(COOKIE_NAME)
+    return response
+
+
+@app.get("/api/me")
+async def me(user: dict = Depends(api_user())) -> dict:
+    return user
+
+
+@app.get("/today")
+def today_page(user: dict = Depends(page_user())) -> FileResponse:
+    return FileResponse(STATIC_DIR / "today.html")
+
+
+@app.get("/consultations")
+def worklist_page(user: dict = Depends(page_user())) -> FileResponse:
+    return FileResponse(STATIC_DIR / "worklist.html")
+
+
+@app.get("/audit")
+def audit_page(user: dict = Depends(page_user("admin"))) -> FileResponse:
+    return FileResponse(STATIC_DIR / "audit.html")
+
+
+@app.get("/api/audit")
+async def audit_list(user: dict = Depends(api_user("admin"))) -> list[dict]:
+    return await audit.recent()
+
+
+# -------------------------------------------------------------------- queue
+
+class QueueAddBody(BaseModel):
+    name: str
+    age: int | None = None
+    sex: str | None = None
+
+
+@app.get("/api/queue")
+async def queue_list(user: dict = Depends(api_user())) -> list[dict]:
+    return await frontdesk.today_queue()
+
+
+@app.post("/api/queue")
+async def queue_add(
+    body: QueueAddBody, user: dict = Depends(api_user("receptionist", "admin"))
+) -> dict:
+    entry = await frontdesk.add_to_queue(body.name.strip(), body.age, body.sex)
+    await audit.log(user["id"], "queue.patient_added", "queue_entry",
+                    entry["entry_id"], {"patient_id": entry["patient_id"]})
+    return entry
+
+
+@app.post("/api/queue/{entry_id}/move")
+async def queue_move(
+    entry_id: int, direction: str,
+    user: dict = Depends(api_user("receptionist", "admin")),
+) -> dict:
+    moved = await frontdesk.move_entry(entry_id, direction)
+    if moved:
+        await audit.log(user["id"], "queue.reordered", "queue_entry", entry_id,
+                        {"direction": direction})
+    return {"ok": moved}
+
+
+@app.post("/api/queue/{entry_id}/start")
+async def queue_start(
+    entry_id: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    started = await frontdesk.start_entry(entry_id)
+    if started is None:
+        return JSONResponse(status_code=409, content={"error": "entry is not waiting"})
+    await audit.log(user["id"], "queue.started", "queue_entry", entry_id,
+                    {"patient_id": started["patient_id"]})
+    return JSONResponse(content=started)
+
+
 @app.get("/live")
-def live_page() -> FileResponse:
-    """The live transcription page: mic capture + streaming transcript."""
+def live_page(user: dict = Depends(page_user(*CLINICAL_ROLES))) -> FileResponse:
+    """The live consultation page: mic capture + streaming transcript."""
     return FileResponse(STATIC_DIR / "live.html")
 
 
+@app.get("/api/consultations")
+async def consultation_list(user: dict = Depends(api_user())) -> list[dict]:
+    """Worklist: statuses only, no clinical content — all roles may see it."""
+    return await consultations.list_consultations()
+
+
 @app.get("/review/{cid}")
-def review_page(cid: int) -> FileResponse:
+def review_page(cid: int, user: dict = Depends(page_user(*CLINICAL_ROLES))) -> FileResponse:
     """Note review screen: editable draft note + diarised transcript."""
     return FileResponse(STATIC_DIR / "review.html")
 
 
+async def _not_editable(cid: int) -> JSONResponse | None:
+    """Approved consultations are read-only — the signed record is final."""
+    consultation = await consultations.get_consultation(cid)
+    if consultation and consultation["status"] == "approved":
+        return JSONResponse(status_code=409, content={"error": "consultation is approved and read-only"})
+    return None
+
+
 @app.get("/api/consultations/{cid}")
-async def consultation_state(cid: int) -> JSONResponse:
+async def consultation_state(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
     consultation = await consultations.get_consultation(cid)
     if consultation is None:
         return JSONResponse(status_code=404, content={"error": "not found"})
     turns = await consultations.get_turns(cid)
     note = await consultations.latest_note(cid)
     plain = note_as_plain_text(note["content"]) if note else None
+    await audit.log(user["id"], "consultation.viewed", "consultation", cid)
     return JSONResponse(
         content={**consultation, "turns": turns, "note": note, "plain_text": plain}
     )
@@ -97,7 +250,11 @@ class ApproveBody(BaseModel):
 
 
 @app.post("/api/consultations/{cid}/approve")
-async def approve(cid: int, body: ApproveBody) -> JSONResponse:
+async def approve(
+    cid: int, body: ApproveBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    if (blocked := await _not_editable(cid)) is not None:
+        return blocked
     consultation = await consultations.get_consultation(cid)
     if consultation and consultation["urgent_actions"] and not consultation["urgent_ack_at"]:
         return JSONResponse(
@@ -105,28 +262,44 @@ async def approve(cid: int, body: ApproveBody) -> JSONResponse:
             content={"error": "Unresolved urgent actions must be acknowledged first."},
         )
     await consultations.approve_note(cid, body.text)
+    await audit.log(user["id"], "note.approved", "consultation", cid)
     return JSONResponse(content={"ok": True})
 
 
 @app.post("/api/consultations/{cid}/acknowledge-urgent")
-async def acknowledge_urgent(cid: int) -> dict:
-    return {"ok": True, "acknowledged_at": await consultations.acknowledge_urgent(cid)}
+async def acknowledge_urgent(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> dict:
+    acked_at = await consultations.acknowledge_urgent(cid)
+    await audit.log(user["id"], "urgent.acknowledged", "consultation", cid,
+                    {"acknowledged_at": acked_at})
+    return {"ok": True, "acknowledged_at": acked_at}
 
 
 @app.post("/api/consultations/{cid}/regenerate")
-async def regenerate(cid: int) -> dict:
+async def regenerate(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
     """Re-draft the note from the (possibly corrected) transcript."""
+    if (blocked := await _not_editable(cid)) is not None:
+        return blocked
     await consultations.set_status(cid, "processing")
     await regenerate_note(cid)
     await consultations.set_status(cid, "awaiting_review")
-    return {"ok": True}
+    await audit.log(user["id"], "note.regenerated", "consultation", cid)
+    return JSONResponse(content={"ok": True})
 
 
 @app.post("/api/consultations/{cid}/swap-roles")
-async def swap_roles(cid: int) -> dict:
+async def swap_roles(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
     """Override for the first-speaker-is-Doctor heuristic."""
+    if (blocked := await _not_editable(cid)) is not None:
+        return blocked
     await consultations.swap_roles(cid)
-    return {"ok": True}
+    await audit.log(user["id"], "roles.swapped", "consultation", cid)
+    return JSONResponse(content={"ok": True})
 
 
 class TurnBody(BaseModel):
@@ -134,9 +307,14 @@ class TurnBody(BaseModel):
 
 
 @app.patch("/api/consultations/{cid}/turns/{idx}")
-async def edit_turn(cid: int, idx: int, body: TurnBody) -> dict:
+async def edit_turn(
+    cid: int, idx: int, body: TurnBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    if (blocked := await _not_editable(cid)) is not None:
+        return blocked
     await consultations.update_turn_text(cid, idx, body.text)
-    return {"ok": True}
+    await audit.log(user["id"], "turn.edited", "consultation", cid, {"turn": idx})
+    return JSONResponse(content={"ok": True})
 
 
 @app.websocket("/ws/transcribe")
@@ -146,10 +324,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     Client → server: binary audio frames, or the text message "stop".
     Server → client: {"type": "final"|"partial"|"done", ...}
     """
+    # WebSocket auth: same session cookie, clinical roles only.
+    user = await auth.get_user(auth.verify_session(websocket.cookies.get(COOKIE_NAME)) or 0)
+    if user is None or user["role"] not in CLINICAL_ROLES:
+        await websocket.close(code=4403)
+        return
+
     await websocket.accept()
     session = LiveSession(websocket.app.state.transcriber)
     engine: CDSEngine = websocket.app.state.cds_engine
-    logger.info("Live session started")
+    patient_id: int | None = None
+    queue_entry_id: int | None = None
+    logger.info("Live session started by %s", user["username"])
 
     rag: RAGService = websocket.app.state.rag
 
@@ -229,6 +415,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     session.append_pcm16(message["bytes"])
                 elif message.get("text") == "stop":
                     break
+                elif (text := message.get("text", "")).startswith("{"):
+                    config = json.loads(text)  # {"patient_id": .., "queue_entry_id": ..}
+                    patient_id = config.get("patient_id")
+                    queue_entry_id = config.get("queue_entry_id")
 
             if session.new_audio_seconds >= PROCESS_INTERVAL_S:
                 committed, partial = await session.process()
@@ -250,7 +440,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
 
         # Kick off the finalisation pipeline (Phase 2). The Stop button IS
         # the trigger — no separate generate step.
-        cid = await consultations.create_consultation()
+        cid = await consultations.create_consultation(patient_id, user["id"])
+        if queue_entry_id is not None:
+            await frontdesk.finish_entry(queue_entry_id)
+        await audit.log(user["id"], "consultation.created", "consultation", cid,
+                        {"patient_id": patient_id})
         wav_path = str(RECORDINGS_DIR / f"consultation_{cid}.wav")
         duration = session.save_recording(wav_path)
         logger.info("Consultation %d: %.1fs of audio saved", cid, duration)

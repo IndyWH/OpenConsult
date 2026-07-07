@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consultation AI — Today</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 780px; margin: 0 auto; padding: 1.5rem; }
+  h1 { font-size: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: .75rem; text-transform: uppercase;
+       letter-spacing: .05em; opacity: .6; padding: .4rem .5rem; }
+  td { padding: .5rem; border-top: 1px solid #8883; }
+  .badge { border-radius: 5px; padding: .1rem .5rem; font-size: .78rem; font-weight: 600; }
+  .badge.waiting { background: #8883; }
+  .badge.in_consultation { background: #ed6c0233; color: #ed6c02; }
+  .badge.done { background: #1a7f3733; color: #1a7f37; }
+  button { padding: .3rem .7rem; border-radius: 6px; border: 1px solid #888;
+           background: transparent; color: inherit; cursor: pointer; font-size: .85rem; }
+  button.start { background: #1a7f37; border-color: #1a7f37; color: white; }
+  form { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; }
+  input, select { padding: .4rem .6rem; border-radius: 6px; border: 1px solid #8886;
+                  background: transparent; color: inherit; }
+  .hint { font-size: .8rem; opacity: .55; }
+</style>
+</head>
+<body>
+<h1>Today's queue</h1>
+<form id="addForm" style="display:none">
+  <input name="name" placeholder="Patient name (synthetic)" required>
+  <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem">
+  <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
+  <button class="start">Add to queue</button>
+</form>
+<p class="hint" id="hint"></p>
+<table>
+  <thead><tr><th>#</th><th>Patient</th><th>Status</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script src="/static/nav.js"></script>
+<script>
+let me = null;
+
+async function refresh() {
+  const queue = await (await fetch('/api/queue')).json();
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  const canManage = me && (me.role === 'receptionist' || me.role === 'admin');
+  const clinical = me && (me.role === 'doctor' || me.role === 'admin');
+  for (const entry of queue) {
+    const tr = document.createElement('tr');
+    const demo = [entry.age, entry.sex].filter(Boolean).join(', ');
+    tr.innerHTML = `<td>${entry.position}</td>` +
+      `<td>${entry.name}${demo ? ` <span class="hint">(${demo})</span>` : ''}</td>` +
+      `<td><span class="badge ${entry.status}">${entry.status.replace('_',' ')}</span></td>`;
+    const actions = document.createElement('td');
+    if (canManage && entry.status === 'waiting') {
+      for (const [dir, arrow] of [['up','↑'], ['down','↓']]) {
+        const b = document.createElement('button');
+        b.textContent = arrow;
+        b.addEventListener('click', async () => {
+          await fetch(`/api/queue/${entry.entry_id}/move?direction=${dir}`, {method:'POST'});
+          refresh();
+        });
+        actions.appendChild(b); actions.appendChild(document.createTextNode(' '));
+      }
+    }
+    if (clinical && entry.status === 'waiting') {
+      const b = document.createElement('button');
+      b.className = 'start'; b.textContent = 'Start consultation';
+      b.addEventListener('click', async () => {
+        const response = await fetch(`/api/queue/${entry.entry_id}/start`, {method:'POST'});
+        if (!response.ok) { refresh(); return; }
+        const started = await response.json();
+        location.href = `/live?patient=${started.patient_id}` +
+          `&queue=${started.entry_id}&name=${encodeURIComponent(started.name)}`;
+      });
+      actions.appendChild(b);
+    }
+    tr.appendChild(actions);
+    tbody.appendChild(tr);
+  }
+  if (!queue.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="hint">Queue is empty.</td></tr>';
+  }
+}
+
+document.addEventListener('me-ready', (e) => {
+  me = e.detail;
+  if (me.role === 'receptionist' || me.role === 'admin') {
+    document.getElementById('addForm').style.display = '';
+    document.getElementById('hint').textContent =
+      'Walk-in queue: add patients in arrival order; reorder while waiting.';
+  } else {
+    document.getElementById('hint').textContent =
+      'Read-only queue view — click Start on a waiting patient to begin their consultation.';
+  }
+  refresh();
+  setInterval(refresh, 5000);
+});
+
+document.getElementById('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  await fetch('/api/queue', {method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: data.name, age: data.age ? +data.age : null,
+                          sex: data.sex || null})});
+  e.target.reset();
+  refresh();
+});
+</script>
+</body>
+</html>

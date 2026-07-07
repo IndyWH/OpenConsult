@@ -4,16 +4,32 @@ and urgent actions never leak into the note's plain text."""
 
 import asyncio
 import os
+import secrets
 
 import psycopg
 import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
-from app import consultations
+from app import auth, consultations
 from app.notes import note_as_plain_text
 
 load_dotenv()
+
+
+def _doctor_client() -> TestClient:
+    """A TestClient logged in with a clinical role (Phase 6 RBAC)."""
+    auth.ensure_schema()
+    from app.main import app
+
+    client = TestClient(app)
+    response = client.post(
+        "/api/register",
+        json={"username": f"doc_{secrets.token_hex(4)}", "password": "test-password-123",
+              "display_name": "Doc", "role": "doctor"},
+    )
+    assert response.status_code == 200
+    return client
 
 
 def _db_ready() -> bool:
@@ -59,10 +75,8 @@ def consultation_with_urgency():
 
 def test_urgent_ack_gates_approval(consultation_with_urgency):
     cid = consultation_with_urgency
-    from app.main import app
-
     # No lifespan: the endpoints under test don't need the ML models.
-    client = TestClient(app)
+    client = _doctor_client()
 
     state = client.get(f"/api/consultations/{cid}").json()
     assert state["urgent_actions"][0]["action"] == "Perform bedside ECG"

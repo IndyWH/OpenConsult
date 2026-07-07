@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consultation AI — Consultations</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 780px; margin: 0 auto; padding: 1.5rem; }
+  h1 { font-size: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: .75rem; text-transform: uppercase;
+       letter-spacing: .05em; opacity: .6; padding: .4rem .5rem; }
+  td { padding: .5rem; border-top: 1px solid #8883; }
+  .badge { border-radius: 5px; padding: .1rem .5rem; font-size: .78rem; font-weight: 600; }
+  .badge.processing { background: #ed6c0233; color: #ed6c02; }
+  .badge.awaiting_review { background: #0288d133; color: #0288d1; }
+  .badge.approved { background: #1a7f3733; color: #1a7f37; }
+  .badge.failed, .badge.live { background: #d32f2f33; color: #d32f2f; }
+  a.open { color: inherit; }
+  .hint { font-size: .8rem; opacity: .55; }
+</style>
+</head>
+<body>
+<h1>Consultations</h1>
+<p class="hint" id="hint">Worklist and archive. Approved consultations are read-only.</p>
+<table>
+  <thead><tr><th>#</th><th>Patient</th><th>Doctor</th><th>Started</th><th>Status</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script src="/static/nav.js"></script>
+<script>
+document.addEventListener('me-ready', async (e) => {
+  const me = e.detail;
+  const clinical = me.role === 'doctor' || me.role === 'admin';
+  if (!clinical) document.getElementById('hint').textContent =
+    'Status overview. Transcripts and notes are restricted to clinical roles.';
+  const rows = await (await fetch('/api/consultations')).json();
+  const tbody = document.getElementById('rows');
+  for (const c of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${c.id}</td><td>${c.patient_name}</td><td>${c.doctor_name}</td>` +
+      `<td>${c.started_at}</td>` +
+      `<td><span class="badge ${c.status}">${c.status.replace('_',' ')}</span></td>` +
+      `<td>${clinical ? `<a class="open" href="/review/${c.id}">open →</a>` : ''}</td>`;
+    tbody.appendChild(tr);
+  }
+  if (!rows.length) tbody.innerHTML = '<tr><td colspan="6" class="hint">No consultations yet.</td></tr>';
+});
+</script>
+</body>
+</html>

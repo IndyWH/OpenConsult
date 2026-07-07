@@ -38,7 +38,7 @@ uv run uvicorn app.main:app --port 8000  # the app
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done** | 9/9 eval; fidelity spot-check logged; corpus is UK/CDC/WHO starter content. |
 | 5 — Sinhala | **Not started** | Entry point defined below. |
-| 6 — Users/roles/front desk | **Not started** | UI structure agreed (below). |
+| 6 — Users/roles/front desk | **Core built** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — tested), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. Remaining: Docker Compose packaging, demo script, design pass. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next

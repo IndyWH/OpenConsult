@@ -82,7 +82,7 @@
 </head>
 <body>
 <div class="banner">⚠️ Research/educational prototype — not a medical device. Synthetic consultations only.</div>
-<h1>Live transcription (Phase 1 — English)</h1>
+<h1 id="pageTitle">Live consultation</h1>
 <div class="controls">
   <button id="btn">Start</button>
   <span id="status">idle</span>
@@ -99,7 +99,19 @@
   </div>
 </div>
 
+<script src="/static/nav.js"></script>
 <script>
+const params = new URLSearchParams(location.search);
+const PATIENT = {
+  id: params.get('patient') ? +params.get('patient') : null,
+  queue: params.get('queue') ? +params.get('queue') : null,
+  name: params.get('name'),
+};
+if (PATIENT.name) {
+  document.getElementById('pageTitle').textContent = 'Live consultation — ' + PATIENT.name;
+  document.title = 'Consultation — ' + PATIENT.name;
+}
+
 const btn = document.getElementById('btn');
 const statusEl = document.getElementById('status');
 const transcriptEl = document.getElementById('transcript');
@@ -267,6 +279,9 @@ async function start() {
   await new Promise((resolve, reject) => {
     ws.onopen = resolve; ws.onclose = reject;
   });
+  if (PATIENT.id) {
+    ws.send(JSON.stringify({patient_id: PATIENT.id, queue_entry_id: PATIENT.queue}));
+  }
 
   audioCtx = new AudioContext();
   await audioCtx.audioWorklet.addModule('/static/recorder-worklet.js');

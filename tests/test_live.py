@@ -5,11 +5,13 @@ checks that the words come back. Loads the Whisper model, so this is the
 slow part of the suite (a few seconds on GPU).
 """
 
+import secrets
 import wave
 from pathlib import Path
 
 from fastapi.testclient import TestClient
 
+from app import auth
 from app.main import app
 
 JFK_WAV = Path(__file__).parent / "data" / "jfk.wav"
@@ -23,6 +25,15 @@ def test_websocket_streaming_transcription():
 
     finals: list[str] = []
     with TestClient(app) as client:  # `with` runs lifespan → loads the model
+        # The WebSocket requires a clinical-role session (Phase 6 RBAC).
+        auth.ensure_schema()
+        response = client.post(
+            "/api/register",
+            json={"username": f"doc_{secrets.token_hex(4)}",
+                  "password": "test-password-123",
+                  "display_name": "Doc", "role": "doctor"},
+        )
+        assert response.status_code == 200
         with client.websocket_connect("/ws/transcribe") as ws:
             for i in range(0, len(pcm), CHUNK_BYTES):
                 ws.send_bytes(pcm[i : i + CHUNK_BYTES])
