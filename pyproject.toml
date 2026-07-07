@@ -9,6 +9,10 @@ dependencies = [
     "uvicorn[standard]>=0.34",
     "psycopg[binary]>=3.2",
     "python-dotenv>=1.0",
+    "faster-whisper>=1.2.1",
+    "numpy>=2.5.1",
+    "nvidia-cublas-cu12>=12.9.2.10",
+    "nvidia-cudnn-cu12>=9.24.0.43",
 ]
 
 [tool.pytest.ini_options]

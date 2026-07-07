@@ -54,6 +54,13 @@ uv run uvicorn app.main:app --reload
 Then open http://127.0.0.1:8000 — you should see a hello-world JSON response.
 Interactive API docs live at http://127.0.0.1:8000/docs.
 
+**Live transcription (Phase 1):** open http://127.0.0.1:8000/live, click
+Start, allow microphone access, and speak. Confirmed text appears with
+timestamps; the grey italic line is the model's provisional guess. Runs
+`distil-large-v3` on the GPU (override with `WHISPER_MODEL`, e.g.
+`WHISPER_MODEL=small.en` for CPU-only machines). The first run downloads
+the model (~1.5 GB).
+
 Run the tests with:
 
 ```bash

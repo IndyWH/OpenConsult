@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consultation AI — Live Transcription</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    max-width: 780px; margin: 0 auto; padding: 1.5rem;
+  }
+  .banner {
+    background: #fff3cd; color: #664d03; border: 1px solid #ffe69c;
+    border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; margin-bottom: 1rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    .banner { background: #3a3000; color: #ffe69c; border-color: #665c00; }
+  }
+  h1 { font-size: 1.3rem; margin: 0 0 1rem; }
+  .controls { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
+  button {
+    font-size: 1rem; padding: .55rem 1.4rem; border-radius: 8px;
+    border: 1px solid #888; cursor: pointer; background: #1a7f37; color: white;
+  }
+  button.stop { background: #b02a37; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #status { font-size: .9rem; opacity: .8; }
+  #status::before {
+    content: "●"; margin-right: .35rem; color: #999;
+  }
+  #status.recording::before { color: #d32f2f; animation: blink 1.2s infinite; }
+  @keyframes blink { 50% { opacity: .3; } }
+  #transcript {
+    border: 1px solid #8884; border-radius: 8px; padding: 1rem;
+    min-height: 14rem; line-height: 1.7; font-size: 1.05rem;
+  }
+  #transcript p { margin: 0 0 .4rem; }
+  .ts { opacity: .45; font-size: .8rem; font-variant-numeric: tabular-nums; margin-right: .5rem; }
+  #partial { opacity: .55; font-style: italic; }
+</style>
+</head>
+<body>
+<div class="banner">⚠️ Research/educational prototype — not a medical device. Synthetic consultations only.</div>
+<h1>Live transcription (Phase 1 — English)</h1>
+<div class="controls">
+  <button id="btn">Start</button>
+  <span id="status">idle</span>
+</div>
+<div id="transcript"><span id="partial"></span></div>
+
+<script>
+const btn = document.getElementById('btn');
+const statusEl = document.getElementById('status');
+const transcriptEl = document.getElementById('transcript');
+const partialEl = document.getElementById('partial');
+
+const TARGET_RATE = 16000;
+const CHUNK_SAMPLES = 4000;           // send ~0.25 s of audio per frame
+
+let ws = null, audioCtx = null, stream = null, workletNode = null;
+let sendQueue = new Float32Array(0);
+let recording = false;
+
+function setStatus(text, isRecording) {
+  statusEl.textContent = text;
+  statusEl.classList.toggle('recording', !!isRecording);
+}
+
+// Linear-interpolation resampler: browser rate (often 48 kHz) → 16 kHz.
+function resample(input, fromRate) {
+  if (fromRate === TARGET_RATE) return input;
+  const ratio = fromRate / TARGET_RATE;
+  const outLength = Math.floor(input.length / ratio);
+  const out = new Float32Array(outLength);
+  for (let i = 0; i < outLength; i++) {
+    const pos = i * ratio;
+    const i0 = Math.floor(pos), i1 = Math.min(i0 + 1, input.length - 1);
+    out[i] = input[i0] + (input[i1] - input[i0]) * (pos - i0);
+  }
+  return out;
+}
+
+function floatToInt16(float32) {
+  const out = new Int16Array(float32.length);
+  for (let i = 0; i < float32.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32[i]));
+    out[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+  }
+  return out;
+}
+
+function enqueue(samples) {
+  const merged = new Float32Array(sendQueue.length + samples.length);
+  merged.set(sendQueue); merged.set(samples, sendQueue.length);
+  sendQueue = merged;
+  while (sendQueue.length >= CHUNK_SAMPLES) {
+    const chunk = sendQueue.slice(0, CHUNK_SAMPLES);
+    sendQueue = sendQueue.slice(CHUNK_SAMPLES);
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(floatToInt16(chunk).buffer);
+    }
+  }
+}
+
+function formatTime(s) {
+  const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+  return `${m}:${String(sec).padStart(2, '0')}`;
+}
+
+function addFinal(msg) {
+  const p = document.createElement('p');
+  const ts = document.createElement('span');
+  ts.className = 'ts';
+  ts.textContent = formatTime(msg.start);
+  p.appendChild(ts);
+  p.appendChild(document.createTextNode(msg.text));
+  transcriptEl.insertBefore(p, partialEl);
+}
+
+async function start() {
+  btn.disabled = true;
+  setStatus('requesting microphone…');
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
+    });
+  } catch (err) {
+    setStatus('microphone access denied: ' + err.message);
+    btn.disabled = false;
+    return;
+  }
+
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  ws = new WebSocket(`${proto}://${location.host}/ws/transcribe`);
+  ws.binaryType = 'arraybuffer';
+
+  ws.onmessage = (event) => {
+    const msg = JSON.parse(event.data);
+    if (msg.type === 'final') { addFinal(msg); partialEl.textContent = ''; }
+    else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
+    else if (msg.type === 'done') { setStatus('stopped'); ws.close(); ws = null; }
+  };
+  ws.onerror = () => setStatus('connection error');
+
+  await new Promise((resolve, reject) => {
+    ws.onopen = resolve; ws.onclose = reject;
+  });
+
+  audioCtx = new AudioContext();
+  await audioCtx.audioWorklet.addModule('/static/recorder-worklet.js');
+  const source = audioCtx.createMediaStreamSource(stream);
+  workletNode = new AudioWorkletNode(audioCtx, 'pcm-forwarder');
+  workletNode.port.onmessage = (e) => enqueue(resample(e.data, audioCtx.sampleRate));
+  source.connect(workletNode);
+
+  recording = true;
+  btn.textContent = 'Stop';
+  btn.classList.add('stop');
+  btn.disabled = false;
+  setStatus('listening — speak normally', true);
+}
+
+async function stop() {
+  recording = false;
+  btn.disabled = true;
+  setStatus('finishing…');
+  if (workletNode) { workletNode.disconnect(); workletNode = null; }
+  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
+  if (audioCtx) { await audioCtx.close(); audioCtx = null; }
+  if (ws && ws.readyState === WebSocket.OPEN) ws.send('stop'); // server replies "done"
+  btn.textContent = 'Start';
+  btn.classList.remove('stop');
+  btn.disabled = false;
+}
+
+btn.addEventListener('click', () => (recording ? stop() : start()));
+</script>
+</body>
+</html>
