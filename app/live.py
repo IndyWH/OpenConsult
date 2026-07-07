@@ -66,6 +66,11 @@ class LiveSession:
     def _buffer_seconds(self) -> float:
         return len(self._buffer) / SAMPLE_RATE
 
+    @property
+    def audio_seconds(self) -> float:
+        """Total audio received so far — the session clock."""
+        return self._committed_offset_s + self._buffer_seconds
+
     def _absolute(self, seg: Segment) -> Segment:
         """Rebase a buffer-relative segment onto the session clock."""
         return Segment(

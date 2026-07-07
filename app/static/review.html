@@ -52,6 +52,19 @@
   .turn.cited-highlight { background: #ed6c0233; }
   .turn .ttext[contenteditable="true"]:focus { background: #8882; outline: none; }
   .hint { font-size: .75rem; opacity: .55; margin: .4rem 0 .8rem; }
+  #urgentBanner {
+    border: 2px solid #d32f2f; background: #d32f2f14; border-radius: 8px;
+    padding: .75rem 1rem; margin-bottom: 1rem;
+  }
+  #urgentBanner h2 { color: #d32f2f; font-size: .85rem; text-transform: uppercase;
+                     letter-spacing: .05em; margin: 0 0 .4rem; }
+  #urgentBanner li { font-weight: 600; margin-bottom: .3rem; }
+  #urgentBanner .why { font-weight: 400; display: block; opacity: .75; font-size: .85rem; }
+  #urgentBanner .fired { font-weight: 400; opacity: .6; font-size: .8rem;
+                         font-variant-numeric: tabular-nums; }
+  #urgentBanner .caveat { font-size: .82rem; opacity: .8; margin: .5rem 0; }
+  #urgentBanner button { background: #d32f2f; border-color: #d32f2f; color: white; }
+  #urgentBanner .acked { font-size: .82rem; color: #1a7f37; font-weight: 600; }
   #processing { text-align: center; padding: 3rem 1rem; opacity: .7; }
   .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; margin-right: .5rem;
              border: 3px solid #8885; border-top-color: #1a7f37; border-radius: 50%;
@@ -69,6 +82,8 @@ output is a draft requiring doctor review and sign-off.</div>
 identifying speakers, drafting the note… this takes a minute or two.</div>
 
 <div class="columns" id="content" style="display:none">
+  <div>
+  <div id="urgentBanner" style="display:none"></div>
   <div class="pane">
     <h2>Draft note — review and edit</h2>
     <p class="hint">Text is editable in place. <span class="flagmark">⚠</span> marks a
@@ -81,6 +96,7 @@ identifying speakers, drafting the note… this takes a minute or two.</div>
       <button id="regen">Regenerate</button>
       <button id="copy">Copy as plain text</button>
     </div>
+  </div>
   </div>
   <div class="pane">
     <h2>Diarised transcript (audit artifact)</h2>
@@ -208,8 +224,43 @@ async function refresh() {
     return;
   }
   contentEl.style.display = '';
+  renderUrgentBanner();
   renderTranscript();
   renderNote();
+}
+
+function renderUrgentBanner() {
+  const banner = document.getElementById('urgentBanner');
+  const actions = state.urgent_actions || [];
+  const approveBtn = document.getElementById('approve');
+  if (!actions.length) { banner.style.display = 'none'; return; }
+  banner.style.display = '';
+  banner.innerHTML = '';
+  banner.appendChild(el('h2', null, '⚠ Urgent actions unresolved at end of consultation'));
+  const list = el('ul');
+  for (const a of actions) {
+    const li = el('li', null, a.action);
+    if (a.first_fired_s != null) li.appendChild(el('span', 'fired', ` — first flagged at ${fmt(a.first_fired_s)}`));
+    li.appendChild(el('span', 'why', a.reason));
+    list.appendChild(li);
+  }
+  banner.appendChild(list);
+  banner.appendChild(el('p', 'caveat',
+    'The transcript does not show these as done or arranged. AI-flagged during the live consultation — clinical judgement remains yours.'));
+  if (state.urgent_ack_at) {
+    banner.appendChild(el('p', 'acked', `Acknowledged ${state.urgent_ack_at.slice(0,16)}`));
+    approveBtn.disabled = false;
+    approveBtn.title = '';
+  } else {
+    const ack = el('button', null, 'Acknowledge urgent items');
+    ack.addEventListener('click', async () => {
+      await fetch(`/api/consultations/${cid}/acknowledge-urgent`, {method: 'POST'});
+      refresh();
+    });
+    banner.appendChild(ack);
+    approveBtn.disabled = true;
+    approveBtn.title = 'Acknowledge the urgent items before approving';
+  }
 }
 
 document.getElementById('approve').addEventListener('click', async () => {

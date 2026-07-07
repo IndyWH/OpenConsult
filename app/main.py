@@ -97,9 +97,20 @@ class ApproveBody(BaseModel):
 
 
 @app.post("/api/consultations/{cid}/approve")
-async def approve(cid: int, body: ApproveBody) -> dict:
+async def approve(cid: int, body: ApproveBody) -> JSONResponse:
+    consultation = await consultations.get_consultation(cid)
+    if consultation and consultation["urgent_actions"] and not consultation["urgent_ack_at"]:
+        return JSONResponse(
+            status_code=409,
+            content={"error": "Unresolved urgent actions must be acknowledged first."},
+        )
     await consultations.approve_note(cid, body.text)
-    return {"ok": True}
+    return JSONResponse(content={"ok": True})
+
+
+@app.post("/api/consultations/{cid}/acknowledge-urgent")
+async def acknowledge_urgent(cid: int) -> dict:
+    return {"ok": True, "acknowledged_at": await consultations.acknowledge_urgent(cid)}
 
 
 @app.post("/api/consultations/{cid}/regenerate")
@@ -149,6 +160,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     cds_failures = 0
     gl_task: asyncio.Task | None = None
     gl_conditions: tuple = ()  # conditions the current guideline panel is for
+    urgent_first_fired: dict[str, float] = {}  # action text → audio time (s)
 
     async def maybe_run_cds() -> None:
         """Launch/collect the CDS side task without ever blocking transcription."""
@@ -157,6 +169,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             try:
                 assessment = cds_task.result()
                 cds_failures = 0
+                for action in assessment.get("urgent_actions", []):
+                    urgent_first_fired.setdefault(
+                        action["action"], round(session.audio_seconds, 1)
+                    )
                 await websocket.send_json({"type": "cds", "assessment": assessment})
             except Exception as exc:  # noqa: BLE001 - degrade, don't crash the stream
                 cds_failures += 1
@@ -238,6 +254,25 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         wav_path = str(RECORDINGS_DIR / f"consultation_{cid}.wav")
         duration = session.save_recording(wav_path)
         logger.info("Consultation %d: %.1fs of audio saved", cid, duration)
+
+        # Persist urgent actions still unresolved at session end (the CDS
+        # engine clears an action once the transcript shows it arranged, so
+        # anything remaining was never seen to be actioned). Shown as an
+        # acknowledge-gated banner on review — never merged into the note.
+        if assessment and assessment.get("urgent_actions"):
+            unresolved = [
+                {
+                    "action": a["action"],
+                    "reason": a["reason"],
+                    "first_fired_s": urgent_first_fired.get(a["action"]),
+                }
+                for a in assessment["urgent_actions"]
+            ]
+            await consultations.save_urgent_actions(cid, unresolved)
+            logger.info(
+                "Consultation %d: %d unresolved urgent action(s) recorded",
+                cid, len(unresolved),
+            )
         task = asyncio.create_task(finalize_consultation(cid, wav_path))
         websocket.app.state.finalize_tasks.add(task)
         task.add_done_callback(websocket.app.state.finalize_tasks.discard)

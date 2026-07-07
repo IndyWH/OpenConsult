@@ -24,6 +24,8 @@ CREATE TABLE IF NOT EXISTS consultation (
     audio_path text,
     error text
 );
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS urgent_actions jsonb;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS urgent_ack_at timestamptz;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -78,7 +80,8 @@ async def get_consultation(cid: int) -> dict | None:
     async with await _conn() as conn:
         row = await (
             await conn.execute(
-                "SELECT id, started_at, status, audio_path, error"
+                "SELECT id, started_at, status, audio_path, error,"
+                " urgent_actions, urgent_ack_at"
                 " FROM consultation WHERE id = %s", (cid,),
             )
         ).fetchone()
@@ -90,7 +93,37 @@ async def get_consultation(cid: int) -> dict | None:
         "status": row[2],
         "audio_path": row[3],
         "error": row[4],
+        "urgent_actions": row[5] or [],
+        "urgent_ack_at": str(row[6]) if row[6] else None,
     }
+
+
+async def save_urgent_actions(cid: int, actions: list[dict]) -> None:
+    """Persist the live session's final unresolved urgent actions."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET urgent_actions = %s WHERE id = %s",
+            (json.dumps(actions), cid),
+        )
+
+
+async def acknowledge_urgent(cid: int) -> str:
+    """Record the doctor's acknowledgement of the urgency banner."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET urgent_ack_at = now()"
+                " WHERE id = %s AND urgent_ack_at IS NULL"
+                " RETURNING urgent_ack_at", (cid,),
+            )
+        ).fetchone()
+        if row is None:  # already acknowledged: keep the original timestamp
+            row = await (
+                await conn.execute(
+                    "SELECT urgent_ack_at FROM consultation WHERE id = %s", (cid,)
+                )
+            ).fetchone()
+    return str(row[0])
 
 
 async def save_turns(cid: int, turns: list[dict]) -> None:
