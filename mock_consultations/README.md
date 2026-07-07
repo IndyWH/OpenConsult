@@ -15,6 +15,20 @@ Phase 5.
 | 04 | Asthma, poorly controlled, 24 F | Medication step-up logic, device/technique counselling, numeric findings (PEFR, sats) |
 | 05 | Epigastric pain, 35 M | Alarm-symptom screening, lifestyle history (alcohol, NSAIDs), test-and-treat plan |
 
+## Red-flag variants (06–09)
+
+Written for the CDS urgency evaluation (`evals/`): four emergency
+presentations, each with an **expected urgent_actions** marking scheme in its
+header. Scripts 07 and 09 reuse the frames of 05 and 02 so the only material
+difference is the red flags — a controlled comparison.
+
+| # | Case | The alarm must catch |
+|---|------|----------------------|
+| 06 | "Funny turn", 72 M — resolved TIA, probable AF | Emergency hiding behind a minimising patient ("it's probably nothing") |
+| 07 | Script 05's dyspepsia + melaena + dizziness — GI bleed | Red flags appearing inside a familiar routine frame |
+| 08 | Breathless, pleuritic pain, swollen calf, 41 F — PE | A picture assembling across the history piece by piece |
+| 09 | Script 02's child on day 4: drowsy, mottled, anuric — shock | Deterioration of a previously routine presentation |
+
 Each script has an **Expected clinical content** section — the marking scheme.
 When later phases generate a SOAP note, differential, or investigations list
 from the recording, check it against that section.

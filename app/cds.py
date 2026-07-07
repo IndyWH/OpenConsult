@@ -2,16 +2,24 @@
 
 Feeds the growing consultation transcript to a locally served medical LLM
 (MedGemma via Ollama) and maintains a working assessment: differential
-diagnoses, questions still worth asking, and signs to examine for.
+diagnoses, questions still worth asking, signs to examine for, and an
+urgency alarm for time-critical presentations.
 
-Stability design (the Phase 3 experiment, per PROJECT_PLAN.md):
-- The model always receives its own previous assessment and is instructed
-  to REVISE it, not start over.
-- Near-zero temperature; strict JSON schema enforced by Ollama's structured
-  output mode.
-- The prompt tells the model the transcript is rough ASR output, so garbled
-  words (especially drug names) should be interpreted charitably rather
-  than taken literally.
+Architecture: TWO model calls per update, one job each.
+
+1. Assessment call — differentials / questions / signs. Receives its own
+   previous output and revises it under stability rules (don't churn the
+   list; rationales accumulate evidence).
+2. Urgency call — a stateless "safety officer" that sees only the current
+   transcript, fresh every update. Evaluation showed the combined call
+   failed in both directions: the previous assessment anchored the alarm
+   (empty stayed empty), and the alarm competed with the revision task
+   (the model wrote "immediate ECG demanded" while emitting an empty
+   actions array). Isolated, the same model answers correctly.
+
+Code, not the model, does the bookkeeping: the alarm is cleared
+deterministically when the urgency call reports the step already arranged,
+and "arranged" latches for the rest of the session once seen.
 
 Everything is a draft for the doctor. Nothing here is medical advice.
 """
@@ -29,8 +37,16 @@ logger = logging.getLogger(__name__)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 CDS_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M")
 
-# Strict output schema; Ollama constrains generation to match it.
-CDS_SCHEMA = {
+ASR_CAVEAT = """\
+You receive a rough LIVE TRANSCRIPT produced by speech recognition: it has \
+no speaker labels and may garble words, especially medication names — \
+interpret plausible mis-transcriptions charitably (e.g. "nucleoside 80 in \
+the morning" in a diabetes review most likely means gliclazide 80 mg).\
+"""
+
+# ---------------------------------------------------------------- assessment
+
+ASSESSMENT_SCHEMA = {
     "type": "object",
     "properties": {
         # First field on purpose: the model reasons here before committing to
@@ -51,44 +67,17 @@ CDS_SCHEMA = {
         },
         "questions_to_ask": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
         "signs_to_check": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
-        # Forced checkpoint generated immediately before urgent_actions: the
-        # model must answer the urgency question before filling the alarm.
-        "urgency_check": {"type": "string"},
-        "urgent_actions": {
-            "type": "array",
-            "maxItems": 3,
-            "items": {
-                "type": "object",
-                "properties": {
-                    "action": {"type": "string"},
-                    "reason": {"type": "string"},
-                },
-                "required": ["action", "reason"],
-            },
-        },
     },
-    "required": [
-        "reasoning",
-        "differentials",
-        "questions_to_ask",
-        "signs_to_check",
-        "urgency_check",
-        "urgent_actions",
-    ],
+    "required": ["reasoning", "differentials", "questions_to_ask", "signs_to_check"],
 }
 
-SYSTEM_PROMPT = """\
+ASSESSMENT_PROMPT = f"""\
 You are a clinical decision support assistant quietly observing a live GP \
-consultation in Sri Lanka. You receive a rough LIVE TRANSCRIPT produced by \
-speech recognition: it has no speaker labels and may garble words, \
-especially medication names — interpret plausible mis-transcriptions \
-charitably (e.g. "nucleoside 80 in the morning" in a diabetes review most \
-likely means gliclazide 80 mg).
+consultation in Sri Lanka. {ASR_CAVEAT}
 
-Fill the `reasoning` field FIRST, before everything else: think through \
-what is new in the transcript since your previous assessment, what it \
-changes, and explicitly whether any time-critical condition now warrants \
-urgent action. Keep it under 150 words. Then produce the assessment:
+Fill the `reasoning` field FIRST: think through what is new in the \
+transcript since your previous assessment and what it changes. Keep it \
+under 120 words. Then produce the assessment:
 1. differentials — up to 5 diagnoses, MOST LIKELY FIRST, each with a short \
 rationale grounded in what was actually said.
 2. questions_to_ask — up to 4 questions the doctor has NOT yet asked that \
@@ -96,19 +85,6 @@ would best narrow the differential. Remove a question once the transcript \
 shows it was asked or answered.
 3. signs_to_check — up to 4 focused examination findings worth checking. \
 Remove one once the transcript shows it was examined.
-4. urgency_check — answer in one or two sentences, on EVERY update: could \
-any differential on your list, at ANY likelihood, be a condition where \
-delay causes serious harm (possible ACS or new angina, dengue, meningitis, \
-severe asthma, sepsis, GI bleeding)? If yes, what immediate step does it \
-demand, and does the transcript already show that step done or arranged?
-5. urgent_actions — populated directly from your urgency_check: each \
-time-critical step that should happen during or immediately after THIS \
-consultation and is not yet done or arranged — e.g. bedside ECG, same-day \
-specialist referral, hospital admission, emergency treatment. Concretely: \
-new exertional chest pain in an adult with cardiac risk factors warrants \
-an ECG at this visit — keep it here until the transcript shows it done or \
-arranged. Leave EMPTY for routine and chronic-disease presentations; do \
-not pad it.
 
 REVISION RULES — you are REVISING your previous assessment, not writing a \
 new one:
@@ -130,6 +106,85 @@ Your output is a draft aid for a qualified doctor, who makes all decisions. \
 Output JSON only.\
 """
 
+# ------------------------------------------------------------------- urgency
+
+URGENCY_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "reasoning": {"type": "string"},
+        "time_critical_possible": {"type": "boolean"},
+        "already_done_or_arranged": {"type": "boolean"},
+        "urgent_actions": {
+            "type": "array",
+            "maxItems": 3,
+            "items": {
+                "type": "object",
+                "properties": {
+                    "action": {"type": "string"},
+                    "reason": {"type": "string"},
+                },
+                "required": ["action", "reason"],
+            },
+        },
+    },
+    "required": [
+        "reasoning",
+        "time_critical_possible",
+        "already_done_or_arranged",
+        "urgent_actions",
+    ],
+}
+
+URGENCY_PROMPT = f"""\
+You are the urgency safety-check for a live GP consultation in Sri Lanka. \
+You have ONE job: decide whether anything in this consultation is \
+time-critical. {ASR_CAVEAT}
+
+Time-critical means exactly this: if the immediate step does not happen \
+TODAY, there is a real risk of death or major irreversible harm within \
+hours to days. In `reasoning` (under 80 words), answer: could ANY \
+plausible cause of this presentation, even an unconfirmed one, meet that \
+bar? Examples that DO: possible ACS or NEW cardiac-sounding chest pain \
+(new angina needs an ECG at this visit even if currently stable); a \
+resolved episode of focal weakness or slurred speech (TIA until proven \
+otherwise); GI bleeding (melaena counts); pulmonary embolism; sepsis or a \
+shocked/drowsy/mottled child; severe asthma; meningitis; dengue WITH \
+warning signs (severe abdominal pain, persistent vomiting, bleeding, \
+drowsiness, not drinking, no urine, cold peripheries) — suspected dengue \
+in an alert, drinking child is handled with same-day testing and review, \
+which is routine care, not an alarm. Judge on reasonable SUSPICION, not \
+confirmation — this alarm exists to prompt action before the picture is \
+complete.
+
+Examples that do NOT meet the bar, however much they deserve proactive \
+care: chronic complications needing better management (diabetic neuropathy \
+without acute infection or ulcer), suboptimal control of diabetes, \
+hypertension, or asthma, overdue screening, routine specialist referrals; \
+an uncomplicated febrile illness in an alert child without warning signs \
+(drowsiness, shock, bleeding, not drinking, no urine). Medication \
+optimisation and routine referrals are NEVER urgent_actions. Taking the \
+history, examining the patient, and ordering routine same-visit tests are \
+the consultation itself — never urgent_actions. "Could cause harm over \
+months if unmanaged" is false for time_critical_possible; only "could \
+cause serious harm within hours to days" is true.
+
+Then set:
+- time_critical_possible: your conclusion as a boolean.
+- already_done_or_arranged: true if the transcript shows the needed \
+step done, in progress, or COMMITTED TO by the doctor — "let's do that \
+ECG now", "I'm calling the ambulance", "I'm writing the urgent referral", \
+"you're going to hospital today" all count as arranged.
+- urgent_actions: if time_critical_possible is true, the immediate \
+step(s) — bedside ECG, same-day specialist referral, hospital admission, \
+emergency treatment — each with a one-line reason. Fill this whenever \
+time_critical_possible is true, even if already arranged (the caller \
+handles that case). Empty only when nothing is time-critical.
+
+Routine and stable chronic-disease presentations are NOT time-critical: \
+for them return time_critical_possible false and an empty list. \
+Output JSON only.\
+"""
+
 
 class CDSEngine:
     """Stateless client: callers hold the assessment and pass it back in."""
@@ -138,32 +193,72 @@ class CDSEngine:
         self.model = model or CDS_MODEL
         self.base_url = (base_url or OLLAMA_URL).rstrip("/")
 
-    async def update(self, transcript: str, previous: dict | None = None) -> dict:
-        """One CDS pass: transcript so far + previous assessment → new assessment."""
-        if previous:
-            prev_text = (
-                "YOUR PREVIOUS ASSESSMENT (revise this, keeping it stable):\n"
-                + json.dumps(previous, indent=1)
-            )
-        else:
-            prev_text = "This is your FIRST assessment of this consultation."
-
-        user_message = f"{prev_text}\n\nLIVE TRANSCRIPT SO FAR:\n{transcript}"
-
+    async def _chat(self, system: str, user: str, schema: dict) -> dict:
         async with httpx.AsyncClient(timeout=180.0) as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
                     "model": self.model,
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
-                        {"role": "user", "content": user_message},
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
                     ],
-                    "format": CDS_SCHEMA,
+                    "format": schema,
                     "stream": False,
                     "keep_alive": "30m",  # avoid a 30 s reload stall mid-consultation
-                    "options": {"temperature": 0.1, "num_ctx": 8192},
+                    "options": {
+                        # Greedy + fixed seed: an alarm must not be a coin flip,
+                        # and evaluations must be reproducible.
+                        "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
+                        "seed": int(os.getenv("CDS_SEED", "42")),
+                        "num_ctx": 8192,
+                    },
                 },
             )
             response.raise_for_status()
         return json.loads(response.json()["message"]["content"])
+
+    async def update(self, transcript: str, previous: dict | None = None) -> dict:
+        """One CDS pass: transcript so far + previous assessment → new assessment.
+
+        Returns the assessment fields plus `urgency_check` (the safety
+        officer's booleans and reasoning) and `urgent_actions` (already
+        bookkept: empty when nothing is due or everything is arranged).
+        """
+        if previous:
+            stable_fields = {
+                k: previous[k]
+                for k in ("differentials", "questions_to_ask", "signs_to_check")
+                if k in previous
+            }
+            prev_text = (
+                "YOUR PREVIOUS ASSESSMENT (revise this, keeping it stable):\n"
+                + json.dumps(stable_fields, indent=1)
+            )
+        else:
+            prev_text = "This is your FIRST assessment of this consultation."
+
+        transcript_text = f"LIVE TRANSCRIPT SO FAR:\n{transcript}"
+
+        assessment = await self._chat(
+            ASSESSMENT_PROMPT, f"{prev_text}\n\n{transcript_text}", ASSESSMENT_SCHEMA
+        )
+        urgency = await self._chat(URGENCY_PROMPT, transcript_text, URGENCY_SCHEMA)
+
+        # Deterministic bookkeeping. "Arranged" latches for the session: once
+        # the doctor has committed to the urgent step, the alarm stays
+        # cleared (the model can flap this boolean on later passes).
+        arranged = urgency["already_done_or_arranged"] or bool(
+            previous and previous.get("urgency_check", {}).get("already_done_or_arranged")
+        )
+        assessment["urgency_check"] = {
+            "time_critical_possible": urgency["time_critical_possible"],
+            "already_done_or_arranged": arranged,
+            "reason": urgency["reasoning"],
+        }
+        assessment["urgent_actions"] = (
+            urgency["urgent_actions"]
+            if urgency["time_critical_possible"] and not arranged
+            else []
+        )
+        return assessment

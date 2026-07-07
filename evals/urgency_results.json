@@ -1,0 +1,1364 @@
+[
+ {
+  "script": "01_chest_pain_en.md",
+  "expected_fire": true,
+  "total_turns": 40,
+  "n_updates": 10,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Bedside ECG"
+  ],
+  "cleared_at_end": true,
+  "stability": "9/9",
+  "leading_dx_final": "Angina pectoris (stable/unstable)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 14.8,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute coronary syndrome or other urgent cardiac pathology."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 15.9,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "Rule out acute coronary syndrome (ACS) in patient with new onset exertional chest pain."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 15.3,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "Rule out acute coronary syndrome in patient with new onset exertional chest pain."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 19.6,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute cardiac ischemia."
+     },
+     {
+      "action": "Consider urgent hospital admission/referral",
+      "reason": "For further investigation (e.g., troponins, stress test) and management of suspected angina."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 17.3,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute ischemic changes."
+     },
+     {
+      "action": "Consider immediate hospital admission/transfer",
+      "reason": "For further cardiac workup and management of potential ACS."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 16.5,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To evaluate for acute coronary syndrome or ischemic changes."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 17.6,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute ischemic changes or baseline abnormalities in new cardiac-sounding chest pain."
+     },
+     {
+      "action": "Consider same-day specialist referral/hospital admission",
+      "reason": "For further investigation (e.g., troponins, stress test) of new onset angina."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 20.1,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for signs of acute coronary syndrome or ischemia."
+     },
+     {
+      "action": "Same-day specialist referral (Cardiology)",
+      "reason": "For further investigation and management of suspected angina/ACS."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 19.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   },
+   {
+    "end_turn": 40,
+    "seconds": 18.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Angina pectoris (stable/unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "02_febrile_child_en.md",
+  "expected_fire": false,
+  "total_turns": 33,
+  "n_updates": 9,
+  "fired": true,
+  "first_fire_turn": 8,
+  "first_fire_actions": [
+   "Same-day Dengue NS1 antigen test and Full Blood Count",
+   "Arrange same-day review of results/patient"
+  ],
+  "cleared_at_end": true,
+  "stability": "7/8",
+  "leading_dx_final": "Dengue Fever",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 12.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Viral upper respiratory tract infection (URTI)",
+     "Influenza",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 17.8,
+    "urgent_actions": [
+     {
+      "action": "Same-day Dengue NS1 antigen test and Full Blood Count",
+      "reason": "To confirm or exclude dengue fever urgently due to warning signs (headache, vomiting)."
+     },
+     {
+      "action": "Arrange same-day review of results/patient",
+      "reason": "To monitor for progression to severe dengue."
+     }
+    ],
+    "differentials": [
+     "Viral upper respiratory tract infection (URTI)",
+     "Influenza",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 15.8,
+    "urgent_actions": [
+     {
+      "action": "Immediate blood tests for Dengue NS1 antigen and CBC",
+      "reason": "To confirm or exclude dengue fever urgently."
+     },
+     {
+      "action": "Close monitoring of vital signs and fluid status",
+      "reason": "Early detection of warning signs for severe dengue."
+     }
+    ],
+    "differentials": [
+     "Viral upper respiratory tract infection (URTI)",
+     "Influenza",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 18.8,
+    "urgent_actions": [
+     {
+      "action": "Same-day dengue NS1 antigen test and FBC",
+      "reason": "To confirm or exclude dengue fever promptly."
+     },
+     {
+      "action": "Arrange same-day review of results/patient",
+      "reason": "To monitor for warning signs and manage potential deterioration."
+     }
+    ],
+    "differentials": [
+     "Viral upper respiratory tract infection (URTI)",
+     "Influenza",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 19.6,
+    "urgent_actions": [
+     {
+      "action": "Immediate blood tests for dengue NS1 antigen and CBC",
+      "reason": "To confirm or exclude dengue fever urgently."
+     },
+     {
+      "action": "Advise mother on warning signs of severe dengue",
+      "reason": "To enable prompt return if condition deteriorates."
+     },
+     {
+      "action": "Arrange close follow-up (same day or next morning)",
+      "reason": "To monitor for dehydration and progression to severe disease."
+     }
+    ],
+    "differentials": [
+     "Dengue Fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 18.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue Fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 20.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue Fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 19.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue Fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ]
+   },
+   {
+    "end_turn": 33,
+    "seconds": 21.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue Fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Bacterial pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "03_diabetes_review_en.md",
+  "expected_fire": false,
+  "total_turns": 37,
+  "n_updates": 10,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "9/9",
+  "leading_dx_final": "Diabetic Peripheral Neuropathy",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 14.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 15.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 15.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 16.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 16.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 18.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 23.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 20.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   },
+   {
+    "end_turn": 37,
+    "seconds": 19.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus (Hyperglycemia)",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "04_asthma_en.md",
+  "expected_fire": false,
+  "total_turns": 30,
+  "n_updates": 8,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "7/7",
+  "leading_dx_final": "Asthma Exacerbation",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 16.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 15.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 18.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 17.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 16.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   },
+   {
+    "end_turn": 30,
+    "seconds": 17.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "Acute Bronchitis",
+     "COPD Exacerbation",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "05_epigastric_pain_en.md",
+  "expected_fire": false,
+  "total_turns": 42,
+  "n_updates": 11,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "10/10",
+  "leading_dx_final": "Peptic Ulcer Disease",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 11.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 13.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 13.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 15.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 17.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 17.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 18.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 18.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 18.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 40,
+    "seconds": 19.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   },
+   {
+    "end_turn": 42,
+    "seconds": 21.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Functional Dyspepsia",
+     "Pancreatitis"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "06_tia_funny_turn_en.md",
+  "expected_fire": true,
+  "total_turns": 39,
+  "n_updates": 10,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Hospital admission"
+  ],
+  "cleared_at_end": true,
+  "stability": "9/9",
+  "leading_dx_final": "Transient Ischemic Attack (TIA)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.1,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected TIA requires urgent investigation and management to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.9,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation and management to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 16.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation and management to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 15.4,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to assess stroke risk and prevent future events."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 15.4,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to rule out stroke and initiate secondary prevention."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 16.9,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected TIA requires urgent investigation and management to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 16.6,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 18.5,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Urgent investigation for TIA/stroke and initiation of secondary prevention."
+     },
+     {
+      "action": "Immediate neurological assessment",
+      "reason": "To confirm diagnosis and rule out ongoing stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 19.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   },
+   {
+    "end_turn": 39,
+    "seconds": 18.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "07_gi_bleed_en.md",
+  "expected_fire": true,
+  "total_turns": 31,
+  "n_updates": 8,
+  "fired": true,
+  "first_fire_turn": 8,
+  "first_fire_actions": [
+   "Hospital admission"
+  ],
+  "cleared_at_end": true,
+  "stability": "6/7",
+  "leading_dx_final": "Duodenal Ulcer",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia",
+     "Gastric Cancer"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 15.2,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected upper GI bleed (melaena) requires urgent assessment and management."
+     }
+    ],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia",
+     "Gastric Cancer"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 15.3,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected upper GI bleed with signs of potential haemodynamic instability (postural dizziness, weakness)."
+     }
+    ],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia",
+     "Gastric Cancer"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.7,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected upper GI bleeding with signs of haemodynamic compromise (orthostatic symptoms, weakness)."
+     },
+     {
+      "action": "Immediate blood tests (FBC, U&Es, coagulation)",
+      "reason": "Assess severity of anaemia and guide resuscitation."
+     }
+    ],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia",
+     "Gastric Cancer"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 16.9,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected significant upper GI bleed requires urgent assessment and management."
+     },
+     {
+      "action": "Immediate blood tests (FBC, U&Es, coagulation)",
+      "reason": "To assess severity of bleeding and guide resuscitation."
+     }
+    ],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastric Cancer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.2,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected significant upper GI bleed with signs of hemodynamic compromise."
+     }
+    ],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastric Cancer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 19.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastric Cancer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia"
+    ]
+   },
+   {
+    "end_turn": 31,
+    "seconds": 19.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Duodenal Ulcer",
+     "Gastric Cancer",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Non-ulcer Dyspepsia"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "08_pulmonary_embolism_en.md",
+  "expected_fire": true,
+  "total_turns": 32,
+  "n_updates": 8,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Bedside ECG",
+   "Pulse oximetry and consider arterial blood gas",
+   "Chest X-ray"
+  ],
+  "cleared_at_end": true,
+  "stability": "6/7",
+  "leading_dx_final": "Pulmonary Embolism",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.2,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "Rule out acute cardiac event."
+     },
+     {
+      "action": "Pulse oximetry and consider arterial blood gas",
+      "reason": "Assess oxygenation status urgently."
+     },
+     {
+      "action": "Chest X-ray",
+      "reason": "Evaluate for pulmonary embolism, heart failure, pneumonia."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Acute Asthma Exacerbation",
+     "Pneumothorax",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation and potential treatment."
+     },
+     {
+      "action": "Consider bedside ECG",
+      "reason": "To look for signs of right heart strain suggestive of PE, although not definitive."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 14.2,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation and management."
+     },
+     {
+      "action": "Consider bedside ECG",
+      "reason": "To look for signs of right heart strain suggestive of PE, although not definitive."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 15.9,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation (e.g., CTPA) and management."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 20.2,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected pulmonary embolism requires immediate investigation and management."
+     },
+     {
+      "action": "Immediate ECG",
+      "reason": "To assess for right heart strain associated with PE."
+     },
+     {
+      "action": "Arrange urgent D-dimer and CTPA",
+      "reason": "Diagnostic tests to confirm or exclude PE."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 20.1,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation and management."
+     },
+     {
+      "action": "Immediate anticoagulation",
+      "reason": "Treatment for suspected PE should be initiated promptly pending confirmation."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 19.9,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected pulmonary embolism requires immediate investigation and treatment."
+     },
+     {
+      "action": "Arrange urgent CTPA",
+      "reason": "To confirm diagnosis of pulmonary embolism."
+     },
+     {
+      "action": "Initiate anticoagulation",
+      "reason": "To prevent further clot formation/embolization while awaiting confirmation."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 18.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Acute Heart Failure Exacerbation",
+     "Pneumonia"
+    ]
+   }
+  ]
+ },
+ {
+  "script": "09_septic_child_en.md",
+  "expected_fire": true,
+  "total_turns": 27,
+  "n_updates": 7,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Hospital admission"
+  ],
+  "cleared_at_end": true,
+  "stability": "4/6",
+  "leading_dx_final": "Sepsis / Septic Shock",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 12.4,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected meningitis/encephalitis requires urgent investigation and treatment."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Sepsis",
+     "Severe Malaria",
+     "Febrile Seizure (complex)"
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 15.9,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected severe dengue or other serious infection with warning signs (lethargy, confusion, dehydration, oliguria)."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Sepsis",
+     "Severe Malaria",
+     "Febrile Seizure (complex)"
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 20.1,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected severe dengue with warning signs requires urgent fluid resuscitation and monitoring for shock."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Sepsis",
+     "Severe Malaria",
+     "Febrile Seizure (complex)"
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.6,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected severe dengue with warning signs (lethargy, vomiting, oliguria, cold extremities) requires urgent fluid resuscitation and monitoring."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Sepsis",
+     "Severe Malaria",
+     "Febrile Seizure (complex)"
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 19.3,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Signs of shock (drowsiness, cold extremities, weak fast pulse, delayed capillary refill, oliguria) require urgent resuscitation and monitoring."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Sepsis / Septic Shock",
+     "Severe Dengue",
+     "Febrile Seizure (complex)"
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 21.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Sepsis / Septic Shock",
+     "Severe Dengue",
+     "Febrile Seizure (complex)"
+    ]
+   },
+   {
+    "end_turn": 27,
+    "seconds": 22.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Sepsis / Septic Shock",
+     "Severe Dengue",
+     "Meningitis",
+     "Encephalitis",
+     "Febrile Seizure (complex)"
+    ]
+   }
+  ]
+ }
+]

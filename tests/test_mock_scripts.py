@@ -7,7 +7,7 @@ SCRIPTS_DIR = Path(__file__).parent.parent / "mock_consultations"
 
 def test_all_scripts_parse_into_dialogue():
     scripts = sorted(SCRIPTS_DIR.glob("0*_en.md"))
-    assert len(scripts) == 5
+    assert len(scripts) == 9  # 5 routine/original + 4 red-flag variants
     for script in scripts:
         turns = parse_script(script)
         assert len(turns) > 20, f"{script.name} parsed suspiciously few turns"
