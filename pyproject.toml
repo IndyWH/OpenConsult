@@ -1,0 +1,21 @@
+[project]
+name = "consultation-ai"
+version = "0.1.0"
+description = "AI-assisted medical consultations in Sinhala and English — research/educational prototype"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.34",
+    "psycopg[binary]>=3.2",
+    "python-dotenv>=1.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.28",
+]

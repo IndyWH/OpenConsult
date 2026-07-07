@@ -32,3 +32,30 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 - A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
 
 See PROJECT_PLAN.md for the full plan.
+
+## Getting started (Phase 0)
+
+Requirements: Linux, [uv](https://docs.astral.sh/uv/) (installs its own Python 3.12), PostgreSQL 18 with pgvector.
+
+```bash
+# 1. Install uv (one-time)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# 2. Install PostgreSQL + pgvector (one-time)
+sudo apt update && sudo apt install -y postgresql postgresql-18-pgvector
+
+# 3. Install project dependencies
+uv sync
+
+# 4. Run the app
+uv run uvicorn app.main:app --reload
+```
+
+Then open http://127.0.0.1:8000 — you should see a hello-world JSON response.
+Interactive API docs live at http://127.0.0.1:8000/docs.
+
+Run the tests with:
+
+```bash
+uv run pytest
+```

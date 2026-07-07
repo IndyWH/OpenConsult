@@ -1,0 +1,20 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+
+# Environment / secrets — never commit these
+.env
+
+# Test artifacts
+.pytest_cache/
+
+# Editors
+.vscode/
+.idea/
+
+# Audio recordings and model files are large — decide per-file what to track
+*.wav
+*.mp3
+models/
