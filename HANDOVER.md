@@ -194,11 +194,20 @@ must not open transcripts or notes.
    (over-flagged without the transcript: 15 false positives; missed both
    known-real errors with it) — see the note-quality eval. Consider a
    different model as assistant, never the authoring model.
-3. **Specimens for that audit** (both in deterministic script-03 note):
-   invented "atorvastatin **1mg**" dose (transcript says "one at night");
-   inverted monofilament finding ("toes and ankle" vs toes-only). Plus
-   the RAG aspirin-qualifier paraphrase ("unless contraindicated" vs
-   CG95's "unless clear evidence of allergy").
+3. **Specimens for that audit**: invented "atorvastatin **1mg**" dose
+   (transcript says "one at night") and inverted monofilament finding
+   ("toes and ankle" vs toes-only) — both in the deterministic script-03
+   note; a "**wheelbarrow**" noun substitution where the transcript said
+   *three-wheeler* (2026-07-07 live loop test — caught by clicking the
+   claim's citation chip during review, which is exactly the verification
+   loop working); plus the RAG aspirin-qualifier paraphrase ("unless
+   contraindicated" vs CG95's "unless clear evidence of allergy").
+4. **Two-hats loop-test notes** (2026-07-07, project owner playing both
+   roles in one voice, consultation deliberately interrupted): diarisation
+   held up despite a single speaker — one boundary merge only; and the
+   note generator left Assessment and Plan **empty rather than
+   fabricating** when the consultation never reached them. Both behaviours
+   worth preserving; re-check them during real-audio validation.
 
 ## Phase 5 — entry point
 
