@@ -38,7 +38,7 @@ uv run uvicorn app.main:app --port 8000  # the app
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done** | 9/9 eval; fidelity spot-check logged; corpus is UK/CDC/WHO starter content. |
 | 5 — Sinhala | **Not started** | Entry point defined below. |
-| 6 — Users/roles/front desk | **Core built** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — tested), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. Remaining: Docker Compose packaging, demo script, design pass. |
+| 6 — Users/roles/front desk | **Core built, manual verification pending** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Pending (project owner, in-browser):** the two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (expect 403), doctor attempting queue add/reorder (expect 403), and edit attempts on an approved consultation (expect 409 / read-only UI). Remaining build work: Docker Compose packaging, demo script, design pass. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -232,10 +232,11 @@ the `FinalTranscript` model in the plan already anticipates si/en pairs.
   to the note-quality eval.
 - **Phase 5:** as above; start by listing candidate HF Sinhala Whisper
   fine-tunes and building the WER harness.
-- **Phase 6:** auth + roles, queue model (`QueueEntry` in plan §5), the
-  three tabs, audit log (`AuditEvent` — the CDS `reasoning`/urgency and
-  `urgent_ack_at` fields are already designed to feed it), Docker Compose
-  packaging, demo script.
+- **Phase 6:** core is built (auth + roles, queue, three tabs, RBAC,
+  audit log — see status table). Next: the project owner's in-browser
+  click-through and adversarial checks listed in the status table; then
+  Docker Compose packaging, the two-role demo script, and the design
+  pass.
 - **Whole-project:** the end-of-project review docket above.
 
 ## Session/environment facts
