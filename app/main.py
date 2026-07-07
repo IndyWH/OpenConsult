@@ -17,8 +17,14 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.cds import CDSEngine
 from app.live import PROCESS_INTERVAL_S, LiveSession
 from app.transcription import LiveTranscriber
+
+# Run a CDS pass once this much new confirmed text has accumulated.
+CDS_MIN_NEW_CHARS = 150
+# Stop trying after this many consecutive failures (e.g. Ollama not running).
+CDS_MAX_FAILURES = 2
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -33,6 +39,7 @@ async def lifespan(app: FastAPI):
     # Load the Whisper model once, before serving traffic (takes a second or
     # two from the local cache; the first ever run downloads the model).
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
+    app.state.cds_engine = CDSEngine()
     yield
 
 app = FastAPI(
@@ -64,7 +71,41 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     """
     await websocket.accept()
     session = LiveSession(websocket.app.state.transcriber)
+    engine: CDSEngine = websocket.app.state.cds_engine
     logger.info("Live session started")
+
+    transcript_parts: list[str] = []  # confirmed text, the CDS engine's input
+    assessment: dict | None = None
+    cds_task: asyncio.Task | None = None
+    cds_sent_len = 0
+    cds_failures = 0
+
+    async def maybe_run_cds() -> None:
+        """Launch/collect the CDS side task without ever blocking transcription."""
+        nonlocal cds_task, assessment, cds_sent_len, cds_failures
+        if cds_task is not None and cds_task.done():
+            try:
+                assessment = cds_task.result()
+                cds_failures = 0
+                await websocket.send_json({"type": "cds", "assessment": assessment})
+            except Exception as exc:  # noqa: BLE001 - degrade, don't crash the stream
+                cds_failures += 1
+                logger.warning("CDS pass failed (%d): %s", cds_failures, exc)
+                if cds_failures >= CDS_MAX_FAILURES:
+                    await websocket.send_json(
+                        {"type": "cds_unavailable",
+                         "detail": "CDS engine unreachable; transcription continues."}
+                    )
+            cds_task = None
+        transcript = "\n".join(transcript_parts)
+        if (
+            cds_task is None
+            and cds_failures < CDS_MAX_FAILURES
+            and len(transcript) - cds_sent_len >= CDS_MIN_NEW_CHARS
+        ):
+            cds_sent_len = len(transcript)
+            cds_task = asyncio.create_task(engine.update(transcript, assessment))
+
     try:
         while True:
             try:
@@ -83,10 +124,13 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if session.new_audio_seconds >= PROCESS_INTERVAL_S:
                 committed, partial = await session.process()
                 for seg in committed:
+                    transcript_parts.append(seg.text)
                     await websocket.send_json(
                         {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
                     )
                 await websocket.send_json({"type": "partial", "text": partial})
+
+            await maybe_run_cds()
 
         # Client pressed stop: transcribe the tail end and finish cleanly.
         for seg in await session.flush():
@@ -98,6 +142,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     except WebSocketDisconnect:
         pass
     finally:
+        if cds_task is not None:
+            cds_task.cancel()
         logger.info("Live session ended")
 
 

@@ -9,8 +9,10 @@
   * { box-sizing: border-box; }
   body {
     font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    max-width: 780px; margin: 0 auto; padding: 1.5rem;
+    max-width: 1200px; margin: 0 auto; padding: 1.5rem;
   }
+  .columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; }
+  @media (max-width: 800px) { .columns { grid-template-columns: 1fr; } }
   .banner {
     background: #fff3cd; color: #664d03; border: 1px solid #ffe69c;
     border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; margin-bottom: 1rem;
@@ -39,6 +41,22 @@
   #transcript p { margin: 0 0 .4rem; }
   .ts { opacity: .45; font-size: .8rem; font-variant-numeric: tabular-nums; margin-right: .5rem; }
   #partial { opacity: .55; font-style: italic; }
+  #cds {
+    border: 1px solid #8884; border-radius: 8px; padding: 1rem;
+    font-size: .92rem; line-height: 1.5;
+  }
+  #cds h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em;
+            opacity: .6; margin: 1rem 0 .35rem; }
+  #cds h2:first-child { margin-top: 0; }
+  #cds ul { margin: 0; padding-left: 1.2rem; }
+  #cds li { margin-bottom: .3rem; }
+  .likelihood { font-size: .7rem; font-weight: 600; border-radius: 4px;
+                padding: .05rem .35rem; margin-right: .35rem; vertical-align: middle; }
+  .likelihood.high { background: #d32f2f22; color: #d32f2f; }
+  .likelihood.moderate { background: #ed6c0222; color: #ed6c02; }
+  .likelihood.low { background: #55555522; color: inherit; opacity: .8; }
+  .rationale { display: block; opacity: .6; font-size: .82rem; }
+  #cds .idle { opacity: .5; font-style: italic; }
 </style>
 </head>
 <body>
@@ -48,7 +66,12 @@
   <button id="btn">Start</button>
   <span id="status">idle</span>
 </div>
-<div id="transcript"><span id="partial"></span></div>
+<div class="columns">
+  <div id="transcript"><span id="partial"></span></div>
+  <div id="cds"><p class="idle">Clinical decision support will appear here once the
+  conversation gets going. All suggestions are AI drafts for the doctor —
+  not medical advice.</p></div>
+</div>
 
 <script>
 const btn = document.getElementById('btn');
@@ -104,6 +127,37 @@ function enqueue(samples) {
   }
 }
 
+const cdsEl = document.getElementById('cds');
+
+function el(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text) node.textContent = text;
+  return node;
+}
+
+function renderCDS(a) {
+  cdsEl.innerHTML = '';
+  cdsEl.appendChild(el('h2', null, 'Differential diagnosis'));
+  const dxList = el('ul');
+  for (const d of a.differentials) {
+    const li = el('li');
+    li.appendChild(el('span', 'likelihood ' + d.likelihood, d.likelihood));
+    li.appendChild(document.createTextNode(d.condition));
+    li.appendChild(el('span', 'rationale', d.rationale));
+    dxList.appendChild(li);
+  }
+  cdsEl.appendChild(dxList);
+  cdsEl.appendChild(el('h2', null, 'Questions to ask'));
+  const qList = el('ul');
+  for (const q of a.questions_to_ask) qList.appendChild(el('li', null, q));
+  cdsEl.appendChild(qList);
+  cdsEl.appendChild(el('h2', null, 'Signs to check'));
+  const sList = el('ul');
+  for (const s of a.signs_to_check) sList.appendChild(el('li', null, s));
+  cdsEl.appendChild(sList);
+}
+
 function formatTime(s) {
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${m}:${String(sec).padStart(2, '0')}`;
@@ -140,6 +194,8 @@ async function start() {
     const msg = JSON.parse(event.data);
     if (msg.type === 'final') { addFinal(msg); partialEl.textContent = ''; }
     else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
+    else if (msg.type === 'cds') { renderCDS(msg.assessment); }
+    else if (msg.type === 'cds_unavailable') { cdsEl.innerHTML = ''; cdsEl.appendChild(el('p', 'idle', msg.detail)); }
     else if (msg.type === 'done') { setStatus('stopped'); ws.close(); ws = null; }
   };
   ws.onerror = () => setStatus('connection error');

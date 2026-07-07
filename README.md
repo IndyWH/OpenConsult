@@ -61,6 +61,24 @@ timestamps; the grey italic line is the model's provisional guess. Runs
 `WHISPER_MODEL=small.en` for CPU-only machines). The first run downloads
 the model (~1.5 GB).
 
+**Live clinical decision support (Phase 3):** the live page shows a CDS
+panel — differential diagnoses, questions to ask, signs to check — updated
+as the conversation grows. It needs MedGemma running locally via
+[Ollama](https://ollama.com):
+
+```bash
+ollama serve &
+ollama pull hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M   # ~17 GB, needs ~20 GB GPU
+```
+
+Without Ollama running, transcription still works; the CDS panel reports
+itself unavailable. Replay a mock consultation through the CDS engine
+without speaking:
+
+```bash
+uv run python scripts/simulate_cds.py mock_consultations/01_chest_pain_en.md
+```
+
 Run the tests with:
 
 ```bash
