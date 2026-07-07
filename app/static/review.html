@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consultation AI — Note Review</title>
+<style>
+  :root { color-scheme: light dark; }
+  * { box-sizing: border-box; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 1250px; margin: 0 auto; padding: 1.5rem; }
+  .banner { background: #fff3cd; color: #664d03; border: 1px solid #ffe69c;
+            border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; margin-bottom: 1rem; }
+  @media (prefers-color-scheme: dark) {
+    .banner { background: #3a3000; color: #ffe69c; border-color: #665c00; }
+  }
+  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
+  #status { font-size: .85rem; opacity: .75; margin-bottom: 1rem; }
+  #status .badge { border-radius: 5px; padding: .1rem .5rem; font-weight: 600;
+                   background: #8883; margin-left: .3rem; }
+  #status .badge.approved { background: #1a7f3733; color: #1a7f37; }
+  .columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; }
+  @media (max-width: 900px) { .columns { grid-template-columns: 1fr; } }
+  .pane { border: 1px solid #8884; border-radius: 8px; padding: 1rem; }
+  .pane h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em;
+             opacity: .6; margin: 0 0 .5rem; }
+  h3.soap { font-size: .95rem; margin: 1rem 0 .3rem; }
+  h3.soap:first-of-type { margin-top: 0; }
+  .claim { margin: 0 0 .35rem; line-height: 1.5; }
+  .claim .text { outline: none; padding: .1rem .2rem; border-radius: 4px; }
+  .claim .text:focus { background: #8882; }
+  .claim.flagged .text { border-bottom: 2px dotted #ed6c02; }
+  .flagmark { color: #ed6c02; font-size: .8rem; cursor: help; }
+  .uncited { color: #b02a37; font-size: .75rem; }
+  .chip { font-size: .72rem; background: #8882; border-radius: 4px;
+          padding: .05rem .35rem; margin-left: .25rem; cursor: pointer;
+          font-variant-numeric: tabular-nums; }
+  .chip:hover { background: #1a7f3744; }
+  .controls { margin-top: 1rem; display: flex; gap: .6rem; flex-wrap: wrap; }
+  button { font-size: .92rem; padding: .45rem 1rem; border-radius: 7px;
+           border: 1px solid #888; cursor: pointer; background: transparent; }
+  button.primary { background: #1a7f37; border-color: #1a7f37; color: white; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  #transcript { max-height: 75vh; overflow-y: auto; }
+  .turn { margin: 0 0 .5rem; font-size: .88rem; line-height: 1.45;
+          padding: .3rem .45rem; border-radius: 6px; }
+  .turn .who { font-weight: 700; }
+  .turn .ts { opacity: .45; font-size: .75rem; margin-left: .3rem;
+              font-variant-numeric: tabular-nums; }
+  .turn.doctor { background: #1a7f3711; }
+  .turn.lowconf { border-left: 3px solid #ed6c02; }
+  .turn.cited-highlight { background: #ed6c0233; }
+  .turn .ttext[contenteditable="true"]:focus { background: #8882; outline: none; }
+  .hint { font-size: .75rem; opacity: .55; margin: .4rem 0 .8rem; }
+  #processing { text-align: center; padding: 3rem 1rem; opacity: .7; }
+  .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; margin-right: .5rem;
+             border: 3px solid #8885; border-top-color: #1a7f37; border-radius: 50%;
+             animation: spin 1s linear infinite; vertical-align: -0.3rem; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+<div class="banner">⚠️ Research/educational prototype — not a medical device. All AI
+output is a draft requiring doctor review and sign-off.</div>
+<h1>Consultation note review</h1>
+<div id="status"></div>
+
+<div id="processing"><span class="spinner"></span>Finalising: re-transcribing,
+identifying speakers, drafting the note… this takes a minute or two.</div>
+
+<div class="columns" id="content" style="display:none">
+  <div class="pane">
+    <h2>Draft note — review and edit</h2>
+    <p class="hint">Text is editable in place. <span class="flagmark">⚠</span> marks a
+    number/drug/side that rests on a low-confidence transcript segment — click its
+    [turn] chip to verify against what was heard. The transcript is the audit trail;
+    the note is what you're signing.</p>
+    <div id="note"></div>
+    <div class="controls">
+      <button class="primary" id="approve">Approve</button>
+      <button id="regen">Regenerate</button>
+      <button id="copy">Copy as plain text</button>
+    </div>
+  </div>
+  <div class="pane">
+    <h2>Diarised transcript (audit artifact)</h2>
+    <p class="hint">Double-click a line to correct it, then Regenerate. Orange bar =
+    low ASR confidence.</p>
+    <button id="swap" style="font-size:.8rem; padding:.25rem .6rem">Swap Doctor/Patient</button>
+    <div id="transcript"></div>
+  </div>
+</div>
+
+<script>
+const cid = location.pathname.split('/').pop();
+const statusEl = document.getElementById('status');
+const processingEl = document.getElementById('processing');
+const contentEl = document.getElementById('content');
+const noteEl = document.getElementById('note');
+const transcriptEl = document.getElementById('transcript');
+let state = null;
+
+function el(tag, className, text) {
+  const n = document.createElement(tag);
+  if (className) n.className = className;
+  if (text !== undefined) n.textContent = text;
+  return n;
+}
+
+function fmt(s) { const m = Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
+
+function renderStatus() {
+  statusEl.innerHTML = '';
+  statusEl.append(`Consultation #${state.id} · started ${state.started_at.slice(0,16)} · status`);
+  const badge = el('span', 'badge' + (state.status === 'approved' ? ' approved' : ''), state.status.replace('_',' '));
+  statusEl.appendChild(badge);
+  if (state.note) statusEl.append(` · note v${state.note.version}`);
+}
+
+function renderTranscript() {
+  transcriptEl.innerHTML = '';
+  for (const t of state.turns) {
+    const div = el('div', 'turn ' + (t.role === 'Doctor' ? 'doctor' : '') +
+                          (t.confidence < 0.6 ? ' lowconf' : ''));
+    div.id = 'turn-' + t.idx;
+    const head = el('span', 'who', `[${t.idx}] ${t.role}`);
+    head.appendChild(el('span', 'ts', fmt(t.start)));
+    div.appendChild(head);
+    div.appendChild(document.createTextNode(' '));
+    const body = el('span', 'ttext', t.text);
+    body.addEventListener('dblclick', () => {
+      body.contentEditable = 'true'; body.focus();
+    });
+    body.addEventListener('blur', async () => {
+      if (body.contentEditable !== 'true') return;
+      body.contentEditable = 'false';
+      await fetch(`/api/consultations/${cid}/turns/${t.idx}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({text: body.textContent})
+      });
+    });
+    div.appendChild(body);
+    transcriptEl.appendChild(div);
+  }
+}
+
+function renderNote() {
+  noteEl.innerHTML = '';
+  const sections = [['subjective','S — Subjective'], ['objective','O — Objective'],
+                    ['assessment','A — Assessment'], ['plan','P — Plan']];
+  for (const [key, heading] of sections) {
+    noteEl.appendChild(el('h3', 'soap', heading));
+    for (const claim of state.note.content[key]) {
+      const div = el('div', 'claim' + (claim.flagged ? ' flagged' : ''));
+      div.dataset.section = key;
+      if (claim.flagged) {
+        const mark = el('span', 'flagmark', '⚠ ');
+        mark.title = 'Contains a number/drug/side resting on a low-confidence transcript segment — verify';
+        div.appendChild(mark);
+      }
+      const text = el('span', 'text', claim.text);
+      text.contentEditable = 'true';
+      div.appendChild(text);
+      for (const n of claim.turns) {
+        const chip = el('span', 'chip', `[${n}]`);
+        chip.addEventListener('click', () => {
+          const target = document.getElementById('turn-' + n);
+          if (!target) return;
+          target.scrollIntoView({behavior: 'smooth', block: 'center'});
+          target.classList.add('cited-highlight');
+          setTimeout(() => target.classList.remove('cited-highlight'), 2500);
+        });
+        div.appendChild(chip);
+      }
+      if (claim.uncited) div.appendChild(el('span', 'uncited', ' (uncited — verify manually)'));
+      noteEl.appendChild(div);
+    }
+  }
+}
+
+function currentPlainText() {
+  // Serialise the possibly-edited note: clean line breaks, no markdown.
+  const out = [];
+  const headings = {subjective: 'S:', objective: 'O:', assessment: 'A:', plan: 'P:'};
+  for (const key of ['subjective','objective','assessment','plan']) {
+    out.push(headings[key]);
+    for (const div of noteEl.querySelectorAll(`.claim[data-section="${key}"]`)) {
+      out.push('  ' + div.querySelector('.text').textContent.trim());
+    }
+    out.push('');
+  }
+  return out.join('\n').trim() + '\n';
+}
+
+async function refresh() {
+  const response = await fetch(`/api/consultations/${cid}`);
+  state = await response.json();
+  renderStatus();
+  if (state.status === 'processing' || state.status === 'live') {
+    processingEl.style.display = 'block'; contentEl.style.display = 'none';
+    setTimeout(refresh, 3000);
+    return;
+  }
+  processingEl.style.display = 'none';
+  if (state.status === 'failed') {
+    processingEl.style.display = 'block';
+    processingEl.textContent = 'Finalisation failed: ' + (state.error || 'unknown error');
+    return;
+  }
+  contentEl.style.display = '';
+  renderTranscript();
+  renderNote();
+}
+
+document.getElementById('approve').addEventListener('click', async () => {
+  await fetch(`/api/consultations/${cid}/approve`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({text: currentPlainText()})
+  });
+  refresh();
+});
+
+document.getElementById('regen').addEventListener('click', async () => {
+  processingEl.style.display = 'block'; contentEl.style.display = 'none';
+  processingEl.innerHTML = '<span class="spinner"></span>Re-drafting the note from the corrected transcript…';
+  await fetch(`/api/consultations/${cid}/regenerate`, {method: 'POST'});
+  refresh();
+});
+
+document.getElementById('copy').addEventListener('click', async (e) => {
+  await navigator.clipboard.writeText(currentPlainText());
+  e.target.textContent = 'Copied ✓';
+  setTimeout(() => e.target.textContent = 'Copy as plain text', 1500);
+});
+
+document.getElementById('swap').addEventListener('click', async () => {
+  await fetch(`/api/consultations/${cid}/swap-roles`, {method: 'POST'});
+  refresh();
+});
+
+refresh();
+</script>
+</body>
+</html>

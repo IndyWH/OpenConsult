@@ -7,7 +7,7 @@
 
 - **Assessment:** poorly controlled asthma on reliever-only treatment; current mild exacerbation, not severe
 - **Key positives:** salbutamol inhaler use 4–5 times per week, night cough waking her about twice a week, symptoms worse with dust (sweeping) and during current dry weather, exam stress, ran out of inhaler last week
-- **Key negatives:** no fever, no chest pain, speaking in full sentences, never admitted to hospital or intensive care for asthma, non-smoker
+- **Key negatives:** no fever, no chest pain, speaking in full sentences, no adult hospital admissions for asthma (one overnight ward stay as a small child, never ICU), non-smoker
 - **Examination:** respiratory rate 18, oxygen saturation 98% on air, scattered expiratory wheeze both sides, peak flow 380 vs her predicted ~450
 - **Plan:** start regular inhaled corticosteroid (beclometasone twice daily) via spacer, continue salbutamol as reliever, inhaler technique checked and corrected, written asthma action plan, trigger avoidance (wet dusting / mask when sweeping), review in one month, safety-netting for severe attack
 

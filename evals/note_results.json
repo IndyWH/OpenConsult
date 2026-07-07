@@ -1,0 +1,124 @@
+[
+ {
+  "script": "01_chest_pain_en.md",
+  "claims": 26,
+  "cited": 26,
+  "coverage": "18/18",
+  "coverage_pct": 100,
+  "missed": [],
+  "discrepancies": [],
+  "note_plain": "S:\n  2 week Hx exertional central chest tightness/pressure\n  Triggered by exertion (pushing wheelbarrow, climbing stairs)\n  Lasts 5-10 mins, resolves with rest\n  Radiated to left arm once\n  No pain at rest\n  Mild SOB with pain, no nausea/vomiting\n  Occasional post-prandial burning (rice), different from current pain\n  No chest wall tenderness on palpation\n  Smokes 20 cigarettes/day for 30 years\n  Alcohol: weekends, 2-3 glasses\n  Hx of high BP diagnosed last year at medical camp, untreated\n  Father had MI age ~60\n  No regular medications or known allergies\n\nO:\n  Pulse 88/min, regular\n  BP 150/95 mmHg\n  Heart sounds normal, no murmurs\n  Lungs clear\n  No chest wall tenderness on palpation\n\nA:\n  Concerned for angina pectoris\n  Hypertension (newly diagnosed)\n\nP:\n  ECG now\n  Urgent referral to Cardiology clinic\n  Start Aspirin (dose unspecified) after ECG\n  Smoking cessation advice, provide details of clinics\n  Address hypertension - monitor BP, likely start medication\n  Safety-netting: If chest pain occurs at rest >15 mins & not settling, go straight to hospital ED\n"
+ },
+ {
+  "script": "02_febrile_child_en.md",
+  "claims": 32,
+  "cited": 32,
+  "coverage": "24/26",
+  "coverage_pct": 92,
+  "missed": [
+   "Key negatives: no cough or cold symptoms",
+   "Key negatives: drinking fluids"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  6yo F presents with 3 days fever (started Fri eve).\n  Fever up to 39\u00b0C, responds partially to paracetamol.\n  Associated headache and retro-orbital pain.\n  Vomiting x2 this morning.\n  Anorexia.\n  Reduced fluid intake.\n  Passing urine normally.\n  No rash, bleeding (gums, nose, urine, stool).\n  Mild cough.\n  No ear pain.\n  Local dengue outbreak reported.\n  Construction site nearby with water collection.\n  No previous history of dengue.\n  Otherwise healthy child, no allergies.\n  Currently taking paracetamol.\n\nO:\n  Temp 38.9\u00b0C.\n  Mild conjunctival injection.\n  Throat slightly red.\n  Chest clear on auscultation.\n  Abdomen soft, non-tender, liver not enlarged.\n  No rash or petechiae.\n  Capillary refill normal.\n  Alert and appears well hydrated.\n\nA:\n  Fever, 3 days duration.\n  Possible Dengue Fever (given symptoms & local epidemiology).\n  Viral fever differential.\n\nP:\n  Full Blood Count (FBC).\n  Dengue NS1 test.\n  Paracetamol for fever ONLY. Avoid ibuprofen/NSAIDs.\n  Encourage oral fluids frequently (water, king coconut, kanji).\n  Review tomorrow with blood results.\n  Safety netting: return immediately / go to hospital if worsening symptoms (severe abdominal pain, persistent vomiting, bleeding, lethargy/confusion, oliguria, cold extremities) or sudden deterioration after fever subsides.\n"
+ },
+ {
+  "script": "03_diabetes_review_en.md",
+  "claims": 29,
+  "cited": 29,
+  "coverage": "31/33",
+  "coverage_pct": 94,
+  "missed": [
+   "statin not yet started",
+   "creatinine/eGFR"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  3 month diabetes check-up\n  Feels generally 'not too bad'\n  Reports increased thirst\n  Burning, tingling feet at night for ~2 months, wakes her up\n  Symptoms in both feet equally\n  Some numbness in feet ('walking on cushions')\n  No wounds or ulcers on feet; checks regularly\n  Medications: Metformin 1g BD, Gliclazide 80mg AM, Losartan 50mg OD\n  No episodes of hypoglycaemia (shaking, sweating, faintness)\n  Checks blood sugar at home; fasting ~160-170 mg/dL\n  Diet: Rice in afternoon, bread/string hoppers at night. Tea with 2 tsp sugar BD\n  No regular exercise due to knee pain\n  No chest pain or breathlessness\n  Eyes 'alright' but no check >1 year\n\nO:\n  BP 140/85 mmHg\n  Weight 68 kg\n  Feet: Skin healthy, no cracks/ulcers. Pulses palpable bilaterally\n  Neuropathy screen: Reduced sensation to monofilament in toes and ankle\n\nA:\n  Poorly controlled T2DM (HbA1c 8.4, fasting ~160-170)\n  Diabetic peripheral neuropathy\n  Hypertension (controlled on Losartan)\n\nP:\n  Increase Gliclazide to 80mg BD\n  Start Atorvastatin 1mg nocte\n  Order HbA1c, kidney function tests, cholesterol, urine protein\n  Referral for diabetic eye screening\n  Dietary advice: Reduce rice by half (replace with vegetables), eliminate sugar from tea\n  Exercise advice: Start walking 15 mins daily on flat ground\n  Foot care advice: Daily inspection for wounds/changes\n  Review in 3 months with results\n"
+ },
+ {
+  "script": "04_asthma_en.md",
+  "claims": 26,
+  "cited": 26,
+  "coverage": "20/22",
+  "coverage_pct": 91,
+  "missed": [
+   "Key negatives: speaking in full sentences",
+   "Plan: continue salbutamol as reliever"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  Asthma symptoms worsening over 1 month\n  Wheezing, nocturnal cough (wakes ~2x/week)\n  Using salbutamol 4-5x/week, sometimes twice daily\n  Ran out of salbutamol last week\n  No current preventer inhaler use (brown/orange)\n  Triggers: dust (sweeping), dry weather, stress (exams)\n  No recent fever, cold resolved 2 weeks ago\n  No chest pain\n  Can walk normally\n  Hospital admission for asthma once as a child (overnight)\n  Never ICU, no repeated nebulisers\n  Non-smoker\n  No household smokers\n\nO:\n  RR 18/min\n  SpO2 98% on room air\n  Mild expiratory wheeze bilaterally\n  Peak flow 380 (expected ~450)\n\nA:\n  Uncontrolled asthma\n\nP:\n  Start beclometasone MDI 2 puffs AM + 2 puffs PM daily\n  Provide spacer device\n  Educate on correct inhaler technique with spacer\n  Advise rinsing mouth after beclometasone use\n  Environmental advice: wet-dusting, mask if sweeping\n  Provide written asthma action plan\n  Safety netting: seek immediate medical attention for severe breathlessness unresponsive to salbutamol\n  Review in 1 month (peak flow, symptom control)\n"
+ },
+ {
+  "script": "05_epigastric_pain_en.md",
+  "claims": 29,
+  "cited": 29,
+  "coverage": "23/26",
+  "coverage_pct": 88,
+  "missed": [
+   "Differential: peptic ulcer disease / NSAID-related gastritis (leading), GORD, functional dyspepsia",
+   "Key negatives (alarm screen): no previous ulcer",
+   "Examination: no guarding"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  6 week hx burning epigastric pain\n  Pain worse when hungry & at night (wakes patient)\n  Pain relieved by food/Gelusil\n  Pain radiates slightly up chest after late meals\n  No weight loss, appetite normal\n  No dysphagia\n  No vomiting, haematemesis, or coffee ground vomitus\n  Stools normal colour, no melena\n  Takes ibuprofen 3-4 days/week (sometimes more) for back pain x >1 year\n  Drinks arrack weekends (~quarter bottle/night)\n  Non-smoker\n  Irregular meals due to delivery work\n  Reports job stress\n\nO:\n  Mild epigastric tenderness on palpation\n  Abdomen otherwise soft, no lumps\n  No pallor noted\n\nA:\n  Likely acid damage (irritation/ulcer) in stomach lining\n  Exacerbated by ibuprofen use\n  Contributing factors: empty stomach, alcohol, stress\n\nP:\n  Stop ibuprofen immediately\n  Use paracetamol for back pain\n  Start omeprazole 1 tab daily, 30 mins before breakfast x 4 weeks\n  Stool test for H. pylori\n  If H. pylori positive: add antibiotics (details not specified)\n  Advice on regular meals (every 3-4 hrs)\n  Advise reducing alcohol intake\n  Follow up in 2 weeks with stool result\n  Safety netting: attend hospital immediately if vomiting blood or melena\n  Consider endoscopy if pain persists after 4 weeks or warning signs develop\n"
+ },
+ {
+  "script": "06_tia_funny_turn_en.md",
+  "claims": 22,
+  "cited": 22,
+  "coverage": "4/4",
+  "coverage_pct": 100,
+  "missed": [],
+  "discrepancies": [],
+  "note_plain": "S:\n  Patient reports sudden onset R hand weakness yesterday evening (~6pm) lasting ~15 mins, associated with slurred speech. Symptoms resolved completely.\n  No LOC, falls, fits or jerking movements during episode.\n  No headache or visual disturbance reported.\n  First such episode.\n  Currently asymptomatic; denies weakness, facial droop, speech difficulty.\n  History of HTN, takes amlodipine intermittently.\n  Reports borderline T2DM and stopped cholesterol medication long ago.\n  Smokes 5-6 cigarettes/day for 50 years.\n  Reports occasional palpitations ('heart does a little dance').\n\nO:\n  BP 165/95 mmHg.\n  Pulse irregularly irregular.\n  Neurological exam: Strength equal in both hands. Facial symmetry intact. Speech clear ('British constitution'). No arm drift.\n  Cardiac auscultation: Irregular rhythm, no murmurs.\n  Lungs clear.\n\nA:\n  Transient Ischaemic Attack (TIA).\n  Hypertension.\n  Suspected Atrial Fibrillation.\n  History of smoking.\n\nP:\n  ECG performed in clinic.\n  Aspirin 300mg given immediately.\n  Urgent referral to Medical Assessment Unit at Base Hospital today for brain scan and anticoagulation initiation.\n  Safety netting: Advised patient to attend ED immediately if any neurological symptoms recur.\n"
+ },
+ {
+  "script": "07_gi_bleed_en.md",
+  "claims": 24,
+  "cited": 24,
+  "coverage": "16/19",
+  "coverage_pct": 84,
+  "missed": [
+   "Key negatives: no weight loss",
+   "Key negatives: no dysphagia",
+   "Examination: no masses"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  6 week hx burning epigastric pain, worse when hungry/at night, relieved by food/Gelusil.\n  New onset melena x 2 days (black tarry stools, sticky).\n  Associated postural dizziness, near-syncope this morning.\n  Sweating, weakness.\n  Mild SOB on exertion (stairs) today.\n  Regular ibuprofen use for back pain >1 year, 3-4 days/week sometimes more.\n  Weekend alcohol use (arrack, quarter bottle+).\n  No known previous ulcer.\n  No blood thinners/aspirin.\n  No vomiting or haematemesis reported.\n  No chest pain.\n\nO:\n  Pale conjunctivae.\n  BP 100/70.\n  Pulse 104 bpm.\n  Epigastric tenderness on palpation.\n\nA:\n  Likely bleeding peptic ulcer (gastric).\n  Significant blood loss / anaemia.\n  NSAID-induced gastropathy.\n\nP:\n  Urgent hospital admission via ambulance.\n  Referral letter to hospital.\n  Investigations: Blood count, cross-match blood, urgent endoscopy.\n  Management: IV fluids, possible transfusion.\n  Stop ibuprofen immediately.\n  Safety netting: Advise patient to inform ambulance crew if vomiting blood or feeling faint.\n"
+ },
+ {
+  "script": "08_pulmonary_embolism_en.md",
+  "claims": 26,
+  "cited": 26,
+  "coverage": "21/22",
+  "coverage_pct": 95,
+  "missed": [
+   "Differential: pulmonary embolism (leading, with DVT source), pneumonia/pleurisy, musculoskeletal chest pain, cardiac cause"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  Acute SOB since yesterday morning\n  Sudden onset while hanging washing\n  Sharp R chest pain, worse on deep breath/coughing\n  No fever, chills, phlegm\n  No hemoptysis\n  R calf swelling x 3 days, painful to walk, warm\n  Leg symptoms preceded breathing difficulty\n  Takes daily OCP for 5 years\n  No personal or family history of VTE\n  Non-smoker\n  Recent long bus journey (Jaffna)\n\nO:\n  RR 24/min\n  SpO2 92% on room air\n  Pulse 110 bpm, regular\n  BP 125/80 mmHg\n  Chest clear to auscultation\n  R calf swollen (+3cm vs L), warm, tender\n\nA:\n  Suspected DVT R leg\n  Suspected PE\n\nP:\n  Admit to hospital urgently\n  Call ambulance\n  Apply oxygen\n  Investigations: Lung scan (implied)\n  Treatment: Anticoagulation (injections)\n  Stop OCP\n  Referral to hospital\n"
+ },
+ {
+  "script": "09_septic_child_en.md",
+  "claims": 28,
+  "cited": 28,
+  "coverage": "22/22",
+  "coverage_pct": 100,
+  "missed": [],
+  "discrepancies": [],
+  "note_plain": "S:\n  6yo F presents with 4 days fever.\n  Acute change today: drowsy, not waking properly.\n  Refusing fluids (water, king coconut) since this morning.\n  Vomited x4 since last night.\n  Last urine output ~5am this morning.\n  No bleeding (gums, nose, vomit).\n  No rash observed by mother.\n  Mother notes blotchy skin on legs, cold hands/feet, hot body.\n  Cold extremities noted ~1 hour ago.\n  No fits or shaking.\n  Dengue contact in lane (neighbour recovered), 2 more houses now have fever.\n  Mother notes child is drowsy, mumbles, asked strange question ('where school bag?').\n\nO:\n  Rousable but very drowsy.\n  Temp 39.5C.\n  Hands cold to wrists, body hot.\n  Capillary refill time 4 seconds.\n  Pulse 145/min, weak.\n  Legs mottled.\n  Abdomen: winces slightly on palpation.\n  Neck: no stiffness.\n  No rash or petechiae observed.\n\nA:\n  Shock (likely secondary to severe dengue or serious bacterial infection).\n\nP:\n  Immediate transfer to General Hospital via ambulance.\n  Call ambulance (1990) - child in shock, suspected severe dengue.\n  Referral note for hospital team: fever x4d, shock signs from morning, dengue contact.\n  NPO (nothing by mouth).\n  Positioning: flat, legs slightly elevated.\n  Reassurance to mother.\n"
+ },
+ {
+  "script": "10_testicular_torsion_en.md",
+  "claims": 21,
+  "cited": 21,
+  "coverage": "12/14",
+  "coverage_pct": 86,
+  "missed": [
+   "Key positives: abdomen soft, no rebound, McBurney's point non-tender",
+   "Key negatives: no urethral discharge"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  15yo M presents with acute onset R lower abdominal pain radiating to R groin/testicle since 5 am this morning.\n  Pain started suddenly, severe ('like a cricket ball hit me'), woke him from sleep.\n  Initially came in waves, now constant.\n  Associated nausea and vomiting x2 (home & en route).\n  No fever, chills reported.\n  Bowel movements normal yesterday, no diarrhoea/constipation.\n  Urination normal, no dysuria or haematuria.\n  No recent injury, fall, or trauma. Played cricket yesterday evening without incident.\n  No unusual food intake. No other household members unwell.\n  Pain radiates to R groin/testicle, possibly worse than abdominal pain. Pain exacerbated by underwear contact.\n\nO:\n  Patient in apparent distress due to pain.\n  Abdomen: Tenderness on deep palpation R lower quadrant. No guarding/rebound noted (implied by 'soft' and lack of further comment).\n  Genitalia: R testicle swollen, high-riding compared to L.\n  R testicle exquisitely tender on palpation.\n  Absent cremasteric reflex on R side. Present on L side.\n\nA:\n  Right testicular torsion.\n\nP:\n  Urgent surgical referral to hospital.\n  Nil by mouth (NBM) immediately.\n  Inform mother of situation and arrange hospital transport via uncle.\n  Provide referral letter to surgical team.\n  Patient safety-netting: Advise patient to report any future testicular pain immediately.\n"
+ }
+]

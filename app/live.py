@@ -34,12 +34,29 @@ class LiveSession:
         self._buffer = np.zeros(0, dtype=np.float32)
         self._committed_offset_s = 0.0  # audio time already committed and dropped
         self._new_samples = 0
+        # Full session audio, kept for the finalisation pipeline (raw audio
+        # is retained until finalisation succeeds, per plan).
+        self._recording: list[bytes] = []
 
     def append_pcm16(self, data: bytes) -> None:
         """Add a chunk of little-endian 16-bit mono 16 kHz PCM."""
+        self._recording.append(data)
         chunk = np.frombuffer(data, dtype=np.int16).astype(np.float32) / 32768.0
         self._buffer = np.concatenate([self._buffer, chunk])
         self._new_samples += len(chunk)
+
+    def save_recording(self, path: str) -> float:
+        """Write the whole session's audio as a 16 kHz mono WAV; returns its
+        duration in seconds."""
+        import wave
+
+        pcm = b"".join(self._recording)
+        with wave.open(path, "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(SAMPLE_RATE)
+            w.writeframes(pcm)
+        return len(pcm) / 2 / SAMPLE_RATE
 
     @property
     def new_audio_seconds(self) -> float:

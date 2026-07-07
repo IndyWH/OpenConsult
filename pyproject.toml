@@ -11,10 +11,25 @@ dependencies = [
     "python-dotenv>=1.0",
     "faster-whisper>=1.2.1",
     "numpy>=2.5.1",
-    "nvidia-cublas-cu12>=12.9.2.10",
-    "nvidia-cudnn-cu12>=9.24.0.43",
+    "nvidia-cublas-cu12>=12",
+    "nvidia-cudnn-cu12>=9",
     "beautifulsoup4>=4.15.0",
     "pyyaml>=6.0.3",
+    "whisperx>=3.8.5",
+    "edge-tts>=7.2.8",
+]
+
+[tool.uv]
+# whisperx pins ctranslate2<4.5, but 4.4's bundled lib fails on WSL2/newer
+# glibc ("cannot enable executable stack"). 4.6+ works for both whisperx
+# and the live faster-whisper path (cuDNN 9 comes from the nvidia wheels).
+override-dependencies = [
+    "ctranslate2>=4.6",
+    # whisperx 3.8 wants pyannote>=4, whose 3.1-pipeline loader pulls the
+    # separately-gated community-1 artifacts. pyannote 3.4 loads
+    # speaker-diarization-3.1 directly with the token we have; we call
+    # pyannote ourselves in app/finalize.py rather than via whisperx.
+    "pyannote-audio==3.4.0",
 ]
 
 [tool.pytest.ini_options]

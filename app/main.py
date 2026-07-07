@@ -17,8 +17,13 @@ from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
+from pydantic import BaseModel
+
+from app import consultations
 from app.cds import CDSEngine
+from app.finalize import finalize_consultation, regenerate_note
 from app.live import PROCESS_INTERVAL_S, LiveSession
+from app.notes import note_as_plain_text
 from app.rag import RAGService
 from app.transcription import LiveTranscriber
 
@@ -33,15 +38,19 @@ logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 STATIC_DIR = Path(__file__).parent / "static"
+RECORDINGS_DIR = Path(os.getenv("RECORDINGS_DIR", "data/recordings"))
 
 
 @contextlib.asynccontextmanager
 async def lifespan(app: FastAPI):
     # Load the Whisper model once, before serving traffic (takes a second or
     # two from the local cache; the first ever run downloads the model).
+    consultations.ensure_schema()
+    RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
     app.state.cds_engine = CDSEngine()
     app.state.rag = RAGService()
+    app.state.finalize_tasks = set()  # keep refs so tasks aren't GC'd mid-run
     yield
 
 app = FastAPI(
@@ -62,6 +71,61 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 def live_page() -> FileResponse:
     """The live transcription page: mic capture + streaming transcript."""
     return FileResponse(STATIC_DIR / "live.html")
+
+
+@app.get("/review/{cid}")
+def review_page(cid: int) -> FileResponse:
+    """Note review screen: editable draft note + diarised transcript."""
+    return FileResponse(STATIC_DIR / "review.html")
+
+
+@app.get("/api/consultations/{cid}")
+async def consultation_state(cid: int) -> JSONResponse:
+    consultation = await consultations.get_consultation(cid)
+    if consultation is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    turns = await consultations.get_turns(cid)
+    note = await consultations.latest_note(cid)
+    plain = note_as_plain_text(note["content"]) if note else None
+    return JSONResponse(
+        content={**consultation, "turns": turns, "note": note, "plain_text": plain}
+    )
+
+
+class ApproveBody(BaseModel):
+    text: str
+
+
+@app.post("/api/consultations/{cid}/approve")
+async def approve(cid: int, body: ApproveBody) -> dict:
+    await consultations.approve_note(cid, body.text)
+    return {"ok": True}
+
+
+@app.post("/api/consultations/{cid}/regenerate")
+async def regenerate(cid: int) -> dict:
+    """Re-draft the note from the (possibly corrected) transcript."""
+    await consultations.set_status(cid, "processing")
+    await regenerate_note(cid)
+    await consultations.set_status(cid, "awaiting_review")
+    return {"ok": True}
+
+
+@app.post("/api/consultations/{cid}/swap-roles")
+async def swap_roles(cid: int) -> dict:
+    """Override for the first-speaker-is-Doctor heuristic."""
+    await consultations.swap_roles(cid)
+    return {"ok": True}
+
+
+class TurnBody(BaseModel):
+    text: str
+
+
+@app.patch("/api/consultations/{cid}/turns/{idx}")
+async def edit_turn(cid: int, idx: int, body: TurnBody) -> dict:
+    await consultations.update_turn_text(cid, idx, body.text)
+    return {"ok": True}
 
 
 @app.websocket("/ws/transcribe")
@@ -167,7 +231,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await websocket.send_json(
                 {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
             )
-        await websocket.send_json({"type": "done"})
+
+        # Kick off the finalisation pipeline (Phase 2). The Stop button IS
+        # the trigger — no separate generate step.
+        cid = await consultations.create_consultation()
+        wav_path = str(RECORDINGS_DIR / f"consultation_{cid}.wav")
+        duration = session.save_recording(wav_path)
+        logger.info("Consultation %d: %.1fs of audio saved", cid, duration)
+        task = asyncio.create_task(finalize_consultation(cid, wav_path))
+        websocket.app.state.finalize_tasks.add(task)
+        task.add_done_callback(websocket.app.state.finalize_tasks.discard)
+
+        await websocket.send_json({"type": "done", "consultation_id": cid})
         await websocket.close()
     except WebSocketDisconnect:
         pass

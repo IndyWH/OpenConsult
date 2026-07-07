@@ -91,8 +91,18 @@ ollama pull embeddinggemma          # one-time: the embedding model
 uv run python scripts/ingest_guidelines.py   # fetch + chunk + embed into pgvector
 ```
 
-Evaluations for the CDS urgency alarm and the RAG grounding live in
-`evals/`, with reusable harnesses in `scripts/evaluate_*.py`.
+**Post-consultation note (Phase 2):** pressing Stop triggers the
+finalisation pipeline — WhisperX re-transcription, pyannote speaker
+diarisation, Doctor/Patient role attribution — and lands you on a review
+page with a draft SOAP note. Every claim cites its transcript turns
+(click to verify); numbers/drugs/laterality resting on low-confidence
+audio are marked ⚠. Edit in place, Regenerate after transcript
+corrections, Approve to sign off, or copy as EMR-ready plain text.
+The heavy models take turns on the GPU (MedGemma is unloaded while
+WhisperX/pyannote run), so finalisation takes a minute or two.
+
+Evaluations for the CDS urgency alarm, RAG grounding, and note quality
+live in `evals/`, with reusable harnesses in `scripts/evaluate_*.py`.
 
 Run the tests with:
 

@@ -22,6 +22,9 @@ models/
 # ...but small test fixtures are tracked
 !tests/data/*.wav
 
+# Session data: consultation recordings and disposable TTS samples
+data/
+
 # Guideline corpus: fetched locally, never committed (copyright).
 # The manifest is committed and rebuilds it via scripts/ingest_guidelines.py.
 corpus/*

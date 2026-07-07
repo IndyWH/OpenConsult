@@ -253,7 +253,14 @@ async function start() {
     else if (msg.type === 'cds') { renderCDS(msg.assessment); }
     else if (msg.type === 'guidelines') { renderGuidelines(msg); }
     else if (msg.type === 'cds_unavailable') { cdsEl.innerHTML = ''; cdsEl.appendChild(el('p', 'idle', msg.detail)); }
-    else if (msg.type === 'done') { setStatus('stopped'); ws.close(); ws = null; }
+    else if (msg.type === 'done') {
+      setStatus('stopped — finalising note…');
+      ws.close(); ws = null;
+      if (msg.consultation_id) {
+        // Stop triggers the finalisation pipeline; take the doctor to review.
+        window.location.href = '/review/' + msg.consultation_id;
+      }
+    }
   };
   ws.onerror = () => setStatus('connection error');
 
