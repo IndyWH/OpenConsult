@@ -43,6 +43,9 @@ EXPECTATIONS = {
     "07_gi_bleed_en.md": True,     # melaena + haemodynamic compromise
     "08_pulmonary_embolism_en.md": True,   # pleuritic pain + hypoxia + DVT leg
     "09_septic_child_en.md": True,  # shocked child → emergency transfer
+    # Held-out generalisation case: a condition the urgency prompt never
+    # mentions. Added AFTER the 2026-07-07 evaluation was finalised.
+    "10_testicular_torsion_en.md": True,  # torsion as abdo pain → immediate surgery
 }
 
 

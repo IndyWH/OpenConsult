@@ -1,0 +1,171 @@
+{
+ "script": "10_testicular_torsion_en.md",
+ "expected_fire": true,
+ "total_turns": 38,
+ "n_updates": 10,
+ "fired": true,
+ "first_fire_turn": 4,
+ "first_fire_actions": [
+  "Immediate surgical referral"
+ ],
+ "cleared_at_end": true,
+ "stability": "8/9",
+ "leading_dx_final": "Testicular torsion (right)",
+ "updates": [
+  {
+   "end_turn": 4,
+   "seconds": 14.2,
+   "urgent_actions": [
+    {
+     "action": "Immediate surgical referral",
+     "reason": "Suspected acute appendicitis or other surgical emergency."
+    }
+   ],
+   "differentials": [
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)",
+    "Gastroenteritis"
+   ]
+  },
+  {
+   "end_turn": 8,
+   "seconds": 15.1,
+   "urgent_actions": [
+    {
+     "action": "Immediate surgical referral/hospital admission",
+     "reason": "Suspected acute appendicitis requires urgent assessment and potential surgery."
+    }
+   ],
+   "differentials": [
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)",
+    "Gastroenteritis"
+   ]
+  },
+  {
+   "end_turn": 12,
+   "seconds": 15.0,
+   "urgent_actions": [
+    {
+     "action": "Immediate surgical referral/hospital admission",
+     "reason": "Suspected acute appendicitis requires urgent assessment and potential surgery."
+    }
+   ],
+   "differentials": [
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)",
+    "Gastroenteritis"
+   ]
+  },
+  {
+   "end_turn": 16,
+   "seconds": 15.6,
+   "urgent_actions": [
+    {
+     "action": "Immediate surgical referral/hospital admission",
+     "reason": "Rule out acute appendicitis or other surgical emergency."
+    }
+   ],
+   "differentials": [
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)",
+    "Gastroenteritis"
+   ]
+  },
+  {
+   "end_turn": 20,
+   "seconds": 17.0,
+   "urgent_actions": [
+    {
+     "action": "Immediate surgical referral/hospital admission",
+     "reason": "Suspected acute appendicitis requires urgent assessment and potential surgery to prevent perforation."
+    }
+   ],
+   "differentials": [
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)",
+    "Gastroenteritis"
+   ]
+  },
+  {
+   "end_turn": 24,
+   "seconds": 16.5,
+   "urgent_actions": [
+    {
+     "action": "Immediate surgical referral/hospital admission",
+     "reason": "Suspected testicular torsion requires urgent urological assessment and potential surgery."
+    }
+   ],
+   "differentials": [
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)",
+    "Gastroenteritis"
+   ]
+  },
+  {
+   "end_turn": 28,
+   "seconds": 18.0,
+   "urgent_actions": [
+    {
+     "action": "Immediate specialist referral (urology/surgery)",
+     "reason": "Suspected testicular torsion requires urgent surgical exploration."
+    }
+   ],
+   "differentials": [
+    "Testicular torsion (right)",
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)"
+   ]
+  },
+  {
+   "end_turn": 32,
+   "seconds": 18.1,
+   "urgent_actions": [],
+   "differentials": [
+    "Testicular torsion (right)",
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)"
+   ]
+  },
+  {
+   "end_turn": 36,
+   "seconds": 18.6,
+   "urgent_actions": [],
+   "differentials": [
+    "Testicular torsion (right)",
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)"
+   ]
+  },
+  {
+   "end_turn": 38,
+   "seconds": 18.8,
+   "urgent_actions": [],
+   "differentials": [
+    "Testicular torsion (right)",
+    "Appendicitis",
+    "Renal colic (right)",
+    "Mesenteric adenitis",
+    "Ovarian pathology (right)"
+   ]
+  }
+ ]
+}

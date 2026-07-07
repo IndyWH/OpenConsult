@@ -174,6 +174,30 @@ acceptable), or encode a sharper threshold (e.g. WHO's "persistent
 vomiting" as ≥3 episodes) with clinical sign-off. Until then the alarm
 keeps its cautious behaviour on borderline dengue presentations.
 
+## Held-out generalisation check (added after the main run)
+
+The nine-script evaluation shares a weakness with the prompt it tests:
+every emergency it contains is *named in the urgency prompt's examples
+list*, so a passing score cannot distinguish clinical generalisation from
+example-matching. One held-out case was therefore written for a condition
+the prompt never mentions: **testicular torsion presenting as abdominal
+pain in a 15-year-old** (`10_testicular_torsion_en.md`), reproducing the
+classic trap — the true site emerges only on direct questioning of an
+embarrassed teenager. Run once, deterministic settings (temperature 0,
+seed 42), same harness. Raw data: `evals/urgency_heldout_10.json`.
+
+| Script | Expected | Fired | First fired | First action said | Cleared | Dx stability | Verdict |
+|---|---|---|---|---|---|---|---|
+| 10_testicular_torsion_en.md | fire | yes | turn 4/38 | Immediate surgical referral | yes | 8/9 | PASS |
+
+The alarm fired at turn 4 — before the scrotal findings are on the table —
+on "sudden severe right lower abdominal pain waking a teenager from sleep,
+with vomiting": acute-abdomen reasoning, not a lookup of the prompt's
+examples. The final leading differential was testicular torsion, and the
+alarm cleared when the doctor phoned the surgical registrar. n=1 held-out
+case; a broader unlisted-condition sweep would strengthen the claim, but
+the alarm demonstrably does not require its emergencies to be enumerated.
+
 ## Limitations
 
 - Scripted text fed directly to the engine — no ASR noise. The live path
