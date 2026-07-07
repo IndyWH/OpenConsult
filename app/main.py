@@ -19,6 +19,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.cds import CDSEngine
 from app.live import PROCESS_INTERVAL_S, LiveSession
+from app.rag import RAGService
 from app.transcription import LiveTranscriber
 
 # Run a CDS pass once this much new confirmed text has accumulated.
@@ -40,6 +41,7 @@ async def lifespan(app: FastAPI):
     # two from the local cache; the first ever run downloads the model).
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
     app.state.cds_engine = CDSEngine()
+    app.state.rag = RAGService()
     yield
 
 app = FastAPI(
@@ -74,11 +76,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     engine: CDSEngine = websocket.app.state.cds_engine
     logger.info("Live session started")
 
+    rag: RAGService = websocket.app.state.rag
+
     transcript_parts: list[str] = []  # confirmed text, the CDS engine's input
     assessment: dict | None = None
     cds_task: asyncio.Task | None = None
     cds_sent_len = 0
     cds_failures = 0
+    gl_task: asyncio.Task | None = None
+    gl_conditions: tuple = ()  # conditions the current guideline panel is for
 
     async def maybe_run_cds() -> None:
         """Launch/collect the CDS side task without ever blocking transcription."""
@@ -106,6 +112,29 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             cds_sent_len = len(transcript)
             cds_task = asyncio.create_task(engine.update(transcript, assessment))
 
+    async def maybe_run_guidelines() -> None:
+        """Refresh the guideline panel when the leading differentials change.
+
+        Queries are built from the CDS layer's conditions, not raw transcript
+        text, and the summary is grounded in retrieved passages only.
+        """
+        nonlocal gl_task, gl_conditions
+        if gl_task is not None and gl_task.done():
+            try:
+                answer = gl_task.result()
+                await websocket.send_json({"type": "guidelines", **answer})
+            except Exception as exc:  # noqa: BLE001 - the panel is optional
+                logger.warning("Guideline lookup failed: %s", exc)
+            gl_task = None
+        if assessment is None or gl_task is not None:
+            return
+        conditions = tuple(
+            d["condition"] for d in assessment.get("differentials", [])[:2]
+        )
+        if conditions and conditions != gl_conditions:
+            gl_conditions = conditions
+            gl_task = asyncio.create_task(rag.answer_for_conditions(list(conditions)))
+
     try:
         while True:
             try:
@@ -131,6 +160,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "partial", "text": partial})
 
             await maybe_run_cds()
+            await maybe_run_guidelines()
 
         # Client pressed stop: transcribe the tail end and finish cleanly.
         for seg in await session.flush():
@@ -144,6 +174,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     finally:
         if cds_task is not None:
             cds_task.cancel()
+        if gl_task is not None:
+            gl_task.cancel()
         logger.info("Live session ended")
 
 

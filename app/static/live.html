@@ -64,6 +64,20 @@
   .urgent h2 { color: #d32f2f; margin-top: 0 !important; }
   .urgent li { font-weight: 600; }
   .urgent .rationale { font-weight: 400; }
+  #guidelines {
+    border: 1px solid #8884; border-radius: 8px; padding: 1rem;
+    font-size: .92rem; line-height: 1.5; margin-top: 1rem;
+  }
+  #guidelines h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em;
+                   opacity: .6; margin: 0 0 .35rem; }
+  #guidelines .cite {
+    font-size: .8rem; opacity: .75; margin: .5rem 0 0; padding-left: 1.1rem; text-indent: -1.1rem;
+  }
+  #guidelines .provenance {
+    font-size: .72rem; opacity: .5; margin-top: .75rem; border-top: 1px solid #8883;
+    padding-top: .4rem;
+  }
+  #guidelines .refusal { opacity: .6; font-style: italic; }
 </style>
 </head>
 <body>
@@ -75,9 +89,14 @@
 </div>
 <div class="columns">
   <div id="transcript"><span id="partial"></span></div>
-  <div id="cds"><p class="idle">Clinical decision support will appear here once the
-  conversation gets going. All suggestions are AI drafts for the doctor —
-  not medical advice.</p></div>
+  <div>
+    <div id="cds"><p class="idle">Clinical decision support will appear here once the
+    conversation gets going. All suggestions are AI drafts for the doctor —
+    not medical advice.</p></div>
+    <div id="guidelines"><h2>Guidelines</h2><p class="refusal">Guideline summaries
+    appear here once a working differential exists. Grounded in the local corpus
+    only — every claim cited, or the panel declines.</p></div>
+  </div>
 </div>
 
 <script>
@@ -177,6 +196,24 @@ function renderCDS(a) {
   cdsEl.appendChild(sList);
 }
 
+const glEl = document.getElementById('guidelines');
+
+function renderGuidelines(msg) {
+  glEl.innerHTML = '';
+  glEl.appendChild(el('h2', null, 'Guidelines'));
+  if (!msg.covered) {
+    glEl.appendChild(el('p', 'refusal', msg.summary));
+  } else {
+    glEl.appendChild(el('p', null, msg.summary));
+    for (const c of msg.citations) {
+      glEl.appendChild(el('p', 'cite', `[${c.n}] ${c.publisher} — ${c.source}: ${c.section}`));
+    }
+  }
+  const p = msg.provenance;
+  glEl.appendChild(el('p', 'provenance',
+    `${p.corpus_name} · v${p.corpus_version} · ${p.n_sources} sources, ${p.n_chunks} passages · ingested ${p.date_ingested}`));
+}
+
 function formatTime(s) {
   const m = Math.floor(s / 60), sec = Math.floor(s % 60);
   return `${m}:${String(sec).padStart(2, '0')}`;
@@ -214,6 +251,7 @@ async function start() {
     if (msg.type === 'final') { addFinal(msg); partialEl.textContent = ''; }
     else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
     else if (msg.type === 'cds') { renderCDS(msg.assessment); }
+    else if (msg.type === 'guidelines') { renderGuidelines(msg); }
     else if (msg.type === 'cds_unavailable') { cdsEl.innerHTML = ''; cdsEl.appendChild(el('p', 'idle', msg.detail)); }
     else if (msg.type === 'done') { setStatus('stopped'); ws.close(); ws = null; }
   };

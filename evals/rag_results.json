@@ -1,0 +1,124 @@
+[
+ {
+  "case": "chest pain (script 01)",
+  "kind": "in-corpus",
+  "conditions": [
+   "Stable Angina",
+   "Acute Coronary Syndrome (ACS)"
+  ],
+  "covered": true,
+  "top_similarity": 0.596,
+  "n_citations": 2,
+  "top_cited_source": "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)",
+  "summary_first_120": "For suspected ACS, initiate management immediately without delaying hospital transfer [1]. Offer pain relief with GTN or",
+  "verdict": "PASS"
+ },
+ {
+  "case": "dyspepsia (script 05)",
+  "kind": "in-corpus",
+  "conditions": [
+   "Peptic ulcer disease",
+   "NSAID-related gastritis"
+  ],
+  "covered": true,
+  "top_similarity": 0.608,
+  "n_citations": 2,
+  "top_cited_source": "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)",
+  "summary_first_120": "For peptic ulcer disease, offer full-dose PPI or H2RA therapy for 4 to 8 weeks to people who have tested negative for H ",
+  "verdict": "PASS"
+ },
+ {
+  "case": "dengue child (script 02)",
+  "kind": "in-corpus",
+  "conditions": [
+   "Dengue fever",
+   "Viral fever"
+  ],
+  "covered": true,
+  "top_similarity": 0.652,
+  "n_citations": 4,
+  "top_cited_source": "Dengue and severe dengue \u2014 fact sheet",
+  "summary_first_120": "Dengue is a viral infection transmitted by mosquitoes [1][2]. Most infections are asymptomatic or mild, but severe dengu",
+  "verdict": "PASS"
+ },
+ {
+  "case": "asthma (script 04)",
+  "kind": "in-corpus",
+  "conditions": [
+   "Poorly controlled asthma"
+  ],
+  "covered": true,
+  "top_similarity": 0.691,
+  "n_citations": 2,
+  "top_cited_source": "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)",
+  "summary_first_120": "Poorly controlled asthma impacts lifestyle or restricts activities due to symptoms like coughing, wheezing, shortness of",
+  "verdict": "PASS"
+ },
+ {
+  "case": "diabetes (script 03)",
+  "kind": "in-corpus",
+  "conditions": [
+   "Diabetic Peripheral Neuropathy",
+   "Poorly Controlled Diabetes Mellitus"
+  ],
+  "covered": true,
+  "top_similarity": 0.56,
+  "n_citations": 3,
+  "top_cited_source": "Type 2 diabetes in adults: management (NG28)",
+  "summary_first_120": "For painful diabetic peripheral neuropathy in adults with type 2 diabetes, see the NICE guideline on neuropathic pain [1",
+  "verdict": "PASS"
+ },
+ {
+  "case": "TIA (script 06)",
+  "kind": "out-of-corpus",
+  "conditions": [
+   "Transient ischaemic attack",
+   "Atrial fibrillation"
+  ],
+  "covered": false,
+  "top_similarity": 0.353,
+  "n_citations": 0,
+  "refusal_layer": "retrieval floor",
+  "summary_first_120": "The local guideline corpus does not cover this topic.",
+  "verdict": "PASS"
+ },
+ {
+  "case": "torsion (script 10)",
+  "kind": "out-of-corpus",
+  "conditions": [
+   "Testicular torsion"
+  ],
+  "covered": false,
+  "top_similarity": 0.213,
+  "n_citations": 0,
+  "refusal_layer": "retrieval floor",
+  "summary_first_120": "The local guideline corpus does not cover this topic.",
+  "verdict": "PASS"
+ },
+ {
+  "case": "unrelated specialty",
+  "kind": "out-of-corpus",
+  "conditions": [
+   "Postpartum haemorrhage"
+  ],
+  "covered": false,
+  "top_similarity": 0.314,
+  "n_citations": 0,
+  "refusal_layer": "retrieval floor",
+  "summary_first_120": "The local guideline corpus does not cover this topic.",
+  "verdict": "PASS"
+ },
+ {
+  "case": "non-medical",
+  "kind": "out-of-corpus",
+  "conditions": [
+   "Cricket batting technique"
+  ],
+  "covered": false,
+  "top_similarity": 0.167,
+  "n_citations": 0,
+  "refusal_layer": "retrieval floor",
+  "summary_first_120": "The local guideline corpus does not cover this topic.",
+  "verdict": "PASS"
+ }
+]

@@ -21,3 +21,8 @@ models/
 
 # ...but small test fixtures are tracked
 !tests/data/*.wav
+
+# Guideline corpus: fetched locally, never committed (copyright).
+# The manifest is committed and rebuilds it via scripts/ingest_guidelines.py.
+corpus/*
+!corpus/manifest.yaml

@@ -79,6 +79,21 @@ without speaking:
 uv run python scripts/simulate_cds.py mock_consultations/01_chest_pain_en.md
 ```
 
+**Guideline grounding (Phase 4):** the live page shows a guidelines panel —
+a summary grounded ONLY in retrieved guideline passages, each claim cited,
+with a provenance line (corpus name, version, ingestion date). If the local
+corpus doesn't cover the topic, the panel declines rather than improvises.
+The corpus itself is not committed (third-party content); rebuild it from
+the committed manifest:
+
+```bash
+ollama pull embeddinggemma          # one-time: the embedding model
+uv run python scripts/ingest_guidelines.py   # fetch + chunk + embed into pgvector
+```
+
+Evaluations for the CDS urgency alarm and the RAG grounding live in
+`evals/`, with reusable harnesses in `scripts/evaluate_*.py`.
+
 Run the tests with:
 
 ```bash

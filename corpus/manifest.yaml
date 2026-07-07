@@ -1,0 +1,81 @@
+# Guideline corpus manifest — the committed record of what the local corpus
+# contains and where every document came from.
+#
+# The corpus files themselves are NOT committed (they are third-party
+# copyrighted content, fetched locally for research/educational use).
+# Rebuild the corpus and the pgvector store with:
+#
+#     uv run python scripts/ingest_guidelines.py
+#
+# Coverage is deliberately scoped to the mock-consultation test cases:
+# chest pain / stable angina, dyspepsia, dengue, asthma, type 2 diabetes.
+
+corpus_name: "Starter guideline corpus (UK NICE + CDC/WHO dengue)"
+corpus_version: "2026-07-07.2"
+
+sources:
+  - slug: nice-cg95-chest-pain
+    title: "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)"
+    publisher: NICE
+    url: https://www.nice.org.uk/guidance/cg95/chapter/Recommendations
+    format: html
+    license_note: "© NICE. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"
+
+  - slug: nice-cg184-dyspepsia
+    title: "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)"
+    publisher: NICE
+    url: https://www.nice.org.uk/guidance/cg184/chapter/Recommendations
+    format: html
+    license_note: "© NICE. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"
+
+  - slug: nice-ng28-type2-diabetes
+    title: "Type 2 diabetes in adults: management (NG28)"
+    publisher: NICE
+    # NG28 is published as topical chapters (its /Recommendations URL now
+    # holds only research recommendations); ingest the clinical chapters.
+    urls:
+      - https://www.nice.org.uk/guidance/ng28/chapter/Individualised-care
+      - https://www.nice.org.uk/guidance/ng28/chapter/Blood-glucose-management
+      - https://www.nice.org.uk/guidance/ng28/chapter/Initial-medicines
+      - https://www.nice.org.uk/guidance/ng28/chapter/Further-medication
+      - https://www.nice.org.uk/guidance/ng28/chapter/Complications
+    format: html
+    license_note: "© NICE. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"
+
+  - slug: nice-ng245-asthma
+    title: "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)"
+    publisher: NICE
+    url: https://www.nice.org.uk/guidance/ng245/chapter/Recommendations
+    format: html
+    license_note: "© NICE. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"
+
+  # Added in v2026-07-07.2: NG28 handles painful diabetic neuropathy by
+  # cross-reference to CG173; the first RAG evaluation correctly refused a
+  # neuropathy query because only the pointer stub was in the corpus.
+  - slug: nice-cg173-neuropathic-pain
+    title: "Neuropathic pain in adults: pharmacological management in non-specialist settings (CG173)"
+    publisher: NICE
+    url: https://www.nice.org.uk/guidance/cg173/chapter/Recommendations
+    format: html
+    license_note: "© NICE. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"
+
+  - slug: cdc-dengue-clinical-care
+    title: "Clinical Care of Dengue (healthcare providers)"
+    publisher: CDC
+    url: https://www.cdc.gov/dengue/hcp/clinical-care/index.html
+    format: html
+    license_note: "US CDC public-domain content. Fetched for local research/educational use."
+    date_ingested: "2026-07-07"
+
+  - slug: who-dengue-factsheet
+    title: "Dengue and severe dengue — fact sheet"
+    publisher: WHO
+    url: https://www.who.int/news-room/fact-sheets/detail/dengue-and-severe-dengue
+    format: html
+    license_note: "© WHO. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"
