@@ -108,8 +108,9 @@ def test_receptionist_gets_403_on_all_clinical_content(clients, consultation_id)
     assert recep.post(f"/api/consultations/{cid}/acknowledge-urgent").status_code == 403
     assert recep.patch(f"/api/consultations/{cid}/turns/0", json={"text": "x"}).status_code == 403
     assert recep.get("/api/audit").status_code == 403
-    # Doctor-only queue action:
+    # Doctor-only queue actions:
     assert recep.post("/api/queue/999999/start").status_code == 403
+    assert recep.post("/api/queue/walk-in", json={"name": "X"}).status_code == 403
 
 
 def test_doctor_cannot_manage_queue_but_can_open_clinical(clients, consultation_id):
@@ -117,6 +118,48 @@ def test_doctor_cannot_manage_queue_but_can_open_clinical(clients, consultation_
     assert doctor.post("/api/queue", json={"name": "X"}).status_code == 403  # front desk job
     assert doctor.get(f"/api/consultations/{consultation_id}").status_code == 200
     assert doctor.get(f"/review/{consultation_id}").status_code == 200
+
+
+def test_doctor_walk_in_grants_no_broader_queue_rights(clients):
+    doctor = clients["doctor"]
+
+    # The walk-in shortcut works: patient registered + entry created
+    # directly in consultation, distinct audit event recorded.
+    response = doctor.post(
+        "/api/queue/walk-in", json={"name": "Walk-in Test Patient", "age": 61, "sex": "M"}
+    )
+    assert response.status_code == 200
+    entry = response.json()
+    queue = doctor.get("/api/queue").json()
+    mine = next(q for q in queue if q["entry_id"] == entry["entry_id"])
+    assert mine["status"] == "in_consultation"
+    assert mine["name"] == "Walk-in Test Patient"
+    events = asyncio.run(audit.recent(50))
+    assert ("queue.walk_in_started", entry["entry_id"]) in {
+        (e["action"], e["subject_id"]) for e in events
+    }
+    # A walk-in entry was never 'waiting', so it cannot be started again.
+    assert doctor.post(f"/api/queue/{entry['entry_id']}/start").status_code == 409
+
+    # The live page's patient banner reads identity from the server, not the
+    # URL: the entry-state API carries name/age/sex for the walk-in path.
+    detail = doctor.get(f"/api/queue/{entry['entry_id']}").json()
+    assert (detail["name"], detail["age"], detail["sex"], detail["status"]) == (
+        "Walk-in Test Patient", 61, "M", "in_consultation"
+    )
+    # …and via /current (how /live resolves identity when opened by nav tab).
+    current = doctor.get("/api/queue/current").json()
+    assert current["patient_id"] == entry["patient_id"]
+    assert doctor.get("/api/queue/999999").status_code == 404
+
+    # …but the doctor still has NO other queue management rights.
+    assert doctor.post("/api/queue", json={"name": "X"}).status_code == 403
+    assert doctor.post(
+        f"/api/queue/{entry['entry_id']}/move?direction=up"
+    ).status_code == 403
+
+    # Blank names are rejected (the form requires one; so does the API).
+    assert doctor.post("/api/queue/walk-in", json={"name": "  "}).status_code == 400
 
 
 def test_full_front_desk_loop(clients):
@@ -136,6 +179,12 @@ def test_full_front_desk_loop(clients):
     assert started.json()["name"] == "Loop Test Patient"
     queue = doctor.get("/api/queue").json()
     assert next(q for q in queue if q["entry_id"] == entry["entry_id"])["status"] == "in_consultation"
+    # …the live page's banner can fetch the patient identity server-side
+    # (queue-Start path — same guarantee as the walk-in path)…
+    detail = doctor.get(f"/api/queue/{entry['entry_id']}").json()
+    assert (detail["name"], detail["age"], detail["sex"], detail["status"]) == (
+        "Loop Test Patient", 40, "F", "in_consultation"
+    )
     # …a second start on the same entry is rejected…
     assert doctor.post(f"/api/queue/{entry['entry_id']}/start").status_code == 409
 

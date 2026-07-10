@@ -169,6 +169,28 @@ async def queue_list(user: dict = Depends(api_user())) -> list[dict]:
     return await frontdesk.today_queue()
 
 
+@app.get("/api/queue/current")
+async def queue_current(user: dict = Depends(api_user())) -> JSONResponse:
+    """Today's active (in-consultation) entry — the live page's patient
+    banner when no entry id is in the URL (e.g. reached via the nav tab)."""
+    entry = await frontdesk.current_entry()
+    if entry is None:
+        return JSONResponse(status_code=404, content={"error": "no patient in consultation"})
+    return JSONResponse(content=entry)
+
+
+@app.get("/api/queue/{entry_id}")
+async def queue_entry_detail(
+    entry_id: int, user: dict = Depends(api_user())
+) -> JSONResponse:
+    """Server-side patient identity for one of today's entries. The live
+    page's banner reads THIS, never URL text (wrong-patient prevention)."""
+    entry = await frontdesk.get_entry(entry_id)
+    if entry is None:
+        return JSONResponse(status_code=404, content={"error": "no such queue entry today"})
+    return JSONResponse(content=entry)
+
+
 @app.post("/api/queue")
 async def queue_add(
     body: QueueAddBody, user: dict = Depends(api_user("receptionist", "admin"))
@@ -189,6 +211,21 @@ async def queue_move(
         await audit.log(user["id"], "queue.reordered", "queue_entry", entry_id,
                         {"direction": direction})
     return {"ok": moved}
+
+
+@app.post("/api/queue/walk-in")
+async def queue_walk_in(
+    body: QueueAddBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """Doctor's walk-in shortcut: register + start in one step. Grants no
+    other queue rights — add/move stay receptionist-only."""
+    name = body.name.strip()
+    if not name:
+        return JSONResponse(status_code=400, content={"error": "name is required"})
+    entry = await frontdesk.start_walk_in(name, body.age, body.sex)
+    await audit.log(user["id"], "queue.walk_in_started", "queue_entry",
+                    entry["entry_id"], {"patient_id": entry["patient_id"]})
+    return JSONResponse(content=entry)
 
 
 @app.post("/api/queue/{entry_id}/start")

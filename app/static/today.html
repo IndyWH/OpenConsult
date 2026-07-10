@@ -34,6 +34,12 @@
   <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
   <button class="start">Add to queue</button>
 </form>
+<form id="walkinForm" style="display:none">
+  <input name="name" placeholder="Walk-in patient name (synthetic)" required>
+  <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem">
+  <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
+  <button class="start">Start walk-in consultation</button>
+</form>
 <p class="hint" id="hint"></p>
 <table>
   <thead><tr><th>#</th><th>Patient</th><th>Status</th><th></th></tr></thead>
@@ -75,8 +81,7 @@ async function refresh() {
         const response = await fetch(`/api/queue/${entry.entry_id}/start`, {method:'POST'});
         if (!response.ok) { refresh(); return; }
         const started = await response.json();
-        location.href = `/live?patient=${started.patient_id}` +
-          `&queue=${started.entry_id}&name=${encodeURIComponent(started.name)}`;
+        location.href = `/live?queue=${started.entry_id}`;
       });
       actions.appendChild(b);
     }
@@ -94,12 +99,29 @@ document.addEventListener('me-ready', (e) => {
     document.getElementById('addForm').style.display = '';
     document.getElementById('hint').textContent =
       'Walk-in queue: add patients in arrival order; reorder while waiting.';
-  } else {
+  }
+  if (me.role === 'doctor' || me.role === 'admin') {
+    document.getElementById('walkinForm').style.display = '';
+  }
+  if (me.role === 'doctor') {
     document.getElementById('hint').textContent =
-      'Read-only queue view — click Start on a waiting patient to begin their consultation.';
+      'Read-only queue view — click Start on a waiting patient, or use the ' +
+      'walk-in form to register and start a consultation in one step.';
   }
   refresh();
   setInterval(refresh, 5000);
+});
+
+document.getElementById('walkinForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const data = Object.fromEntries(new FormData(e.target).entries());
+  const response = await fetch('/api/queue/walk-in', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({name: data.name, age: data.age ? +data.age : null,
+                          sex: data.sex || null})});
+  if (!response.ok) { refresh(); return; }
+  const started = await response.json();
+  location.href = `/live?queue=${started.entry_id}`;
 });
 
 document.getElementById('addForm').addEventListener('submit', async (e) => {

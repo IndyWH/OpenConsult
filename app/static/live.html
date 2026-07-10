@@ -78,11 +78,18 @@
     padding-top: .4rem;
   }
   #guidelines .refusal { opacity: .6; font-style: italic; }
+  .patient-banner { margin: .2rem 0 .8rem; padding: .55rem .9rem; border-radius: 8px;
+                    background: #8882; border: 1px solid #8885; font-size: 1rem; }
+  .patient-banner.active { background: #1a7f371a; border-color: #1a7f3766; }
+  .patient-banner.warn { background: #ed6c021a; border-color: #ed6c0266; }
+  .patient-banner .name { font-weight: 700; font-size: 1.2rem; }
+  .patient-banner .demo { opacity: .85; margin-left: .4rem; }
 </style>
 </head>
 <body>
 <div class="banner">⚠️ Research/educational prototype — not a medical device. Synthetic consultations only.</div>
 <h1 id="pageTitle">Live consultation</h1>
+<div id="patientBanner" class="patient-banner">Checking for an active patient…</div>
 <div class="controls">
   <button id="btn">Start</button>
   <span id="status">idle</span>
@@ -101,16 +108,46 @@
 
 <script src="/static/nav.js"></script>
 <script>
+// URL params are POINTERS only (which queue entry); patient identity is
+// always fetched from the server — never display URL-supplied text
+// (patient-banner principle: wrong-patient-error prevention).
 const params = new URLSearchParams(location.search);
 const PATIENT = {
-  id: params.get('patient') ? +params.get('patient') : null,
+  id: null,
   queue: params.get('queue') ? +params.get('queue') : null,
-  name: params.get('name'),
 };
-if (PATIENT.name) {
-  document.getElementById('pageTitle').textContent = 'Live consultation — ' + PATIENT.name;
-  document.title = 'Consultation — ' + PATIENT.name;
+
+async function loadPatientBanner() {
+  const bannerEl = document.getElementById('patientBanner');
+  const unlinked = (cls, text) => {
+    bannerEl.className = 'patient-banner ' + cls;
+    bannerEl.textContent = text + ' Consultations started here will not be linked to a patient — use the Today queue.';
+  };
+  const url = PATIENT.queue ? `/api/queue/${PATIENT.queue}` : '/api/queue/current';
+  let entry = null;
+  try {
+    const response = await fetch(url);
+    if (response.ok) entry = await response.json();
+  } catch (e) { /* fall through to unlinked */ }
+  if (!entry) {
+    unlinked('', 'No active patient found for today.');
+    return;
+  }
+  if (entry.status !== 'in_consultation') {
+    unlinked('warn', `${entry.name} is not in consultation (status: ${entry.status.replace('_', ' ')}).`);
+    return;
+  }
+  PATIENT.id = entry.patient_id;          // server-sourced binding for the record
+  PATIENT.queue = entry.entry_id;
+  bannerEl.className = 'patient-banner active';
+  bannerEl.innerHTML = '<span class="name"></span><span class="demo"></span>';
+  bannerEl.querySelector('.name').textContent = entry.name;
+  const demo = [entry.age != null ? `${entry.age} y` : null, entry.sex || null]
+    .filter(Boolean).join(' · ');
+  bannerEl.querySelector('.demo').textContent = demo ? `· ${demo}` : '';
+  document.title = 'Consultation — ' + entry.name;
 }
+const patientReady = loadPatientBanner();
 
 const btn = document.getElementById('btn');
 const statusEl = document.getElementById('status');
@@ -279,6 +316,7 @@ async function start() {
   await new Promise((resolve, reject) => {
     ws.onopen = resolve; ws.onclose = reject;
   });
+  await patientReady;   // identity is server-sourced; don't race the fetch
   if (PATIENT.id) {
     ws.send(JSON.stringify({patient_id: PATIENT.id, queue_entry_id: PATIENT.queue}));
   }

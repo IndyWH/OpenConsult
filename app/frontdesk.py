@@ -63,20 +63,70 @@ async def add_to_queue(name: str, age: int | None, sex: str | None) -> dict:
     return {"entry_id": entry[0], "patient_id": patient[0], "position": entry[1]}
 
 
+async def start_walk_in(name: str, age: int | None, sex: str | None) -> dict:
+    """Doctor-initiated walk-in: register a minimal patient and create the
+    queue entry directly in 'in_consultation' — one transaction, so a crash
+    can't leave a patient without a queue entry or vice versa."""
+    async with await _conn() as conn:
+        patient = await (
+            await conn.execute(
+                "INSERT INTO patient (name, age, sex) VALUES (%s, %s, %s) RETURNING id",
+                (name, age, sex),
+            )
+        ).fetchone()
+        entry = await (
+            await conn.execute(
+                "INSERT INTO queue_entry (patient_id, position, status)"
+                " VALUES (%s, COALESCE((SELECT max(position) FROM queue_entry"
+                "   WHERE queue_date = CURRENT_DATE), 0) + 1, 'in_consultation')"
+                " RETURNING id, position",
+                (patient[0],),
+            )
+        ).fetchone()
+    return {"entry_id": entry[0], "patient_id": patient[0], "position": entry[1],
+            "name": name, "age": age, "sex": sex}
+
+
+def _entry_row_to_dict(r) -> dict:
+    return {"entry_id": r[0], "position": r[1], "status": r[2], "patient_id": r[3],
+            "name": r[4], "age": r[5], "sex": r[6]}
+
+
+_ENTRY_SELECT = (
+    "SELECT q.id, q.position, q.status, p.id, p.name, p.age, p.sex"
+    " FROM queue_entry q JOIN patient p ON p.id = q.patient_id"
+    " WHERE q.queue_date = CURRENT_DATE"
+)
+
+
+async def get_entry(entry_id: int) -> dict | None:
+    """One of today's entries with its patient identity — the live page's
+    patient banner is sourced from here, never from URL text."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(_ENTRY_SELECT + " AND q.id = %s", (entry_id,))
+        ).fetchone()
+    return _entry_row_to_dict(row) if row else None
+
+
+async def current_entry() -> dict | None:
+    """The most recently started of today's in-consultation entries (covers
+    reaching /live through the nav tab, where no entry id is in the URL)."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                _ENTRY_SELECT + " AND q.status = 'in_consultation' ORDER BY q.id DESC LIMIT 1"
+            )
+        ).fetchone()
+    return _entry_row_to_dict(row) if row else None
+
+
 async def today_queue() -> list[dict]:
     async with await _conn() as conn:
         rows = await (
-            await conn.execute(
-                "SELECT q.id, q.position, q.status, p.id, p.name, p.age, p.sex"
-                " FROM queue_entry q JOIN patient p ON p.id = q.patient_id"
-                " WHERE q.queue_date = CURRENT_DATE ORDER BY q.position"
-            )
+            await conn.execute(_ENTRY_SELECT + " ORDER BY q.position")
         ).fetchall()
-    return [
-        {"entry_id": r[0], "position": r[1], "status": r[2], "patient_id": r[3],
-         "name": r[4], "age": r[5], "sex": r[6]}
-        for r in rows
-    ]
+    return [_entry_row_to_dict(r) for r in rows]
 
 
 async def move_entry(entry_id: int, direction: str) -> bool:
