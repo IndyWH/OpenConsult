@@ -232,6 +232,43 @@ def test_zombie_lifecycle_resume_close_and_concurrency_guard(clients):
     _close_active(doctor)  # leave the queue clean for later tests
 
 
+def test_live_page_gates_recording_on_linked_patient(clients):
+    recep, doctor = clients["receptionist"], clients["doctor"]
+    _close_active(doctor)
+
+    page = doctor.get("/live")
+    assert page.status_code == 200
+    # Start ships disabled in the markup — only a server-resolved active
+    # patient enables it (JS); unlinked recording is impossible by default.
+    assert 'id="btn" disabled' in page.text
+    # The no-patient state embeds the same walk-in flow plus a Today link.
+    assert 'id="liveWalkin"' in page.text
+    assert "/api/queue/walk-in" in page.text
+    assert 'href="/today"' in page.text
+
+    # Stale-code prevention: pages and static JS must revalidate on load.
+    assert page.headers["cache-control"] == "no-cache"
+    assert doctor.get("/static/nav.js").headers["cache-control"] == "no-cache"
+
+    # The state chain the page's JS binds to: unlinked ⇒ /current 404
+    # (Start stays disabled); in-place walk-in ⇒ /current resolves ⇒
+    # the banner re-resolution enables Start.
+    assert doctor.get("/api/queue/current").status_code == 404
+    entry = doctor.post(
+        "/api/queue/walk-in", json={"name": "In-Place Walkin", "age": 33, "sex": "F"}
+    ).json()
+    current = doctor.get("/api/queue/current").json()
+    assert current["entry_id"] == entry["entry_id"]
+    assert (current["name"], current["status"]) == ("In-Place Walkin", "in_consultation")
+
+    # RBAC unchanged: the receptionist sees neither the form nor Start
+    # (no live page at all) and cannot hit the endpoint behind them.
+    assert recep.get("/live", follow_redirects=False).status_code == 403
+    assert recep.post("/api/queue/walk-in", json={"name": "X"}).status_code == 403
+
+    _close_active(doctor)
+
+
 def test_full_front_desk_loop(clients):
     recep, doctor = clients["receptionist"], clients["doctor"]
     _close_active(doctor)

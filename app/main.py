@@ -73,6 +73,19 @@ app = FastAPI(
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
+@app.middleware("http")
+async def no_stale_app_code(request, call_next):
+    """Pages and /static assets must revalidate on every load. Without
+    Cache-Control, browsers cache them heuristically and demo machines
+    keep running old JS after a deploy (seen: /live without the patient
+    banner until a hard refresh). no-cache still permits ETag 304s."""
+    response = await call_next(request)
+    content_type = response.headers.get("content-type", "")
+    if request.url.path.startswith("/static") or content_type.startswith("text/html"):
+        response.headers["cache-control"] = "no-cache"
+    return response
+
+
 # ------------------------------------------------------------ auth & pages
 
 class RegisterBody(BaseModel):
