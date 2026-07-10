@@ -292,6 +292,22 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 "/mnt/c/Program Files/Tailscale/tailscale.exe" serve status
 ```
 
+If Postgres is down after a reboot (`pg_isready` says no response), check
+`systemctl status postgresql@18-main`. Mirrored networking means Windows
+and WSL share one port space; a leftover Windows PostgreSQL 18 service
+(`postgresql-x64-18`, empty default databases only) used to auto-start,
+grab 5432 first, and the WSL cluster then failed with "address already in
+use" — worse, the app would reach the *Windows* Postgres and die with a
+password-authentication error. Fixed 2026-07-10 by disabling the Windows
+service (admin PowerShell: `Stop-Service postgresql-x64-18;
+Set-Service postgresql-x64-18 -StartupType Disabled`) and
+`sudo systemctl restart postgresql@18-main`. If it recurs, check nothing
+on Windows is listening on 5432 (`netstat.exe -ano | findstr 5432`).
+
+Note: testing the HTTPS URL with curl *from inside WSL* fails (hairpin
+limitation of mirrored networking) — test from Windows
+(`curl.exe https://mlrig.tail93fa1d.ts.net`) or another tailnet device.
+
 Then from any tailnet device: https://mlrig.tail93fa1d.ts.net
 (log in as a doctor; mic permission prompt should appear on the live page).
 
