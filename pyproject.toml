@@ -39,4 +39,6 @@ pythonpath = ["."]
 dev = [
     "pytest>=8.0",
     "httpx>=0.28",
+    "datasets==3.6.0",
+    "jiwer>=4",
 ]

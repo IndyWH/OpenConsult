@@ -37,8 +37,8 @@ uv run uvicorn app.main:app --port 8000  # the app
 | 2 — Post-consultation note | **Done, pending real-audio validation** | Full pipeline + review UI + eval. TTS-sample-tested; real recordings will exercise ASR-confidence flagging properly. |
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done** | 9/9 eval; fidelity spot-check logged; corpus is UK/CDC/WHO starter content. |
-| 5 — Sinhala | **Not started** | Entry point defined below. |
-| 6 — Users/roles/front desk | **Core built, manual verification pending** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Pending (project owner, in-browser):** the two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (expect 403), doctor attempting queue add/reorder (expect 403), and edit attempts on an approved consultation (expect 409 / read-only UI). Remaining build work: Docker Compose packaging, demo script, design pass. |
+| 5 — Sinhala | **Benchmark stage done (2026-07-10)** | 9 candidates benchmarked on two OpenSLR test sets; stock Whisper (incl. our final-pass large-v3) is unusable for Sinhala; best is the `seniruk/whisper-small-si` fine-tune (CER 0.035 on both sets). Recordings-eval procedure pre-registered. See `evals/2026-07-10_sinhala_asr_benchmark.md`. |
+| 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). Remaining build work: Docker Compose packaging, demo script, design pass. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -59,8 +59,8 @@ app/consultations.py   Postgres persistence (consultation/turns/notes/urgency)
 app/mock_scripts.py    mock-script parser (turns)
 app/static/live.html   live page; review.html  review page
 corpus/manifest.yaml   committed provenance for the gitignored corpus
-scripts/               ingest_guidelines, simulate_cds, evaluate_{urgency,rag,notes},
-                       make_tts_sample
+scripts/               ingest_guidelines, simulate_cds, make_tts_sample,
+                       evaluate_{urgency,rag,notes,sinhala_asr}
 ```
 
 Models: MedGemma 27B Q4_K_M GGUF via Ollama (clinical reasoning, notes,
@@ -209,17 +209,31 @@ must not open transcripts or notes.
    fabricating** when the consultation never reached them. Both behaviours
    worth preserving; re-check them during real-audio validation.
 
-## Phase 5 — entry point
+## Phase 5 — benchmark done, recordings eval next
 
-Benchmark FIRST, train later (plan §7): take the weekend's real
-recordings, then evaluate existing Sinhala Whisper fine-tunes from HF
-against them (WER + code-switched English medical-term accuracy —
-the mock scripts are the reference texts). `app/mock_scripts.py` parses
-reference turns; the eval-harness pattern in `scripts/evaluate_*.py` is
-the template. Only if existing fine-tunes fall short: fine-tune on the
-4090 (itself a demonstrable result). Then: translation layer
-(Gemma/NMT benchmark, plan §4) and dual-language transcript storage —
-the `FinalTranscript` model in the plan already anticipates si/en pairs.
+Benchmark stage (plan §7 "benchmark FIRST, train later") completed
+2026-07-10 — `evals/2026-07-10_sinhala_asr_benchmark.md`, harness
+`scripts/evaluate_sinhala_asr.py`. What a newcomer needs to know:
+
+- **No public Sinhala test set exists** (Common Voice never collected
+  Sinhala; FLEURS, MMS, SeamlessM4T all skip it). Benchmarked on two
+  OpenSLR corpora (SLR52 sample n=500 / SLR30 sample n=250, seed 42)
+  with per-model contamination documented — the dual-set design caught
+  one candidate that had memorised SLR30.
+- **Stock Whisper (any size, incl. large-v3) emits degenerate
+  repetition loops on Sinhala** — so Phase 5 must swap both
+  transcription paths, not just the live one.
+- **Front-runner:** `seniruk/whisper-small-si` (CER 0.035 on both
+  sets); challenger `janiduchamika/whisper-small-sinhala-general-185k`.
+- **Next:** score the weekend's real recordings with the SAME harness
+  (`--manifest` mode; long-form chunked decoding auto-activates) per
+  the pre-registered procedure in the eval record — references, curated
+  English-term lists frozen before viewing outputs, transliteration
+  adjudication by the project owner, decision rule already written.
+  Only if the winner falls short on real audio: fine-tune on the 4090.
+  Then: translation layer (Gemma/NMT benchmark, plan §4) and
+  dual-language transcript storage — the `FinalTranscript` model in the
+  plan already anticipates si/en pairs.
 
 ## Precise next steps
 
@@ -230,13 +244,12 @@ the `FinalTranscript` model in the plan already anticipates si/en pairs.
   Stop→review flow; check diarisation/roles, confidence flags (first real
   test), and note quality vs marking schemes; append a real-audio section
   to the note-quality eval.
-- **Phase 5:** as above; start by listing candidate HF Sinhala Whisper
-  fine-tunes and building the WER harness.
-- **Phase 6:** core is built (auth + roles, queue, three tabs, RBAC,
-  audit log — see status table). Next: the project owner's in-browser
-  click-through and adversarial checks listed in the status table; then
-  Docker Compose packaging, the two-role demo script, and the design
-  pass.
+- **Phase 5:** benchmark done (see status table); next step is the
+  pre-registered recordings eval once the weekend recordings exist.
+- **Phase 6:** core is built and manually verified (auth + roles, queue,
+  three tabs, RBAC, audit log; click-through and adversarial checks done
+  2026-07-10 — see status table). Next: Docker Compose packaging, the
+  two-role demo script, and the design pass.
 - **Whole-project:** the end-of-project review docket above.
 
 ## Session/environment facts
