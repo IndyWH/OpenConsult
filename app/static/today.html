@@ -17,6 +17,7 @@
   .badge.waiting { background: #8883; }
   .badge.in_consultation { background: #ed6c0233; color: #ed6c02; }
   .badge.done { background: #1a7f3733; color: #1a7f37; }
+  .badge.cancelled { background: #d32f2f22; color: #d32f2f; }
   button { padding: .3rem .7rem; border-radius: 6px; border: 1px solid #888;
            background: transparent; color: inherit; cursor: pointer; font-size: .85rem; }
   button.start { background: #1a7f37; border-color: #1a7f37; color: white; }
@@ -50,6 +51,27 @@
 <script>
 let me = null;
 
+async function resumeEntry(entryId) {
+  const response = await fetch(`/api/queue/${entryId}/resume`);
+  if (!response.ok) { refresh(); return; }
+  const dest = await response.json();
+  location.href = dest.mode === 'review'
+    ? `/review/${dest.consultation_id}` : `/live?queue=${dest.entry_id}`;
+}
+
+// Concurrency guard: the server refuses to start while another
+// consultation is active; offer to resume it instead.
+function offerResume(payload) {
+  if (!payload || !payload.active) { refresh(); return; }
+  const a = payload.active;
+  if (confirm(`${a.name} is already in consultation. Resume that consultation?\n` +
+              `(Cancel to stay here — you can Close their entry from the queue.)`)) {
+    resumeEntry(a.entry_id);
+  } else {
+    refresh();
+  }
+}
+
 async function refresh() {
   const queue = await (await fetch('/api/queue')).json();
   const tbody = document.getElementById('rows');
@@ -79,9 +101,30 @@ async function refresh() {
       b.className = 'start'; b.textContent = 'Start consultation';
       b.addEventListener('click', async () => {
         const response = await fetch(`/api/queue/${entry.entry_id}/start`, {method:'POST'});
+        if (response.status === 409) { offerResume(await response.json()); return; }
         if (!response.ok) { refresh(); return; }
         const started = await response.json();
         location.href = `/live?queue=${started.entry_id}`;
+      });
+      actions.appendChild(b);
+    }
+    if (clinical && entry.status === 'in_consultation') {
+      const b = document.createElement('button');
+      b.className = 'start'; b.textContent = 'Resume';
+      b.addEventListener('click', () => resumeEntry(entry.entry_id));
+      actions.appendChild(b); actions.appendChild(document.createTextNode(' '));
+    }
+    if ((canManage || clinical) &&
+        (entry.status === 'waiting' || entry.status === 'in_consultation')) {
+      const b = document.createElement('button');
+      b.textContent = 'Close';
+      b.title = 'Close without a consultation (marks the entry cancelled)';
+      b.addEventListener('click', async () => {
+        if (!confirm(`Close ${entry.name}'s queue entry without a consultation?`)) return;
+        await fetch(`/api/queue/${entry.entry_id}/close`, {
+          method: 'POST', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({outcome: 'cancelled'})});
+        refresh();
       });
       actions.appendChild(b);
     }
@@ -119,6 +162,7 @@ document.getElementById('walkinForm').addEventListener('submit', async (e) => {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({name: data.name, age: data.age ? +data.age : null,
                           sex: data.sex || null})});
+  if (response.status === 409) { offerResume(await response.json()); return; }
   if (!response.ok) { refresh(); return; }
   const started = await response.json();
   location.href = `/live?queue=${started.entry_id}`;

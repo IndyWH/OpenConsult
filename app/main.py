@@ -223,6 +223,11 @@ async def queue_walk_in(
     if not name:
         return JSONResponse(status_code=400, content={"error": "name is required"})
     entry = await frontdesk.start_walk_in(name, body.age, body.sex)
+    if entry is None:  # concurrency guard: another consultation is active
+        return JSONResponse(status_code=409, content={
+            "error": "another consultation is already in progress",
+            "active": await frontdesk.current_entry(),
+        })
     await audit.log(user["id"], "queue.walk_in_started", "queue_entry",
                     entry["entry_id"], {"patient_id": entry["patient_id"]})
     return JSONResponse(content=entry)
@@ -234,10 +239,58 @@ async def queue_start(
 ) -> JSONResponse:
     started = await frontdesk.start_entry(entry_id)
     if started is None:
+        active = await frontdesk.current_entry()
+        if active and active["entry_id"] != entry_id:  # concurrency guard
+            return JSONResponse(status_code=409, content={
+                "error": "another consultation is already in progress",
+                "active": active,
+            })
         return JSONResponse(status_code=409, content={"error": "entry is not waiting"})
     await audit.log(user["id"], "queue.started", "queue_entry", entry_id,
                     {"patient_id": started["patient_id"]})
     return JSONResponse(content=started)
+
+
+@app.get("/api/queue/{entry_id}/resume")
+async def queue_resume(
+    entry_id: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """Where to send the doctor for an in-consultation entry: back to the
+    live page, or to the review page if a consultation record already
+    exists (the session was stopped but the entry outlived it)."""
+    entry = await frontdesk.get_entry(entry_id)
+    if entry is None:
+        return JSONResponse(status_code=404, content={"error": "no such queue entry today"})
+    if entry["status"] != "in_consultation":
+        return JSONResponse(status_code=409, content={"error": "entry is not in consultation"})
+    cid = await consultations.latest_for_patient_today(entry["patient_id"])
+    await audit.log(user["id"], "queue.resumed", "queue_entry", entry_id,
+                    {"consultation_id": cid})
+    if cid is not None:
+        return JSONResponse(content={"mode": "review", "consultation_id": cid})
+    return JSONResponse(content={"mode": "live", "entry_id": entry_id})
+
+
+class CloseBody(BaseModel):
+    outcome: str = "cancelled"  # cancelled | done
+
+
+@app.post("/api/queue/{entry_id}/close")
+async def queue_close(
+    entry_id: int, body: CloseBody, user: dict = Depends(api_user())
+) -> JSONResponse:
+    """Administrative closure (doctor or receptionist): no recording
+    happened — distinct audit event so it can't be mistaken for a
+    completed consultation."""
+    if body.outcome not in ("done", "cancelled"):
+        return JSONResponse(status_code=400, content={"error": "outcome must be done or cancelled"})
+    closed = await frontdesk.close_entry(entry_id, body.outcome)
+    if closed is None:
+        return JSONResponse(status_code=409, content={"error": "entry is not open"})
+    await audit.log(user["id"], "queue.cancelled", "queue_entry", entry_id,
+                    {"outcome": body.outcome, "from_status": closed["from_status"],
+                     "patient_id": closed["patient_id"]})
+    return JSONResponse(content={"ok": True, "outcome": body.outcome})
 
 
 @app.get("/live")

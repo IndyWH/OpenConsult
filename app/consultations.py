@@ -74,6 +74,21 @@ async def create_consultation(
         return row[0]
 
 
+async def latest_for_patient_today(patient_id: int) -> int | None:
+    """Newest of today's consultations for this patient — the Resume
+    target when a queue entry's live session was stopped but the entry
+    outlived it (or crashed between create and finish)."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT id FROM consultation WHERE patient_id = %s"
+                " AND started_at::date = CURRENT_DATE ORDER BY id DESC LIMIT 1",
+                (patient_id,),
+            )
+        ).fetchone()
+    return row[0] if row else None
+
+
 async def list_consultations() -> list[dict]:
     """Worklist rows: no clinical content — safe for all logged-in roles."""
     async with await _conn() as conn:

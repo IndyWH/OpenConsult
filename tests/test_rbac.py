@@ -84,6 +84,15 @@ def consultation_id():
     return asyncio.run(build())
 
 
+def _close_active(client) -> None:
+    """Close any in-consultation entries so the concurrency guard doesn't
+    refuse the start under test (also how real zombies get cleaned up)."""
+    for q in client.get("/api/queue").json():
+        if q["status"] == "in_consultation":
+            client.post(f"/api/queue/{q['entry_id']}/close",
+                        json={"outcome": "cancelled"})
+
+
 def test_anonymous_is_locked_out():
     from app.main import app
 
@@ -111,6 +120,7 @@ def test_receptionist_gets_403_on_all_clinical_content(clients, consultation_id)
     # Doctor-only queue actions:
     assert recep.post("/api/queue/999999/start").status_code == 403
     assert recep.post("/api/queue/walk-in", json={"name": "X"}).status_code == 403
+    assert recep.get("/api/queue/999999/resume").status_code == 403
 
 
 def test_doctor_cannot_manage_queue_but_can_open_clinical(clients, consultation_id):
@@ -122,6 +132,7 @@ def test_doctor_cannot_manage_queue_but_can_open_clinical(clients, consultation_
 
 def test_doctor_walk_in_grants_no_broader_queue_rights(clients):
     doctor = clients["doctor"]
+    _close_active(doctor)
 
     # The walk-in shortcut works: patient registered + entry created
     # directly in consultation, distinct audit event recorded.
@@ -162,8 +173,68 @@ def test_doctor_walk_in_grants_no_broader_queue_rights(clients):
     assert doctor.post("/api/queue/walk-in", json={"name": "  "}).status_code == 400
 
 
+def test_zombie_lifecycle_resume_close_and_concurrency_guard(clients):
+    recep, doctor = clients["receptionist"], clients["doctor"]
+    _close_active(doctor)
+
+    # An abandoned session: walk-in started, browser closed, no Stop.
+    zombie = doctor.post(
+        "/api/queue/walk-in", json={"name": "Zombie Patient", "age": 30, "sex": "F"}
+    ).json()
+
+    # (1) Resume: no consultation record exists yet → back to the live page.
+    resume = doctor.get(f"/api/queue/{zombie['entry_id']}/resume")
+    assert resume.status_code == 200
+    assert resume.json() == {"mode": "live", "entry_id": zombie["entry_id"]}
+
+    # (3) Concurrency guard: starting anything else while the zombie is
+    # active is refused, and the refusal names the active entry.
+    blocked = doctor.post("/api/queue/walk-in", json={"name": "Second Patient"})
+    assert blocked.status_code == 409
+    assert blocked.json()["active"]["entry_id"] == zombie["entry_id"]
+    waiting = recep.post("/api/queue", json={"name": "Waiting Patient", "age": 25}).json()
+    blocked = doctor.post(f"/api/queue/{waiting['entry_id']}/start")
+    assert blocked.status_code == 409
+    assert blocked.json()["active"]["entry_id"] == zombie["entry_id"]
+
+    # (2) Close-without-consultation — receptionist may do it too; the
+    # audit event is distinct from a completed consultation.
+    assert recep.post(
+        f"/api/queue/{zombie['entry_id']}/close", json={"outcome": "cancelled"}
+    ).status_code == 200
+    queue = recep.get("/api/queue").json()
+    assert next(q for q in queue if q["entry_id"] == zombie["entry_id"])["status"] == "cancelled"
+    events = asyncio.run(audit.recent(50))
+    cancel = next(e for e in events if e["action"] == "queue.cancelled"
+                  and e["subject_id"] == zombie["entry_id"])
+    assert cancel["detail"]["from_status"] == "in_consultation"
+    # Closing an already-closed entry is refused; bad outcomes are rejected.
+    assert recep.post(f"/api/queue/{zombie['entry_id']}/close",
+                      json={"outcome": "cancelled"}).status_code == 409
+    assert doctor.post(f"/api/queue/{waiting['entry_id']}/close",
+                       json={"outcome": "destroyed"}).status_code == 400
+
+    # Guard lifted: the waiting patient can start now…
+    started = doctor.post(f"/api/queue/{waiting['entry_id']}/start")
+    assert started.status_code == 200
+
+    # …and once a consultation record exists for that patient, Resume
+    # routes to its review page instead of the live page.
+    cid = asyncio.run(consultations.create_consultation(started.json()["patient_id"], None))
+    resume = doctor.get(f"/api/queue/{waiting['entry_id']}/resume")
+    assert resume.json() == {"mode": "review", "consultation_id": cid}
+
+    # RBAC unchanged: doctor still cannot add/move; receptionist still
+    # cannot resume (it leads into clinical pages).
+    assert doctor.post("/api/queue", json={"name": "X"}).status_code == 403
+    assert recep.get(f"/api/queue/{waiting['entry_id']}/resume").status_code == 403
+
+    _close_active(doctor)  # leave the queue clean for later tests
+
+
 def test_full_front_desk_loop(clients):
     recep, doctor = clients["receptionist"], clients["doctor"]
+    _close_active(doctor)
 
     # Receptionist queues a patient…
     entry = recep.post(
