@@ -252,6 +252,49 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   two-role demo script, and the design pass.
 - **Whole-project:** the end-of-project review docket above.
 
+## Remote access (Tailscale, set up 2026-07-10)
+
+The app is reachable from the project owner's other devices over their
+private tailnet at **https://mlrig.tail93fa1d.ts.net** — HTTPS is
+mandatory for remote microphone access (browsers only allow getUserMedia
+on secure origins). Nothing is exposed to the public internet.
+
+How the pieces fit (each is required):
+
+1. **Tailscale on Windows** (host `mlrig`, 100.94.144.52) — the tailnet
+   endpoint. Signed in as wajirah@; other devices must run Tailscale on
+   the same account.
+2. **WSL2 mirrored networking** (`C:\Users\wajir\.wslconfig`,
+   `networkingMode=mirrored`) — WSL shares the Windows network
+   interfaces, so a WSL service on 0.0.0.0 is reachable at the Windows
+   machine's addresses. Changing .wslconfig requires `wsl --shutdown`
+   from Windows — that kills every WSL process (shells, uvicorn, Ollama,
+   any running Claude session); see the startup sequence below for what
+   comes back by itself and what doesn't.
+3. **uvicorn must bind 0.0.0.0** (not the default 127.0.0.1) — see
+   startup sequence below.
+4. **Tailscale Serve** (`tailscale.exe serve --bg 8000` on Windows,
+   runnable from WSL via the interop path below) — terminates HTTPS with
+   a tailnet certificate at mlrig.tail93fa1d.ts.net and proxies to
+   port 8000. The config persists across reboots; it needed a one-time
+   "enable Serve" approval in the admin console. WebSockets are proxied
+   fine; live.html already picks wss:// under https.
+
+## After-reboot startup sequence
+
+```bash
+# 1. Postgres: nothing to do — systemd unit is enabled, starts with WSL.
+# 2. LLM runtime (user-space install, does NOT auto-start):
+ollama serve &
+# 3. The app — 0.0.0.0 matters for remote access:
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+# 4. Verify Serve still routes (from WSL; config persists, this just checks):
+"/mnt/c/Program Files/Tailscale/tailscale.exe" serve status
+```
+
+Then from any tailnet device: https://mlrig.tail93fa1d.ts.net
+(log in as a doctor; mic permission prompt should appear on the live page).
+
 ## Session/environment facts
 
 WSL2 Ubuntu 26.04, RTX 4090 (24 GB), Postgres 18 + pgvector on localhost,
