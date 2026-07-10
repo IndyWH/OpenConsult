@@ -12,9 +12,11 @@ the way it is, what's known to be fragile, and what to do next.
 One machine (RTX 4090, 24 GB VRAM, WSL2 Ubuntu 26.04), everything local.
 
 ```bash
-uv sync                                  # Python env (uv manages Python 3.12)
-ollama serve &                           # LLM runtime (MedGemma + embeddinggemma)
-uv run uvicorn app.main:app --port 8000  # the app
+uv sync    # Python env (uv manages Python 3.12)
+# Ollama (MedGemma + embeddinggemma) and the app are systemd services —
+# already running on this machine. Manual equivalent on a fresh box:
+#   ollama serve &
+#   uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
 - http://localhost:8000/live — live consultation: streaming transcript,
@@ -160,8 +162,10 @@ encoded in `pyproject.toml`. Summary:
 - **NICE URLs are not stable contracts**: NG28's /Recommendations chapter
   silently became research-only content. Validate ingestion with expected
   queries, not chunk counts (see RAG eval, finding 1).
-- Ollama is a user-space install (`~/.local/opt/ollama`); `ollama serve`
-  must be running. Models keep_alive 30 m.
+- Ollama is a user-space install (`~/.local/opt/ollama`), run by the
+  `ollama.service` systemd unit since 2026-07-10 (as is the app, via
+  `consultation-ai.service` — see the startup sequence below). Models
+  keep_alive 30 m.
 - sudo needs a real terminal (the assistant's shell can't prompt); batch
   root steps into one command for the user.
 
@@ -282,15 +286,22 @@ How the pieces fit (each is required):
 
 ## After-reboot startup sequence
 
+Since 2026-07-10 everything is systemd-managed (`/etc/systemd/system/
+ollama.service` and `consultation-ai.service`, both enabled,
+Restart=on-failure): Postgres, Ollama, and the app all start when WSL
+boots. WSL itself does not boot until something starts it — after a
+Windows reboot, open a WSL terminal once (it can be closed again;
+running services keep the VM alive). Then verify:
+
 ```bash
-# 1. Postgres: nothing to do — systemd unit is enabled, starts with WSL.
-# 2. LLM runtime (user-space install, does NOT auto-start):
-ollama serve &
-# 3. The app — 0.0.0.0 matters for remote access:
-uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
-# 4. Verify Serve still routes (from WSL; config persists, this just checks):
+systemctl is-active postgresql@18-main ollama consultation-ai
+# and that Serve still routes (config persists, this just checks):
 "/mnt/c/Program Files/Tailscale/tailscale.exe" serve status
 ```
+
+Manual fallback (if ever needed): `ollama serve &` and
+`uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` — 0.0.0.0
+matters for remote access. Logs: `journalctl -u consultation-ai`.
 
 If Postgres is down after a reboot (`pg_isready` says no response), check
 `systemctl status postgresql@18-main`. Mirrored networking means Windows
