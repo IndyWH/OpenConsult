@@ -34,7 +34,7 @@ uv sync    # Python env (uv manages Python 3.12)
 
 | Phase | Status | Notes |
 |---|---|---|
-| 0 — Foundations | **Done except recordings** | Env, Postgres, app, tests all in. Ten mock scripts written (5 routine, 4 red-flag variants, 1 held-out). Real two-voice recordings scheduled for the coming weekend; a disposable TTS sample stands in meanwhile. |
+| 0 — Foundations | **Done except recordings** | Env, Postgres, app, tests all in. Seventeen mock scripts written: 10 English (5 routine, 4 red-flag variants, 1 held-out), 2 Sinhala/English code-switched (`_si`, for the Phase 5 ASR recordings eval), 5 UK private-GP (`_uk`, CDS restraint + buried-red-flag urgency) — see `mock_consultations/README.md`. Real two-voice recordings scheduled for the coming weekend; a disposable TTS sample stands in meanwhile. |
 | 1 — Streaming transcription | **Done** | Voice-tested; lag inside the 2–5 s target. |
 | 2 — Post-consultation note | **Done, pending real-audio validation** | Full pipeline + review UI + eval. TTS-sample-tested; real recordings will exercise ASR-confidence flagging properly. |
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
@@ -229,6 +229,16 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   transcription paths, not just the live one.
 - **Front-runner:** `seniruk/whisper-small-si` (CER 0.035 on both
   sets); challenger `janiduchamika/whisper-small-sinhala-general-185k`.
+- **Code-switched scripts now exist:** `01_chest_pain_si.md` and
+  `03_diabetes_review_si.md` — patient mostly Sinhala with embedded English
+  medical/loan terms ("pressure eka", drug names, test names), doctor mixes
+  both. Each carries the Sinhala-script as-spoken reference transcript
+  (parseable turns), a turn-by-turn romanised reading guide for the readers,
+  the clinical-content marking scheme (identical to the English twin), and
+  the curated English-term list the code-switching metric needs. Draft
+  references generated via `app/mock_scripts.py` sit in
+  `mock_consultations/recordings/refs/*.txt` — correct to as-spoken and
+  freeze before viewing model output, per the pre-registration.
 - **Next:** score the weekend's real recordings with the SAME harness
   (`--manifest` mode; long-form chunked decoding auto-activates) per
   the pre-registered procedure in the eval record — references, curated
@@ -238,6 +248,32 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   Then: translation layer (Gemma/NMT benchmark, plan §4) and
   dual-language transcript storage — the `FinalTranscript` model in the
   plan already anticipates si/en pairs.
+
+## CDS restraint dimension — scripts written, harness pending
+
+A new evaluation dimension the existing eval records don't cover: does the
+CDS keep the differential appropriately **broad** on undifferentiated
+presentations, or does it over-commit? Introduced by the UK private-GP
+series (`_uk`), designed as controlled comparisons:
+
+- **11 (TATT), 12 (dizziness)** — undifferentiated; the differential must
+  stay broad and the urgency alarm must stay silent (negative controls).
+- **13 (migraine)** — the differentiable *positive* control: the picture is
+  textbook, so narrowing confidently IS correct. Proves restraint is
+  calibration, not blanket caution.
+- **14 (giant cell arteritis), 15 (cauda equina)** — subtle emergencies with
+  red flags buried in casual, minimised asides; the alarm must fire. 13 and
+  14 are a controlled headache pair (same complaint, opposite correct
+  behaviour).
+
+Each header carries its Expected clinical content + Expected urgent_actions
+marking schemes, written before any recording. **Deliberately not wired into
+the harnesses yet:** `scripts/evaluate_urgency.py` runs an explicit
+filename→expected dict and `scripts/evaluate_notes.py` globs `[01]*_en.md`,
+so neither picks up `_uk`/`_si` automatically and existing eval runs are
+unaffected. To evaluate once recorded, add the `_uk` names to the urgency
+dict (11/12/13 → False, 14/15 → True); the restraint metric itself
+(differential breadth / over-commitment) still needs a harness.
 
 ## Precise next steps
 
@@ -249,7 +285,12 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   test), and note quality vs marking schemes; append a real-audio section
   to the note-quality eval.
 - **Phase 5:** benchmark done (see status table); next step is the
-  pre-registered recordings eval once the weekend recordings exist.
+  pre-registered recordings eval once the weekend recordings exist. The two
+  `_si` code-switched scripts and their draft refs are written and ready to
+  record.
+- **CDS restraint dimension:** UK `_uk` scripts (11–15) written with marking
+  schemes; wire them into the urgency dict once recorded, and build the
+  differential-breadth metric (see the CDS restraint section above).
 - **Phase 6:** core is built and manually verified (auth + roles, queue,
   three tabs, RBAC, audit log; click-through and adversarial checks done
   2026-07-10 — see status table). Next: Docker Compose packaging, the
