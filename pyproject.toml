@@ -30,6 +30,14 @@ override-dependencies = [
     # speaker-diarization-3.1 directly with the token we have; we call
     # pyannote ourselves in app/finalize.py rather than via whisperx.
     "pyannote-audio==3.4.0",
+    # whisperx declares torchcodec but never imports it (audio loads via its
+    # own ffmpeg subprocess). torchcodec 0.7 cannot load against Ubuntu
+    # 26.04's FFmpeg 8 (needs libavutil 56-59), and its mere presence makes
+    # transformers' chunked ASR pipeline crash at import (it probes
+    # availability by package metadata, then `import torchcodec` fails) —
+    # which broke long-form decoding in scripts/evaluate_sinhala_asr.py.
+    # Excluding it makes transformers skip the torchcodec path entirely.
+    "torchcodec; sys_platform == 'never'",
 ]
 
 [tool.pytest.ini_options]

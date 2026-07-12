@@ -67,6 +67,12 @@ MODELS: dict[str, tuple[str, str, str]] = {
     "janiduchamika-small-185k": ("janiduchamika/whisper-small-sinhala-general-185k", "whisper", "small fine-tune, likely SLR52-trained (CONTAMINATED for this test set)"),
     "subhaka-small": ("Subhaka/whisper-small-Sinhala-Fine_Tune", "whisper", "small fine-tune (2023)"),
     "rrashmini-large-v2": ("RRashmini/whisper-large-v2-sinhala", "whisper", "only large fine-tune found; no tokenizer files -> stock large-v2 processor"),
+    # post-hoc additions (2026-07-12, recordings eval): sibling checkpoints of
+    # the same RRashmini large-v2 training effort, found after the benchmark;
+    # all lack tokenizer files -> same stock large-v2 processor fallback
+    "rrashmini-large": ("RRashmini/whisper-large-sinhala", "whisper", "post-hoc: large-v2-based sibling checkpoint (Dec 21 2024)"),
+    "rrashmini-large-1": ("RRashmini/whisper-large-sinhala-1", "whisper", "post-hoc: large-v2-based sibling checkpoint (Dec 22 2024)"),
+    "rrashmini-large-v2-t1": ("RRashmini/whisper-large-v2-sinhala-t1", "whisper", "post-hoc: large-v2-based sibling checkpoint (Dec 22 2024)"),
     # facebook/mms-1b-all and seamless-m4t-v2 were assessed and EXCLUDED:
     # neither supports Sinhala (checked 2026-07-10; 'sin' absent from the
     # MMS ASR adapter list and from the Seamless language list).
@@ -277,6 +283,18 @@ def load_longform(model_id: str, kind: str):
             feature_extractor=proc.feature_extractor,
             **kwargs,
         )
+    if kind == "whisper" and not getattr(pipe.model.generation_config, "lang_to_id", None):
+        # some fine-tune repos (RRashmini large siblings) ship no
+        # generation_config.json; without lang_to_id the `language` argument
+        # to generate() raises. Borrow the stock config of the same base.
+        from transformers import GenerationConfig
+
+        base = "openai/whisper-large-v2" if "large" in model_id.lower() else "openai/whisper-small"
+        borrowed = GenerationConfig.from_pretrained(base)
+        pipe.model.generation_config = borrowed
+        # the pipeline snapshots its own generation_config at construction and
+        # passes it to generate(), overriding the model's — replace both
+        pipe.generation_config = borrowed
     gen_kwargs = (
         {"language": "sinhala", "task": "transcribe", "num_beams": 5, "do_sample": False}
         if kind == "whisper"

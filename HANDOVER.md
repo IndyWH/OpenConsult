@@ -34,12 +34,12 @@ uv sync    # Python env (uv manages Python 3.12)
 
 | Phase | Status | Notes |
 |---|---|---|
-| 0 — Foundations | **Done except recordings** | Env, Postgres, app, tests all in. Seventeen mock scripts written: 10 English (5 routine, 4 red-flag variants, 1 held-out), 2 Sinhala/English code-switched (`_si`, for the Phase 5 ASR recordings eval), 5 UK private-GP (`_uk`, CDS restraint + buried-red-flag urgency) — see `mock_consultations/README.md`. Real two-voice recordings scheduled for the coming weekend; a disposable TTS sample stands in meanwhile. |
+| 0 — Foundations | **Done except one recording** | Env, Postgres, app, tests all in. Seventeen mock scripts written: 10 English (5 routine, 4 red-flag variants, 1 held-out), 2 Sinhala/English code-switched (`_si`, for the Phase 5 ASR recordings eval), 5 UK private-GP (`_uk`, CDS restraint + buried-red-flag urgency) — see `mock_consultations/README.md`. **Real two-voice recordings made 2026-07-12** through the live app (consultations 66–70), copied to `mock_consultations/recordings/`: routine 01–04 English + `03_diabetes_review_si`. Still to record: `05_epigastric_pain_en` and `01_chest_pain_si`. WAVs gitignored; LFS decision still open. |
 | 1 — Streaming transcription | **Done** | Voice-tested; lag inside the 2–5 s target. |
-| 2 — Post-consultation note | **Done, pending real-audio validation** | Full pipeline + review UI + eval. TTS-sample-tested; real recordings will exercise ASR-confidence flagging properly. |
+| 2 — Post-consultation note | **Done, real-audio validation begun** | Full pipeline + review UI + eval. The 2026-07-12 recordings ran through the full live→Stop→review pipeline as they were made (five consultations; three approved, two awaiting review as of that date) — diarisation and notes held up in use; the formal check against marking schemes + a real-audio section in the note-quality eval are still to do. |
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done** | 9/9 eval; fidelity spot-check logged; corpus is UK/CDC/WHO starter content. |
-| 5 — Sinhala | **Benchmark stage done (2026-07-10)** | 9 candidates benchmarked on two OpenSLR test sets; stock Whisper (incl. our final-pass large-v3) is unusable for Sinhala; best is the `seniruk/whisper-small-si` fine-tune (CER 0.035 on both sets). Recordings-eval procedure pre-registered. See `evals/2026-07-10_sinhala_asr_benchmark.md`. |
+| 5 — Sinhala | **Recordings eval run (2026-07-12); decision pending adjudication** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). Owner's transliteration adjudication pending (`evals/adjudication_03_si_worksheet.md`); fine-tune fallback squarely in scope. See `evals/2026-07-12_sinhala_asr_recordings_eval.md`. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). Remaining build work: Docker Compose packaging, demo script, design pass. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
 
 Every completed phase has an evaluation record in `evals/` with a
@@ -162,6 +162,18 @@ encoded in `pyproject.toml`. Summary:
 - **NICE URLs are not stable contracts**: NG28's /Recommendations chapter
   silently became research-only content. Validate ingestion with expected
   queries, not chunk counts (see RAG eval, finding 1).
+- **torchcodec is excluded via uv override** (2026-07-12): whisperx
+  declares it but never imports it; torchcodec 0.7 can't load against
+  Ubuntu 26.04's FFmpeg 8, and its mere installed presence makes
+  transformers' chunked ASR pipeline throw — which silently produced
+  empty transcripts (uniform WER/CER 1.000) the first time the Sinhala
+  recordings eval ran. If a future dependency really needs torchcodec,
+  it needs FFmpeg ≤7 or a torchcodec release supporting FFmpeg 8.
+- **Models published without config files**: the evaluate_sinhala_asr
+  long-form path patches over repos missing tokenizer files AND missing
+  `generation_config.json` (borrow stock base config — and install it on
+  both the model and the pipeline object; the pipeline snapshots its own
+  copy at construction and that copy wins).
 - Ollama is a user-space install (`~/.local/opt/ollama`), run by the
   `ollama.service` systemd unit since 2026-07-10 (as is the app, via
   `consultation-ai.service` — see the startup sequence below). Models
@@ -239,12 +251,26 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   references generated via `app/mock_scripts.py` sit in
   `mock_consultations/recordings/refs/*.txt` — correct to as-spoken and
   freeze before viewing model output, per the pre-registration.
-- **Next:** score the weekend's real recordings with the SAME harness
-  (`--manifest` mode; long-form chunked decoding auto-activates) per
-  the pre-registered procedure in the eval record — references, curated
-  English-term lists frozen before viewing outputs, transliteration
-  adjudication by the project owner, decision rule already written.
-  Only if the winner falls short on real audio: fine-tune on the 4090.
+- **Recordings eval executed 2026-07-12** on `03_diabetes_review_si`
+  (`evals/2026-07-12_sinhala_asr_recordings_eval.md`): reference frozen by
+  the owner's verbatim attestation, 12-term curated list frozen before any
+  output viewed. Headlines: all models collapse on real conversational
+  code-switched audio (best CER 0.46–0.50 vs 0.035 on read speech);
+  English-term mechanical recall 0/106 for every fine-tune — some
+  transliterations clean (metformin → මෙත්ෆෝමෙන්), some dangerous
+  (gliclazide → වික්පසායිල්). Ranking reshuffled: xlsr-sinhala (CTC) best
+  CER but fragmentary output; seniruk-small best Whisper and best WER.
+- **Off-the-shelf landscape is exhausted:** no seniruk-large exists; the
+  four other RRashmini repos hold only two distinct models (one is the
+  benchmarked large-v2 under another name, byte-identical transcript; the
+  other is worse, 0.710; the medium repo is empty). Post-hoc screen kept
+  separate: `evals/sinhala_asr_results_recordings_posthoc.json`.
+- **Next:** owner's transliteration adjudication
+  (`evals/adjudication_03_si_worksheet.md`, every curated-term occurrence
+  aligned across the top three models), record `01_chest_pain_si` (and
+  `05_epigastric_pain_en` for Phase 0), then the step-7 decision — on
+  these numbers the pre-registered fine-tune fallback (4090, plan §7) is
+  the likely outcome unless adjudicated term recovery changes the picture.
   Then: translation layer (Gemma/NMT benchmark, plan §4) and
   dual-language transcript storage — the `FinalTranscript` model in the
   plan already anticipates si/en pairs.
@@ -277,17 +303,20 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
 
 ## Precise next steps
 
-- **Phase 0 (close out):** record the 5 routine scripts, two voices, per
-  `mock_consultations/README.md`; drop WAVs in
-  `mock_consultations/recordings/`; decide Git LFS.
-- **Phase 2 (validate on real audio):** run each recording through the
-  Stop→review flow; check diarisation/roles, confidence flags (first real
-  test), and note quality vs marking schemes; append a real-audio section
-  to the note-quality eval.
-- **Phase 5:** benchmark done (see status table); next step is the
-  pre-registered recordings eval once the weekend recordings exist. The two
-  `_si` code-switched scripts and their draft refs are written and ready to
-  record.
+- **Phase 0 (close out):** recorded 2026-07-12: routine 01–04 English +
+  `03_diabetes_review_si` (via the live app; WAVs in
+  `mock_consultations/recordings/`, named per README). Still to record:
+  `05_epigastric_pain_en` and `01_chest_pain_si`. Decide Git LFS.
+- **Phase 2 (validate on real audio):** the recordings already ran the
+  full live→Stop→review pipeline as they were made; still to do: review
+  the two consultations left awaiting review, check diarisation/roles and
+  confidence flags (first real test) against marking schemes, and append
+  a real-audio section to the note-quality eval.
+- **Phase 5:** recordings eval run on `03_diabetes_review_si` — see status
+  table and `evals/2026-07-12_sinhala_asr_recordings_eval.md`. Next: the
+  owner's transliteration adjudication
+  (`evals/adjudication_03_si_worksheet.md`), record `01_chest_pain_si`,
+  then the model decision (fine-tune fallback likely).
 - **CDS restraint dimension:** UK `_uk` scripts (11–15) written with marking
   schemes; wire them into the urgency dict once recorded, and build the
   differential-breadth metric (see the CDS restraint section above).
@@ -359,6 +388,18 @@ on Windows is listening on 5432 (`netstat.exe -ano | findstr 5432`).
 Note: testing the HTTPS URL with curl *from inside WSL* fails (hairpin
 limitation of mirrored networking) — test from Windows
 (`curl.exe https://mlrig.tail93fa1d.ts.net`) or another tailnet device.
+
+**If the web interface goes unreachable while everything looks healthy**
+(post-mortem of the 2026-07-11 overnight "crash" that wasn't): journals
+showed app/Ollama/Postgres ran perfectly all night, Windows never slept,
+Tailscale never restarted — but no request reached uvicorn after 22:38.
+The one link that fails silently and leaves no logs is the Windows↔WSL
+mirrored-networking bridge, which both access routes (localhost AND
+Tailscale Serve → 127.0.0.1:8000) cross. Before rebooting, run
+`curl.exe http://localhost:8000/login` in Windows PowerShell: if it fails
+while `systemctl status consultation-ai` says active, the bridge is the
+culprit — `wsl --shutdown` + reopening a WSL terminal usually rebuilds it
+without a full Windows reboot.
 
 Then from any tailnet device: https://mlrig.tail93fa1d.ts.net
 (log in as a doctor; mic permission prompt should appear on the live page).

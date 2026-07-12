@@ -1,0 +1,17 @@
+# Frozen curated English-term list — 03_diabetes_review_si
+# Pre-registration step 5 (evals/2026-07-10_sinhala_asr_benchmark.md).
+# Frozen by project owner 2026-07-12, BEFORE viewing any model output.
+# Reference: draft of 2026-07-11 declared as-spoken (script read verbatim,
+# owner's attestation 2026-07-12) and frozen unchanged.
+gliclazide
+metformin
+HbA1c
+cholesterol
+diabetes
+monofilament
+blood pressure
+losartan
+atorvastatin
+neuropathy
+ulcer
+referral
