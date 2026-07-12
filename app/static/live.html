@@ -27,6 +27,7 @@
     border: 1px solid #888; cursor: pointer; background: #1a7f37; color: white;
   }
   button.stop { background: #b02a37; }
+  button.ready { background: #0b5ed7; }
   button:disabled { opacity: .5; cursor: not-allowed; }
   #status { font-size: .9rem; opacity: .8; }
   #status::before {
@@ -346,11 +347,16 @@ async function start() {
     else if (msg.type === 'guidelines') { renderGuidelines(msg); }
     else if (msg.type === 'cds_unavailable') { cdsEl.innerHTML = ''; cdsEl.appendChild(el('p', 'idle', msg.detail)); }
     else if (msg.type === 'done') {
-      setStatus('stopped — finalising note…');
       ws.close(); ws = null;
       if (msg.consultation_id) {
-        // Stop triggers the finalisation pipeline; take the doctor to review.
-        window.location.href = '/review/' + msg.consultation_id;
+        // Finalisation (diarisation + note) runs in the background. Keep the
+        // live view — transcript, CDS panel and any urgent alert stay on
+        // screen — and flip the button to "See results" when the note is ready.
+        awaitResults(msg.consultation_id);
+      } else {
+        btn.textContent = 'Start';
+        btn.disabled = false;
+        setStatus('stopped — nothing was recorded');
       }
     }
   };
@@ -381,17 +387,56 @@ async function start() {
 async function stop() {
   recording = false;
   btn.disabled = true;
+  btn.textContent = 'Please wait…';
+  btn.classList.remove('stop');
   setStatus('finishing…');
   if (workletNode) { workletNode.disconnect(); workletNode = null; }
   if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
   if (audioCtx) { await audioCtx.close(); audioCtx = null; }
-  if (ws && ws.readyState === WebSocket.OPEN) ws.send('stop'); // server replies "done"
-  btn.textContent = 'Start';
-  btn.classList.remove('stop');
-  btn.disabled = false;
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send('stop'); // server replies "done", which starts the results wait
+  } else {
+    btn.textContent = 'Start';
+    btn.disabled = false;
+    setStatus('stopped — connection was lost');
+  }
 }
 
-btn.addEventListener('click', () => (recording ? stop() : start()));
+let resultUrl = null;
+
+async function awaitResults(cid) {
+  setStatus('processing — diarisation and note drafting (usually about a minute)…');
+  while (true) {
+    await new Promise(r => setTimeout(r, 3000));
+    let row = null;
+    try {
+      const rows = await (await fetch('/api/consultations')).json();
+      row = rows.find(c => c.id === cid);
+    } catch (e) { continue; }  // transient network error — keep waiting
+    if (!row) continue;
+    if (row.status === 'awaiting_review' || row.status === 'approved') {
+      resultUrl = '/review/' + cid;
+      btn.textContent = 'See results';
+      btn.classList.add('ready');
+      btn.disabled = false;
+      setStatus('note ready for review');
+      return;
+    }
+    if (row.status === 'failed') {
+      resultUrl = '/review/' + cid;
+      btn.textContent = 'See details';
+      btn.disabled = false;
+      setStatus('finalisation failed — open the consultation for details');
+      return;
+    }
+  }
+}
+
+btn.addEventListener('click', () => {
+  if (recording) { stop(); }
+  else if (resultUrl) { window.location.href = resultUrl; }
+  else { start(); }
+});
 </script>
 </body>
 </html>
