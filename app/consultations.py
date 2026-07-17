@@ -28,6 +28,11 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS urgent_actions jsonb;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS urgent_ack_at timestamptz;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS patient_id int;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS doctor_id int;
+-- Governance (admin): voiding hides a consultation from working views but
+-- keeps its content in the database; only the separate purge step deletes.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS voided_at timestamptz;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS voided_by int;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS void_reason text;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -82,28 +87,35 @@ async def latest_for_patient_today(patient_id: int) -> int | None:
         row = await (
             await conn.execute(
                 "SELECT id FROM consultation WHERE patient_id = %s"
-                " AND started_at::date = CURRENT_DATE ORDER BY id DESC LIMIT 1",
+                " AND started_at::date = CURRENT_DATE AND voided_at IS NULL"
+                " ORDER BY id DESC LIMIT 1",
                 (patient_id,),
             )
         ).fetchone()
     return row[0] if row else None
 
 
-async def list_consultations() -> list[dict]:
-    """Worklist rows: no clinical content — safe for all logged-in roles."""
+async def list_consultations(include_voided: bool = False) -> list[dict]:
+    """Worklist rows: no clinical content — safe for all logged-in roles.
+    Voided consultations appear only in the admin view (include_voided)."""
     async with await _conn() as conn:
         rows = await (
             await conn.execute(
-                "SELECT c.id, c.started_at, c.status, p.name, u.display_name"
+                "SELECT c.id, c.started_at, c.status, p.name, u.display_name,"
+                " c.voided_at, c.void_reason, v.display_name"
                 " FROM consultation c"
                 " LEFT JOIN patient p ON p.id = c.patient_id"
                 " LEFT JOIN app_user u ON u.id = c.doctor_id"
-                " ORDER BY c.id DESC"
+                " LEFT JOIN app_user v ON v.id = c.voided_by"
+                + ("" if include_voided else " WHERE c.voided_at IS NULL")
+                + " ORDER BY c.id DESC"
             )
         ).fetchall()
     return [
         {"id": r[0], "started_at": str(r[1])[:16], "status": r[2],
-         "patient_name": r[3] or "—", "doctor_name": r[4] or "—"}
+         "patient_name": r[3] or "—", "doctor_name": r[4] or "—",
+         "voided_at": str(r[5])[:16] if r[5] else None,
+         "void_reason": r[6], "voided_by": r[7]}
         for r in rows
     ]
 
@@ -123,7 +135,8 @@ async def get_consultation(cid: int) -> dict | None:
         row = await (
             await conn.execute(
                 "SELECT c.id, c.started_at, c.status, c.audio_path, c.error,"
-                " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name"
+                " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name,"
+                " c.voided_at, c.void_reason"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -140,6 +153,8 @@ async def get_consultation(cid: int) -> dict | None:
         "urgent_ack_at": str(row[6]) if row[6] else None,
         "patient_id": row[7],
         "patient_name": row[8],
+        "voided_at": str(row[9]) if row[9] else None,
+        "void_reason": row[10],
     }
 
 
@@ -244,6 +259,58 @@ async def latest_note(cid: int) -> dict | None:
         return None
     return {"version": row[0], "content": row[1], "status": row[2],
             "approved_text": row[3]}
+
+
+async def void_consultation(cid: int, admin_id: int, reason: str) -> dict | None:
+    """Admin error-correction: mark voided (any status, including approved
+    — that is the point). Content stays in the database; working views
+    filter on voided_at. Returns the prior status, or None when the
+    consultation doesn't exist or is already voided."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET voided_at = now(), voided_by = %s,"
+                " void_reason = %s WHERE id = %s AND voided_at IS NULL"
+                " RETURNING status, patient_id",
+                (admin_id, reason, cid),
+            )
+        ).fetchone()
+    return {"from_status": row[0], "patient_id": row[1]} if row else None
+
+
+async def purge_voided(only_ids: list[int] | None = None) -> dict:
+    """The second, explicit deletion step: hard-delete already-voided
+    consultations (turns and notes cascade) and any synthetic patients
+    left with no remaining consultations. Never touches un-voided rows.
+    only_ids narrows the purge (tests use it to stay surgical); the admin
+    endpoint purges all voided. Returns counts + audio paths for the
+    caller to unlink after commit."""
+    async with await _conn() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT id, audio_path, patient_id FROM consultation"
+                " WHERE voided_at IS NOT NULL"
+                + (" AND id = ANY(%s)" if only_ids is not None else ""),
+                ((only_ids,) if only_ids is not None else ()),
+            )
+        ).fetchall()
+        cids = [r[0] for r in rows]
+        patient_ids = sorted({r[2] for r in rows if r[2] is not None})
+        await conn.execute("DELETE FROM consultation WHERE id = ANY(%s)", (cids,))
+        purged_patients = await (
+            await conn.execute(
+                "DELETE FROM patient p WHERE p.id = ANY(%s) AND NOT EXISTS"
+                " (SELECT 1 FROM consultation c WHERE c.patient_id = p.id)"
+                " RETURNING p.id",
+                (patient_ids,),
+            )
+        ).fetchall()
+    return {
+        "consultations": len(cids),
+        "consultation_ids": cids,
+        "patients": len(purged_patients),
+        "audio_paths": [r[1] for r in rows if r[1]],
+    }
 
 
 async def approve_note(cid: int, approved_text: str) -> None:

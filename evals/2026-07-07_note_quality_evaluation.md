@@ -128,6 +128,56 @@ later via `DIARIZATION_MODEL` after accepting its licence), torch 2.8
   real accented audio is the true test.
 - n=1 per script, deterministic settings.
 
+## Addendum 2026-07-17 — fidelity specimen 4: wholesale fabrication on an
+## empty transcript, and the grounding gate it forced
+
+The fourth and most severe fidelity specimen, found in live use
+(consultation #78, 2026-07-15). The transcript was a mic check — one turn,
+"Check one, two, three. Check one, two, three." — yet the generator
+produced a complete, internally coherent **fabricated angina
+consultation**: exertional chest pain radiating to the left arm, 2-month
+timeline, 20-pack-year ex-smoker, father's MI at 55, Ramipril 5mg,
+Atorvastatin 20mg, BP 150/95, "possible angina", ECG-then-cardiology plan.
+
+Mechanism, established by investigation:
+
+- **Not prompt regurgitation**: `NOTE_PROMPT` contains no few-shot example.
+- **Not context leakage**: `draft_note` sends a single stateless call
+  containing only this consultation's turns.
+- **Not a Regenerate-path quirk**: fresh generation and Regenerate share
+  the same `draft_note` call; note v1 (fresh) and v2 (Regenerate) were
+  byte-identical (temperature 0, seed 42). This is pure confabulation:
+  given no clinical content, MedGemma writes the archetypal GP
+  consultation, and chest pain is the archetype.
+- **Citation validation worked** — all 12 claims came back `uncited` —
+  but nothing consumed that signal; the note reached the review page with
+  only per-claim "(uncited — verify manually)" tags, and Approve was
+  available.
+
+Fix (2026-07-17): the note pipeline now applies the same demotion rule as
+the RAG layer. `validate_and_gate` (`app/notes.py`) counts validly-cited
+claims after citation validation; when fewer than
+`NOTE_MIN_CITED_FRACTION` (default 0.5) of claims cite a real turn — or
+the draft has no claims — the note is replaced by a refusal
+(`refusal: true` + reason + claim counts) and the fabricated draft is
+discarded. The review page renders the refusal ("insufficient clinical
+content to draft a note") instead of a draft and hides Approve/Copy;
+the approve API independently returns 409 for a refusal note, so approval
+is impossible client- and server-side. Regenerate remains available for
+the correct-transcript-then-retry loop.
+
+Verification: regenerating #78 post-fix produced note v3 = refusal (the
+model fabricated 18 claims that run; 0 cited; all suppressed). Tests in
+`tests/test_note_gating.py`: the #78 shape → refusal; sparse-but-real
+transcripts stay notes; the 50% threshold boundary; refusal plain-text
+serialisation; approve → 409; and an Ollama-gated end-to-end regression
+(real model, mic-check transcript → refusal).
+
+Classification note: specimens 1–3 were distortions of real content; this
+one is fabrication of the entire encounter — caught by citation
+validation, previously unblocked by the UI. The gate turns the existing
+detection into an enforcement.
+
 ## Reproduce
 
 ```bash

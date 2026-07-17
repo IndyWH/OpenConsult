@@ -14,8 +14,8 @@ from pathlib import Path
 
 import psycopg
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import Cookie, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import Depends
@@ -149,6 +149,24 @@ async def me(user: dict = Depends(api_user())) -> dict:
     return user
 
 
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post("/api/change-password")
+async def change_password(
+    body: ChangePasswordBody, user: dict = Depends(api_user())
+) -> JSONResponse:
+    """Self-service, any logged-in role; the current password gates it."""
+    if len(body.new_password) < 8:
+        return JSONResponse(status_code=400, content={"error": "password too short (min 8)"})
+    if not await auth.change_password(user["id"], body.current_password, body.new_password):
+        return JSONResponse(status_code=403, content={"error": "current password is incorrect"})
+    await audit.log(user["id"], "user.password_changed", "user", user["id"])
+    return JSONResponse(content={"ok": True})
+
+
 @app.get("/today")
 def today_page(user: dict = Depends(page_user())) -> FileResponse:
     return FileResponse(STATIC_DIR / "today.html")
@@ -167,6 +185,101 @@ def audit_page(user: dict = Depends(page_user("admin"))) -> FileResponse:
 @app.get("/api/audit")
 async def audit_list(user: dict = Depends(api_user("admin"))) -> list[dict]:
     return await audit.recent()
+
+
+# -------------------------------------------------- admin: users, void, purge
+
+@app.get("/users")
+def users_page(user: dict = Depends(page_user("admin"))) -> FileResponse:
+    return FileResponse(STATIC_DIR / "users.html")
+
+
+@app.get("/api/admin/users")
+async def admin_users(user: dict = Depends(api_user("admin"))) -> list[dict]:
+    return await auth.list_users()
+
+
+@app.post("/api/admin/users/{uid}/deactivate")
+async def admin_deactivate_user(
+    uid: int, user: dict = Depends(api_user("admin"))
+) -> JSONResponse:
+    """Governance, not deletion: the account can no longer log in and its
+    sessions stop resolving, but the row (and every audit/consultation
+    reference to it) is preserved."""
+    if uid == user["id"]:
+        return JSONResponse(status_code=409, content={"error": "you cannot deactivate your own account"})
+    if not await auth.set_user_active(uid, False):
+        return JSONResponse(
+            status_code=409,
+            content={"error": "cannot deactivate: user not found or last active admin"},
+        )
+    await audit.log(user["id"], "user.deactivated", "user", uid)
+    return JSONResponse(content={"ok": True})
+
+
+@app.post("/api/admin/users/{uid}/reactivate")
+async def admin_reactivate_user(
+    uid: int, user: dict = Depends(api_user("admin"))
+) -> JSONResponse:
+    if not await auth.set_user_active(uid, True):
+        return JSONResponse(status_code=404, content={"error": "no such user"})
+    await audit.log(user["id"], "user.reactivated", "user", uid)
+    return JSONResponse(content={"ok": True})
+
+
+@app.get("/api/admin/consultations")
+async def admin_consultations(user: dict = Depends(api_user("admin"))) -> list[dict]:
+    """All consultations, any status or doctor, voided included."""
+    return await consultations.list_consultations(include_voided=True)
+
+
+class VoidBody(BaseModel):
+    reason: str
+
+
+@app.post("/api/admin/consultations/{cid}/void")
+async def admin_void_consultation(
+    cid: int, body: VoidBody, user: dict = Depends(api_user("admin"))
+) -> JSONResponse:
+    """Error correction on any status, including approved. The reason is
+    mandatory; content stays in the database until an explicit purge."""
+    reason = body.reason.strip()
+    if not reason:
+        return JSONResponse(status_code=400, content={"error": "a reason is required to void"})
+    voided = await consultations.void_consultation(cid, user["id"], reason)
+    if voided is None:
+        return JSONResponse(status_code=409, content={"error": "not found or already voided"})
+    # Free any open queue entry for this patient today so a voided live
+    # session can't hold the one-active-consultation guard.
+    if voided["patient_id"]:
+        for entry in await frontdesk.today_queue():
+            if (entry["patient_id"] == voided["patient_id"]
+                    and entry["status"] in ("waiting", "in_consultation")):
+                await frontdesk.close_entry(entry["entry_id"], "cancelled")
+                await audit.log(user["id"], "queue.cancelled", "queue_entry",
+                                entry["entry_id"], {"via": "consultation.voided"})
+    await audit.log(user["id"], "consultation.voided", "consultation", cid,
+                    {"reason": reason, "from_status": voided["from_status"]})
+    return JSONResponse(content={"ok": True})
+
+
+@app.post("/api/admin/purge-voided")
+async def admin_purge_voided(user: dict = Depends(api_user("admin"))) -> dict:
+    """The second deliberate step after voiding: hard-delete voided
+    consultations and their orphaned synthetic patients. UI double-confirms."""
+    purged = await consultations.purge_voided()
+    removed_files = 0
+    for path in purged["audio_paths"]:
+        with contextlib.suppress(OSError):
+            os.unlink(path)
+            removed_files += 1
+    await audit.log(user["id"], "data.purged", "consultation", None,
+                    {"consultations": purged["consultations"],
+                     "consultation_ids": purged["consultation_ids"],
+                     "patients": purged["patients"],
+                     "audio_files": removed_files})
+    return {"ok": True, "consultations": purged["consultations"],
+            "patients": purged["patients"], "audio_files": removed_files}
 
 
 # -------------------------------------------------------------------- queue
@@ -325,8 +438,11 @@ def review_page(cid: int, user: dict = Depends(page_user(*CLINICAL_ROLES))) -> F
 
 
 async def _not_editable(cid: int) -> JSONResponse | None:
-    """Approved consultations are read-only — the signed record is final."""
+    """Approved consultations are read-only — the signed record is final.
+    Voided ones are frozen too: content is preserved for audit, not work."""
     consultation = await consultations.get_consultation(cid)
+    if consultation and consultation["voided_at"]:
+        return JSONResponse(status_code=409, content={"error": "consultation is voided"})
     if consultation and consultation["status"] == "approved":
         return JSONResponse(status_code=409, content={"error": "consultation is approved and read-only"})
     return None
@@ -339,6 +455,9 @@ async def consultation_state(
     consultation = await consultations.get_consultation(cid)
     if consultation is None:
         return JSONResponse(status_code=404, content={"error": "not found"})
+    if consultation["voided_at"] and user["role"] != "admin":
+        # Voided consultations exist only in the admin view.
+        return JSONResponse(status_code=410, content={"error": "consultation voided"})
     turns = await consultations.get_turns(cid)
     note = await consultations.latest_note(cid)
     plain = note_as_plain_text(note["content"]) if note else None
@@ -363,6 +482,13 @@ async def approve(
         return JSONResponse(
             status_code=409,
             content={"error": "Unresolved urgent actions must be acknowledged first."},
+        )
+    note = await consultations.latest_note(cid)
+    if note is None or note["content"].get("refusal"):
+        return JSONResponse(
+            status_code=409,
+            content={"error": "No approvable draft: the transcript had insufficient"
+                     " clinical content. Correct the transcript and regenerate."},
         )
     await consultations.approve_note(cid, body.text)
     await audit.log(user["id"], "note.approved", "consultation", cid)
@@ -587,13 +713,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
 
 
 @app.get("/")
-def root() -> dict:
-    return {
-        "app": "Consultation AI",
-        "status": "hello, world",
-        "phase": 0,
-        "warning": "Prototype for research/education only. Not for real patients.",
-    }
+def root(session: str | None = Cookie(default=None, alias=COOKIE_NAME)) -> RedirectResponse:
+    """Land on Today when a session cookie is valid, else the login page."""
+    destination = "/today" if auth.verify_session(session) else "/login"
+    return RedirectResponse(destination, status_code=307)
 
 
 @app.get("/health")

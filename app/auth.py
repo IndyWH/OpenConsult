@@ -40,6 +40,10 @@ CREATE TABLE IF NOT EXISTS app_user (
     role text NOT NULL CHECK (role IN ('doctor', 'receptionist', 'admin')),
     created_at timestamptz NOT NULL DEFAULT now()
 );
+-- Governance: accounts are deactivated, never deleted — audit rows and
+-- consultations reference them and the names must survive for the record.
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
 """
 
 
@@ -102,6 +106,41 @@ def _row_to_user(row) -> dict:
     return {"id": row[0], "username": row[1], "display_name": row[2], "role": row[3]}
 
 
+async def list_users() -> list[dict]:
+    """The admin Users view: every account, active or not."""
+    async with await _conn() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT id, username, display_name, role, created_at,"
+                " last_login_at, active FROM app_user ORDER BY id"
+            )
+        ).fetchall()
+    return [
+        {"id": r[0], "username": r[1], "display_name": r[2], "role": r[3],
+         "created_at": str(r[4])[:16], "last_login_at": str(r[5])[:16] if r[5] else None,
+         "active": r[6]}
+        for r in rows
+    ]
+
+
+async def set_user_active(user_id: int, active: bool, conn=None) -> bool:
+    """Deactivate/reactivate an account. Deactivation is refused (returns
+    False) when it would leave no active admin — the guard is inside the
+    UPDATE so a concurrent deactivation can't slip past it. The optional
+    conn lets tests exercise the last-admin guard inside a rolled-back
+    transaction instead of touching real accounts."""
+    sql = (
+        "UPDATE app_user SET active = %s WHERE id = %s AND (%s OR"
+        " role != 'admin' OR EXISTS (SELECT 1 FROM app_user"
+        "   WHERE role = 'admin' AND active AND id != %s)) RETURNING id"
+    )
+    params = (active, user_id, active, user_id)
+    if conn is not None:
+        return await (await conn.execute(sql, params)).fetchone() is not None
+    async with await _conn() as conn:
+        return await (await conn.execute(sql, params)).fetchone() is not None
+
+
 async def create_user(username: str, password: str, display_name: str, role: str) -> dict:
     if role not in ROLES:
         raise ValueError(f"invalid role {role!r}")
@@ -120,11 +159,13 @@ async def create_user(username: str, password: str, display_name: str, role: str
 
 
 async def get_user(user_id: int) -> dict | None:
+    """Active accounts only: a deactivated user's (still-signed) session
+    cookies stop resolving to a user, which is what invalidates them."""
     async with await _conn() as conn:
         row = await (
             await conn.execute(
-                "SELECT id, username, display_name, role FROM app_user WHERE id = %s",
-                (user_id,),
+                "SELECT id, username, display_name, role FROM app_user"
+                " WHERE id = %s AND active", (user_id,),
             )
         ).fetchone()
     return _row_to_user(row) if row else None
@@ -135,12 +176,65 @@ async def authenticate(username: str, password: str) -> dict | None:
         row = await (
             await conn.execute(
                 "SELECT id, username, display_name, role, password_hash"
-                " FROM app_user WHERE username = %s", (username,),
+                " FROM app_user WHERE username = %s AND active", (username,),
             )
         ).fetchone()
-    if row and verify_password(password, row[4]):
-        return _row_to_user(row)
+        if row and verify_password(password, row[4]):
+            await conn.execute(
+                "UPDATE app_user SET last_login_at = now() WHERE id = %s", (row[0],)
+            )
+            return _row_to_user(row)
     return None
+
+
+async def change_password(user_id: int, current: str, new: str) -> bool:
+    """Self-service change: the current password must verify first."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT password_hash FROM app_user WHERE id = %s AND active",
+                (user_id,),
+            )
+        ).fetchone()
+        if row is None or not verify_password(current, row[0]):
+            return False
+        await conn.execute(
+            "UPDATE app_user SET password_hash = %s WHERE id = %s",
+            (hash_password(new), user_id),
+        )
+    return True
+
+
+async def reset_password(username: str, new: str) -> bool:
+    """Break-glass reset, no current password — server-shell CLI only
+    (scripts/manage_users.py). Never exposed over HTTP."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE app_user SET password_hash = %s WHERE username = %s"
+                " RETURNING id",
+                (hash_password(new), username),
+            )
+        ).fetchone()
+    return row is not None
+
+
+async def set_role(username: str, role: str) -> bool:
+    """Promote/demote — server-shell CLI only. Refuses to demote the last
+    active admin, same invariant as deactivation."""
+    if role not in ROLES:
+        raise ValueError(f"invalid role {role!r}")
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE app_user SET role = %s WHERE username = %s AND"
+                " (%s = 'admin' OR role != 'admin' OR EXISTS"
+                "  (SELECT 1 FROM app_user WHERE role = 'admin' AND active"
+                "   AND username != %s)) RETURNING id",
+                (role, username, role, username),
+            )
+        ).fetchone()
+    return row is not None
 
 
 # ------------------------------------------------------------- dependencies

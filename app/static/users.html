@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Consultation AI — Users</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+         max-width: 880px; margin: 0 auto; padding: 1.5rem; }
+  h1 { font-size: 1.25rem; }
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; font-size: .75rem; text-transform: uppercase;
+       letter-spacing: .05em; opacity: .6; padding: .4rem .5rem; }
+  td { padding: .5rem; border-top: 1px solid #8883; }
+  tr.inactive td { opacity: .55; }
+  .badge { border-radius: 5px; padding: .1rem .5rem; font-size: .78rem; font-weight: 600; }
+  .badge.active { background: #1a7f3733; color: #1a7f37; }
+  .badge.inactive { background: #d32f2f33; color: #d32f2f; }
+  .badge.role { background: #8883; }
+  button { padding: .25rem .7rem; border-radius: 6px; border: 1px solid #888;
+           background: transparent; color: inherit; cursor: pointer; font-size: .82rem; }
+  .hint { font-size: .8rem; opacity: .55; }
+  .err { color: #d32f2f; font-size: .85rem; min-height: 1.2em; }
+</style>
+</head>
+<body>
+<h1>Users</h1>
+<p class="hint">Accounts are deactivated, never deleted — names stay attached to
+their audit events and consultations. A deactivated user cannot log in and
+existing sessions stop working. You cannot deactivate yourself or the last
+active admin.</p>
+<div class="err" id="err"></div>
+<table>
+  <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Created</th>
+    <th>Last login</th><th>Status</th><th></th></tr></thead>
+  <tbody id="rows"></tbody>
+</table>
+
+<script src="/static/nav.js"></script>
+<script>
+const errEl = document.getElementById('err');
+
+async function act(uid, verb) {
+  errEl.textContent = '';
+  const response = await fetch(`/api/admin/users/${uid}/${verb}`, {method: 'POST'});
+  if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
+  load();
+}
+
+async function load() {
+  const users = await (await fetch('/api/admin/users')).json();
+  const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
+  for (const u of users) {
+    const tr = document.createElement('tr');
+    if (!u.active) tr.className = 'inactive';
+    const canDeactivate = u.active && u.id !== window.ME.id;
+    tr.innerHTML =
+      `<td>${u.id}</td><td>${u.display_name}</td><td>${u.username}</td>` +
+      `<td><span class="badge role">${u.role}</span></td>` +
+      `<td>${u.created_at}</td><td>${u.last_login_at || '—'}</td>` +
+      `<td><span class="badge ${u.active ? 'active' : 'inactive'}">${u.active ? 'active' : 'inactive'}</span></td>` +
+      '<td></td>';
+    const cell = tr.lastElementChild;
+    const btn = document.createElement('button');
+    if (u.active) {
+      btn.textContent = 'Deactivate';
+      btn.disabled = !canDeactivate;
+      btn.title = u.id === window.ME.id ? 'You cannot deactivate your own account' : '';
+      btn.addEventListener('click', () => act(u.id, 'deactivate'));
+    } else {
+      btn.textContent = 'Reactivate';
+      btn.addEventListener('click', () => act(u.id, 'reactivate'));
+    }
+    cell.appendChild(btn);
+    tbody.appendChild(tr);
+  }
+}
+
+document.addEventListener('me-ready', load);
+</script>
+</body>
+</html>

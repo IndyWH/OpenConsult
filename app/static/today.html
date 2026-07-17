@@ -24,6 +24,8 @@
   form { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; }
   input, select { padding: .4rem .6rem; border-radius: 6px; border: 1px solid #8886;
                   background: transparent; color: inherit; }
+  /* Keep select dropdown options readable in dark mode (see login.html). */
+  select, option { background: Canvas; color: CanvasText; }
   .hint { font-size: .8rem; opacity: .55; }
 </style>
 </head>

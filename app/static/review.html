@@ -65,6 +65,10 @@
   #urgentBanner .caveat { font-size: .82rem; opacity: .8; margin: .5rem 0; }
   #urgentBanner button { background: #d32f2f; border-color: #d32f2f; color: white; }
   #urgentBanner .acked { font-size: .82rem; color: #1a7f37; font-weight: 600; }
+  .refusal { border: 1px solid #b02a37; background: #b02a3714; border-radius: 8px;
+             padding: .75rem 1rem; }
+  .refusal h3 { color: #b02a37; font-size: .9rem; margin: 0 0 .4rem; }
+  .refusal .detail { font-size: .85rem; opacity: .8; }
   #processing { text-align: center; padding: 3rem 1rem; opacity: .7; }
   .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; margin-right: .5rem;
              border: 3px solid #8885; border-top-color: #1a7f37; border-radius: 50%;
@@ -132,6 +136,11 @@ function renderStatus() {
   const badge = el('span', 'badge' + (state.status === 'approved' ? ' approved' : ''), state.status.replace('_',' '));
   statusEl.appendChild(badge);
   if (state.note) statusEl.append(` · note v${state.note.version}`);
+  if (state.voided_at) {
+    const voided = el('span', 'badge', 'VOIDED: ' + (state.void_reason || ''));
+    voided.style.color = '#b02a37';
+    statusEl.appendChild(voided);
+  }
 }
 
 function renderTranscript() {
@@ -164,6 +173,21 @@ function renderTranscript() {
 
 function renderNote() {
   noteEl.innerHTML = '';
+  if (state.note && state.note.content.refusal) {
+    const box = el('div', 'refusal');
+    box.appendChild(el('h3', null, 'No draft note — insufficient clinical content'));
+    box.appendChild(el('p', null,
+      'The transcript contains no or insufficient clinical content to draft a note.'));
+    box.appendChild(el('p', 'detail', state.note.content.refusal_reason));
+    box.appendChild(el('p', 'detail',
+      'If the consultation did happen, correct the transcript (double-click a line) and Regenerate. This consultation cannot be approved without a grounded draft.'));
+    noteEl.appendChild(box);
+    document.getElementById('approve').style.display = 'none';
+    document.getElementById('copy').style.display = 'none';
+    return;
+  }
+  document.getElementById('approve').style.display = '';
+  document.getElementById('copy').style.display = '';
   const sections = [['subjective','S — Subjective'], ['objective','O — Objective'],
                     ['assessment','A — Assessment'], ['plan','P — Plan']];
   for (const [key, heading] of sections) {
@@ -238,8 +262,11 @@ async function refresh() {
 
 function applyReadOnly() {
   // Approved = signed record: no edits, no regeneration, copy still allowed.
-  const locked = state.status === 'approved';
-  document.getElementById('approve').style.display = locked ? 'none' : '';
+  // Voided (admin inspection) is read-only too. A refusal has no approvable
+  // draft: Approve stays hidden (renderNote).
+  const locked = state.status === 'approved' || !!state.voided_at;
+  const refused = state.note && state.note.content.refusal;
+  document.getElementById('approve').style.display = (locked || refused) ? 'none' : '';
   document.getElementById('regen').style.display = locked ? 'none' : '';
   document.getElementById('swap').style.display = locked ? 'none' : '';
   if (locked) {

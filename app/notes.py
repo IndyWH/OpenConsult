@@ -24,6 +24,12 @@ OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 NOTE_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M")
 
 LOW_CONFIDENCE = float(os.getenv("ASR_LOW_CONFIDENCE", "0.60"))
+# Below this fraction of validly-cited claims the note is demoted to a
+# refusal (same rule as the RAG layer: uncited claims are worthless, and a
+# note that is substantially uncited is fabrication, not documentation).
+# Seen in the wild: a mic-check transcript produced a fully fabricated
+# angina consultation, every claim uncited (consultation #78, 2026-07-15).
+MIN_CITED_FRACTION = float(os.getenv("NOTE_MIN_CITED_FRACTION", "0.5"))
 # Numbers, dose units, laterality: the content classes where an ASR slip
 # changes clinical meaning (gliclazide 80 vs 18; left vs right).
 _LOAD_BEARING = re.compile(
@@ -88,6 +94,59 @@ def format_turns(turns: list[dict]) -> str:
     return "\n".join(f"[{t['idx']}] {t['role']}: {t['text']}" for t in turns)
 
 
+SECTIONS = ("subjective", "objective", "assessment", "plan")
+
+
+def validate_and_gate(note: dict, turns: list[dict]) -> dict:
+    """Validate citations, flag risky claims, and demote ungrounded notes.
+
+    Pure post-processing on the model's output — separated from the model
+    call so the gating logic is testable without Ollama.
+
+    The demotion rule mirrors the RAG layer: every claim must cite real
+    transcript turns; when fewer than MIN_CITED_FRACTION of claims do (or
+    the note has no claims at all), the whole draft is replaced by a
+    refusal. A substantially-uncited note is fabrication — the model
+    inventing a plausible consultation the transcript never contained —
+    and must never be presented for review or approval.
+    """
+    by_idx = {t["idx"]: t for t in turns}
+    total = cited = 0
+    for section in SECTIONS:
+        for claim in note[section]:
+            valid = sorted({n for n in claim["turns"] if n in by_idx})
+            claim["turns"] = valid
+            claim["uncited"] = not valid
+            total += 1
+            cited += bool(valid)
+            claim["flagged"] = bool(
+                valid
+                and _LOAD_BEARING.search(claim["text"])
+                and any(by_idx[n]["confidence"] < LOW_CONFIDENCE for n in valid)
+            )
+
+    if total == 0 or cited / total < MIN_CITED_FRACTION:
+        return {
+            "refusal": True,
+            "refusal_reason": (
+                "The transcript contains no or insufficient clinical content "
+                "to draft a note: "
+                + (
+                    f"only {cited} of {total} draft claims could cite a "
+                    "transcript turn"
+                    if total
+                    else "the draft contained no claims at all"
+                )
+                + f" (threshold: {MIN_CITED_FRACTION:.0%} cited). "
+                "The suppressed draft was discarded as ungrounded."
+            ),
+            "claims_total": total,
+            "claims_cited": cited,
+            **{section: [] for section in SECTIONS},
+        }
+    return note
+
+
 async def draft_note(turns: list[dict]) -> dict:
     """Generate a cited SOAP note; validate citations; flag risky claims."""
     async with httpx.AsyncClient(timeout=600.0) as client:
@@ -111,23 +170,13 @@ async def draft_note(turns: list[dict]) -> dict:
         )
         response.raise_for_status()
     note = json.loads(response.json()["message"]["content"])
-
-    by_idx = {t["idx"]: t for t in turns}
-    for section in ("subjective", "objective", "assessment", "plan"):
-        for claim in note[section]:
-            valid = sorted({n for n in claim["turns"] if n in by_idx})
-            claim["turns"] = valid
-            claim["uncited"] = not valid
-            claim["flagged"] = bool(
-                valid
-                and _LOAD_BEARING.search(claim["text"])
-                and any(by_idx[n]["confidence"] < LOW_CONFIDENCE for n in valid)
-            )
-    return note
+    return validate_and_gate(note, turns)
 
 
 def note_as_plain_text(note: dict) -> str:
     """EMR-friendly plain text: clean line breaks, no markdown, no citations."""
+    if note.get("refusal"):
+        return note["refusal_reason"] + "\n"
     lines: list[str] = []
     for section, heading in (
         ("subjective", "S:"),

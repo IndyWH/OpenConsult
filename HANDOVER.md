@@ -62,7 +62,8 @@ app/mock_scripts.py    mock-script parser (turns)
 app/static/live.html   live page; review.html  review page
 corpus/manifest.yaml   committed provenance for the gitignored corpus
 scripts/               ingest_guidelines, simulate_cds, make_tts_sample,
-                       evaluate_{urgency,rag,notes,sinhala_asr}
+                       evaluate_{urgency,rag,notes,sinhala_asr},
+                       manage_users (break-glass CLI, see toolbox below)
 ```
 
 Models: MedGemma 27B Q4_K_M GGUF via Ollama (clinical reasoning, notes,
@@ -181,6 +182,48 @@ encoded in `pyproject.toml`. Summary:
 - sudo needs a real terminal (the assistant's shell can't prompt); batch
   root steps into one command for the user.
 
+## Toolbox: break-glass user CLI (2026-07-17)
+
+`scripts/manage_users.py` — server shell only, never exposed over HTTP.
+For a forgotten admin password, a lost admin, or console role changes:
+
+```bash
+uv run python scripts/manage_users.py list                      # all accounts
+uv run python scripts/manage_users.py reset-password USERNAME   # prompts; never argv
+uv run python scripts/manage_users.py set-role USERNAME ROLE    # promote/demote
+```
+
+Passwords are prompted via getpass so they stay out of shell history.
+`set-role` refuses to demote the last active admin (same invariant the
+admin UI enforces for deactivation). In the UI, every logged-in user has
+"Change password" in the nav bar (current password required, audited as
+`user.password_changed`).
+
+## Admin governance (2026-07-17)
+
+Built after the Phase 6 verification, admin-only, all 403-tested:
+
+- **Users view** (`/users`): deactivate/reactivate accounts. Deactivation
+  blocks login AND kills existing sessions (the cookie stays signed but
+  `get_user` only resolves active accounts); rows are never deleted —
+  audit events and consultations keep their names. Guards: no
+  self-deactivation, never the last active admin (enforced inside the
+  UPDATE, concurrency-safe). Audit: `user.deactivated`/`user.reactivated`.
+- **Void** (Consultations tab, admin): mark any consultation —
+  including approved ones; that's the error-correction point — voided
+  with a mandatory reason. Voided consultations vanish from
+  doctor/receptionist worklists (410 on direct URL), show struck-through
+  with the reason in the admin view, are frozen against edits, and any
+  open queue entry for that patient today is cancelled (frees the
+  one-active-consultation guard). Content stays in the database. Audit:
+  `consultation.voided` {reason}.
+- **Purge** (separate, second step): "Purge voided test data" hard-deletes
+  already-voided consultations (turns/notes cascade), their WAVs, and
+  synthetic patients left with no other consultations. Double-confirm in
+  the UI. Audit: `data.purged` with counts. Void first, purge second —
+  two deliberate steps by design. Tests: `tests/test_admin.py`
+  (RBAC, last-admin guard via rolled-back transaction, void-then-purge).
+
 ## Phase 6 — agreed UI structure (do not re-litigate)
 
 Three tabs, mirroring a Sri Lankan GP surgery:
@@ -217,7 +260,12 @@ must not open transcripts or notes.
    *three-wheeler* (2026-07-07 live loop test — caught by clicking the
    claim's citation chip during review, which is exactly the verification
    loop working); plus the RAG aspirin-qualifier paraphrase ("unless
-   contraindicated" vs CG95's "unless clear evidence of allergy").
+   contraindicated" vs CG95's "unless clear evidence of allergy"); and
+   specimen 4 (2026-07-15, consultation #78): a mic-check transcript
+   yielded a wholly fabricated angina consultation, every claim uncited —
+   now blocked by the note grounding gate (`validate_and_gate`,
+   `NOTE_MIN_CITED_FRACTION`, refusal instead of draft; see the
+   2026-07-17 addendum in the note-quality eval).
 4. **Two-hats loop-test notes** (2026-07-07, project owner playing both
    roles in one voice, consultation deliberately interrupted): diarisation
    held up despite a single speaker — one boundary merge only; and the

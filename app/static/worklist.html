@@ -20,6 +20,15 @@
   .badge.failed, .badge.live { background: #d32f2f33; color: #d32f2f; }
   a.open { color: inherit; }
   .hint { font-size: .8rem; opacity: .55; }
+  tr.voided td { opacity: .55; }
+  tr.voided .strike { text-decoration: line-through; }
+  .voidreason { font-size: .78rem; color: #b02a37; display: block; }
+  .badge.voided { background: #8883; }
+  button.small { font-size: .78rem; padding: .2rem .55rem; border-radius: 6px;
+                 border: 1px solid #888; background: transparent; color: inherit;
+                 cursor: pointer; }
+  #purge { margin-top: 1rem; border-color: #b02a37; color: #b02a37; }
+  .err { color: #d32f2f; font-size: .85rem; min-height: 1.2em; }
 </style>
 </head>
 <body>
@@ -30,25 +39,94 @@
   <tbody id="rows"></tbody>
 </table>
 
+<div class="err" id="err"></div>
+<button id="purge" class="small" style="display:none">Purge voided test data…</button>
+
 <script src="/static/nav.js"></script>
 <script>
-document.addEventListener('me-ready', async (e) => {
-  const me = e.detail;
-  const clinical = me.role === 'doctor' || me.role === 'admin';
+let ME = null;
+const errEl = document.getElementById('err');
+
+async function voidConsultation(cid) {
+  const reason = prompt(`Void consultation #${cid} — reason (required):`);
+  if (reason === null) return;
+  if (!reason.trim()) { errEl.textContent = 'A reason is required to void.'; return; }
+  errEl.textContent = '';
+  const response = await fetch(`/api/admin/consultations/${cid}/void`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({reason: reason.trim()})
+  });
+  if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
+  load();
+}
+
+async function purgeVoided() {
+  if (!confirm('Permanently DELETE all voided consultations, their notes, ' +
+      'transcripts, recordings, and any synthetic patients left with no ' +
+      'other consultations?\n\nThis cannot be undone.')) return;
+  if (!confirm('Second confirmation: really hard-delete the voided data now?')) return;
+  errEl.textContent = '';
+  const response = await fetch('/api/admin/purge-voided', {method: 'POST'});
+  const body = await response.json();
+  if (!response.ok) { errEl.textContent = body.error || 'failed'; return; }
+  alert(`Purged ${body.consultations} consultation(s), ${body.patients} patient(s), ` +
+        `${body.audio_files} recording(s).`);
+  load();
+}
+
+async function load() {
+  const me = ME;
+  const admin = me.role === 'admin';
+  const clinical = me.role === 'doctor' || admin;
   if (!clinical) document.getElementById('hint').textContent =
     'Status overview. Transcripts and notes are restricted to clinical roles.';
-  const rows = await (await fetch('/api/consultations')).json();
+  if (admin) {
+    document.getElementById('hint').textContent =
+      'All consultations, any doctor. Void removes a consultation from working ' +
+      'views (with a reason, content kept); purge later hard-deletes voided data.';
+    document.getElementById('purge').style.display = '';
+  }
+  const rows = await (await fetch(admin ? '/api/admin/consultations' : '/api/consultations')).json();
   const tbody = document.getElementById('rows');
+  tbody.innerHTML = '';
   for (const c of rows) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${c.id}</td><td>${c.patient_name}</td><td>${c.doctor_name}</td>` +
-      `<td>${c.started_at}</td>` +
-      `<td><span class="badge ${c.status}">${c.status.replace('_',' ')}</span></td>` +
-      `<td>${clinical ? `<a class="open" href="/review/${c.id}">open →</a>` : ''}</td>`;
+    if (c.voided_at) tr.className = 'voided';
+    const status = c.voided_at
+      ? '<span class="badge voided">voided</span>'
+      : `<span class="badge ${c.status}">${c.status.replace('_',' ')}</span>`;
+    const reason = c.voided_at
+      ? `<span class="voidreason">voided ${c.voided_at}${c.voided_by ? ' by ' + c.voided_by : ''}: ${c.void_reason}</span>` : '';
+    tr.innerHTML =
+      `<td>${c.id}</td>` +
+      `<td><span class="${c.voided_at ? 'strike' : ''}">${c.patient_name}</span>${reason}</td>` +
+      `<td>${c.doctor_name}</td><td>${c.started_at}</td><td>${status}</td><td></td>`;
+    const cell = tr.lastElementChild;
+    if (clinical && !c.voided_at) {
+      const a = document.createElement('a');
+      a.className = 'open'; a.href = `/review/${c.id}`; a.textContent = 'open →';
+      cell.appendChild(a);
+    }
+    if (admin) {
+      if (c.voided_at) {
+        const a = document.createElement('a');
+        a.className = 'open'; a.href = `/review/${c.id}`; a.textContent = 'inspect →';
+        cell.appendChild(a);
+      } else {
+        cell.appendChild(document.createTextNode(' '));
+        const btn = document.createElement('button');
+        btn.className = 'small'; btn.textContent = 'Void…';
+        btn.addEventListener('click', () => voidConsultation(c.id));
+        cell.appendChild(btn);
+      }
+    }
     tbody.appendChild(tr);
   }
   if (!rows.length) tbody.innerHTML = '<tr><td colspan="6" class="hint">No consultations yet.</td></tr>';
-});
+}
+
+document.getElementById('purge').addEventListener('click', purgeVoided);
+document.addEventListener('me-ready', (e) => { ME = e.detail; load(); });
 </script>
 </body>
 </html>

@@ -10,10 +10,19 @@ from app.main import app
 client = TestClient(app)
 
 
-def test_root_answers():
-    response = client.get("/")
-    assert response.status_code == 200
-    assert response.json()["app"] == "Consultation AI"
+def test_root_redirects_anonymous_to_login():
+    response = client.get("/", follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/login"
+
+
+def test_root_redirects_valid_session_to_today():
+    from app import auth
+
+    cookies = {auth.COOKIE_NAME: auth.sign_session(1)}
+    response = client.get("/", cookies=cookies, follow_redirects=False)
+    assert response.status_code == 307
+    assert response.headers["location"] == "/today"
 
 
 def test_health_reports_database():
