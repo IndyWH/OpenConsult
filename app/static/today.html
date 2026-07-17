@@ -44,6 +44,9 @@
   <button class="start">Start walk-in consultation</button>
 </form>
 <p class="hint" id="hint"></p>
+<label class="hint" style="display:block;margin-bottom:.5rem">
+  <input type="checkbox" id="showClosed"> Show closed entries (done / cancelled)
+</label>
 <table>
   <thead><tr><th>#</th><th>Patient</th><th>Status</th><th></th></tr></thead>
   <tbody id="rows"></tbody>
@@ -80,10 +83,20 @@ async function refresh() {
   tbody.innerHTML = '';
   const canManage = me && (me.role === 'receptionist' || me.role === 'admin');
   const clinical = me && (me.role === 'doctor' || me.role === 'admin');
-  for (const entry of queue) {
+  // Active entries always visible and first, numbered gaplessly 1..N in
+  // queue order (server positions keep gaps when entries close — the
+  // displayed number is the human "you're third in line" one). Closed
+  // entries sit behind the toggle with no number.
+  const isActive = e => e.status === 'waiting' || e.status === 'in_consultation';
+  const active = queue.filter(isActive);
+  const closed = queue.filter(e => !isActive(e));
+  const shown = document.getElementById('showClosed').checked
+    ? active.concat(closed) : active;
+  let displayNo = 0;
+  for (const entry of shown) {
     const tr = document.createElement('tr');
     const demo = [entry.age, entry.sex].filter(Boolean).join(', ');
-    tr.innerHTML = `<td>${entry.position}</td>` +
+    tr.innerHTML = `<td>${isActive(entry) ? ++displayNo : '—'}</td>` +
       `<td>${entry.name}${demo ? ` <span class="hint">(${demo})</span>` : ''}</td>` +
       `<td><span class="badge ${entry.status}">${entry.status.replace('_',' ')}</span></td>`;
     const actions = document.createElement('td');
@@ -133,8 +146,15 @@ async function refresh() {
     tr.appendChild(actions);
     tbody.appendChild(tr);
   }
-  if (!queue.length) {
-    tbody.innerHTML = '<tr><td colspan="4" class="hint">Queue is empty.</td></tr>';
+  if (!shown.length) {
+    tbody.innerHTML = '<tr><td colspan="4" class="hint">' +
+      (queue.length ? 'No active entries.' : 'Queue is empty.') + '</td></tr>';
+  }
+  if (closed.length && !document.getElementById('showClosed').checked) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="4" class="hint">${closed.length} closed ` +
+      'entr' + (closed.length === 1 ? 'y' : 'ies') + ' hidden — tick "Show closed entries" to see them.</td>';
+    tbody.appendChild(tr);
   }
 }
 
@@ -156,6 +176,8 @@ document.addEventListener('me-ready', (e) => {
   refresh();
   setInterval(refresh, 5000);
 });
+
+document.getElementById('showClosed').addEventListener('change', refresh);
 
 document.getElementById('walkinForm').addEventListener('submit', async (e) => {
   e.preventDefault();

@@ -387,7 +387,12 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   table and `evals/2026-07-12_sinhala_asr_recordings_eval.md`. Next: the
   owner's transliteration adjudication
   (`evals/adjudication_03_si_worksheet.md`), record `01_chest_pain_si`,
-  then the model decision (fine-tune fallback likely).
+  then the model decision (fine-tune fallback likely). **Fine-tune
+  groundwork plan drafted 2026-07-17** —
+  `evals/2026-07-17_finetune_plan.md`: data sources/licences (verified),
+  code-switch synthesis strategy, two-arm base-model plan, 4090-sized
+  recipe, pre-registered gates against the frozen recordings eval; eight
+  owner sign-offs pending, no training started.
 - **CDS restraint dimension:** UK `_uk` scripts (11–15) written with marking
   schemes; wire them into the urgency dict once recorded, and build the
   differential-breadth metric (see the CDS restraint section above).
