@@ -251,6 +251,16 @@ must not open transcripts or notes.
    matches the script doctor's own plan; recorded as FAIL per the
    unamended marking scheme. Decide: relax expectation, or encode a
    ≥3-episodes vomiting threshold with clinical sign-off.
+1b. **Script-11 TATT over-commitment boundary case** (restraint eval,
+   2026-07-17): the CDS kept the differential correctly broad (all 5
+   finals in the marking scheme) but graded iron-deficiency anaemia AND
+   depression/anxiety "high" on the undifferentiated tired-all-the-time
+   case, failing the scheme's strict "none high-confidence". Both are
+   clinically defensible top candidates (heavy periods → iron loss; flat
+   mood), so this is early over-commitment, not a wrong list. Decide:
+   is strict "none high" the right bar for an undifferentiated
+   presentation, or should one defensible high-confidence leader be
+   allowed? Same class of call as the dengue case.
 2. **Claim-by-claim fidelity audit** of RAG summaries and SOAP notes —
    human-led. Context: the LLM-judge experiment failed in both directions
    (over-flagged without the transcript: 15 false positives; missed both
@@ -346,7 +356,21 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   dual-language transcript storage — the `FinalTranscript` model in the
   plan already anticipates si/en pairs.
 
-## CDS restraint dimension — scripts written, harness pending
+## CDS restraint dimension — built and evaluated (2026-07-17)
+
+**Status update:** the differential-breadth restraint metric is now built
+(`scripts/evaluate_cds_restraint.py`) and run — see
+`evals/2026-07-17_cds_restraint_evaluation.md`. Both arms on script text
+(the correction below): **urgency 5/5, restraint 4/5**. 14/15 catch the
+buried emergencies and clear; 11/12 don't false-alarm; 13 narrows
+confidently to migraine; **11 is the one restraint FAIL** — it keeps the
+list broad but over-grades two conditions "high" on the undifferentiated
+TATT case (a subtle, clinically-arguable over-commitment, now on the
+docket for adjudication). Correction absorbed: the HANDOVER previously
+said `_uk` wires in "once recorded", but the urgency/CDS harnesses run on
+script text (as the 2026-07-07 eval did); recordings later add only the
+noisy-ASR arm. The urgency harness keeps `UK_EXPECTATIONS` separate from
+the canonical `EXPECTATIONS`, so `urgency_results.json` is unchanged.
 
 A new evaluation dimension the existing eval records don't cover: does the
 CDS keep the differential appropriately **broad** on undifferentiated

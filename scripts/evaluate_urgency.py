@@ -48,8 +48,24 @@ EXPECTATIONS = {
     "10_testicular_torsion_en.md": True,  # torsion as abdo pain → immediate surgery
 }
 
+# UK private-GP series (11–15). Urgency ground truth only here; the
+# differential-breadth restraint dimension lives in
+# scripts/evaluate_cds_restraint.py, which imports evaluate_script below.
+# Kept OUT of EXPECTATIONS on purpose so a normal urgency run still writes
+# the canonical ten-script urgency_results.json unchanged (HANDOVER: the
+# _uk scripts must not perturb existing eval records).
+UK_EXPECTATIONS = {
+    "11_tired_all_the_time_uk.md": False,   # undifferentiated — negative control
+    "12_dizziness_uk.md": False,            # undifferentiated — negative control
+    "13_migraine_uk.md": False,             # classic migraine — differentiable, no red flag
+    "14_giant_cell_arteritis_uk.md": True,  # buried GCA → sight-threatening
+    "15_cauda_equina_uk.md": True,          # buried cauda equina → surgical emergency
+}
 
-async def evaluate_script(name: str) -> dict:
+
+async def evaluate_script(name: str, expected_fire: bool | None = None) -> dict:
+    if expected_fire is None:
+        expected_fire = EXPECTATIONS[name]
     turns = parse_script(SCRIPTS_DIR / name)
     engine = CDSEngine()
     assessment: dict | None = None
@@ -72,6 +88,12 @@ async def evaluate_script(name: str) -> dict:
                 "seconds": round(time.perf_counter() - started, 1),
                 "urgent_actions": assessment["urgent_actions"],
                 "differentials": dx,
+                # Full graded differential for the restraint metric (name +
+                # likelihood, order = rank). The urgency arm only reads names.
+                "differential_grades": [
+                    {"condition": d["condition"], "likelihood": d["likelihood"]}
+                    for d in assessment["differentials"]
+                ],
             }
         )
         print(f"  {name} turn {end_turn}/{len(turns)}: "
@@ -80,7 +102,7 @@ async def evaluate_script(name: str) -> dict:
     fired = [u for u in updates if u["urgent_actions"]]
     return {
         "script": name,
-        "expected_fire": EXPECTATIONS[name],
+        "expected_fire": expected_fire,
         "total_turns": len(turns),
         "n_updates": len(updates),
         "fired": bool(fired),

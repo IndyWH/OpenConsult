@@ -1,0 +1,1999 @@
+[
+ {
+  "script": "11_tired_all_the_time_uk.md",
+  "expected_fire": false,
+  "total_turns": 39,
+  "n_updates": 10,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "8/9",
+  "leading_dx_final": "Iron deficiency anaemia",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Hypothyroidism",
+     "Depression/Anxiety",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+     "Sleep Apnea"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Hypothyroidism",
+     "Depression/Anxiety",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+     "Sleep Apnea"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 16.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Hypothyroidism",
+     "Depression/Anxiety",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+     "Sleep Apnea"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 18.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Hypothyroidism",
+     "Depression/Anxiety",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+     "Sleep Apnea"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 17.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Hypothyroidism",
+     "Depression/Anxiety",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+     "Sleep Apnea"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Depression/Anxiety",
+     "Hypothyroidism",
+     "Sleep Apnea",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 20.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Depression/Anxiety",
+     "Hypothyroidism",
+     "Sleep Apnea",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 19.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Depression/Anxiety",
+     "Hypothyroidism",
+     "Sleep Apnea",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 19.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Depression/Anxiety",
+     "Hypothyroidism",
+     "Sleep Apnea",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 39,
+    "seconds": 19.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Iron deficiency anaemia",
+     "Depression/Anxiety",
+     "Hypothyroidism",
+     "Sleep Apnea",
+     "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Iron deficiency anaemia",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Depression/Anxiety",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Hypothyroidism",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sleep Apnea",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Chronic Fatigue Syndrome (CFS)/Myalgic Encephalomyelitis (ME)",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ],
+  "restraint": {
+   "n_differentials": 5,
+   "n_high": 2,
+   "top_condition": "Iron deficiency anaemia",
+   "top_likelihood": "high",
+   "top_high": true,
+   "mode": "broad",
+   "verdict": "FAIL (over-committed: 2 high-confidence)",
+   "trajectory": [
+    {
+     "end_turn": 4,
+     "n": 5,
+     "n_high": 1,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 8,
+     "n": 5,
+     "n_high": 1,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 12,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 16,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 20,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 24,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 28,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 32,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 36,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    },
+    {
+     "end_turn": 39,
+     "n": 5,
+     "n_high": 2,
+     "top": "Iron deficiency anaemia"
+    }
+   ]
+  },
+  "urgency_verdict": "PASS"
+ },
+ {
+  "script": "12_dizziness_uk.md",
+  "expected_fire": false,
+  "total_turns": 41,
+  "n_updates": 11,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "9/10",
+  "leading_dx_final": "Orthostatic Hypotension",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 12.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 14.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 16.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 21.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 19.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 19.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 20.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 40,
+    "seconds": 20.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder",
+     "Anxiety/Panic Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 41,
+    "seconds": 20.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Orthostatic Hypotension",
+     "Anxiety/Panic Disorder",
+     "Presyncope (Cardiac)",
+     "Vasovagal Syncope",
+     "Central Vestibular Disorder"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Orthostatic Hypotension",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Anxiety/Panic Disorder",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Presyncope (Cardiac)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Vasovagal Syncope",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Central Vestibular Disorder",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ],
+  "restraint": {
+   "n_differentials": 5,
+   "n_high": 0,
+   "top_condition": "Orthostatic Hypotension",
+   "top_likelihood": "moderate",
+   "top_high": false,
+   "mode": "broad",
+   "verdict": "PASS (broad, uncommitted)",
+   "trajectory": [
+    {
+     "end_turn": 4,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 8,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 12,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 16,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 20,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 24,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 28,
+     "n": 5,
+     "n_high": 1,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 32,
+     "n": 5,
+     "n_high": 0,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 36,
+     "n": 5,
+     "n_high": 0,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 40,
+     "n": 5,
+     "n_high": 0,
+     "top": "Orthostatic Hypotension"
+    },
+    {
+     "end_turn": 41,
+     "n": 5,
+     "n_high": 0,
+     "top": "Orthostatic Hypotension"
+    }
+   ]
+  },
+  "urgency_verdict": "PASS"
+ },
+ {
+  "script": "13_migraine_uk.md",
+  "expected_fire": false,
+  "total_turns": 39,
+  "n_updates": 10,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "9/9",
+  "leading_dx_final": "Migraine",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 12.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 17.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 15.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 16.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 17.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 17.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 17.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 39,
+    "seconds": 18.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Migraine",
+     "Tension-type headache",
+     "Cluster headache",
+     "Secondary headache (e.g., structural lesion)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Migraine",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Cluster headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., structural lesion)",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ],
+  "restraint": {
+   "n_differentials": 4,
+   "n_high": 1,
+   "top_condition": "Migraine",
+   "top_likelihood": "high",
+   "top_high": true,
+   "mode": "narrow",
+   "verdict": "PASS (confident, correct leader)",
+   "trajectory": [
+    {
+     "end_turn": 4,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 8,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 12,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 16,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 20,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 24,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 28,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 32,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 36,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    },
+    {
+     "end_turn": 39,
+     "n": 4,
+     "n_high": 1,
+     "top": "Migraine"
+    }
+   ]
+  },
+  "urgency_verdict": "PASS"
+ },
+ {
+  "script": "14_giant_cell_arteritis_uk.md",
+  "expected_fire": true,
+  "total_turns": 31,
+  "n_updates": 8,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Urgent blood tests: ESR and CRP",
+   "Consider urgent referral to ophthalmology or rheumatology"
+  ],
+  "cleared_at_end": true,
+  "stability": "5/7",
+  "leading_dx_final": "Giant cell arteritis (Temporal Arteritis)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 14.1,
+    "urgent_actions": [
+     {
+      "action": "Urgent blood tests: ESR and CRP",
+      "reason": "To screen for temporal arteritis (GCA), which requires prompt treatment to prevent blindness."
+     },
+     {
+      "action": "Consider urgent referral to ophthalmology or rheumatology",
+      "reason": "If inflammatory markers are elevated, specialist assessment is needed urgently."
+     }
+    ],
+    "differentials": [
+     "Tension-type headache",
+     "Migraine without aura",
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 15.5,
+    "urgent_actions": [
+     {
+      "action": "Urgent blood tests: ESR and CRP",
+      "reason": "To screen for inflammatory markers suggestive of Giant Cell Arteritis."
+     },
+     {
+      "action": "Consider urgent referral to ophthalmology or rheumatology",
+      "reason": "If inflammatory markers are elevated, prompt specialist assessment is needed to prevent vision loss."
+     }
+    ],
+    "differentials": [
+     "Tension-type headache",
+     "Migraine without aura",
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 18.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate blood tests: ESR and CRP",
+      "reason": "To screen for inflammatory markers suggestive of Giant Cell Arteritis."
+     },
+     {
+      "action": "Urgent referral to ophthalmology",
+      "reason": "To assess for visual involvement, a potential complication of GCA."
+     }
+    ],
+    "differentials": [
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Tension-type headache",
+     "Migraine without aura",
+     "Secondary headache (e.g., intracranial pathology)",
+     "Polymyalgia Rheumatica (PMR)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Polymyalgia Rheumatica (PMR)",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 18.4,
+    "urgent_actions": [
+     {
+      "action": "Immediate referral to ophthalmology",
+      "reason": "Risk of permanent vision loss from suspected Giant Cell Arteritis."
+     },
+     {
+      "action": "Start high-dose corticosteroids immediately",
+      "reason": "To prevent further vascular complications, especially blindness, pending confirmation."
+     }
+    ],
+    "differentials": [
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Polymyalgia Rheumatica (PMR)",
+     "Tension-type headache",
+     "Migraine without aura",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Polymyalgia Rheumatica (PMR)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 18.6,
+    "urgent_actions": [
+     {
+      "action": "Immediate referral to ophthalmology",
+      "reason": "Risk of permanent vision loss from suspected GCA."
+     },
+     {
+      "action": "Urgent blood tests (ESR/CRP)",
+      "reason": "To support diagnosis of suspected GCA."
+     },
+     {
+      "action": "Consider immediate high-dose steroids",
+      "reason": "Pending confirmation, to prevent vision loss from suspected GCA."
+     }
+    ],
+    "differentials": [
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Polymyalgia Rheumatica (PMR)",
+     "Tension-type headache",
+     "Migraine without aura",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Polymyalgia Rheumatica (PMR)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.7,
+    "urgent_actions": [
+     {
+      "action": "Immediate high-dose corticosteroids",
+      "reason": "To prevent permanent vision loss from suspected Giant Cell Arteritis."
+     },
+     {
+      "action": "Urgent ophthalmology referral",
+      "reason": "To assess for visual involvement and confirm diagnosis."
+     }
+    ],
+    "differentials": [
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Polymyalgia Rheumatica (PMR)",
+     "Tension-type headache",
+     "Migraine without aura",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Polymyalgia Rheumatica (PMR)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 19.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Polymyalgia Rheumatica (PMR)",
+     "Tension-type headache",
+     "Migraine without aura",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Polymyalgia Rheumatica (PMR)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 31,
+    "seconds": 19.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Giant cell arteritis (Temporal Arteritis)",
+     "Polymyalgia Rheumatica (PMR)",
+     "Tension-type headache",
+     "Migraine without aura",
+     "Secondary headache (e.g., intracranial pathology)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Giant cell arteritis (Temporal Arteritis)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Polymyalgia Rheumatica (PMR)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Tension-type headache",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine without aura",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Secondary headache (e.g., intracranial pathology)",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ],
+  "restraint": {
+   "n_differentials": 5,
+   "n_high": 2,
+   "top_condition": "Giant cell arteritis (Temporal Arteritis)",
+   "top_likelihood": "high",
+   "top_high": true,
+   "mode": "lead",
+   "verdict": "PASS (emergency leads)",
+   "trajectory": [
+    {
+     "end_turn": 4,
+     "n": 4,
+     "n_high": 1,
+     "top": "Tension-type headache"
+    },
+    {
+     "end_turn": 8,
+     "n": 4,
+     "n_high": 0,
+     "top": "Tension-type headache"
+    },
+    {
+     "end_turn": 12,
+     "n": 5,
+     "n_high": 1,
+     "top": "Giant cell arteritis (Temporal Arteritis)"
+    },
+    {
+     "end_turn": 16,
+     "n": 5,
+     "n_high": 2,
+     "top": "Giant cell arteritis (Temporal Arteritis)"
+    },
+    {
+     "end_turn": 20,
+     "n": 5,
+     "n_high": 2,
+     "top": "Giant cell arteritis (Temporal Arteritis)"
+    },
+    {
+     "end_turn": 24,
+     "n": 5,
+     "n_high": 2,
+     "top": "Giant cell arteritis (Temporal Arteritis)"
+    },
+    {
+     "end_turn": 28,
+     "n": 5,
+     "n_high": 2,
+     "top": "Giant cell arteritis (Temporal Arteritis)"
+    },
+    {
+     "end_turn": 31,
+     "n": 5,
+     "n_high": 2,
+     "top": "Giant cell arteritis (Temporal Arteritis)"
+    }
+   ]
+  },
+  "urgency_verdict": "PASS"
+ },
+ {
+  "script": "15_cauda_equina_uk.md",
+  "expected_fire": true,
+  "total_turns": 27,
+  "n_updates": 7,
+  "fired": true,
+  "first_fire_turn": 8,
+  "first_fire_actions": [
+   "Immediate referral for spinal imaging (MRI preferred)"
+  ],
+  "cleared_at_end": true,
+  "stability": "4/6",
+  "leading_dx_final": "Cauda Equina Syndrome",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 12.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Lumbar disc herniation",
+     "Lumbar muscle strain",
+     "Sciatica (non-specific)",
+     "Spinal stenosis",
+     "Spondylolisthesis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Spondylolisthesis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 17.1,
+    "urgent_actions": [
+     {
+      "action": "Immediate referral for spinal imaging (MRI preferred)",
+      "reason": "Rule out cauda equina syndrome due to worsening radicular pain and new bilateral neurological symptoms."
+     }
+    ],
+    "differentials": [
+     "Lumbar disc herniation",
+     "Lumbar muscle strain",
+     "Sciatica (non-specific)",
+     "Spinal stenosis",
+     "Spondylolisthesis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Spondylolisthesis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 19.8,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected Cauda Equina Syndrome requires urgent neurosurgical assessment and imaging."
+     }
+    ],
+    "differentials": [
+     "Lumbar disc herniation",
+     "Cauda Equina Syndrome",
+     "Lumbar muscle strain",
+     "Sciatica (non-specific)",
+     "Spinal stenosis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Cauda Equina Syndrome",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.1,
+    "urgent_actions": [
+     {
+      "action": "Immediate referral to hospital emergency department",
+      "reason": "Suspected Cauda Equina Syndrome requires urgent investigation and potential surgical decompression."
+     }
+    ],
+    "differentials": [
+     "Cauda Equina Syndrome",
+     "Lumbar disc herniation",
+     "Sciatica (non-specific)",
+     "Lumbar muscle strain",
+     "Spinal stenosis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Cauda Equina Syndrome",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 20.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected cauda equina syndrome requires urgent surgical assessment."
+     },
+     {
+      "action": "Urgent neurosurgical referral",
+      "reason": "Requires specialist evaluation for potential emergency decompression."
+     }
+    ],
+    "differentials": [
+     "Cauda Equina Syndrome",
+     "Lumbar disc herniation",
+     "Sciatica (non-specific)",
+     "Lumbar muscle strain",
+     "Spinal stenosis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Cauda Equina Syndrome",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Cauda Equina Syndrome",
+     "Lumbar disc herniation",
+     "Sciatica (non-specific)",
+     "Lumbar muscle strain",
+     "Spinal stenosis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Cauda Equina Syndrome",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 27,
+    "seconds": 18.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Cauda Equina Syndrome",
+     "Lumbar disc herniation",
+     "Sciatica (non-specific)",
+     "Lumbar muscle strain",
+     "Spinal stenosis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Cauda Equina Syndrome",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Lumbar disc herniation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Sciatica (non-specific)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Lumbar muscle strain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Spinal stenosis",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ],
+  "restraint": {
+   "n_differentials": 5,
+   "n_high": 2,
+   "top_condition": "Cauda Equina Syndrome",
+   "top_likelihood": "high",
+   "top_high": true,
+   "mode": "lead",
+   "verdict": "PASS (emergency leads)",
+   "trajectory": [
+    {
+     "end_turn": 4,
+     "n": 5,
+     "n_high": 1,
+     "top": "Lumbar disc herniation"
+    },
+    {
+     "end_turn": 8,
+     "n": 5,
+     "n_high": 1,
+     "top": "Lumbar disc herniation"
+    },
+    {
+     "end_turn": 12,
+     "n": 5,
+     "n_high": 2,
+     "top": "Lumbar disc herniation"
+    },
+    {
+     "end_turn": 16,
+     "n": 5,
+     "n_high": 2,
+     "top": "Cauda Equina Syndrome"
+    },
+    {
+     "end_turn": 20,
+     "n": 5,
+     "n_high": 2,
+     "top": "Cauda Equina Syndrome"
+    },
+    {
+     "end_turn": 24,
+     "n": 5,
+     "n_high": 2,
+     "top": "Cauda Equina Syndrome"
+    },
+    {
+     "end_turn": 27,
+     "n": 5,
+     "n_high": 2,
+     "top": "Cauda Equina Syndrome"
+    }
+   ]
+  },
+  "urgency_verdict": "PASS"
+ }
+]
