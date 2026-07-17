@@ -31,6 +31,9 @@ their audit events and consultations. A deactivated user cannot log in and
 existing sessions stop working. You cannot deactivate yourself or the last
 active admin.</p>
 <div class="err" id="err"></div>
+<label class="hint" style="display:block;margin-bottom:.5rem">
+  <input type="checkbox" id="showInactive"> Show inactive accounts
+</label>
 <table>
   <thead><tr><th>#</th><th>Name</th><th>Username</th><th>Role</th><th>Created</th>
     <th>Last login</th><th>Status</th><th></th></tr></thead>
@@ -50,9 +53,12 @@ async function act(uid, verb) {
 
 async function load() {
   const users = await (await fetch('/api/admin/users')).json();
+  const showInactive = document.getElementById('showInactive').checked;
+  const shown = users.filter(u => u.active || showInactive);
+  const hidden = users.length - shown.length;
   const tbody = document.getElementById('rows');
   tbody.innerHTML = '';
-  for (const u of users) {
+  for (const u of shown) {
     const tr = document.createElement('tr');
     if (!u.active) tr.className = 'inactive';
     const canDeactivate = u.active && u.id !== window.ME.id;
@@ -76,8 +82,14 @@ async function load() {
     cell.appendChild(btn);
     tbody.appendChild(tr);
   }
+  if (hidden) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="8" class="hint">${hidden} inactive account(s) hidden — tick "Show inactive accounts" to manage them.</td>`;
+    tbody.appendChild(tr);
+  }
 }
 
+document.getElementById('showInactive').addEventListener('change', load);
 document.addEventListener('me-ready', load);
 </script>
 </body>

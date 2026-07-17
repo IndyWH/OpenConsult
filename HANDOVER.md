@@ -216,7 +216,10 @@ Built after the Phase 6 verification, admin-only, all 403-tested:
   with the reason in the admin view, are frozen against edits, and any
   open queue entry for that patient today is cancelled (frees the
   one-active-consultation guard). Content stays in the database. Audit:
-  `consultation.voided` {reason}.
+  `consultation.voided` {reason}. Mistaken voids are reversible: **Unvoid**
+  on the struck-through row restores the consultation to working views in
+  its prior state (audit: `consultation.unvoided` with the reverted
+  reason).
 - **Purge** (separate, second step): "Purge voided test data" hard-deletes
   already-voided consultations (turns/notes cascade), their WAVs, and
   synthetic patients left with no other consultations. Double-confirm in

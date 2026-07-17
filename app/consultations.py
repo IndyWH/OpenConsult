@@ -278,6 +278,25 @@ async def void_consultation(cid: int, admin_id: int, reason: str) -> dict | None
     return {"from_status": row[0], "patient_id": row[1]} if row else None
 
 
+async def unvoid_consultation(cid: int) -> dict | None:
+    """Reverse a mistaken void: clear the flags, restoring the consultation
+    to working views exactly as it was (voiding only ever set these three
+    columns). Returns the reverted reason for the audit trail, or None if
+    the consultation doesn't exist or isn't voided."""
+    async with await _conn() as conn:
+        # Self-join to hand back the PRE-update reason (RETURNING alone
+        # would give the freshly-NULLed column).
+        row = await (
+            await conn.execute(
+                "UPDATE consultation c SET voided_at = NULL, voided_by = NULL,"
+                " void_reason = NULL FROM consultation old"
+                " WHERE c.id = %s AND old.id = c.id AND c.voided_at IS NOT NULL"
+                " RETURNING c.status, old.void_reason", (cid,),
+            )
+        ).fetchone()
+    return {"status": row[0], "reverted_reason": row[1]} if row else None
+
+
 async def purge_voided(only_ids: list[int] | None = None) -> dict:
     """The second, explicit deletion step: hard-delete already-voided
     consultations (turns and notes cascade) and any synthetic patients

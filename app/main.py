@@ -263,6 +263,21 @@ async def admin_void_consultation(
     return JSONResponse(content={"ok": True})
 
 
+@app.post("/api/admin/consultations/{cid}/unvoid")
+async def admin_unvoid_consultation(
+    cid: int, user: dict = Depends(api_user("admin"))
+) -> JSONResponse:
+    """Reverse a mistaken void; the consultation returns to working views
+    in its prior state. The audit trail keeps both the void and this."""
+    reverted = await consultations.unvoid_consultation(cid)
+    if reverted is None:
+        return JSONResponse(status_code=409, content={"error": "not found or not voided"})
+    await audit.log(user["id"], "consultation.unvoided", "consultation", cid,
+                    {"reverted_reason": reverted["reverted_reason"],
+                     "status": reverted["status"]})
+    return JSONResponse(content={"ok": True})
+
+
 @app.post("/api/admin/purge-voided")
 async def admin_purge_voided(user: dict = Depends(api_user("admin"))) -> dict:
     """The second deliberate step after voiding: hard-delete voided

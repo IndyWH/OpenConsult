@@ -78,6 +78,7 @@ ADMIN_POSTS = [
     "/api/admin/users/999999/deactivate",
     "/api/admin/users/999999/reactivate",
     "/api/admin/consultations/999999/void",
+    "/api/admin/consultations/999999/unvoid",
     "/api/admin/purge-voided",
 ]
 
@@ -185,6 +186,46 @@ def test_void_requires_reason_and_hides_from_working_views():
     assert admin_client.post(f"/api/consultations/{cid}/regenerate").status_code == 409
     assert admin_client.post(f"/api/admin/consultations/{cid}/void",
                              json={"reason": "again"}).status_code == 409
+
+
+def test_unvoid_restores_a_mistaken_void():
+    admin = _make_user("admin")
+    doctor = _make_user("doctor")
+    cid, _pid = _make_consultation()
+    admin_client = _client_for(admin)
+    doctor_client = _client_for(doctor)
+
+    # Unvoiding something that isn't voided is refused.
+    assert admin_client.post(f"/api/admin/consultations/{cid}/unvoid").status_code == 409
+
+    assert admin_client.post(f"/api/admin/consultations/{cid}/void",
+                             json={"reason": "oops, wrong one"}).status_code == 200
+    assert doctor_client.get(f"/api/consultations/{cid}").status_code == 410
+
+    assert admin_client.post(f"/api/admin/consultations/{cid}/unvoid").status_code == 200
+
+    # Back in working views, prior status intact, editable again.
+    state = doctor_client.get(f"/api/consultations/{cid}").json()
+    assert state["status"] == "awaiting_review"
+    assert state["voided_at"] is None
+    assert cid in {c["id"] for c in doctor_client.get("/api/consultations").json()}
+    # Editable again (turn edits share the voided/approved guard):
+    assert doctor_client.patch(f"/api/consultations/{cid}/turns/0",
+                               json={"text": "Hello there."}).status_code == 200
+
+    # The audit trail kept the round trip, reason included.
+    async def audit_detail() -> list:
+        async with await psycopg.AsyncConnection.connect(os.environ["DATABASE_URL"]) as conn:
+            rows = await (await conn.execute(
+                "SELECT action, detail FROM audit_event WHERE subject_type = 'consultation'"
+                " AND subject_id = %s ORDER BY id", (cid,))).fetchall()
+            return rows
+
+    events = asyncio.run(audit_detail())
+    actions = [e[0] for e in events]
+    assert "consultation.voided" in actions and "consultation.unvoided" in actions
+    unvoid_detail = next(e[1] for e in events if e[0] == "consultation.unvoided")
+    assert unvoid_detail["reverted_reason"] == "oops, wrong one"
 
 
 def test_void_then_purge_sequence():

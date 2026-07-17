@@ -112,6 +112,17 @@ async function load() {
         const a = document.createElement('a');
         a.className = 'open'; a.href = `/review/${c.id}`; a.textContent = 'inspect →';
         cell.appendChild(a);
+        cell.appendChild(document.createTextNode(' '));
+        const btn = document.createElement('button');
+        btn.className = 'small'; btn.textContent = 'Unvoid';
+        btn.addEventListener('click', async () => {
+          if (!confirm(`Restore consultation #${c.id} to the working views?`)) return;
+          errEl.textContent = '';
+          const response = await fetch(`/api/admin/consultations/${c.id}/unvoid`, {method: 'POST'});
+          if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
+          load();
+        });
+        cell.appendChild(btn);
       } else {
         cell.appendChild(document.createTextNode(' '));
         const btn = document.createElement('button');
