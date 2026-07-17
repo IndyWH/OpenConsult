@@ -120,8 +120,9 @@ Low-confidence: turn 23 (0.44).
    turns") did not hold for these two.
 3. **End-of-recording contamination** in 66 and 68: off-script speech
    after the scripted close (worst: 68's "I don't read the script…").
-   Decide whether references include it (as-spoken) or recordings are
-   treated as ending at the scripted close.
+   **Owner's ruling (2026-07-17): references are truncated at the
+   scripted close for ASR scoring; recordings stay untouched on disk;
+   recorded as a workflow observation in the HANDOVER docket.**
 4. Names drift (Perera, Sanuki, Nadeesha) — expected, low clinical
    weight, but they seed the patient-identity fields.
 
@@ -161,12 +162,30 @@ exists is the owner's decision. This also confirms the HANDOVER note
 that Phase 5 must swap the *final* transcription path, not just the
 live one.
 
-## What the owner needs to decide (blocking any scoring)
+## Decisions log
+
+Resolved 2026-07-17 (owner):
+
+- **End-of-recording speech**: truncate references at the scripted close
+  for ASR scoring; keep the full recordings untouched on disk (docket
+  workflow observation).
+- **#70's approved note**: consultation voided ("note generated from
+  invalid English-forced transcription of Sinhala audio — see recordings
+  inventory"); the recording and the frozen Sinhala reference are
+  unaffected. NOTE: while #70 is voided, the admin purge action must NOT
+  be run — it would hard-delete the consultation row and
+  `data/recordings/consultation_70.wav` (the named copy under
+  `mock_consultations/recordings/` would survive).
+- **Finalisation initial prompt**: the live path's clinical vocabulary
+  prompt (`CLINICAL_INITIAL_PROMPT`, app/transcription.py) is now also
+  passed to the WhisperX finalisation pass (app/finalize.py) — the
+  drug-name failures above are the measured cost of its absence.
+  Pre-registered as a **before/after experiment**: the stored transcripts
+  for 66–69 are the WITHOUT-prompt arm; re-finalisation after reference
+  sign-off is the WITH-prompt arm. Compare drug-name recall specifically.
+
+Still blocking any scoring:
 
 1. For each material row in 66–69: reader deviation (reference follows
    the audio) or ASR error (reference follows the script)? Listening
    required; the raw diffs give surrounding context.
-2. End-of-recording off-script speech (66, 68): include in references or
-   trim.
-3. #70: confirm the frozen reference stands (nothing new needed), and
-   decide the fate of its approved English-pipeline note.

@@ -78,8 +78,16 @@ def transcribe_and_diarise(wav_path: str) -> list[dict]:
     started = time.perf_counter()
     # Silero VAD: whisperx's default pyannote VAD checkpoint is incompatible
     # with the pinned pyannote 3.4 (see pyproject override note).
+    # Same clinical initial prompt as the live path: the 2026-07-17
+    # recordings deviation report measured the cost of its absence here —
+    # drug names failed at nearly every mention in the final pass
+    # (gliclazide 0/3, salbutamol, losartan) while the prompted live path
+    # was built precisely against that class of error.
+    from app.transcription import CLINICAL_INITIAL_PROMPT
+
     model = whisperx.load_model(
-        WHISPERX_MODEL, device, compute_type=compute, vad_method="silero"
+        WHISPERX_MODEL, device, compute_type=compute, vad_method="silero",
+        asr_options={"initial_prompt": CLINICAL_INITIAL_PROMPT},
     )
     result = model.transcribe(audio, batch_size=8, language="en")
 

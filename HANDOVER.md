@@ -269,7 +269,27 @@ must not open transcripts or notes.
    now blocked by the note grounding gate (`validate_and_gate`,
    `NOTE_MIN_CITED_FRACTION`, refusal instead of draft; see the
    2026-07-17 addendum in the note-quality eval).
-4. **Two-hats loop-test notes** (2026-07-07, project owner playing both
+4. **Confidence-flag heuristic failed its first real test** (2026-07-17
+   recordings deviation report): two load-bearing numbers were corrupted
+   on CONFIDENT turns (HbA1c 8.4 → "84", respiratory rate 18 → "80") —
+   the ⚠ flag never fired because it keys solely on ASR confidence.
+   Needs a plausibility-range defence for clinical numbers (an RR of 80
+   or an HbA1c of 84 is physiologically absurd), not just confidence.
+   Clinical sign-off on the ranges is the owner's.
+5. **Finalisation needs a transcript-quality gate**: consultation #70's
+   Sinhala audio went through the English-forced pipeline and produced a
+   hallucinated English translation (repetition loops, avg confidence
+   0.49, last 33 s dropped) — and a normal-looking draft note was
+   presented and approved. Low average confidence or language mismatch
+   should flag the review as unreliable, analogous to the note grounding
+   gate, not present a normal draft. (#70 voided 2026-07-17 for this.)
+6. **Workflow observation — end-of-recording contamination**: recordings
+   66 and 68 captured off-script reader speech after the scripted close
+   (worst: 68's "I don't read the script but I do naturally"). Owner's
+   ruling 2026-07-17: ASR-scoring references are truncated at the
+   scripted close; the recordings themselves stay untouched on disk.
+   Future recording sessions: pause capture before debriefing.
+7. **Two-hats loop-test notes** (2026-07-07, project owner playing both
    roles in one voice, consultation deliberately interrupted): diarisation
    held up despite a single speaker — one boundary merge only; and the
    note generator left Assessment and Plan **empty rather than

@@ -52,6 +52,21 @@ class Segment:
     text: str
 
 
+# Biases recognition toward clinical vocabulary. Whisper reads this as
+# "text that came just before the audio", so phrasing it as a transcript
+# description steers word choice without inventing content. Shared by the
+# live path and the WhisperX finalisation pass (the 2026-07-17 recordings
+# deviation report measured the cost of its absence in the final pass).
+CLINICAL_INITIAL_PROMPT = os.getenv(
+    "WHISPER_INITIAL_PROMPT",
+    "A general practice consultation between a doctor and a patient, "
+    "including medical terminology and medication names such as "
+    "metformin, gliclazide, losartan, atorvastatin, omeprazole, "
+    "salbutamol, beclometasone, and investigations such as HbA1c, "
+    "full blood count, NS1 antigen, ECG.",
+)
+
+
 class LiveTranscriber:
     """Loads a Whisper model once and transcribes audio buffers on demand."""
 
@@ -65,17 +80,7 @@ class LiveTranscriber:
         model_size = model_size or os.getenv("WHISPER_MODEL", "distil-large-v3")
         device = device or os.getenv("WHISPER_DEVICE", "auto")
         self.beam_size = int(os.getenv("WHISPER_BEAM_SIZE", "5"))
-        # Biases recognition toward clinical vocabulary. Whisper reads this as
-        # "text that came just before the audio", so phrasing it as a
-        # transcript description steers word choice without inventing content.
-        self.initial_prompt = os.getenv(
-            "WHISPER_INITIAL_PROMPT",
-            "A general practice consultation between a doctor and a patient, "
-            "including medical terminology and medication names such as "
-            "metformin, gliclazide, losartan, atorvastatin, omeprazole, "
-            "salbutamol, beclometasone, and investigations such as HbA1c, "
-            "full blood count, NS1 antigen, ECG.",
-        )
+        self.initial_prompt = CLINICAL_INITIAL_PROMPT
 
         if device in ("auto", "cuda"):
             _preload_cuda_libraries()
