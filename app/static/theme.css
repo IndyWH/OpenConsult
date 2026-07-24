@@ -1,0 +1,195 @@
+/* Consultation AI — shared design system (2026-07-24 design pass).
+   Tokens and components lifted from the approved mockups
+   (live_mockup.html / review_mockup.html, Claude Cowork + owner).
+   Deliberate LIGHT theme only — no dark variant in this pass. */
+
+:root {
+  --paper: #FAF6F1;          /* warm cream canvas */
+  --panel: #FFFFFF;          /* cards / panes */
+  --ink: #29231F;            /* warm near-black */
+  --ink-soft: #6E645C;       /* secondary text */
+  --ink-faint: #A39A91;      /* metadata */
+  --line: #E9E1D8;           /* hairline borders */
+  --plum: #4E2A3A;           /* single brand accent (primary action) */
+  --plum-hover: #3E2130;
+  --red: #C2402F;            /* urgency ONLY */
+  --amber: #B07C1E;          /* low-confidence flags + awaiting states */
+  --green: #2E7D4F;          /* mic level / linked / approved */
+  --radius: 10px;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+}
+
+/* ============ App chrome (injected by nav.js) ============ */
+header.app {
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: .65rem 1.4rem; border-bottom: 1px solid var(--line);
+  background: var(--paper); position: sticky; top: 0; z-index: 5;
+}
+.brand { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; letter-spacing: .01em; color: var(--ink); text-decoration: none; }
+nav.tabs { display: flex; gap: .25rem; flex-wrap: wrap; }
+nav.tabs a {
+  text-decoration: none; color: var(--ink-soft); padding: .35rem .8rem;
+  border-radius: 999px; font-size: .9rem;
+}
+nav.tabs a.active { background: #EFE7DE; color: var(--ink); font-weight: 600; }
+.spacer { flex: 1; }
+.whoami { font-size: .82rem; color: var(--ink-faint); text-align: right; line-height: 1.3; }
+.whoami b { color: var(--ink-soft); font-weight: 600; }
+.whoami a { color: var(--ink-faint); text-decoration: none; cursor: pointer; }
+.whoami a:hover { color: var(--ink-soft); text-decoration: underline; }
+
+/* ============ Page container ============ */
+.wrap { max-width: 1080px; margin: 1.1rem auto 2rem; padding: 0 1.4rem; }
+h1.page { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margin: 0 0 .6rem; }
+
+/* ============ Chips ============ */
+.chip {
+  display: inline-flex; align-items: center; gap: .35rem;
+  font-size: .78rem; color: var(--ink-soft);
+  border: 1px solid var(--line); background: var(--panel);
+  padding: .18rem .6rem; border-radius: 999px;
+}
+.chip.linked { border-color: #CDE3D5; background: #F0F7F2; color: var(--green); }
+.chip.status { border-color: #E3D9C8; background: #F7F1E6; color: var(--amber); font-weight: 600; }
+.chip.status.approved, .chip.status.done { border-color: #CDE3D5; background: #F0F7F2; color: var(--green); }
+.chip.status.failed, .chip.status.live { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
+.chip.status.neutral, .chip.status.waiting, .chip.status.cancelled, .chip.status.voided {
+  border-color: var(--line); background: var(--panel); color: var(--ink-soft);
+}
+.chips { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+
+/* ============ Buttons ============ */
+button {
+  font-family: var(--sans); font-size: .9rem; cursor: pointer;
+  border-radius: 999px; padding: .5rem 1.2rem;
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft);
+}
+button:hover { border-color: #D8CEC3; color: var(--ink); }
+button.primary { background: var(--plum); border: none; color: #FBF6F1; font-weight: 600; }
+button.primary:hover { background: var(--plum-hover); color: #FBF6F1; }
+button.primary:disabled { opacity: .45; cursor: not-allowed; }
+button:disabled { opacity: .45; cursor: not-allowed; }
+button.small { font-size: .78rem; padding: .25rem .7rem; }
+button.danger { border-color: #EBC7C0; color: var(--red); }
+button.danger:hover { border-color: var(--red); color: var(--red); }
+button.plus {
+  background: var(--plum); border: none; color: #FBF6F1; font-weight: 700;
+  width: 2.4rem; height: 2.4rem; border-radius: 50%; font-size: 1.25rem; line-height: 1;
+  align-items: center; justify-content: center; padding: 0;
+}
+button.plus:hover { background: var(--plum-hover); }
+
+/* ============ Forms ============ */
+input, select {
+  font-family: var(--sans); font-size: .92rem; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: .45rem .7rem;
+}
+input:focus, select:focus { outline: none; border-color: #D8CEC3; }
+label { font-size: .85rem; color: var(--ink-soft); }
+.err { color: var(--red); font-size: .85rem; min-height: 1.2em; }
+.hint { font-size: .8rem; color: var(--ink-faint); }
+
+/* ============ Panes ============ */
+.pane {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: var(--radius); margin-top: 1rem;
+}
+.pane-head {
+  display: flex; align-items: center; gap: .6rem; padding: .7rem 1.1rem;
+  border-bottom: 1px solid var(--line);
+}
+.pane-head h2, .pane > h2, h2.pane-label {
+  font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+  color: var(--ink-faint); margin: 0; font-weight: 600;
+}
+.pane-head .tools { margin-left: auto; display: flex; gap: .5rem; align-items: center; font-size: .76rem; color: var(--ink-faint); }
+.pane-body { padding: 1rem 1.1rem; }
+
+/* ============ Tables ============ */
+table { width: 100%; border-collapse: collapse; background: var(--panel); }
+table.plain { background: transparent; }
+th {
+  text-align: left; font-size: .72rem; text-transform: uppercase;
+  letter-spacing: .09em; color: var(--ink-faint); font-weight: 600;
+  padding: .5rem .6rem;
+}
+td { padding: .5rem .6rem; border-top: 1px solid var(--line); font-size: .92rem; }
+.pane table { border-radius: var(--radius); overflow: hidden; }
+
+/* ============ Urgency banner (red is reserved for this) ============ */
+.urgent, .urgency {
+  border: 1.5px solid var(--red); background: #FBF1EF;
+  border-radius: var(--radius); padding: .8rem 1.1rem;
+}
+.urgent h2, .urgency h2, .urgency h3 { color: var(--red); }
+.urgent ul { margin: 0; padding-left: 1.15rem; }
+.urgent li { font-weight: 600; font-size: 1.02rem; margin-bottom: .3rem; }
+.urgent .why { display: block; font-weight: 400; color: var(--ink-soft); font-size: .85rem; }
+.urgency.acked { border-color: var(--line); background: var(--panel); }
+.urgency.acked .icon, .urgency.acked h3 { color: var(--green); }
+
+/* ============ Likelihood tags (CDS differential) ============ */
+.lk {
+  font-size: .68rem; font-weight: 700; border-radius: 4px; padding: .06rem .4rem;
+  margin-right: .4rem; vertical-align: middle; text-transform: lowercase;
+}
+.lk.high { background: #F7E8E5; color: var(--red); }
+.lk.moderate { background: #F5EBDA; color: var(--amber); }
+.lk.low { background: #EFEAE4; color: var(--ink-soft); }
+
+/* ============ Citations / provenance ============ */
+.cite { font-size: .8rem; color: var(--ink-soft); margin: .5rem 0 0; padding-left: 1.2rem; text-indent: -1.2rem; }
+.cite b { color: var(--ink); font-weight: 600; }
+.provenance {
+  font-size: .72rem; color: var(--ink-faint); margin-top: .8rem;
+  border-top: 1px solid var(--line); padding-top: .5rem;
+}
+
+/* ============ Citation chips + confidence flags (note) ============ */
+.cchip {
+  display: inline-block; font-size: .68rem; font-weight: 700; color: var(--ink-soft);
+  background: #EFEAE4; border-radius: 4px; padding: .02rem .35rem; margin-left: .3rem;
+  cursor: pointer; vertical-align: middle; font-variant-numeric: tabular-nums;
+}
+.cchip:hover { background: #E3D9C8; color: var(--ink); }
+.flag {
+  display: inline-flex; align-items: center; gap: .25rem; font-size: .68rem; font-weight: 700;
+  color: var(--amber); background: #F7F1E6; border: 1px solid #E9DCC0;
+  border-radius: 4px; padding: .02rem .4rem; margin-left: .3rem; vertical-align: middle;
+}
+.draft-tag {
+  display: inline-flex; font-size: .7rem; font-weight: 700; color: var(--amber);
+  background: #F7F1E6; border: 1px solid #E9DCC0; border-radius: 4px; padding: .05rem .45rem;
+}
+
+/* ============ Diarised transcript turns ============ */
+.turn { display: flex; gap: .7rem; margin-bottom: .65rem; padding: .3rem .45rem; border-radius: 6px; }
+.turn .n { flex: none; width: 1.6rem; text-align: right; color: var(--ink-faint); font-size: .76rem; font-variant-numeric: tabular-nums; padding-top: .15rem; }
+.turn .who { flex: none; width: 4.2rem; font-size: .78rem; font-weight: 700; padding-top: .12rem; }
+.turn.doctor .who { color: var(--plum); }
+.turn.patient .who { color: var(--green); }
+.turn .text, .turn .ttext { font-size: .95rem; }
+.turn.lowconf .text, .turn.lowconf .ttext { border-bottom: 2px dotted var(--amber); }
+.turn.hl { background: #F7F1E6; outline: 1px solid #E3D9C8; }
+.turn .ts { color: var(--ink-faint); font-size: .76rem; font-variant-numeric: tabular-nums; }
+
+/* ============ Footer disclaimer (every page) ============ */
+footer.disclaimer {
+  text-align: center; font-size: .72rem; color: var(--ink-faint);
+  padding: .6rem 1rem 1.2rem;
+}
+
+/* ============ Dialog (change password) ============ */
+dialog {
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); color: var(--ink); padding: 1.1rem;
+  box-shadow: 0 6px 24px #29231F14;
+}
+dialog::backdrop { background: #29231F33; }

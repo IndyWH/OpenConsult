@@ -4,53 +4,39 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consultation AI — Today</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         max-width: 780px; margin: 0 auto; padding: 1.5rem; }
-  h1 { font-size: 1.25rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: .75rem; text-transform: uppercase;
-       letter-spacing: .05em; opacity: .6; padding: .4rem .5rem; }
-  td { padding: .5rem; border-top: 1px solid #8883; }
-  .badge { border-radius: 5px; padding: .1rem .5rem; font-size: .78rem; font-weight: 600; }
-  .badge.waiting { background: #8883; }
-  .badge.in_consultation { background: #ed6c0233; color: #ed6c02; }
-  .badge.done { background: #1a7f3733; color: #1a7f37; }
-  .badge.cancelled { background: #d32f2f22; color: #d32f2f; }
-  button { padding: .3rem .7rem; border-radius: 6px; border: 1px solid #888;
-           background: transparent; color: inherit; cursor: pointer; font-size: .85rem; }
-  button.start { background: #1a7f37; border-color: #1a7f37; color: white; }
-  form { display: flex; gap: .5rem; margin: 1rem 0; flex-wrap: wrap; }
-  input, select { padding: .4rem .6rem; border-radius: 6px; border: 1px solid #8886;
-                  background: transparent; color: inherit; }
-  /* Keep select dropdown options readable in dark mode (see login.html). */
-  select, option { background: Canvas; color: CanvasText; }
-  .hint { font-size: .8rem; opacity: .55; }
+  form.queue { display: flex; gap: .5rem; margin: .8rem 0; flex-wrap: wrap; }
+  td .hint { margin-left: .25rem; }
+  td button { margin-right: .25rem; }
 </style>
 </head>
 <body>
-<h1>Today's queue</h1>
-<form id="addForm" style="display:none">
+<div class="wrap">
+<h1 class="page">Today's queue</h1>
+<form id="addForm" class="queue" style="display:none">
   <input name="name" placeholder="Patient name (synthetic)" required>
   <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem">
   <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
-  <button class="start">Add to queue</button>
+  <button class="primary">Add to queue</button>
 </form>
-<form id="walkinForm" style="display:none">
+<form id="walkinForm" class="queue" style="display:none">
   <input name="name" placeholder="Walk-in patient name (synthetic)" required>
   <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem">
   <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
-  <button class="start">Start walk-in consultation</button>
+  <button class="primary">Start walk-in consultation</button>
 </form>
 <p class="hint" id="hint"></p>
 <label class="hint" style="display:block;margin-bottom:.5rem">
-  <input type="checkbox" id="showClosed"> Show closed entries (done / cancelled)
+  <input type="checkbox" id="showClosed" style="width:auto"> Show closed entries (done / cancelled)
 </label>
+<div class="pane">
 <table>
   <thead><tr><th>#</th><th>Patient</th><th>Status</th><th></th></tr></thead>
   <tbody id="rows"></tbody>
 </table>
+</div>
+</div>
 
 <script src="/static/nav.js"></script>
 <script>
@@ -98,12 +84,12 @@ async function refresh() {
     const demo = [entry.age, entry.sex].filter(Boolean).join(', ');
     tr.innerHTML = `<td>${isActive(entry) ? ++displayNo : '—'}</td>` +
       `<td>${entry.name}${demo ? ` <span class="hint">(${demo})</span>` : ''}</td>` +
-      `<td><span class="badge ${entry.status}">${entry.status.replace('_',' ')}</span></td>`;
+      `<td><span class="chip status ${entry.status}">${entry.status.replace('_',' ')}</span></td>`;
     const actions = document.createElement('td');
     if (canManage && entry.status === 'waiting') {
       for (const [dir, arrow] of [['up','↑'], ['down','↓']]) {
         const b = document.createElement('button');
-        b.textContent = arrow;
+        b.className = 'small'; b.textContent = arrow;
         b.addEventListener('click', async () => {
           await fetch(`/api/queue/${entry.entry_id}/move?direction=${dir}`, {method:'POST'});
           refresh();
@@ -113,7 +99,7 @@ async function refresh() {
     }
     if (clinical && entry.status === 'waiting') {
       const b = document.createElement('button');
-      b.className = 'start'; b.textContent = 'Start consultation';
+      b.className = 'primary small'; b.textContent = 'Start consultation';
       b.addEventListener('click', async () => {
         const response = await fetch(`/api/queue/${entry.entry_id}/start`, {method:'POST'});
         if (response.status === 409) { offerResume(await response.json()); return; }
@@ -125,14 +111,14 @@ async function refresh() {
     }
     if (clinical && entry.status === 'in_consultation') {
       const b = document.createElement('button');
-      b.className = 'start'; b.textContent = 'Resume';
+      b.className = 'primary small'; b.textContent = 'Resume';
       b.addEventListener('click', () => resumeEntry(entry.entry_id));
       actions.appendChild(b); actions.appendChild(document.createTextNode(' '));
     }
     if ((canManage || clinical) &&
         (entry.status === 'waiting' || entry.status === 'in_consultation')) {
       const b = document.createElement('button');
-      b.textContent = 'Close';
+      b.className = 'small'; b.textContent = 'Close';
       b.title = 'Close without a consultation (marks the entry cancelled)';
       b.addEventListener('click', async () => {
         if (!confirm(`Close ${entry.name}'s queue entry without a consultation?`)) return;

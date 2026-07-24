@@ -4,25 +4,23 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consultation AI — Audit log</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         max-width: 900px; margin: 0 auto; padding: 1.5rem; }
-  h1 { font-size: 1.25rem; }
-  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-  th { text-align: left; font-size: .72rem; text-transform: uppercase;
-       letter-spacing: .05em; opacity: .6; padding: .35rem .5rem; }
-  td { padding: .35rem .5rem; border-top: 1px solid #8883;
-       font-variant-numeric: tabular-nums; }
-  code { font-size: .8rem; opacity: .75; }
+  table { font-size: .85rem; }
+  td { font-variant-numeric: tabular-nums; }
+  code { font-size: .8rem; color: var(--ink-soft); }
 </style>
 </head>
 <body>
-<h1>Audit log</h1>
+<div class="wrap">
+<h1 class="page">Audit log</h1>
+<div class="pane">
 <table>
   <thead><tr><th>When</th><th>Who</th><th>Action</th><th>Subject</th><th>Detail</th></tr></thead>
   <tbody id="rows"></tbody>
 </table>
+</div>
+</div>
 <script src="/static/nav.js"></script>
 <script>
 document.addEventListener('me-ready', async () => {

@@ -4,43 +4,30 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consultation AI — Consultations</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         max-width: 780px; margin: 0 auto; padding: 1.5rem; }
-  h1 { font-size: 1.25rem; }
-  table { width: 100%; border-collapse: collapse; }
-  th { text-align: left; font-size: .75rem; text-transform: uppercase;
-       letter-spacing: .05em; opacity: .6; padding: .4rem .5rem; }
-  td { padding: .5rem; border-top: 1px solid #8883; }
-  .badge { border-radius: 5px; padding: .1rem .5rem; font-size: .78rem; font-weight: 600; }
-  .badge.processing { background: #ed6c0233; color: #ed6c02; }
-  .badge.awaiting_review { background: #0288d133; color: #0288d1; }
-  .badge.approved { background: #1a7f3733; color: #1a7f37; }
-  .badge.failed, .badge.live { background: #d32f2f33; color: #d32f2f; }
-  a.open { color: inherit; }
-  .hint { font-size: .8rem; opacity: .55; }
+  a.open { color: var(--ink-soft); }
   tr.voided td { opacity: .55; }
   tr.voided .strike { text-decoration: line-through; }
-  .voidreason { font-size: .78rem; color: #b02a37; display: block; }
-  .badge.voided { background: #8883; }
-  button.small { font-size: .78rem; padding: .2rem .55rem; border-radius: 6px;
-                 border: 1px solid #888; background: transparent; color: inherit;
-                 cursor: pointer; }
-  #purge { margin-top: 1rem; border-color: #b02a37; color: #b02a37; }
-  .err { color: #d32f2f; font-size: .85rem; min-height: 1.2em; }
+  .voidreason { font-size: .78rem; color: var(--red); display: block; }
+  #purge { margin-top: 1rem; }
+  td button, td a.open { margin-right: .25rem; }
 </style>
 </head>
 <body>
-<h1>Consultations</h1>
+<div class="wrap">
+<h1 class="page">Consultations</h1>
 <p class="hint" id="hint">Worklist and archive. Approved consultations are read-only.</p>
+<div class="pane">
 <table>
   <thead><tr><th>#</th><th>Patient</th><th>Doctor</th><th>Started</th><th>Status</th><th></th></tr></thead>
   <tbody id="rows"></tbody>
 </table>
+</div>
 
 <div class="err" id="err"></div>
-<button id="purge" class="small" style="display:none">Purge voided test data…</button>
+<button id="purge" class="small danger" style="display:none">Purge voided test data…</button>
+</div>
 
 <script src="/static/nav.js"></script>
 <script>
@@ -93,8 +80,8 @@ async function load() {
     const tr = document.createElement('tr');
     if (c.voided_at) tr.className = 'voided';
     const status = c.voided_at
-      ? '<span class="badge voided">voided</span>'
-      : `<span class="badge ${c.status}">${c.status.replace('_',' ')}</span>`;
+      ? '<span class="chip status voided">voided</span>'
+      : `<span class="chip status ${c.status}">${c.status.replace('_',' ')}</span>`;
     const reason = c.voided_at
       ? `<span class="voidreason">voided ${c.voided_at}${c.voided_by ? ' by ' + c.voided_by : ''}: ${c.void_reason}</span>` : '';
     tr.innerHTML =

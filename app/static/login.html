@@ -4,39 +4,29 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Consultation AI — Sign in</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root { color-scheme: light dark; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         max-width: 420px; margin: 0 auto; padding: 2rem 1.5rem; }
-  .banner { background: #fff3cd; color: #664d03; border: 1px solid #ffe69c;
-            border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; margin-bottom: 1.5rem; }
-  @media (prefers-color-scheme: dark) {
-    .banner { background: #3a3000; color: #ffe69c; border-color: #665c00; }
-  }
-  h1 { font-size: 1.3rem; }
-  form { border: 1px solid #8884; border-radius: 8px; padding: 1rem; margin-bottom: 1.5rem; }
-  label { display: block; font-size: .85rem; margin: .6rem 0 .2rem; opacity: .8; }
-  input, select { width: 100%; padding: .45rem .6rem; border-radius: 6px;
-                  border: 1px solid #8886; font-size: .95rem; background: transparent; color: inherit; }
-  /* A transparent select leaves Chromium painting its dropdown popup with a
-     default (light) background under inherited light text in dark mode —
-     white-on-white options. Canvas/CanvasText follow the active color-scheme. */
-  select, option { background: Canvas; color: CanvasText; }
-  button { margin-top: .9rem; width: 100%; padding: .55rem; border-radius: 7px;
-           border: none; background: #1a7f37; color: white; font-size: 1rem; cursor: pointer; }
-  .err { color: #d32f2f; font-size: .85rem; margin-top: .5rem; min-height: 1.2em; }
-  h2 { font-size: 1rem; opacity: .8; }
+  main { max-width: 420px; margin: 0 auto; padding: 2.5rem 1.5rem 1rem; }
+  h1 { font-family: var(--serif); font-size: 1.6rem; font-weight: 600;
+       text-align: center; margin: 0 0 1.5rem; }
+  form { background: var(--panel); border: 1px solid var(--line);
+         border-radius: var(--radius); padding: 1.25rem; margin-bottom: 1.25rem; }
+  h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+       color: var(--ink-faint); font-weight: 600; margin: 0 0 .6rem; }
+  label { display: block; margin: .6rem 0 .2rem; }
+  input, select { width: 100%; }
+  form button { margin-top: 1rem; width: 100%; }
 </style>
 </head>
 <body>
-<div class="banner">⚠️ Research/educational prototype — not a medical device. Synthetic consultations only.</div>
+<main>
 <h1>Consultation AI</h1>
 
 <form id="loginForm">
   <h2>Sign in</h2>
   <label>Username</label><input name="username" autocomplete="username" required>
   <label>Password</label><input name="password" type="password" autocomplete="current-password" required>
-  <button>Sign in</button>
+  <button class="primary">Sign in</button>
   <div class="err" id="loginErr"></div>
 </form>
 
@@ -53,6 +43,10 @@
   <button>Register</button>
   <div class="err" id="regErr"></div>
 </form>
+</main>
+
+<footer class="disclaimer">Research/educational prototype — not a medical device.
+Synthetic consultations only. All AI output is a draft until the doctor approves it.</footer>
 
 <script>
 async function submit(form, url, errEl) {

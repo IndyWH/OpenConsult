@@ -1,4 +1,6 @@
-// Shared tab bar: Today | Consultation | Consultations (+ Audit for admin).
+// Shared app chrome: brand wordmark, pill tabs (Today | Consultation |
+// Consultations, + Users/Audit for admin), identity block with Change
+// password / Sign out, and the one-line footer disclaimer.
 // Injects itself at the top of <body>; hides clinical tabs from the
 // receptionist (cosmetic only — the server enforces the boundary).
 (async function () {
@@ -7,9 +9,14 @@
   const me = await response.json();
   window.ME = me;
 
+  const header = document.createElement('header');
+  header.className = 'app';
+  const brand = document.createElement('a');
+  brand.className = 'brand'; brand.href = '/today'; brand.textContent = 'Consultation AI';
+  header.appendChild(brand);
+
   const nav = document.createElement('nav');
-  nav.style.cssText = 'display:flex;gap:.35rem;align-items:center;margin-bottom:1rem;' +
-    'border-bottom:1px solid #8884;padding-bottom:.6rem;flex-wrap:wrap';
+  nav.className = 'tabs';
   const clinical = me.role === 'doctor' || me.role === 'admin';
   const tabs = [
     ['/today', 'Today'],
@@ -22,50 +29,58 @@
     a.href = href; a.textContent = label;
     const active = location.pathname === href ||
       (href === '/live' && location.pathname.startsWith('/review'));
-    a.style.cssText = 'padding:.35rem .8rem;border-radius:7px;text-decoration:none;' +
-      'color:inherit;' + (active ? 'background:#1a7f3722;font-weight:600;' : '');
+    if (active) a.className = 'active';
     nav.appendChild(a);
   }
-  const who = document.createElement('span');
-  who.style.cssText = 'margin-left:auto;font-size:.85rem;opacity:.7';
-  who.textContent = `${me.display_name} (${me.role})`;
-  nav.appendChild(who);
-  const pw = document.createElement('button');
+  header.appendChild(nav);
+
+  const spacer = document.createElement('div');
+  spacer.className = 'spacer';
+  header.appendChild(spacer);
+
+  const who = document.createElement('div');
+  who.className = 'whoami';
+  const name = document.createElement('b');
+  name.textContent = me.display_name;
+  who.appendChild(name);
+  who.appendChild(document.createTextNode(' · ' + me.role));
+  who.appendChild(document.createElement('br'));
+  const pw = document.createElement('a');
   pw.textContent = 'Change password';
-  pw.style.cssText = 'font-size:.8rem;padding:.25rem .6rem;border-radius:6px;' +
-    'border:1px solid #888;background:transparent;color:inherit;cursor:pointer';
   pw.addEventListener('click', () => openPasswordDialog());
-  nav.appendChild(pw);
-  const out = document.createElement('button');
-  out.textContent = 'Log out';
-  out.style.cssText = 'font-size:.8rem;padding:.25rem .6rem;border-radius:6px;' +
-    'border:1px solid #888;background:transparent;color:inherit;cursor:pointer';
+  who.appendChild(pw);
+  who.appendChild(document.createTextNode(' · '));
+  const out = document.createElement('a');
+  out.textContent = 'Sign out';
   out.addEventListener('click', async () => {
     await fetch('/api/logout', {method: 'POST'}); location.href = '/login';
   });
-  nav.appendChild(out);
-  document.body.prepend(nav);
+  who.appendChild(out);
+  header.appendChild(who);
+  document.body.prepend(header);
+
+  if (!document.querySelector('footer.disclaimer')) {
+    const foot = document.createElement('footer');
+    foot.className = 'disclaimer';
+    foot.textContent = 'Research/educational prototype — not a medical device. ' +
+      'Synthetic consultations only. All AI output is a draft until the doctor approves it.';
+    document.body.appendChild(foot);
+  }
 
   function openPasswordDialog() {
     const dialog = document.createElement('dialog');
-    dialog.style.cssText = 'border:1px solid #8886;border-radius:8px;padding:1rem;' +
-      'min-width:280px;background:Canvas;color:CanvasText';
     dialog.innerHTML =
-      '<form method="dialog" style="display:flex;flex-direction:column;gap:.5rem">' +
-      '<strong style="font-size:.95rem">Change password</strong>' +
+      '<form method="dialog" style="display:flex;flex-direction:column;gap:.55rem;min-width:280px">' +
+      '<strong style="font-family:var(--serif);font-size:1rem">Change password</strong>' +
       '<input name="current" type="password" placeholder="Current password" required ' +
       'autocomplete="current-password">' +
       '<input name="next" type="password" placeholder="New password (min 8)" required ' +
       'minlength="8" autocomplete="new-password">' +
-      '<div style="color:#d32f2f;font-size:.82rem;min-height:1.1em" class="pwerr"></div>' +
+      '<div class="err pwerr"></div>' +
       '<div style="display:flex;gap:.5rem;justify-content:flex-end">' +
       '<button value="cancel" formnovalidate>Cancel</button>' +
-      '<button value="save" style="background:#1a7f37;border-color:#1a7f37;color:white">Save</button>' +
+      '<button value="save" class="primary">Save</button>' +
       '</div></form>';
-    for (const input of dialog.querySelectorAll('input, button')) {
-      input.style.cssText += ';padding:.4rem .6rem;border-radius:6px;border:1px solid #8886;' +
-        'background:transparent;color:inherit';
-    }
     const form = dialog.querySelector('form');
     form.addEventListener('submit', async (e) => {
       if (e.submitter && e.submitter.value === 'cancel') return;
