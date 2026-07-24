@@ -1,20 +1,30 @@
-"""Session-wide test-data cleanup.
+"""Test-database isolation: pytest never touches the live database.
 
-The suite runs against the real dev database (heavy tests self-skip when
-it's absent), and several tests exercise the front-desk flow by creating
-real patients, queue entries, and consultations — which used to
-accumulate in the owner's Today view and worklist after every run.
+At session start this conftest creates a fresh `consultation_ai_test`
+database on the same Postgres server, points DATABASE_URL at it BEFORE
+any app module is imported (they all bind the URL at import time), builds
+the schema via the app's own ensure_schema() functions, copies the
+guideline corpus tables from the live database (read-only) so the RAG
+tests keep their coverage, and seeds a sentinel admin so auth's
+"first account becomes admin" bootstrap can't promote a mid-suite test
+registration. The whole database is dropped again at session end.
 
-Strategy: snapshot the max id of each littered table before the session,
-delete everything above the watermark afterwards. This covers every test
-file with one mechanism and no per-test bookkeeping. CAVEAT, documented
-deliberately: rows created in the app by a human DURING a pytest run
-would fall above the watermark and be deleted too — don't use the app
-while the suite runs. Audit rows and app_user rows are never touched
-(append-only log; accounts are governance-managed, see HANDOVER).
+Requires two one-time grants (superuser, documented in HANDOVER):
+
+    sudo -u postgres sh -c 'psql -c "ALTER ROLE consultation_app CREATEDB;" \
+      && psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS vector;"'
+
+(CREATEDB lets the test session create/drop its database; pgvector is an
+untrusted extension, so it must live in template1 for new databases to
+inherit it.) If the grants are missing the suite refuses to run rather
+than fall back to the live database; if Postgres itself is absent,
+DB-dependent tests self-skip exactly as before.
 """
 
 import os
+import secrets
+import subprocess
+import urllib.parse
 
 import psycopg
 import pytest
@@ -22,35 +32,101 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-_TABLES = ("consultation", "queue_entry", "patient")  # delete in this order
+TEST_DB_NAME = "consultation_ai_test"
+
+_ONE_TIME_HELP = (
+    "\n\nTest-database bootstrap failed: {reason}.\n"
+    "Run the one-time setup (superuser, safe to re-run):\n\n"
+    "  sudo -u postgres sh -c 'psql -c \"ALTER ROLE consultation_app CREATEDB;\""
+    " && psql -d template1 -c \"CREATE EXTENSION IF NOT EXISTS vector;\"'\n\n"
+    "The suite refuses to fall back to the live database.\n"
+)
 
 
-def _connect():
-    return psycopg.connect(os.environ["DATABASE_URL"], connect_timeout=2)
+def _swap_db(url: str, dbname: str) -> str:
+    parts = urllib.parse.urlsplit(url)
+    return urllib.parse.urlunsplit(parts._replace(path="/" + dbname))
+
+
+LIVE_URL = os.environ.get("DATABASE_URL", "")
+TEST_URL = _swap_db(LIVE_URL, TEST_DB_NAME) if LIVE_URL else ""
+
+
+def _copy_corpus_tables() -> None:
+    """Guideline corpus, read-only from live → test, so RAG tests run.
+    Best-effort: with no corpus (or no pg_dump) those tests self-skip."""
+    try:
+        dump = subprocess.run(
+            ["pg_dump", LIVE_URL, "-t", "guideline_source", "-t", "guideline_chunk"],
+            capture_output=True, timeout=120,
+        )
+        if dump.returncode != 0:
+            return
+        subprocess.run(
+            ["psql", "-q", TEST_URL], input=dump.stdout,
+            capture_output=True, timeout=120, check=True,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return
+
+
+def _bootstrap_test_database() -> bool:
+    """Fresh test DB, schema, corpus copy, sentinel admin.
+    Returns False when Postgres is absent (tests self-skip as before)."""
+    if not LIVE_URL:
+        return False
+    try:
+        admin = psycopg.connect(LIVE_URL, connect_timeout=2, autocommit=True)
+    except Exception:
+        return False
+    with admin:
+        try:
+            admin.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME} WITH (FORCE)")
+            admin.execute(f"CREATE DATABASE {TEST_DB_NAME}")
+        except psycopg.errors.InsufficientPrivilege:
+            pytest.exit(_ONE_TIME_HELP.format(reason="CREATEDB not granted"), returncode=3)
+
+    with psycopg.connect(TEST_URL) as conn:
+        vector_installed = conn.execute(
+            "SELECT installed_version FROM pg_available_extensions WHERE name = 'vector'"
+        ).fetchone()[0]
+        if not vector_installed:
+            pytest.exit(
+                _ONE_TIME_HELP.format(reason="pgvector missing from template1"),
+                returncode=3,
+            )
+
+    # Every app module binds DATABASE_URL at import time — swap the env
+    # first, then import; nothing imports the app before this conftest.
+    os.environ["DATABASE_URL"] = TEST_URL
+    from app import audit, auth, consultations, frontdesk, letters
+
+    for module in (auth, frontdesk, consultations, letters, audit):
+        module.ensure_schema()
+
+    _copy_corpus_tables()
+
+    # Sentinel admin: with it in place, auth's count==0 bootstrap can never
+    # promote a test registration to admin. Password is random and discarded.
+    with psycopg.connect(TEST_URL) as conn:
+        conn.execute(
+            "INSERT INTO app_user (username, password_hash, display_name, role)"
+            " VALUES ('bootstrap_admin', %s, 'Bootstrap Admin', 'admin')",
+            (auth.hash_password(secrets.token_hex(16)),),
+        )
+    return True
+
+
+_DB_READY = _bootstrap_test_database()
 
 
 @pytest.fixture(scope="session", autouse=True)
-def cleanup_test_rows():
-    try:
-        with _connect() as conn:
-            marks = {
-                t: conn.execute(f"SELECT COALESCE(max(id), 0) FROM {t}").fetchone()[0]
-                for t in _TABLES
-            }
-    except Exception:  # no database: nothing to clean either
-        yield
-        return
-
+def test_database():
     yield
-
-    with _connect() as conn:
-        deleted = {}
-        for table in _TABLES:  # consultations first (turns/notes cascade)
-            deleted[table] = len(
-                conn.execute(
-                    f"DELETE FROM {table} WHERE id > %s RETURNING id",
-                    (marks[table],),
-                ).fetchall()
-            )
-    if any(deleted.values()):
-        print(f"\n[conftest] cleaned up test rows: {deleted}")
+    if not _DB_READY:
+        return
+    try:
+        with psycopg.connect(LIVE_URL, connect_timeout=2, autocommit=True) as conn:
+            conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME} WITH (FORCE)")
+    except Exception as exc:  # leaving the test DB behind is harmless
+        print(f"\n[conftest] could not drop {TEST_DB_NAME}: {exc}")

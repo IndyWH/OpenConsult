@@ -26,7 +26,10 @@ uv sync    # Python env (uv manages Python 3.12)
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
 - `uv run pytest` — 57 tests; heavy ones self-skip if Ollama/Postgres/
-  corpus are absent.
+  corpus are absent. Since 2026-07-24 the suite runs against a disposable
+  `consultation_ai_test` database (created/dropped per session by
+  `tests/conftest.py`) and never writes to the live database; needs a
+  one-time superuser grant, see Troubleshooting.
 - Postgres 18 + pgvector, database `consultation_ai`, credentials in the
   gitignored `.env` (see `.env.example`).
 
@@ -288,6 +291,15 @@ encoded in `pyproject.toml`. Summary:
   keep_alive 30 m.
 - sudo needs a real terminal (the assistant's shell can't prompt); batch
   root steps into one command for the user.
+- **Test-database bootstrap fails** ("CREATEDB not granted" / "pgvector
+  missing from template1"): the suite creates/drops `consultation_ai_test`
+  each session instead of touching the live DB (pytest used to leave
+  hundreds of active junk accounts in it). One-time setup, safe to re-run:
+  `sudo -u postgres psql -c "ALTER ROLE consultation_app CREATEDB;"` and
+  `sudo -u postgres psql -d template1 -c "CREATE EXTENSION IF NOT EXISTS
+  vector;"` (pgvector is untrusted, so it must live in template1 for the
+  test DB to inherit it). Done on this machine 2026-07-24. The suite
+  refuses to fall back to the live database by design.
 
 ## Toolbox: break-glass user CLI (2026-07-17)
 
