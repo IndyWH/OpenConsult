@@ -41,6 +41,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **Recordings eval run (2026-07-12); decision pending adjudication** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). Owner's transliteration adjudication pending (`evals/adjudication_03_si_worksheet.md`); fine-tune fallback squarely in scope. See `evals/2026-07-12_sinhala_asr_recordings_eval.md`. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
+| 7 — Supervised auto history-taking | **Spec'd 2026-07-24; nothing started** | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. Gated: starts only after Phase 5 adjudication/decision, Phase 0 recordings, and Docker/demo packaging are stable; 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -658,6 +659,11 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   Cowork 2026-07-24. Next: Docker Compose packaging and the two-role
   demo script.
 - **Whole-project:** the end-of-project review docket above.
+- **Phase 7 (queued, not started):** supervised auto history-taking is
+  spec'd in `PHASE_7_SPEC.md`. Per its sequencing note it starts only
+  after Phase 5 adjudication, the Phase 0 recordings, and Docker/demo
+  packaging; first commitment when it opens is 7a (tap-to-ask) + 7b
+  (face), with 7c decided separately after review.
 
 ## Remote access (Tailscale, set up 2026-07-10)
 
