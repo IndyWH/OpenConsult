@@ -49,6 +49,19 @@ async def _conn() -> psycopg.AsyncConnection:
     return await psycopg.AsyncConnection.connect(DATABASE_URL)
 
 
+async def get_patient(patient_id: int) -> dict | None:
+    """Server-side demographics (referral letters' Re: line reads this,
+    never model output)."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT id, name, age, sex FROM patient WHERE id = %s",
+                (patient_id,),
+            )
+        ).fetchone()
+    return {"id": row[0], "name": row[1], "age": row[2], "sex": row[3]} if row else None
+
+
 async def add_to_queue(name: str, age: int | None, sex: str | None) -> dict:
     async with await _conn() as conn:
         patient = await (

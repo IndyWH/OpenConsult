@@ -45,6 +45,32 @@
   .refusal h3 { color: var(--red); font-size: .9rem; margin: 0 0 .4rem; }
   .refusal .detail { font-size: .85rem; color: var(--ink-soft); }
 
+  /* referral letters */
+  .ref-menu {
+    position: absolute; right: 0; top: calc(100% + .5rem); z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 6px 24px #29231F14; min-width: 310px; padding: .45rem; display: none;
+  }
+  .ref-menu.open { display: block; }
+  .ref-menu .menu-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--ink-faint); font-weight: 600; padding: .35rem .6rem .25rem; }
+  .ref-menu .menu-note { font-size: .8rem; color: var(--ink-faint); padding: .35rem .6rem; }
+  .ref-menu button.item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    border-radius: 7px; padding: .5rem .6rem; font-size: .9rem; color: var(--ink);
+  }
+  .ref-menu button.item:hover { background: #F3EDE6; }
+  .ref-menu button.item small { display: block; color: var(--ink-faint); font-size: .76rem; }
+  .letter .pane-head h2 { color: var(--plum); }
+  .letter-body { font-size: .95rem; max-width: 46rem; white-space: pre-wrap; }
+  .letter textarea {
+    width: 100%; max-width: 46rem; min-height: 16rem; font-family: var(--sans);
+    font-size: .95rem; line-height: 1.55; color: var(--ink);
+    background: var(--panel); border: 1px solid var(--line); border-radius: 8px;
+    padding: .7rem .8rem; resize: vertical;
+  }
+  #plusBtn { display: none; }
+
   #processing { text-align: center; padding: 3rem 1rem; color: var(--ink-soft); }
   .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; margin-right: .5rem;
              border: 3px solid var(--line); border-top-color: var(--plum); border-radius: 50%;
@@ -64,6 +90,8 @@
       <button id="regen">Regenerate</button>
       <button id="copy">Copy as text</button>
       <button class="primary" id="approve">Approve</button>
+      <button class="plus" id="plusBtn" title="Add to this consultation">+</button>
+      <div class="ref-menu" id="refMenu"></div>
     </div>
   </div>
 
@@ -277,8 +305,149 @@ async function refresh() {
   renderUrgentBanner();
   renderTranscript();
   renderNote();
+  renderLetters();
   applyReadOnly();
 }
+
+// ------------------------------------------------------- referral letters
+// Flow (owner-specified): Approve success replaces the Approve button with
+// a round plum "+" that opens the suggestion menu. Letters are generated
+// from the approved note only — the server enforces this (409 before
+// approval) — and are drafts with their own approve step.
+const plusBtn = document.getElementById('plusBtn');
+const refMenu = document.getElementById('refMenu');
+let suggestionsLoaded = false;
+
+function renderLetters() {
+  const box = document.getElementById('letters');
+  box.innerHTML = '';
+  for (const letter of (state.letters || [])) {
+    const pane = el('div', 'pane letter');
+    const head = el('div', 'pane-head');
+    head.appendChild(el('h2', null, `Referral letter — ${letter.specialty}`));
+    const tools = el('div', 'tools');
+    if (letter.status === 'approved') {
+      tools.appendChild(el('span', 'chip status approved',
+        `approved ${letter.approved_at || ''}${letter.approved_by ? ' · ' + letter.approved_by : ''}`));
+    } else {
+      tools.appendChild(el('span', 'draft-tag', 'DRAFT — review, edit, approve before sending'));
+    }
+    head.appendChild(tools);
+    pane.appendChild(head);
+
+    const body = el('div', 'pane-body');
+    let getText;
+    if (letter.status === 'approved' || state.voided_at) {
+      const text = el('div', 'letter-body', letter.body);
+      body.appendChild(text);
+      getText = () => letter.body;
+    } else {
+      const area = document.createElement('textarea');
+      area.value = letter.body;
+      area.rows = Math.max(10, letter.body.split('\n').length + 2);
+      area.addEventListener('blur', async () => {
+        if (area.value === letter.body) return;
+        await fetch(`/api/consultations/${cid}/letters/${letter.id}`, {
+          method: 'PUT', headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({body: area.value})
+        });
+        letter.body = area.value;
+      });
+      body.appendChild(area);
+      getText = () => area.value;
+    }
+    pane.appendChild(body);
+
+    const foot = el('div', 'note-foot');
+    const grounding = letter.grounding || {};
+    foot.appendChild(el('span', 'grounding',
+      'Drafted from the approved note only — no new clinical claims introduced' +
+      (grounding.placeholders
+        ? ` · ${grounding.placeholders} placeholder(s) for the referring doctor to complete`
+        : '')));
+    const copyBtn = el('button', null, 'Copy as text');
+    copyBtn.addEventListener('click', async () => {
+      await navigator.clipboard.writeText(getText());
+      copyBtn.textContent = 'Copied ✓';
+      setTimeout(() => copyBtn.textContent = 'Copy as text', 1500);
+    });
+    foot.appendChild(copyBtn);
+    if (letter.status !== 'approved' && !state.voided_at) {
+      const approveBtn = el('button', 'primary', 'Approve letter');
+      approveBtn.addEventListener('click', async () => {
+        const response = await fetch(
+          `/api/consultations/${cid}/letters/${letter.id}/approve`, {method: 'POST'});
+        if (!response.ok) alert((await response.json()).error || 'failed');
+        refresh();
+      });
+      foot.appendChild(approveBtn);
+    }
+    pane.appendChild(foot);
+    box.appendChild(pane);
+  }
+}
+
+async function createLetter(specialty, reason) {
+  refMenu.classList.remove('open');
+  const box = document.getElementById('letters');
+  const wait = el('div', 'pane letter');
+  wait.innerHTML = '<div class="pane-body"><span class="spinner"></span>' +
+    `Drafting the ${specialty} referral letter from the approved note…</div>`;
+  box.appendChild(wait);
+  plusBtn.disabled = true;
+  const response = await fetch(`/api/consultations/${cid}/letters`, {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({specialty, reason})
+  });
+  plusBtn.disabled = false;
+  if (!response.ok) alert((await response.json()).error || 'failed');
+  refresh();
+}
+
+function menuItem(label, small, onClick) {
+  const item = el('button', 'item', label);
+  if (small) item.appendChild(el('small', null, small));
+  item.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+  return item;
+}
+
+async function openRefMenu() {
+  refMenu.classList.toggle('open');
+  if (!refMenu.classList.contains('open') || suggestionsLoaded) return;
+  refMenu.innerHTML = '<div class="menu-note">Checking the approved note for indicated referrals…</div>';
+  const response = await fetch(`/api/consultations/${cid}/letters/suggest`, {method: 'POST'});
+  refMenu.innerHTML = '';
+  if (response.ok) {
+    const {suggestions} = await response.json();
+    refMenu.appendChild(el('div', 'menu-title', 'Suggested from the approved note'));
+    if (suggestions.length) {
+      for (const s of suggestions) {
+        refMenu.appendChild(menuItem(`Referral letter — ${s.specialty}`,
+          `${s.urgency === 'urgent' ? 'urgent · ' : ''}${s.reason}`,
+          () => createLetter(s.specialty, s.reason)));
+      }
+    } else {
+      refMenu.appendChild(el('div', 'menu-note', 'No referral indicated by the note.'));
+    }
+    suggestionsLoaded = true;
+  } else {
+    refMenu.appendChild(el('div', 'menu-note',
+      (await response.json()).error || 'Suggestions unavailable.'));
+  }
+  refMenu.appendChild(el('div', 'menu-title', 'Other'));
+  refMenu.appendChild(menuItem('Referral letter — choose specialty…', null, () => {
+    const specialty = prompt('Refer to which specialty?');
+    if (specialty && specialty.trim()) createLetter(specialty.trim(), null);
+  }));
+  refMenu.appendChild(menuItem('Patient information letter', null, () => {
+    alert('Patient information letters are a later increment.');
+  }));
+}
+
+plusBtn.addEventListener('click', (e) => { e.stopPropagation(); openRefMenu(); });
+document.addEventListener('click', (e) => {
+  if (!refMenu.contains(e.target)) refMenu.classList.remove('open');
+});
 
 function applyReadOnly() {
   // Approved = signed record: no edits, no regeneration, copy still allowed.
@@ -287,6 +456,10 @@ function applyReadOnly() {
   const locked = state.status === 'approved' || !!state.voided_at;
   const refused = state.note && state.note.content.refusal;
   document.getElementById('approve').style.display = (locked || refused) ? 'none' : '';
+  // "+" (add letter) exists ONLY on approved, non-voided consultations —
+  // a letter must never cite content the doctor hasn't signed.
+  plusBtn.style.display =
+    (state.status === 'approved' && !state.voided_at) ? 'inline-flex' : 'none';
   document.getElementById('regen').style.display = locked ? 'none' : '';
   document.getElementById('swap').style.display = locked ? 'none' : '';
   document.getElementById('noteTools').textContent = locked

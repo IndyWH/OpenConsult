@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk
+from app import audit, auth, consultations, frontdesk, letters
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
@@ -51,6 +51,7 @@ async def lifespan(app: FastAPI):
     auth.ensure_schema()
     frontdesk.ensure_schema()
     consultations.ensure_schema()
+    letters.ensure_schema()
     audit.ensure_schema()
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
@@ -504,9 +505,11 @@ async def consultation_state(
     turns = await consultations.get_turns(cid)
     note = await consultations.latest_note(cid)
     plain = note_as_plain_text(note["content"]) if note else None
+    letter_rows = await letters.list_letters(cid)
     await audit.log(user["id"], "consultation.viewed", "consultation", cid)
     return JSONResponse(
-        content={**consultation, "turns": turns, "note": note, "plain_text": plain}
+        content={**consultation, "turns": turns, "note": note, "plain_text": plain,
+                 "letters": letter_rows}
     )
 
 
@@ -579,6 +582,120 @@ async def swap_roles(
         return blocked
     await consultations.swap_roles(cid)
     await audit.log(user["id"], "roles.swapped", "consultation", cid)
+    return JSONResponse(content={"ok": True})
+
+
+# ---------------------------------------------------------- referral letters
+
+async def _letter_gate(cid: int, user: dict):
+    """Letters exist ONLY on approved, non-voided consultations (a letter
+    must not cite content the doctor hasn't signed), scoped like every
+    other clinical object. Returns (error_response, consultation, note)."""
+    consultation = await consultations.get_consultation(cid)
+    if consultation is None:
+        return JSONResponse(status_code=404, content={"error": "not found"}), None, None
+    if consultation["voided_at"]:
+        return JSONResponse(status_code=409, content={"error": "consultation is voided"}), None, None
+    if (blocked := _foreign_consultation(consultation, user)) is not None:
+        return blocked, None, None
+    if consultation["status"] != "approved":
+        return JSONResponse(
+            status_code=409,
+            content={"error": "letters can only be created for an approved consultation"},
+        ), None, None
+    note = await consultations.latest_note(cid)
+    if note is None or not note.get("approved_text"):
+        return JSONResponse(
+            status_code=409, content={"error": "no approved note text found"}
+        ), None, None
+    return None, consultation, note
+
+
+@app.post("/api/consultations/{cid}/letters/suggest")
+async def letters_suggest(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """Model-inferred indicated referrals, from the approved note only.
+    Cached per note version; an empty list is a valid and common answer."""
+    blocked, consultation, note = await _letter_gate(cid, user)
+    if blocked is not None:
+        return blocked
+    suggestions = await letters.cached_suggestions(cid, note["version"])
+    if suggestions is None:
+        suggestions = await letters.suggest_referrals(note["approved_text"])
+        await letters.save_suggestions(cid, note["version"], suggestions)
+        await audit.log(user["id"], "letter.suggested", "consultation", cid,
+                        {"note_version": note["version"], "suggestions": suggestions})
+    return JSONResponse(content={"suggestions": suggestions})
+
+
+class LetterCreateBody(BaseModel):
+    specialty: str
+    reason: str | None = None
+
+
+@app.post("/api/consultations/{cid}/letters")
+async def letter_create(
+    cid: int, body: LetterCreateBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    blocked, consultation, note = await _letter_gate(cid, user)
+    if blocked is not None:
+        return blocked
+    specialty = body.specialty.strip()
+    if not specialty:
+        return JSONResponse(status_code=400, content={"error": "specialty is required"})
+    patient = (await frontdesk.get_patient(consultation["patient_id"])
+               if consultation["patient_id"] else None) or {"name": consultation["patient_name"]}
+    # The letter signs off as the consultation's doctor (fall back to the
+    # acting user, e.g. an admin drafting on an unowned legacy row).
+    doctor = None
+    if consultation["doctor_id"]:
+        doctor = await auth.get_user(consultation["doctor_id"])
+    doctor_name = (doctor or user)["display_name"]
+    drafted = await letters.draft_letter(
+        note["approved_text"], specialty, patient, doctor_name
+    )
+    lid = await letters.create_letter(
+        cid, specialty, body.reason, drafted["body"], drafted["grounding"], user["id"]
+    )
+    await audit.log(user["id"], "letter.created", "letter", lid,
+                    {"consultation_id": cid, "specialty": specialty,
+                     "grounding": drafted["grounding"]})
+    return JSONResponse(content={"ok": True, "letter_id": lid})
+
+
+class LetterEditBody(BaseModel):
+    body: str
+
+
+@app.put("/api/consultations/{cid}/letters/{lid}")
+async def letter_edit(
+    cid: int, lid: int, body: LetterEditBody,
+    user: dict = Depends(api_user(*CLINICAL_ROLES)),
+) -> JSONResponse:
+    blocked, _, _ = await _letter_gate(cid, user)
+    if blocked is not None:
+        return blocked
+    if not await letters.update_letter_body(cid, lid, body.body):
+        return JSONResponse(status_code=409,
+                            content={"error": "letter not found or already approved"})
+    await audit.log(user["id"], "letter.edited", "letter", lid,
+                    {"consultation_id": cid})
+    return JSONResponse(content={"ok": True})
+
+
+@app.post("/api/consultations/{cid}/letters/{lid}/approve")
+async def letter_approve(
+    cid: int, lid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    blocked, _, _ = await _letter_gate(cid, user)
+    if blocked is not None:
+        return blocked
+    if not await letters.approve_letter(cid, lid, user["id"]):
+        return JSONResponse(status_code=409,
+                            content={"error": "letter not found or already approved"})
+    await audit.log(user["id"], "letter.approved", "letter", lid,
+                    {"consultation_id": cid})
     return JSONResponse(content={"ok": True})
 
 
