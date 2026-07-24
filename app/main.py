@@ -442,14 +442,40 @@ def live_page(user: dict = Depends(page_user(*CLINICAL_ROLES))) -> FileResponse:
 
 @app.get("/api/consultations")
 async def consultation_list(user: dict = Depends(api_user())) -> list[dict]:
-    """Worklist: statuses only, no clinical content — all roles may see it."""
-    return await consultations.list_consultations()
+    """Worklist: statuses only, no clinical content — all roles may see it.
+    Strict scoping (owner decision 2026-07-24): a doctor sees only their
+    own consultations (plus unowned legacy rows); admin and receptionist
+    behaviour unchanged (receptionist rows are status-only anyway)."""
+    doctor_id = user["id"] if user["role"] == "doctor" else None
+    return await consultations.list_consultations(doctor_id=doctor_id)
 
 
 @app.get("/review/{cid}")
 def review_page(cid: int, user: dict = Depends(page_user(*CLINICAL_ROLES))) -> FileResponse:
     """Note review screen: editable draft note + diarised transcript."""
     return FileResponse(STATIC_DIR / "review.html")
+
+
+def _foreign_consultation(consultation: dict, user: dict) -> JSONResponse | None:
+    """Strict own-consultations scoping (owner decision 2026-07-24, over
+    continuity-of-care sharing — revisit only as an owner decision): a
+    doctor may open or act on only their own consultations. Unowned rows
+    (doctor_id IS NULL: legacy/test data) stay open to clinical roles —
+    real consultations always record their doctor. Admin sees all. 403
+    matches the receptionist-probe pattern; voided stays 410."""
+    if (user["role"] == "doctor" and consultation["doctor_id"] is not None
+            and consultation["doctor_id"] != user["id"]):
+        return JSONResponse(status_code=403,
+                            content={"error": "not your consultation"})
+    return None
+
+
+async def _scoped(cid: int, user: dict) -> JSONResponse | None:
+    """404 for a missing consultation, 403 for another doctor's."""
+    consultation = await consultations.get_consultation(cid)
+    if consultation is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    return _foreign_consultation(consultation, user)
 
 
 async def _not_editable(cid: int) -> JSONResponse | None:
@@ -473,6 +499,8 @@ async def consultation_state(
     if consultation["voided_at"] and user["role"] != "admin":
         # Voided consultations exist only in the admin view.
         return JSONResponse(status_code=410, content={"error": "consultation voided"})
+    if (blocked := _foreign_consultation(consultation, user)) is not None:
+        return blocked
     turns = await consultations.get_turns(cid)
     note = await consultations.latest_note(cid)
     plain = note_as_plain_text(note["content"]) if note else None
@@ -490,6 +518,8 @@ class ApproveBody(BaseModel):
 async def approve(
     cid: int, body: ApproveBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
 ) -> JSONResponse:
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
     if (blocked := await _not_editable(cid)) is not None:
         return blocked
     consultation = await consultations.get_consultation(cid)
@@ -513,11 +543,13 @@ async def approve(
 @app.post("/api/consultations/{cid}/acknowledge-urgent")
 async def acknowledge_urgent(
     cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
-) -> dict:
+) -> JSONResponse:
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
     acked_at = await consultations.acknowledge_urgent(cid)
     await audit.log(user["id"], "urgent.acknowledged", "consultation", cid,
                     {"acknowledged_at": acked_at})
-    return {"ok": True, "acknowledged_at": acked_at}
+    return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
 
 
 @app.post("/api/consultations/{cid}/regenerate")
@@ -525,6 +557,8 @@ async def regenerate(
     cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
 ) -> JSONResponse:
     """Re-draft the note from the (possibly corrected) transcript."""
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
     if (blocked := await _not_editable(cid)) is not None:
         return blocked
     await consultations.set_status(cid, "processing")
@@ -539,6 +573,8 @@ async def swap_roles(
     cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
 ) -> JSONResponse:
     """Override for the first-speaker-is-Doctor heuristic."""
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
     if (blocked := await _not_editable(cid)) is not None:
         return blocked
     await consultations.swap_roles(cid)
@@ -554,6 +590,8 @@ class TurnBody(BaseModel):
 async def edit_turn(
     cid: int, idx: int, body: TurnBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
 ) -> JSONResponse:
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
     if (blocked := await _not_editable(cid)) is not None:
         return blocked
     await consultations.update_turn_text(cid, idx, body.text)

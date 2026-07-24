@@ -95,9 +95,21 @@ async def latest_for_patient_today(patient_id: int) -> int | None:
     return row[0] if row else None
 
 
-async def list_consultations(include_voided: bool = False) -> list[dict]:
+async def list_consultations(
+    include_voided: bool = False, doctor_id: int | None = None
+) -> list[dict]:
     """Worklist rows: no clinical content — safe for all logged-in roles.
-    Voided consultations appear only in the admin view (include_voided)."""
+    Voided consultations appear only in the admin view (include_voided).
+    doctor_id applies the strict own-consultations scoping (owner decision
+    2026-07-24): only that doctor's rows, plus unowned legacy/test rows
+    (doctor_id IS NULL — real consultations always carry their doctor)."""
+    conditions, params = [], []
+    if not include_voided:
+        conditions.append("c.voided_at IS NULL")
+    if doctor_id is not None:
+        conditions.append("(c.doctor_id = %s OR c.doctor_id IS NULL)")
+        params.append(doctor_id)
+    where = (" WHERE " + " AND ".join(conditions)) if conditions else ""
     async with await _conn() as conn:
         rows = await (
             await conn.execute(
@@ -107,8 +119,9 @@ async def list_consultations(include_voided: bool = False) -> list[dict]:
                 " LEFT JOIN patient p ON p.id = c.patient_id"
                 " LEFT JOIN app_user u ON u.id = c.doctor_id"
                 " LEFT JOIN app_user v ON v.id = c.voided_by"
-                + ("" if include_voided else " WHERE c.voided_at IS NULL")
-                + " ORDER BY c.id DESC"
+                + where
+                + " ORDER BY c.id DESC",
+                params,
             )
         ).fetchall()
     return [
@@ -136,7 +149,7 @@ async def get_consultation(cid: int) -> dict | None:
             await conn.execute(
                 "SELECT c.id, c.started_at, c.status, c.audio_path, c.error,"
                 " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name,"
-                " c.voided_at, c.void_reason"
+                " c.voided_at, c.void_reason, c.doctor_id"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -155,6 +168,7 @@ async def get_consultation(cid: int) -> dict | None:
         "patient_name": row[8],
         "voided_at": str(row[9]) if row[9] else None,
         "void_reason": row[10],
+        "doctor_id": row[11],
     }
 
 

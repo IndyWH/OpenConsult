@@ -251,7 +251,16 @@ function currentPlainText() {
 
 async function refresh() {
   const response = await fetch(`/api/consultations/${cid}`);
-  state = await response.json();
+  const body = await response.json();
+  if (!response.ok) {   // 403 not-your-consultation / 404 / 410 voided
+    processingEl.style.display = 'block';
+    contentEl.style.display = 'none';
+    document.getElementById('actionsBox').style.display = 'none';
+    processingEl.textContent = 'Cannot open this consultation: ' +
+      (body.error || `error ${response.status}`);
+    return;
+  }
+  state = body;
   renderHead();
   if (state.status === 'processing' || state.status === 'live') {
     processingEl.style.display = 'block'; contentEl.style.display = 'none';
