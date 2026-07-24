@@ -46,6 +46,8 @@
   .mic.dead { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
   .mic.dead .bars i { background: var(--red); transform: scaleY(.28); }
   .mic.dead svg.micicon { opacity: .9; stroke: var(--red); }
+  .mic.reconnect { border-color: #E9DCC0; background: #F7F1E6; color: var(--amber); }
+  .mic.reconnect .bars i { background: var(--amber); }
   .mic.disabled { cursor: default; }
 
   .mic-menu {
@@ -400,8 +402,20 @@ const partialEl = document.getElementById('partial');
 const TARGET_RATE = 16000;
 const CHUNK_SAMPLES = 4000;           // send ~0.25 s of audio per frame
 
+// Connection resilience: every audio frame carries a sequence number and
+// stays in `pending` until the server acks it. On a drop we keep
+// capturing (nothing is discarded while recording), auto-reconnect with
+// the same session id, and resend whatever the server hasn't confirmed.
+const SESSION_ID = crypto.randomUUID();
+const MAX_PENDING = 2400;             // 10 min of audio — beyond any grace window
 let ws = null;
 let sendQueue = new Float32Array(0);
+let seq = 0;                          // last sequence number assigned
+let pending = [];                     // [{seq, frame}] awaiting server ack
+let reconnecting = false;
+let reconnectAttempts = 0;
+let stopRequested = false;            // Stop pressed while disconnected
+let awaitingDone = false;             // "stop" sent, waiting for "done"
 
 // Linear-interpolation resampler: browser rate (often 48 kHz) → 16 kHz.
 function resample(input, fromRate) {
@@ -426,6 +440,15 @@ function floatToInt16(float32) {
   return out;
 }
 
+function frameChunk(chunk) {
+  // 4-byte big-endian sequence number + 16-bit PCM payload.
+  const pcm = floatToInt16(chunk);
+  const buf = new ArrayBuffer(4 + pcm.byteLength);
+  new DataView(buf).setUint32(0, ++seq, false);
+  new Uint8Array(buf, 4).set(new Uint8Array(pcm.buffer));
+  return {seq: seq, frame: buf};
+}
+
 function enqueue(samples) {
   const merged = new Float32Array(sendQueue.length + samples.length);
   merged.set(sendQueue); merged.set(samples, sendQueue.length);
@@ -433,9 +456,16 @@ function enqueue(samples) {
   while (sendQueue.length >= CHUNK_SAMPLES) {
     const chunk = sendQueue.slice(0, CHUNK_SAMPLES);
     sendQueue = sendQueue.slice(CHUNK_SAMPLES);
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(floatToInt16(chunk).buffer);
+    const item = frameChunk(chunk);
+    pending.push(item);
+    if (pending.length > MAX_PENDING) {
+      pending.shift();  // far beyond the server's grace window by now
+      console.warn('resend buffer full — dropped oldest unacked chunk');
     }
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(item.frame);
+    }
+    // else: disconnected — the chunk stays in `pending` for the resend.
   }
 }
 
@@ -516,6 +546,123 @@ function addFinal(msg) {
 }
 
 // ============================================================= start / stop
+function standDown(statusText) {
+  // Fully reset to the not-recording state (used by busy/resume_failed).
+  recording = false;
+  reconnecting = false;
+  stopRequested = false;
+  awaitingDone = false;
+  micPill.classList.remove('reconnect');
+  if (workletNode) { workletNode.disconnect(); workletNode = null; }
+  stopTimer();
+  if (ws) { ws.onclose = null; ws.close(); ws = null; }
+  btn.textContent = 'Start';
+  btn.disabled = false;
+  setStatus(statusText);
+}
+
+function onWsMessage(event) {
+  const msg = JSON.parse(event.data);
+  if (msg.type === 'final') { addFinal(msg); partialEl.textContent = ''; }
+  else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
+  else if (msg.type === 'cds') { renderCDS(msg.assessment); }
+  else if (msg.type === 'guidelines') { renderGuidelines(msg); }
+  else if (msg.type === 'ack') {
+    while (pending.length && pending[0].seq <= msg.seq) pending.shift();
+  }
+  else if (msg.type === 'resume') {
+    // Reconnected: resend everything the server hasn't confirmed.
+    for (const item of pending) {
+      if (item.seq > msg.last_seq) ws.send(item.frame);
+    }
+    reconnecting = false;
+    reconnectAttempts = 0;
+    micPill.classList.remove('reconnect');
+    if (stopRequested) {
+      stopRequested = false;
+      awaitingDone = true;
+      ws.send('stop');
+      setStatus('reconnected — finishing…');
+    } else {
+      setStatus('reconnected — listening');
+    }
+  }
+  else if (msg.type === 'resume_failed') {
+    // Grace expired: the server already finalised what it received.
+    standDown(msg.detail);
+  }
+  else if (msg.type === 'busy') {
+    // One live consultation at a time (server-enforced). The message
+    // can arrive after start() already flipped into recording state,
+    // so stand down completely: worklet, timer, flags, button.
+    standDown(msg.detail);
+  }
+  else if (msg.type === 'cds_unavailable') {
+    document.getElementById('dxIdle').style.display = '';
+    document.getElementById('dxIdle').textContent = msg.detail;
+  }
+  else if (msg.type === 'done') {
+    awaitingDone = false;
+    if (ws) { ws.onclose = null; ws.close(); ws = null; }
+    if (msg.consultation_id) {
+      // Finalisation (diarisation + note) runs in the background. Keep the
+      // live view — transcript, CDS panel and any urgent alert stay on
+      // screen — and flip the button to "See results" when the note is ready.
+      awaitResults(msg.consultation_id);
+    } else {
+      btn.textContent = 'Start';
+      btn.disabled = false;
+      setStatus('stopped — nothing was recorded');
+    }
+  }
+}
+
+function onWsClose() {
+  ws = null;
+  if (recording || awaitingDone) scheduleReconnect();
+}
+
+async function openSocket(resume) {
+  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+  const socket = new WebSocket(`${proto}://${location.host}/ws/transcribe`);
+  socket.binaryType = 'arraybuffer';
+  socket.onmessage = onWsMessage;
+  await new Promise((resolve, reject) => {
+    socket.onopen = resolve; socket.onclose = reject; socket.onerror = reject;
+  });
+  socket.onclose = onWsClose;
+  socket.onerror = null;
+  ws = socket;
+  ws.send(JSON.stringify({
+    session_id: SESSION_ID, resume: !!resume,
+    patient_id: PATIENT.id, queue_entry_id: PATIENT.queue,
+  }));
+}
+
+function scheduleReconnect() {
+  // A drop mid-recording: capture continues into `pending` (nothing is
+  // discarded); the pill shows the reconnecting state instead of failing
+  // silently; the server holds the session for its grace window.
+  if (reconnecting) return;
+  reconnecting = true;
+  micPill.classList.add('reconnect');
+  setStatus('connection lost — reconnecting… audio keeps buffering locally');
+  attemptReconnect();
+}
+
+async function attemptReconnect() {
+  if (!reconnecting) return;
+  const delay = Math.min(10000, 1000 * 2 ** Math.min(reconnectAttempts++, 4));
+  await new Promise(r => setTimeout(r, delay));
+  if (!reconnecting) return;
+  try {
+    await openSocket(true);
+    // The server replies resume / resume_failed / busy — handled above.
+  } catch (e) {
+    attemptReconnect();  // next backoff step
+  }
+}
+
 async function start() {
   if (!PATIENT.id) return;  // unlinked recording is impossible, not warned
   btn.disabled = true;
@@ -528,54 +675,13 @@ async function start() {
     }
   }
 
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}/ws/transcribe`);
-  ws.binaryType = 'arraybuffer';
-
-  ws.onmessage = (event) => {
-    const msg = JSON.parse(event.data);
-    if (msg.type === 'final') { addFinal(msg); partialEl.textContent = ''; }
-    else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
-    else if (msg.type === 'cds') { renderCDS(msg.assessment); }
-    else if (msg.type === 'guidelines') { renderGuidelines(msg); }
-    else if (msg.type === 'busy') {
-      // One live consultation at a time (server-enforced). The message
-      // can arrive after start() already flipped into recording state,
-      // so stand down completely: worklet, timer, flags, button.
-      recording = false;
-      if (workletNode) { workletNode.disconnect(); workletNode = null; }
-      stopTimer();
-      if (ws) { ws.close(); ws = null; }
-      btn.textContent = 'Start';
-      btn.disabled = false;
-      setStatus(msg.detail);
-    }
-    else if (msg.type === 'cds_unavailable') {
-      document.getElementById('dxIdle').style.display = '';
-      document.getElementById('dxIdle').textContent = msg.detail;
-    }
-    else if (msg.type === 'done') {
-      ws.close(); ws = null;
-      if (msg.consultation_id) {
-        // Finalisation (diarisation + note) runs in the background. Keep the
-        // live view — transcript, CDS panel and any urgent alert stay on
-        // screen — and flip the button to "See results" when the note is ready.
-        awaitResults(msg.consultation_id);
-      } else {
-        btn.textContent = 'Start';
-        btn.disabled = false;
-        setStatus('stopped — nothing was recorded');
-      }
-    }
-  };
-  ws.onerror = () => setStatus('connection error');
-
-  await new Promise((resolve, reject) => {
-    ws.onopen = resolve; ws.onclose = reject;
-  });
   await patientReady;   // identity is server-sourced; don't race the fetch
-  if (PATIENT.id) {
-    ws.send(JSON.stringify({patient_id: PATIENT.id, queue_entry_id: PATIENT.queue}));
+  try {
+    await openSocket(false);
+  } catch (e) {
+    setStatus('could not reach the server — try again');
+    btn.disabled = false;
+    return;
   }
 
   // Attach the transcription worklet to the SAME source the meter reads.
@@ -596,12 +702,20 @@ async function stop() {
   btn.disabled = true;
   btn.textContent = 'Please wait…';
   stopTimer();
-  setStatus('finishing…');
   // Detach the worklet but KEEP the stream and analyser — the level meter
   // stays live after recording ends.
   if (workletNode) { workletNode.disconnect(); workletNode = null; }
   if (ws && ws.readyState === WebSocket.OPEN) {
+    awaitingDone = true;
     ws.send('stop'); // server replies "done", which starts the results wait
+    setStatus('finishing…');
+  } else if (reconnecting) {
+    // Still trying to reach the server: deliver the buffered audio and
+    // the stop as soon as we get through. Even if we never do, the
+    // server finalises what it already received after the grace window.
+    stopRequested = true;
+    setStatus('connection lost — will finish as soon as the server is '
+      + 'reachable; the server keeps what it already received either way');
   } else {
     btn.textContent = 'Start';
     btn.disabled = false;

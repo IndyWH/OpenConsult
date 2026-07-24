@@ -99,16 +99,21 @@ def _client_for(user: dict) -> TestClient:
 
 @needs_db
 def test_second_concurrent_live_session_is_refused():
+    import json as _json
+
     doctor = _make_user("doctor")
     client = _client_for(doctor)
-    appmain.app.state.live_active = {"user": "someone_else"}
+    appmain.app.state.live_sessions = {
+        "other": {"attached": True, "user": {"username": "someone_else"}},
+    }
     try:
         with client.websocket_connect("/ws/transcribe") as ws:
+            ws.send_text(_json.dumps({"session_id": "mine"}))
             msg = ws.receive_json()
             assert msg["type"] == "busy"
             assert "one live consultation at a time" in msg["detail"].lower()
     finally:
-        appmain.app.state.live_active = None
+        appmain.app.state.live_sessions = {}
 
 
 @needs_db

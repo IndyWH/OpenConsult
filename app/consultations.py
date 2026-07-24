@@ -38,6 +38,10 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS void_reason text;
 -- (audio only — transcripts and notes are never deleted by retention).
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS keep_for_research boolean NOT NULL DEFAULT false;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS audio_deleted_at timestamptz;
+-- Connection resilience: set when a live session's WebSocket dropped and
+-- never reconnected — the audio tail may be missing; review shows a
+-- warning banner so the doctor knows what they are signing.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS connection_lost boolean NOT NULL DEFAULT false;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -156,6 +160,15 @@ async def queued_finalisations() -> list[tuple[int, str]]:
     return [(r[0], r[1]) for r in rows]
 
 
+async def set_connection_lost(cid: int) -> None:
+    """The live stream dropped and never reconnected: the recording ends
+    where the connection did, not where the consultation did."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET connection_lost = true WHERE id = %s", (cid,)
+        )
+
+
 async def set_audio_path(cid: int, path: str) -> None:
     """Post-approval FLAC compression updates the stored location."""
     async with await _conn() as conn:
@@ -191,7 +204,7 @@ async def get_consultation(cid: int) -> dict | None:
             await conn.execute(
                 "SELECT c.id, c.started_at, c.status, c.audio_path, c.error,"
                 " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name,"
-                " c.voided_at, c.void_reason, c.doctor_id"
+                " c.voided_at, c.void_reason, c.doctor_id, c.connection_lost"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -211,6 +224,7 @@ async def get_consultation(cid: int) -> dict | None:
         "voided_at": str(row[9]) if row[9] else None,
         "void_reason": row[10],
         "doctor_id": row[11],
+        "connection_lost": row[12],
     }
 
 

@@ -99,6 +99,13 @@
   identifying speakers, drafting the note… this takes a minute or two.</div>
 
   <div id="content" style="display:none">
+    <div class="pane" id="connLost" style="display:none; border-color:#E9DCC0; background:#F7F1E6; padding:.8rem 1.1rem">
+      <strong style="color:var(--amber)">⚠ Connection lost during recording</strong>
+      <span style="font-size:.88rem; color:var(--ink-soft)"> — the live stream
+      dropped and never reconnected, so the end of this consultation may be
+      missing from the transcript and audio. Review with particular care
+      before approving.</span>
+    </div>
     <div class="urgency" id="urgentBanner" style="display:none"></div>
 
     <!-- 1. DRAFT NOTE — the document the doctor is here to sign -->
@@ -303,6 +310,8 @@ async function refresh() {
     return;
   }
   contentEl.style.display = '';
+  document.getElementById('connLost').style.display =
+    state.connection_lost ? '' : 'none';
   renderUrgentBanner();
   renderTranscript();
   renderNote();

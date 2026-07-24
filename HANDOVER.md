@@ -306,6 +306,35 @@ Built after the Phase 6 verification, admin-only, all 403-tested:
   two deliberate steps by design. Tests: `tests/test_admin.py`
   (RBAC, last-admin guard via rolled-back transaction, void-then-purge).
 
+## Connection resilience (2026-07-24)
+
+Built after the owner lost a full remote consultation to a drop near the
+end. Principle: **received audio is never abandoned, buffered audio is
+never silently discarded.** Tests: `tests/test_resilience.py`.
+
+- **Protocol** (`/ws/transcribe`, live.html is the only client — they
+  version together): first message is JSON config with a client
+  `session_id`; binary frames carry a 4-byte big-endian sequence number
+  before the PCM; the server acks progress (`{"type":"ack","seq":N}`).
+- **Client:** unacked frames stay in a ring buffer (capped at 10 min,
+  far beyond any grace window); on a drop mid-recording capture
+  continues into the buffer, the mic pill shows an amber reconnecting
+  state, and the socket auto-reconnects with backoff, sending
+  `{resume: true, session_id}`; on `resume` the server names its
+  `last_seq` and the client resends only what's missing (duplicates
+  are skipped server-side by seq). Stop while disconnected is queued
+  and delivered on reconnect.
+- **Server:** live sessions live in a registry keyed by session id and
+  survive their WebSocket. On abrupt disconnect with audio received,
+  the session detaches and waits `LIVE_RECONNECT_GRACE_S` (env, default
+  120 s); a reconnect cancels the timer and resumes CDS state intact.
+  If the grace expires — or the owner starts a brand-new session (e.g.
+  page reload = new session id) — the received audio is finalised
+  through the normal queue with **connection_lost** set, which renders
+  an amber warning banner on the review page ("the end may be missing —
+  review with care"). Resuming an already-finalised session gets
+  `resume_failed` pointing at the Consultations tab.
+
 ## Concurrent capacity (2026-07-24, investigated + enforced)
 
 **Capacity statement: any number of concurrent logins/browsing sessions

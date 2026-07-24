@@ -67,9 +67,11 @@ async def lifespan(app: FastAPI):
     for cid, wav_path in await consultations.queued_finalisations():
         app.state.finalize_queue.put_nowait((cid, wav_path))
         logger.info("Re-enqueued consultation %d for finalisation", cid)
-    # One live consultation at a time, enforced at the WebSocket layer
-    # (the queue's one-active-entry guard is UI-level; this is the wall).
-    app.state.live_active = None
+    # Live-session registry (connection resilience): sessions survive
+    # their WebSocket, keyed by client session id. Also enforces one
+    # live consultation at a time at the WS layer (the queue's
+    # one-active-entry guard is UI-level; this is the wall).
+    app.state.live_sessions = {}
     app.state.retention_task = asyncio.create_task(retention.retention_loop())
     yield
     app.state.retention_task.cancel()
@@ -777,12 +779,94 @@ async def edit_turn(
     return JSONResponse(content={"ok": True})
 
 
+# Abrupt-disconnect grace: how long a detached live session waits for a
+# reconnect before its received audio is finalised anyway (owner lost a
+# full remote consultation to a drop near the end — audio must never be
+# abandoned).
+LIVE_RECONNECT_GRACE_S = float(os.getenv("LIVE_RECONNECT_GRACE_S", "120"))
+
+
+async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
+    """Turn a live session's received audio into a queued consultation.
+    Shared by the normal Stop path and grace-period finalisation — the
+    only difference is the connection_lost flag (review shows a warning
+    banner: the tail may be missing)."""
+    session: LiveSession = entry["session"]
+    user = entry["user"]
+    cid = await consultations.create_consultation(entry["patient_id"], user["id"])
+    if entry["queue_entry_id"] is not None:
+        await frontdesk.finish_entry(entry["queue_entry_id"])
+    await audit.log(user["id"], "consultation.created", "consultation", cid,
+                    {"patient_id": entry["patient_id"],
+                     **({"connection_lost": True} if connection_lost else {})})
+    wav_path = str(RECORDINGS_DIR / f"consultation_{cid}.wav")
+    duration = session.save_recording(wav_path)
+    logger.info("Consultation %d: %.1fs of audio saved%s", cid, duration,
+                " (connection lost — tail may be missing)" if connection_lost else "")
+
+    # Persist urgent actions still unresolved at session end (the CDS
+    # engine clears an action once the transcript shows it arranged, so
+    # anything remaining was never seen to be actioned). Shown as an
+    # acknowledge-gated banner on review — never merged into the note.
+    assessment = entry["assessment"]
+    if assessment and assessment.get("urgent_actions"):
+        unresolved = [
+            {
+                "action": a["action"],
+                "reason": a["reason"],
+                "first_fired_s": entry["urgent_first_fired"].get(a["action"]),
+            }
+            for a in assessment["urgent_actions"]
+        ]
+        await consultations.save_urgent_actions(cid, unresolved)
+        logger.info("Consultation %d: %d unresolved urgent action(s) recorded",
+                    cid, len(unresolved))
+    if connection_lost:
+        await consultations.set_connection_lost(cid)
+    # Hand the recording to the serialised finalisation worker: with one
+    # GPU, pipelines run one at a time; the consultation waits as
+    # 'queued' (worklist shows "processing (queued)").
+    await consultations.set_status(cid, "queued", audio_path=wav_path)
+    app_state.finalize_queue.put_nowait((cid, wav_path))
+    return cid
+
+
+async def _grace_finalise(app_state, session_id: str) -> None:
+    """No reconnect within the grace window: finalise what was received
+    rather than abandoning it. Cancelled by a successful reconnect."""
+    try:
+        await asyncio.sleep(LIVE_RECONNECT_GRACE_S)
+    except asyncio.CancelledError:
+        return
+    entry = app_state.live_sessions.pop(session_id, None)
+    if entry is None or entry["attached"]:
+        return
+    logger.warning("Live session %s: no reconnect within %.0fs — finalising "
+                   "received audio", session_id, LIVE_RECONNECT_GRACE_S)
+    await _complete_session(app_state, entry, connection_lost=True)
+
+
+def _detach_for_grace(app_state, session_id: str, entry: dict) -> None:
+    entry["attached"] = False
+    entry["grace_task"] = asyncio.create_task(_grace_finalise(app_state, session_id))
+    logger.warning("Live session %s: connection lost mid-recording — holding "
+                   "for reconnect (%.0fs grace)", session_id, LIVE_RECONNECT_GRACE_S)
+
+
 @app.websocket("/ws/transcribe")
 async def ws_transcribe(websocket: WebSocket) -> None:
     """Receive 16 kHz 16-bit mono PCM frames; stream transcript JSON back.
 
-    Client → server: binary audio frames, or the text message "stop".
-    Server → client: {"type": "final"|"partial"|"done", ...}
+    Protocol (connection-resilient since 2026-07-24):
+    - Client's FIRST message is JSON config: {"session_id", "patient_id",
+      "queue_entry_id", "resume": bool}.
+    - Binary frames carry a 4-byte big-endian sequence number, then PCM.
+      The server acks progress ({"type": "ack", "seq": N}); the client
+      keeps unacked chunks and resends them after a reconnect.
+    - On abrupt disconnect the session detaches and waits
+      LIVE_RECONNECT_GRACE_S for a resume; then the received audio is
+      finalised with a connection-lost flag instead of being abandoned.
+    - Text "stop" ends the session normally.
     """
     # WebSocket auth: same session cookie, clinical roles only.
     user = await auth.get_user(auth.verify_session(websocket.cookies.get(COOKIE_NAME)) or 0)
@@ -791,52 +875,122 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
-    # One live consultation at a time, globally: a second concurrent
-    # stream would share the one faster-whisper model (commit latency
-    # blows past the 2-5 s target) and race the finalisation GPU
-    # hand-off. The Today-queue guard already makes this unreachable
-    # through the UI; this is the server-side wall.
     state = websocket.app.state
-    if getattr(state, "live_active", None) is not None:
+    if getattr(state, "live_sessions", None) is None:
+        state.live_sessions = {}
+    sessions: dict[str, dict] = state.live_sessions
+
+    # ---- handshake: the first message must be the JSON config
+    try:
+        first = await asyncio.wait_for(websocket.receive(), timeout=15.0)
+    except asyncio.TimeoutError:
+        await websocket.close(code=4400)
+        return
+    if first["type"] == "websocket.disconnect":
+        return
+    text = first.get("text") or ""
+    if not text.startswith("{"):
+        await websocket.close(code=4400)
+        return
+    config = json.loads(text)
+    session_id = str(config.get("session_id") or os.urandom(8).hex())
+
+    entry = sessions.get(session_id)
+    if config.get("resume") and entry is None:
+        # Grace expired: the audio was finalised server-side already.
+        await websocket.send_json({
+            "type": "resume_failed",
+            "detail": "This session was already finalised on the server — "
+                      "check the Consultations tab for the result.",
+        })
+        await websocket.close(code=4404)
+        return
+    if entry is not None and not entry["attached"]:
+        # Reconnect: cancel the grace timer, resume where we left off.
+        if entry["grace_task"] is not None:
+            with contextlib.suppress(RuntimeError):  # timer loop may be gone
+                entry["grace_task"].cancel()
+            entry["grace_task"] = None
+        entry["attached"] = True
+        await websocket.send_json({"type": "resume", "last_seq": entry["last_seq"]})
+        logger.info("Live session %s: reconnected at seq %d", session_id,
+                    entry["last_seq"])
+    elif entry is not None:  # attached elsewhere — duplicate tab/device
         await websocket.send_json({
             "type": "busy",
-            "detail": "Another live consultation is already in progress "
-                      f"(started by {state.live_active['user']}). "
-                      "One live consultation at a time.",
+            "detail": "This consultation is already streaming from another "
+                      "tab or device. One live consultation at a time.",
         })
         await websocket.close(code=4409)
         return
-    state.live_active = {"user": user["username"]}
+    else:
+        # New session. One live consultation at a time, globally: a second
+        # stream would share the one faster-whisper model (commit latency
+        # blows past the 2-5 s target) and race the finalisation GPU
+        # hand-off. The Today-queue guard makes this unreachable through
+        # the UI; this is the server-side wall.
+        if any(e["attached"] for e in sessions.values()):
+            active = next(e for e in sessions.values() if e["attached"])
+            await websocket.send_json({
+                "type": "busy",
+                "detail": "Another live consultation is already in progress "
+                          f"(started by {active['user']['username']}). "
+                          "One live consultation at a time.",
+            })
+            await websocket.close(code=4409)
+            return
+        # A detached session still in grace means its owner is gone and
+        # someone is starting fresh (e.g. page reload = new session id):
+        # finalise its audio NOW — never lost — and free the slot.
+        for stale_id in [sid for sid, e in sessions.items() if not e["attached"]]:
+            stale = sessions.pop(stale_id)
+            if stale["grace_task"] is not None:
+                with contextlib.suppress(RuntimeError):
+                    stale["grace_task"].cancel()
+            await _complete_session(state, stale, connection_lost=True)
+        entry = {
+            "session": LiveSession(state.transcriber),
+            "user": user,
+            "patient_id": config.get("patient_id"),
+            "queue_entry_id": config.get("queue_entry_id"),
+            "transcript_parts": [],   # confirmed text, the CDS engine's input
+            "assessment": None,
+            "cds_sent_len": 0,
+            "urgent_first_fired": {},  # action text → audio time (s)
+            "last_seq": 0,
+            "attached": True,
+            "grace_task": None,
+            "stopped": False,
+        }
+        sessions[session_id] = entry
+        logger.info("Live session %s started by %s", session_id, user["username"])
 
-    session = LiveSession(websocket.app.state.transcriber)
-    engine: CDSEngine = websocket.app.state.cds_engine
-    patient_id: int | None = None
-    queue_entry_id: int | None = None
-    logger.info("Live session started by %s", user["username"])
+    session: LiveSession = entry["session"]
+    engine: CDSEngine = state.cds_engine
+    rag: RAGService = state.rag
 
-    rag: RAGService = websocket.app.state.rag
-
-    transcript_parts: list[str] = []  # confirmed text, the CDS engine's input
-    assessment: dict | None = None
+    # CDS side tasks are per-connection (cancelled on disconnect); their
+    # accumulated state lives in the entry and survives reconnects.
     cds_task: asyncio.Task | None = None
-    cds_sent_len = 0
     cds_failures = 0
     gl_task: asyncio.Task | None = None
     gl_conditions: tuple = ()  # conditions the current guideline panel is for
-    urgent_first_fired: dict[str, float] = {}  # action text → audio time (s)
+    last_acked = -1
 
     async def maybe_run_cds() -> None:
         """Launch/collect the CDS side task without ever blocking transcription."""
-        nonlocal cds_task, assessment, cds_sent_len, cds_failures
+        nonlocal cds_task, cds_failures
         if cds_task is not None and cds_task.done():
             try:
-                assessment = cds_task.result()
+                entry["assessment"] = cds_task.result()
                 cds_failures = 0
-                for action in assessment.get("urgent_actions", []):
-                    urgent_first_fired.setdefault(
+                for action in entry["assessment"].get("urgent_actions", []):
+                    entry["urgent_first_fired"].setdefault(
                         action["action"], round(session.audio_seconds, 1)
                     )
-                await websocket.send_json({"type": "cds", "assessment": assessment})
+                await websocket.send_json(
+                    {"type": "cds", "assessment": entry["assessment"]}
+                )
             except Exception as exc:  # noqa: BLE001 - degrade, don't crash the stream
                 cds_failures += 1
                 logger.warning("CDS pass failed (%d): %s", cds_failures, exc)
@@ -846,14 +1000,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          "detail": "CDS engine unreachable; transcription continues."}
                     )
             cds_task = None
-        transcript = "\n".join(transcript_parts)
+        transcript = "\n".join(entry["transcript_parts"])
         if (
             cds_task is None
             and cds_failures < CDS_MAX_FAILURES
-            and len(transcript) - cds_sent_len >= CDS_MIN_NEW_CHARS
+            and len(transcript) - entry["cds_sent_len"] >= CDS_MIN_NEW_CHARS
         ):
-            cds_sent_len = len(transcript)
-            cds_task = asyncio.create_task(engine.update(transcript, assessment))
+            entry["cds_sent_len"] = len(transcript)
+            cds_task = asyncio.create_task(
+                engine.update(transcript, entry["assessment"])
+            )
 
     async def maybe_run_guidelines() -> None:
         """Refresh the guideline panel when the leading differentials change.
@@ -869,10 +1025,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             except Exception as exc:  # noqa: BLE001 - the panel is optional
                 logger.warning("Guideline lookup failed: %s", exc)
             gl_task = None
-        if assessment is None or gl_task is not None:
+        if entry["assessment"] is None or gl_task is not None:
             return
         conditions = tuple(
-            d["condition"] for d in assessment.get("differentials", [])[:2]
+            d["condition"] for d in entry["assessment"].get("differentials", [])[:2]
         )
         if conditions and conditions != gl_conditions:
             gl_conditions = conditions
@@ -887,80 +1043,68 @@ async def ws_transcribe(websocket: WebSocket) -> None:
 
             if message is not None:
                 if message["type"] == "websocket.disconnect":
-                    return
-                if message.get("bytes"):
-                    session.append_pcm16(message["bytes"])
+                    return  # finally: detach + grace (audio is never dropped)
+                if data := message.get("bytes"):
+                    # 4-byte big-endian seq + PCM. Duplicates (a resend
+                    # overlapping what already arrived) are skipped by seq.
+                    seq = int.from_bytes(data[:4], "big")
+                    if seq > entry["last_seq"]:
+                        if seq != entry["last_seq"] + 1:
+                            logger.warning("Live session %s: seq gap %d → %d",
+                                           session_id, entry["last_seq"], seq)
+                        session.append_pcm16(data[4:])
+                        entry["last_seq"] = seq
                 elif message.get("text") == "stop":
+                    entry["stopped"] = True
                     break
-                elif (text := message.get("text", "")).startswith("{"):
-                    config = json.loads(text)  # {"patient_id": .., "queue_entry_id": ..}
-                    patient_id = config.get("patient_id")
-                    queue_entry_id = config.get("queue_entry_id")
 
             if session.new_audio_seconds >= PROCESS_INTERVAL_S:
                 committed, partial = await session.process()
                 for seg in committed:
-                    transcript_parts.append(seg.text)
+                    entry["transcript_parts"].append(seg.text)
                     await websocket.send_json(
                         {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
                     )
                 await websocket.send_json({"type": "partial", "text": partial})
+
+            # Ack received audio so the client can prune its resend buffer.
+            if entry["last_seq"] != last_acked:
+                last_acked = entry["last_seq"]
+                await websocket.send_json({"type": "ack", "seq": last_acked})
 
             await maybe_run_cds()
             await maybe_run_guidelines()
 
         # Client pressed stop: transcribe the tail end and finish cleanly.
         for seg in await session.flush():
+            entry["transcript_parts"].append(seg.text)
             await websocket.send_json(
                 {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
             )
 
-        # Kick off the finalisation pipeline (Phase 2). The Stop button IS
-        # the trigger — no separate generate step.
-        cid = await consultations.create_consultation(patient_id, user["id"])
-        if queue_entry_id is not None:
-            await frontdesk.finish_entry(queue_entry_id)
-        await audit.log(user["id"], "consultation.created", "consultation", cid,
-                        {"patient_id": patient_id})
-        wav_path = str(RECORDINGS_DIR / f"consultation_{cid}.wav")
-        duration = session.save_recording(wav_path)
-        logger.info("Consultation %d: %.1fs of audio saved", cid, duration)
-
-        # Persist urgent actions still unresolved at session end (the CDS
-        # engine clears an action once the transcript shows it arranged, so
-        # anything remaining was never seen to be actioned). Shown as an
-        # acknowledge-gated banner on review — never merged into the note.
-        if assessment and assessment.get("urgent_actions"):
-            unresolved = [
-                {
-                    "action": a["action"],
-                    "reason": a["reason"],
-                    "first_fired_s": urgent_first_fired.get(a["action"]),
-                }
-                for a in assessment["urgent_actions"]
-            ]
-            await consultations.save_urgent_actions(cid, unresolved)
-            logger.info(
-                "Consultation %d: %d unresolved urgent action(s) recorded",
-                cid, len(unresolved),
-            )
-        # Hand the recording to the serialised finalisation worker: with
-        # one GPU, pipelines must run one at a time. The consultation
-        # waits as 'queued' (worklist shows "processing (queued)").
-        await consultations.set_status(cid, "queued", audio_path=wav_path)
-        websocket.app.state.finalize_queue.put_nowait((cid, wav_path))
-
+        # The Stop button IS the finalisation trigger — no separate step.
+        sessions.pop(session_id, None)
+        cid = await _complete_session(state, entry, connection_lost=False)
         await websocket.send_json({"type": "done", "consultation_id": cid})
         await websocket.close()
     except WebSocketDisconnect:
         pass
     finally:
-        state.live_active = None
         if cds_task is not None:
             cds_task.cancel()
         if gl_task is not None:
             gl_task.cancel()
-        logger.info("Live session ended")
+        still_mine = sessions.get(session_id) is entry
+        if still_mine and not entry["stopped"]:
+            if entry["last_seq"] > 0:
+                # Abrupt disconnect with audio on the server: hold the
+                # session for a reconnect; grace expiry finalises it.
+                _detach_for_grace(state, session_id, entry)
+            else:
+                sessions.pop(session_id, None)  # nothing received — discard
+        logger.info("Live connection closed (session %s%s)", session_id,
+                    ", held for reconnect" if still_mine and not entry["stopped"]
+                    and entry["last_seq"] > 0 else "")
 
 
 @app.get("/")

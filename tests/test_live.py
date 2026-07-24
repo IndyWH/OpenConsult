@@ -5,7 +5,9 @@ checks that the words come back. Loads the Whisper model, so this is the
 slow part of the suite (a few seconds on GPU).
 """
 
+import json
 import secrets
+import struct
 import wave
 from pathlib import Path
 
@@ -35,8 +37,13 @@ def test_websocket_streaming_transcription():
         )
         assert response.status_code == 200
         with client.websocket_connect("/ws/transcribe") as ws:
+            # Protocol since 2026-07-24: JSON config first, then binary
+            # frames carrying a 4-byte big-endian sequence number.
+            ws.send_text(json.dumps({"session_id": f"t_{secrets.token_hex(4)}"}))
+            seq = 0
             for i in range(0, len(pcm), CHUNK_BYTES):
-                ws.send_bytes(pcm[i : i + CHUNK_BYTES])
+                seq += 1
+                ws.send_bytes(struct.pack(">I", seq) + pcm[i : i + CHUNK_BYTES])
             ws.send_text("stop")
             while True:
                 msg = ws.receive_json()
