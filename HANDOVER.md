@@ -25,7 +25,7 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 16 tests; heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 57 tests; heavy ones self-skip if Ollama/Postgres/
   corpus are absent.
 - Postgres 18 + pgvector, database `consultation_ai`, credentials in the
   gitignored `.env` (see `.env.example`).
@@ -40,7 +40,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done** | 9/9 eval; fidelity spot-check logged; corpus is UK/CDC/WHO starter content. |
 | 5 — Sinhala | **Recordings eval run (2026-07-12); decision pending adjudication** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). Owner's transliteration adjudication pending (`evals/adjudication_03_si_worksheet.md`); fine-tune fallback squarely in scope. See `evals/2026-07-12_sinhala_asr_recordings_eval.md`. |
-| 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). Remaining build work: Docker Compose packaging, demo script, design pass. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
+| 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -58,8 +58,10 @@ app/chunking.py        structure-aware guideline chunker
 app/finalize.py        Stop-triggered pipeline: WhisperX + pyannote + roles + note
 app/notes.py           cited SOAP note generation + plain-text serialiser
 app/consultations.py   Postgres persistence (consultation/turns/notes/urgency)
+app/letters.py         referral letters: suggest/draft calls + grounding gate
 app/mock_scripts.py    mock-script parser (turns)
-app/static/live.html   live page; review.html  review page
+app/static/theme.css   shared design system (2026-07-24 pass; light only)
+app/static/live.html   live page; review.html  review page; nav.js app chrome
 corpus/manifest.yaml   committed provenance for the gitignored corpus
 scripts/               ingest_guidelines, simulate_cds, make_tts_sample,
                        evaluate_{urgency,rag,notes,sinhala_asr},
@@ -140,6 +142,59 @@ WhisperX+pyannote (~6–8 GB) cannot coexist in 24 GB. The pipeline
 explicitly unloads MedGemma (keep_alive=0, polls /api/ps), runs the audio
 models, frees them (del + empty_cache), and lets MedGemma reload on the
 note call. ~17 s for a 4.6-min consultation.
+
+## Design pass + referral letters (2026-07-24)
+
+Implemented from `DESIGN_SPEC.md` (Claude Cowork + owner; approved
+mockups `live_mockup.html`/`review_mockup.html` are the visual source of
+truth — both in the owner's Downloads, spec decisions restated here).
+Five commits, "Design pass 1/5 … 5/5":
+
+- **Design system** (`app/static/theme.css`, linked everywhere): warm
+  cream canvas, one plum accent reserved for the primary action + active
+  tab, semantic colours scarce (red = urgency ONLY, amber =
+  low-confidence/awaiting, green = mic/linked/approved), serif display
+  type for titles/patient names/SOAP headings. **Deliberately light-only**
+  (owner call): dark mode dropped, including the old `select, option
+  { background: Canvas }` workaround — don't reintroduce
+  `color-scheme: light dark` piecemeal. `nav.js` renders the shared
+  chrome (brand, pill tabs, identity block, footer disclaimer).
+- **Live page reorder** (owner's priority): urgent-actions banner first,
+  questions|signs duo, differential with the guidelines summary inside an
+  open `<details>`, transcript last. **Mic status cluster is a safety
+  feature** (answers docket #78 mic-check fabrication and #70 degraded
+  audio, in-room): level meter runs from page load off the SAME
+  getUserMedia stream the transcriber consumes — one capture, so the
+  meter cannot disagree with what the server hears; sustained RMS < 1e-4
+  for 3 s turns the pill red (hysteresis at 5e-4); device picker
+  re-acquires with `deviceId: {exact}`, disabled while recording
+  (mid-recording switch is v2).
+- **Review page reorder**: header (chips + Regenerate/Copy/Approve) →
+  urgency banner → draft SOAP note (grounding footer "N/M claims cited")
+  → letter panes → diarised transcript last.
+- **Strict own-consultations scoping** (owner decision, over
+  continuity-of-care sharing — revisit only as an owner decision): a
+  doctor's worklist and every `/api/consultations/{cid}` op are filtered
+  server-side to their own consultations; foreign probes 403 (matching
+  the receptionist pattern; voided stays 410). Unowned rows
+  (`doctor_id IS NULL`, legacy/test data) stay open to clinical roles.
+  Tests: `tests/test_scoping.py`.
+- **Referral letters** (`app/letters.py`; tests `tests/test_letters.py`):
+  on an approved consultation the Approve button becomes a plum "+" →
+  menu of model-suggested referrals + manual specialty picker (patient
+  info letter = stub). Hard rules, extending the two-hats principles:
+  generated from the APPROVED NOTE TEXT only (server 409s before
+  approval/on voided — a letter must not cite content the doctor hasn't
+  signed); grounding gate in code (`validate_letter`): note passed as
+  numbered lines, paragraphs cite lines, uncited-clinical or
+  invented-number paragraphs become the explicit "[to be completed by
+  the referring doctor]" placeholder; salutation/Re: line (server
+  demographics)/sign-off are code, not model; letters are
+  draft-until-approved with their own edit+approve, then read-only;
+  suggestions cached per note version; deterministic decoding. Audit:
+  `letter.suggested/created/edited/approved`. RBAC doctor+admin;
+  receptionist and foreign-doctor probes 403-tested. Tables `letter` /
+  `letter_suggestion` cascade on purge; void freezes letter ops.
 
 ## Troubleshooting (read before touching dependencies)
 
@@ -422,8 +477,10 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   differential-breadth metric (see the CDS restraint section above).
 - **Phase 6:** core is built and manually verified (auth + roles, queue,
   three tabs, RBAC, audit log; click-through and adversarial checks done
-  2026-07-10 — see status table). Next: Docker Compose packaging, the
-  two-role demo script, and the design pass.
+  2026-07-10 — see status table). Design pass, strict scoping, and
+  referral letters shipped 2026-07-24 (see the design-pass section) —
+  owner's in-browser verification of the new UI still pending. Next:
+  Docker Compose packaging and the two-role demo script.
 - **Whole-project:** the end-of-project review docket above.
 
 ## Remote access (Tailscale, set up 2026-07-10)
