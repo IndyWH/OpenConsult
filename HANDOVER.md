@@ -371,7 +371,15 @@ must not open transcripts or notes.
    0.49, last 33 s dropped) — and a normal-looking draft note was
    presented and approved. Low average confidence or language mismatch
    should flag the review as unreliable, analogous to the note grounding
-   gate, not present a normal draft. (#70 voided 2026-07-17 for this.)
+   gate, not present a normal draft. (#70 voided 2026-07-17 for this.
+   **Void-state incident, investigated 2026-07-24:** the audit trail
+   shows #70 was Unvoided 2026-07-22 07:11 by the owner's admin account,
+   39 s before a batch of "Test case" voids — i.e. it was used to test
+   the then-new Unvoid button during a governance-testing session and
+   never re-voided, so it sat wrongly approved-and-visible for two days.
+   Re-voided 2026-07-24 with the original reason; the restoration audit
+   row carries user_id NULL and a `restoration` detail. Lesson for the
+   demo script: don't exercise governance actions on real rows.)
 6. **Workflow observation — end-of-recording contamination**: recordings
    66 and 68 captured off-script reader speech after the scripted close
    (worst: 68's "I don't read the script but I do naturally"). Owner's
