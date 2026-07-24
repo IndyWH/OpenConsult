@@ -40,7 +40,11 @@ PULSE_CACHE_TTL_S = 10.0
 # the event site plus one row here; each field automatically gets a
 # rolling *_last_hour twin computed from the same query.
 _DAY_COUNTERS = {
+    # Both registration events feed one field (counts ACCUMULATE per
+    # field): user.registered is the pre-approval-era event, kept so the
+    # day's totals stay correct across the cutover.
     "user.registered": "registrations_today",
+    "user.registered_pending": "registrations_today",
     "user.login": "logins_today",
     "consultation.created": "consultations_started_today",
     "finalisation.failed": "finalisations_failed_today",
@@ -118,9 +122,23 @@ async def _aggregates(recordings_dir: Path) -> dict:
                 (day_start, hour_ago, min(day_start, hour_ago), list(_DAY_COUNTERS)),
             )
         ).fetchall()
+        # Accounts still waiting for the admin's approval (approve-to-
+        # activate, 2026-07-24), windowed by registration time so the
+        # hourly sentry can say "someone new is waiting". Live state, not
+        # an event count: an approved account drops out immediately.
+        pending_row = await (
+            await conn.execute(
+                "SELECT count(*) FILTER (WHERE created_at >= %s),"
+                " count(*) FILTER (WHERE created_at >= %s)"
+                " FROM app_user WHERE pending_approval AND NOT active",
+                (day_start, hour_ago),
+            )
+        ).fetchone()
     for action, day_n, hour_n in rows:
-        counts[_DAY_COUNTERS[action]] = day_n
-        counts[_last_hour_field(_DAY_COUNTERS[action])] = hour_n
+        counts[_DAY_COUNTERS[action]] += day_n
+        counts[_last_hour_field(_DAY_COUNTERS[action])] += hour_n
+    counts["registrations_pending_activation_today"] = pending_row[0]
+    counts["registrations_pending_activation_last_hour"] = pending_row[1]
     counts["audio_disk_used_mb"] = round(
         _audio_disk_bytes(recordings_dir) / (1024 * 1024), 1
     )

@@ -13,6 +13,7 @@ import secrets
 import psycopg
 import pytest
 from dotenv import load_dotenv
+from conftest import approve_account
 from fastapi.testclient import TestClient
 
 from app import audit, auth, consultations, frontdesk
@@ -50,17 +51,15 @@ def clients():
                   "display_name": role.title(), "role": role},
         )
         assert response.status_code == 200
-        # NB: the very first user ever registered becomes admin (bootstrap);
-        # make sure this fixture's users really carry the intended role.
-        if response.json()["user"]["role"] != role:
-            client = TestClient(app)
-            username = f"{role}_{secrets.token_hex(4)}"
-            response = client.post(
-                "/api/register",
-                json={"username": username, "password": "test-password-123",
-                      "display_name": role.title(), "role": role},
-            )
-            assert response.json()["user"]["role"] == role
+        # Registration is approve-to-activate; the conftest sentinel admin
+        # also guarantees the first-user-becomes-admin bootstrap never
+        # fires mid-suite, so the requested role always sticks.
+        approve_account(username)
+        response = client.post(
+            "/api/login", json={"username": username, "password": "test-password-123"}
+        )
+        assert response.status_code == 200
+        assert response.json()["user"]["role"] == role
         out[role] = client
     return out
 
@@ -126,6 +125,8 @@ def test_monitor_pulse_is_deliberately_public_and_aggregate_only(clients):
         "registrations_last_hour", "logins_last_hour",
         "consultations_started_last_hour", "finalisations_failed_last_hour",
         "live_slot_rejections_last_hour",
+        "registrations_pending_activation_today",
+        "registrations_pending_activation_last_hour",
         "errors_last_hour", "audio_disk_used_mb",
     }
     assert isinstance(body["live_consultation_active"], bool)

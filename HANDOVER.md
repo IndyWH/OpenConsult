@@ -322,6 +322,17 @@ admin UI enforces for deactivation). In the UI, every logged-in user has
 
 Built after the Phase 6 verification, admin-only, all 403-tested:
 
+- **Approve-to-activate registration (2026-07-24, public exposure):**
+  public registration still works (doctor/receptionist only) but creates
+  the account INACTIVE with `pending_approval` set — no session cookie,
+  and login answers "awaiting administrator approval" (correct password
+  only; a wrong password, or a governance-deactivated account, stays
+  "invalid credentials"). The admin approves via the Users view, where
+  pending accounts pin to the top with an amber chip and an Approve
+  button (the existing reactivate endpoint; first approval audits
+  `user.activated`, later governance reactivation stays
+  `user.reactivated`; registration audits `user.registered_pending`).
+  Tests: `tests/test_registration_approval.py`.
 - **Users view** (`/users`): deactivate/reactivate accounts. Deactivation
   blocks login AND kills existing sessions (the cookie stays signed but
   `get_user` only resolves active accounts); rows are never deleted —
@@ -441,7 +452,12 @@ RBAC assertions in `tests/test_rbac.py`.
   `logins_today`, `consultations_started_today`,
   `finalisations_failed_today`, `live_consultation_active`,
   `live_slot_rejections_today`, `errors_last_hour`,
-  `audio_disk_used_mb`. Never a username, patient name, or clinical
+  `audio_disk_used_mb`, and (2026-07-24)
+  `registrations_pending_activation_today`/`_last_hour` — live counts of
+  accounts still awaiting the admin's approval, windowed by registration
+  time, so the hourly sentry can say someone is waiting (approve-to-
+  activate; `user.registered_pending` also feeds `registrations_today`).
+  Never a username, patient name, or clinical
   content — enforced structurally (every value is a number/boolean plus
   one ISO timestamp) and tested against the actual names in the
   database. Keep it that way: any new field must be a count or boolean.

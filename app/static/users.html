@@ -15,7 +15,8 @@
 <p class="hint">Accounts are deactivated, never deleted — names stay attached to
 their audit events and consultations. A deactivated user cannot log in and
 existing sessions stop working. You cannot deactivate yourself or the last
-active admin.</p>
+active admin. Public registrations start as <em>awaiting approval</em> (shown
+on top) and cannot sign in until you approve them.</p>
 <div class="err" id="err"></div>
 <label class="hint" style="display:block;margin-bottom:.5rem">
   <input type="checkbox" id="showInactive" style="width:auto"> Show inactive accounts
@@ -43,19 +44,27 @@ async function act(uid, verb) {
 async function load() {
   const users = await (await fetch('/api/admin/users')).json();
   const showInactive = document.getElementById('showInactive').checked;
-  const shown = users.filter(u => u.active || showInactive);
+  // Pending-approval accounts always show, pinned on top — they are the
+  // admin's to-do list, not governance-deactivated history.
+  const shown = users.filter(u => u.active || u.pending_approval || showInactive);
+  shown.sort((a, b) => (b.pending_approval ? 1 : 0) - (a.pending_approval ? 1 : 0));
   const hidden = users.length - shown.length;
   const tbody = document.getElementById('rows');
   tbody.innerHTML = '';
   for (const u of shown) {
     const tr = document.createElement('tr');
-    if (!u.active) tr.className = 'inactive';
+    if (!u.active && !u.pending_approval) tr.className = 'inactive';
     const canDeactivate = u.active && u.id !== window.ME.id;
+    const statusChip = u.active
+      ? '<span class="chip status approved">active</span>'
+      : u.pending_approval
+        ? '<span class="chip status">awaiting approval</span>'
+        : '<span class="chip status failed">inactive</span>';
     tr.innerHTML =
       `<td>${u.id}</td><td>${u.display_name}</td><td>${u.username}</td>` +
       `<td><span class="chip">${u.role}</span></td>` +
       `<td>${u.created_at}</td><td>${u.last_login_at || '—'}</td>` +
-      `<td><span class="chip status ${u.active ? 'approved' : 'failed'}">${u.active ? 'active' : 'inactive'}</span></td>` +
+      `<td>${statusChip}</td>` +
       '<td></td>';
     const cell = tr.lastElementChild;
     const btn = document.createElement('button');
@@ -66,7 +75,7 @@ async function load() {
       btn.title = u.id === window.ME.id ? 'You cannot deactivate your own account' : '';
       btn.addEventListener('click', () => act(u.id, 'deactivate'));
     } else {
-      btn.textContent = 'Reactivate';
+      btn.textContent = u.pending_approval ? 'Approve' : 'Reactivate';
       btn.addEventListener('click', () => act(u.id, 'reactivate'));
     }
     cell.appendChild(btn);

@@ -163,19 +163,36 @@ async def register(body: RegisterBody) -> JSONResponse:
     if len(body.password) < 8:
         return JSONResponse(status_code=400, content={"error": "password too short (min 8)"})
     try:
-        user = await auth.create_user(body.username, body.password, body.display_name, body.role)
+        user = await auth.create_user(
+            body.username, body.password, body.display_name, body.role, pending=True
+        )
     except Exception:
         return JSONResponse(status_code=409, content={"error": "username already taken"})
+    if user["pending_approval"]:
+        # Approve-to-activate (public exposure): no session until the
+        # administrator activates the account in the Users view.
+        await audit.log(
+            user["id"], "user.registered_pending", "user", user["id"], {"role": user["role"]}
+        )
+        return JSONResponse(content={
+            "ok": True, "pending": True, "user": user,
+            "message": "Account created — awaiting the administrator's approval."
+        })
+    # First-account bootstrap only: active immediately, session as before.
     await audit.log(user["id"], "user.registered", "user", user["id"], {"role": user["role"]})
-    response = JSONResponse(content={"ok": True, "user": user})
+    response = JSONResponse(content={"ok": True, "pending": False, "user": user})
     response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
     return response
 
 
 @app.post("/api/login")
 async def login(body: LoginBody) -> JSONResponse:
-    user = await auth.authenticate(body.username, body.password)
+    user, reason = await auth.authenticate(body.username, body.password)
     if user is None:
+        if reason == "awaiting_approval":
+            return JSONResponse(status_code=403, content={
+                "error": "account awaiting administrator approval — "
+                         "you will be able to sign in once it is activated"})
         return JSONResponse(status_code=401, content={"error": "invalid credentials"})
     await audit.log(user["id"], "user.login", "user", user["id"])
     response = JSONResponse(content={"ok": True, "user": user})
@@ -267,9 +284,13 @@ async def admin_deactivate_user(
 async def admin_reactivate_user(
     uid: int, user: dict = Depends(api_user("admin"))
 ) -> JSONResponse:
+    was_pending = await auth.is_pending_approval(uid)
     if not await auth.set_user_active(uid, True):
         return JSONResponse(status_code=404, content={"error": "no such user"})
-    await audit.log(user["id"], "user.reactivated", "user", uid)
+    # First approval of a public registration vs reactivating a
+    # governance-deactivated account — different events for the record.
+    action = "user.activated" if was_pending else "user.reactivated"
+    await audit.log(user["id"], action, "user", uid)
     return JSONResponse(content={"ok": True})
 
 

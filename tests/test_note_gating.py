@@ -16,6 +16,7 @@ import httpx
 import psycopg
 import pytest
 from dotenv import load_dotenv
+from conftest import approve_account
 from fastapi.testclient import TestClient
 
 from app import auth, consultations
@@ -127,10 +128,16 @@ def test_refusal_note_cannot_be_approved():
 
     cid = asyncio.run(build())
     client = TestClient(app)
+    username = f"doc_{secrets.token_hex(4)}"
     response = client.post(
         "/api/register",
-        json={"username": f"doc_{secrets.token_hex(4)}", "password": "test-password-123",
+        json={"username": username, "password": "test-password-123",
               "display_name": "Doc", "role": "doctor"},
+    )
+    assert response.status_code == 200
+    approve_account(username)  # registration is approve-to-activate
+    response = client.post(
+        "/api/login", json={"username": username, "password": "test-password-123"}
     )
     assert response.status_code == 200
 

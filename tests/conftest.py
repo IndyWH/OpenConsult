@@ -120,6 +120,18 @@ def _bootstrap_test_database() -> bool:
 _DB_READY = _bootstrap_test_database()
 
 
+def approve_account(username: str) -> None:
+    """Stand in for the admin's approval click: public registration is
+    approve-to-activate (2026-07-24), so tests that register over HTTP
+    approve the account here, then log in for their session cookie."""
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        conn.execute(
+            "UPDATE app_user SET active = true, pending_approval = false"
+            " WHERE username = %s",
+            (username,),
+        )
+
+
 @pytest.fixture(scope="session", autouse=True)
 def test_database():
     yield

@@ -44,6 +44,10 @@ CREATE TABLE IF NOT EXISTS app_user (
 -- consultations reference them and the names must survive for the record.
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS active boolean NOT NULL DEFAULT true;
 ALTER TABLE app_user ADD COLUMN IF NOT EXISTS last_login_at timestamptz;
+-- Approve-to-activate (2026-07-24, public exposure): public registrations
+-- start inactive with this flag set; the admin's approval activates them.
+-- Distinguishes "never approved" from "deactivated by governance".
+ALTER TABLE app_user ADD COLUMN IF NOT EXISTS pending_approval boolean NOT NULL DEFAULT false;
 """
 
 
@@ -112,13 +116,13 @@ async def list_users() -> list[dict]:
         rows = await (
             await conn.execute(
                 "SELECT id, username, display_name, role, created_at,"
-                " last_login_at, active FROM app_user ORDER BY id"
+                " last_login_at, active, pending_approval FROM app_user ORDER BY id"
             )
         ).fetchall()
     return [
         {"id": r[0], "username": r[1], "display_name": r[2], "role": r[3],
          "created_at": str(r[4])[:16], "last_login_at": str(r[5])[:16] if r[5] else None,
-         "active": r[6]}
+         "active": r[6], "pending_approval": r[7]}
         for r in rows
     ]
 
@@ -130,32 +134,56 @@ async def set_user_active(user_id: int, active: bool, conn=None) -> bool:
     conn lets tests exercise the last-admin guard inside a rolled-back
     transaction instead of touching real accounts."""
     sql = (
-        "UPDATE app_user SET active = %s WHERE id = %s AND (%s OR"
+        "UPDATE app_user SET active = %s,"
+        " pending_approval = pending_approval AND NOT %s"  # activation = approval
+        " WHERE id = %s AND (%s OR"
         " role != 'admin' OR EXISTS (SELECT 1 FROM app_user"
         "   WHERE role = 'admin' AND active AND id != %s)) RETURNING id"
     )
-    params = (active, user_id, active, user_id)
+    params = (active, active, user_id, active, user_id)
     if conn is not None:
         return await (await conn.execute(sql, params)).fetchone() is not None
     async with await _conn() as conn:
         return await (await conn.execute(sql, params)).fetchone() is not None
 
 
-async def create_user(username: str, password: str, display_name: str, role: str) -> dict:
+async def is_pending_approval(user_id: int) -> bool:
+    """Lets the activation endpoint tell a first approval (audit
+    user.activated) from reactivating a governance-deactivated account
+    (audit user.reactivated)."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT pending_approval FROM app_user WHERE id = %s", (user_id,)
+            )
+        ).fetchone()
+    return bool(row and row[0])
+
+
+async def create_user(
+    username: str, password: str, display_name: str, role: str, *, pending: bool = False
+) -> dict:
+    """pending=True is the public-registration path: the account is created
+    inactive and awaits the admin's approval. Direct callers (CLI, tests)
+    keep the default and get an active account."""
     if role not in ROLES:
         raise ValueError(f"invalid role {role!r}")
     async with await _conn() as conn:
         count = (await (await conn.execute("SELECT count(*) FROM app_user")).fetchone())[0]
         if count == 0:
             role = "admin"  # bootstrap: the first account administers the rest
+            pending = False  # …so it must be able to log in
         row = await (
             await conn.execute(
-                "INSERT INTO app_user (username, password_hash, display_name, role)"
-                " VALUES (%s, %s, %s, %s) RETURNING id, username, display_name, role",
-                (username, hash_password(password), display_name, role),
+                "INSERT INTO app_user"
+                " (username, password_hash, display_name, role, active, pending_approval)"
+                " VALUES (%s, %s, %s, %s, %s, %s)"
+                " RETURNING id, username, display_name, role, pending_approval",
+                (username, hash_password(password), display_name, role,
+                 not pending, pending),
             )
         ).fetchone()
-    return _row_to_user(row)
+    return {**_row_to_user(row), "pending_approval": row[4]}
 
 
 async def get_user(user_id: int) -> dict | None:
@@ -171,20 +199,27 @@ async def get_user(user_id: int) -> dict | None:
     return _row_to_user(row) if row else None
 
 
-async def authenticate(username: str, password: str) -> dict | None:
+async def authenticate(username: str, password: str) -> tuple[dict | None, str | None]:
+    """(user, None) on success; (None, reason) otherwise. The reason is
+    'awaiting_approval' only when the password is CORRECT on a pending
+    account — the applicant may learn their own status. A governance-
+    deactivated account stays indistinguishable from bad credentials."""
     async with await _conn() as conn:
         row = await (
             await conn.execute(
-                "SELECT id, username, display_name, role, password_hash"
-                " FROM app_user WHERE username = %s AND active", (username,),
+                "SELECT id, username, display_name, role, password_hash,"
+                " active, pending_approval"
+                " FROM app_user WHERE username = %s", (username,),
             )
         ).fetchone()
-        if row and verify_password(password, row[4]):
-            await conn.execute(
-                "UPDATE app_user SET last_login_at = now() WHERE id = %s", (row[0],)
-            )
-            return _row_to_user(row)
-    return None
+        if row is None or not verify_password(password, row[4]):
+            return None, "bad_credentials"
+        if not row[5]:
+            return None, "awaiting_approval" if row[6] else "bad_credentials"
+        await conn.execute(
+            "UPDATE app_user SET last_login_at = now() WHERE id = %s", (row[0],)
+        )
+        return _row_to_user(row), None
 
 
 async def change_password(user_id: int, current: str, new: str) -> bool:

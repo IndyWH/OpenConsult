@@ -31,7 +31,9 @@
 </form>
 
 <form id="regForm">
-  <h2>Register (prototype: open registration for demo purposes)</h2>
+  <h2>Register</h2>
+  <p class="hint">New accounts need the administrator's approval before
+  they can sign in — you'll be able to log in once yours is activated.</p>
   <label>Display name</label><input name="display_name" required>
   <label>Username</label><input name="username" required>
   <label>Password (min 8)</label><input name="password" type="password" minlength="8" required>
@@ -53,8 +55,18 @@ async function submit(form, url, errEl) {
   const body = Object.fromEntries(new FormData(form).entries());
   const response = await fetch(url, {method: 'POST',
     headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)});
-  if (response.ok) { location.href = '/today'; return; }
-  errEl.textContent = (await response.json()).error || 'failed';
+  const data = await response.json();
+  if (response.ok) {
+    if (data.pending) {  // registered, awaiting the administrator's approval
+      form.reset();
+      errEl.style.color = 'var(--green)';
+      errEl.textContent = data.message;
+      return;
+    }
+    location.href = '/today'; return;
+  }
+  errEl.style.color = '';
+  errEl.textContent = data.error || 'failed';
 }
 document.getElementById('loginForm').addEventListener('submit', (e) => {
   e.preventDefault(); submit(e.target, '/api/login', document.getElementById('loginErr'));

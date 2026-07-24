@@ -11,6 +11,7 @@ import struct
 import wave
 from pathlib import Path
 
+from conftest import approve_account
 from fastapi.testclient import TestClient
 
 from app import auth
@@ -29,11 +30,17 @@ def test_websocket_streaming_transcription():
     with TestClient(app) as client:  # `with` runs lifespan → loads the model
         # The WebSocket requires a clinical-role session (Phase 6 RBAC).
         auth.ensure_schema()
+        username = f"doc_{secrets.token_hex(4)}"
         response = client.post(
             "/api/register",
-            json={"username": f"doc_{secrets.token_hex(4)}",
+            json={"username": username,
                   "password": "test-password-123",
                   "display_name": "Doc", "role": "doctor"},
+        )
+        assert response.status_code == 200
+        approve_account(username)  # registration is approve-to-activate
+        response = client.post(
+            "/api/login", json={"username": username, "password": "test-password-123"}
         )
         assert response.status_code == 200
         with client.websocket_connect("/ws/transcribe") as ws:
