@@ -510,9 +510,10 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
 - **Phase 6:** core is built and manually verified (auth + roles, queue,
   three tabs, RBAC, audit log; click-through and adversarial checks done
   2026-07-10 — see status table). Design pass, strict scoping, and
-  referral letters shipped 2026-07-24 (see the design-pass section) —
-  owner's in-browser verification of the new UI still pending. Next:
-  Docker Compose packaging and the two-role demo script.
+  referral letters shipped 2026-07-24 (see the design-pass section);
+  in-browser verification of the six-stage UI work completed by Claude
+  Cowork 2026-07-24. Next: Docker Compose packaging and the two-role
+  demo script.
 - **Whole-project:** the end-of-project review docket above.
 
 ## Remote access (Tailscale, set up 2026-07-10)
