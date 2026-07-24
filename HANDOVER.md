@@ -122,7 +122,16 @@ kept with their stems, never mid-sentence (`app/chunking.py`).
 
 **Note citation architecture (app/notes.py):** same pattern as RAG —
 every SOAP claim cites transcript turn numbers, validated in code,
-click-to-verify in the UI. Flagging is deterministic code, not model
+click-to-verify in the UI. **Prompt change 2026-07-24 (ICE):** the note
+prompt now extracts the patient's Ideas/Concerns/Expectations as up to
+three labelled entries ending Subjective — only when the transcript
+contains them (patient-volunteered, never doctor-proposed; omitted
+entirely when absent, per the leave-empty-rather-than-fabricate
+principle), cited like every claim. Any note-output diff after this date
+traces to that prompt change (`NOTE_ICE_SPEC.md` addendum; eval record
+changelog updated, harness re-run same day). The referral letter's
+patient-expectation sentence draws ONLY from the "Patient's
+expectations:" bullet. Flagging is deterministic code, not model
 judgement: a claim is ⚠-marked iff it contains load-bearing content
 (number / dose unit / laterality, by regex) AND cites a turn whose ASR
 confidence is below 0.6. Doctor-corrected turns get confidence 1.0.
@@ -185,16 +194,31 @@ Five commits, "Design pass 1/5 … 5/5":
   info letter = stub). Hard rules, extending the two-hats principles:
   generated from the APPROVED NOTE TEXT only (server 409s before
   approval/on voided — a letter must not cite content the doctor hasn't
-  signed); grounding gate in code (`validate_letter`): note passed as
-  numbered lines, paragraphs cite lines, uncited-clinical or
-  invented-number paragraphs become the explicit "[to be completed by
-  the referring doctor]" placeholder; salutation/Re: line (server
-  demographics)/sign-off are code, not model; letters are
+  signed); grounding gate in code (`validate_letter`); salutation/Re:
+  line (server demographics)/sign-off are code, not model; letters are
   draft-until-approved with their own edit+approve, then read-only;
   suggestions cached per note version; deterministic decoding. Audit:
   `letter.suggested/created/edited/approved`. RBAC doctor+admin;
   receptionist and foreign-doctor probes 403-tested. Tables `letter` /
   `letter_suggestion` cascade on purge; void freezes letter ops.
+
+  **Owner's clinical framework (2026-07-24 addendum,
+  `REFERRAL_LETTER_STYLE.md`, after reviewing the #66 letter):** the
+  letter presents the evidence and lets the specialist draw the
+  conclusion. Prompt rewritten (symptoms-first opening, compressed
+  history, findings/investigations as recorded, one expectation sentence
+  only from the note's ICE bullet, neutral close, no diagnosis, no
+  advice to the consultant). The gates are the guarantee, per sentence
+  ("every clinical sentence traceable"): Assessment lines are masked in
+  the model's copy of the note AND uncitable (a letter can never carry
+  the differential); numbers must appear in cited lines; result-class
+  verbs over planned-class citations are rejected (planned ≠ performed ≠
+  resulted, the #66 QA finding); expectation-class sentences without a
+  cited "Patient's expectations:" bullet are dropped outright (the model
+  invented one on the #66 regen — the gate now makes that impossible).
+  Verification: #66 regenerated under the new prompt and diffed against
+  approved v1 for the owner (13/16 sentences grounded; the one
+  under-cited sentence and the dropped invention placeholdered).
 
 ## Troubleshooting (read before touching dependencies)
 

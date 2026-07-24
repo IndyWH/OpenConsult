@@ -184,3 +184,39 @@ detection into an enforcement.
 uv run python scripts/evaluate_notes.py
 uv run python scripts/make_tts_sample.py   # disposable audio sample
 ```
+
+## Changelog 2026-07-24 — ICE prompt addition (no regression)
+
+The note-generation prompt gained dedicated ICE extraction (patient's
+Ideas / Concerns / Expectations as up to three labelled, cited entries at
+the end of Subjective, omitted entirely when the transcript has none —
+`NOTE_ICE_SPEC.md` addendum). Decoding is unchanged (temp 0, seed 42);
+this is the only prompt change since the runs above, so any note-output
+diff after today traces to it.
+
+Harness re-run same day (`scripts/evaluate_notes.py`) to confirm the
+change is additive on the scored dimensions — the existing marking
+schemes do not score ICE, so prior records stay valid.
+
+| Dimension | Before | After |
+|---|---|---|
+| Mean clinical coverage (LLM judge) | 93% | 94% |
+| Discrepancies (note vs expected) | 0 across 10 | 0 across 10 |
+| Citation (mechanical, code) | all cited | one uncited claim in script 10 (23/24); rest fully cited |
+
+ICE fired as intended on the scripted consultations: per-script claim
+counts rose (e.g. 01 26→29, 03 29→34, 04 26→30) and every added claim
+stayed cited — the additions are grounded ICE bullets, not fabrication.
+Script 10 (testicular torsion) is the clearest example, capturing all
+three: `Patient's ideas/concerns/expectations`, the last being
+"Wants to know if it can be fixed ('Can they untwist it?')". Coverage
+moves within the LLM judge's documented run-to-run noise (see the
+judge-reliability finding above); the deterministic code-side metrics
+(citation, discrepancy count) are the load-bearing ones and held.
+
+One item for the owner's claim-by-claim audit docket: the single new
+uncited claim in script 10 (the ⚠/uncited machinery already marks it in
+the UI — this is the detection working, not a silent miss).
+
+Raw per-case results overwritten in `evals/note_results.json` (harness
+keeps only the latest run, per the existing convention).

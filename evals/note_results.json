@@ -1,57 +1,55 @@
 [
  {
   "script": "01_chest_pain_en.md",
-  "claims": 26,
-  "cited": 26,
+  "claims": 29,
+  "cited": 29,
   "coverage": "18/18",
   "coverage_pct": 100,
   "missed": [],
   "discrepancies": [],
-  "note_plain": "S:\n  2 week Hx exertional central chest tightness/pressure\n  Triggered by exertion (pushing wheelbarrow, climbing stairs)\n  Lasts 5-10 mins, resolves with rest\n  Radiated to left arm once\n  No pain at rest\n  Mild SOB with pain, no nausea/vomiting\n  Occasional post-prandial burning (rice), different from current pain\n  No chest wall tenderness on palpation\n  Smokes 20 cigarettes/day for 30 years\n  Alcohol: weekends, 2-3 glasses\n  Hx of high BP diagnosed last year at medical camp, untreated\n  Father had MI age ~60\n  No regular medications or known allergies\n\nO:\n  Pulse 88/min, regular\n  BP 150/95 mmHg\n  Heart sounds normal, no murmurs\n  Lungs clear\n  No chest wall tenderness on palpation\n\nA:\n  Concerned for angina pectoris\n  Hypertension (newly diagnosed)\n\nP:\n  ECG now\n  Urgent referral to Cardiology clinic\n  Start Aspirin (dose unspecified) after ECG\n  Smoking cessation advice, provide details of clinics\n  Address hypertension - monitor BP, likely start medication\n  Safety-netting: If chest pain occurs at rest >15 mins & not settling, go straight to hospital ED\n"
+  "note_plain": "S:\n  2 week Hx exertional central chest tightness\n  Described as heavy pressing sensation\n  Triggered by exertion (pushing wheelbarrow, climbing stairs)\n  Lasts 5-10 mins, resolves with rest\n  Radiated to left arm once\n  No pain at rest\n  Mild SOB with pain, no nausea/vomiting\n  Occasional post-prandial burning (rice), but current pain is different\n  No tenderness on chest wall palpation\n  Smokes 20 cigarettes/day for 30 years\n  Alcohol: weekends, 2-3 glasses\n  Hx of high BP identified at medical camp last year, not followed up\n  Father had MI age ~60\n  No regular medications or known allergies\n  Patient's ideas: Unclear what he thinks is going on, but worried about the chest pain.\n  Patient's concerns: Worried it might be a heart attack.\n  Patient's expectations: Reassurance that it isn't a current heart attack.\n\nO:\n  Pulse 88 regular\n  BP 150/95\n  Heart sounds normal, no murmurs\n  Lungs clear\n  No chest wall tenderness on palpation\n\nA:\n  Angina suspected\n\nP:\n  ECG today\n  Urgent referral to Cardiology clinic for bloods and further tests\n  Start Aspirin (dose not specified) after ECG\n  Smoking cessation advice given, provide details of clinics\n  Discussed BP management, will confirm and likely start medication at next visit\n  Safety netting: Advised to go straight to hospital ED if chest pain occurs at rest, lasts >15 mins, or doesn't settle with rest\n"
  },
  {
   "script": "02_febrile_child_en.md",
-  "claims": 32,
-  "cited": 32,
-  "coverage": "24/26",
-  "coverage_pct": 92,
+  "claims": 29,
+  "cited": 29,
+  "coverage": "25/26",
+  "coverage_pct": 96,
   "missed": [
-   "Key negatives: no cough or cold symptoms",
    "Key negatives: drinking fluids"
   ],
   "discrepancies": [],
-  "note_plain": "S:\n  6yo F presents with 3 days fever (started Fri eve).\n  Fever up to 39\u00b0C, responds partially to paracetamol.\n  Associated headache and retro-orbital pain.\n  Vomiting x2 this morning.\n  Anorexia.\n  Reduced fluid intake.\n  Passing urine normally.\n  No rash, bleeding (gums, nose, urine, stool).\n  Mild cough.\n  No ear pain.\n  Local dengue outbreak reported.\n  Construction site nearby with water collection.\n  No previous history of dengue.\n  Otherwise healthy child, no allergies.\n  Currently taking paracetamol.\n\nO:\n  Temp 38.9\u00b0C.\n  Mild conjunctival injection.\n  Throat slightly red.\n  Chest clear on auscultation.\n  Abdomen soft, non-tender, liver not enlarged.\n  No rash or petechiae.\n  Capillary refill normal.\n  Alert and appears well hydrated.\n\nA:\n  Fever, 3 days duration.\n  Possible Dengue Fever (given symptoms & local epidemiology).\n  Viral fever differential.\n\nP:\n  Full Blood Count (FBC).\n  Dengue NS1 test.\n  Paracetamol for fever ONLY. Avoid ibuprofen/NSAIDs.\n  Encourage oral fluids frequently (water, king coconut, kanji).\n  Review tomorrow with blood results.\n  Safety netting: return immediately / go to hospital if worsening symptoms (severe abdominal pain, persistent vomiting, bleeding, lethargy/confusion, oliguria, cold extremities) or sudden deterioration after fever subsides.\n"
+  "note_plain": "S:\n  6yo F presents with 3 days fever (started Fri eve)\n  Fever up to 39\u00b0C, partially responsive to paracetamol\n  Associated symptoms: headache, retro-orbital eye pain, vomiting x2 this morning, anorexia\n  Reduced fluid intake (drinks little when prompted)\n  Normal urine output\n  No rash, bleeding (gums, nose, urine, stool)\n  Minimal cough\n  Local dengue cases reported nearby; construction site with water collection\n  No previous history of dengue or other significant illness\n  No regular medications, no known allergies\n  Patient's ideas: Is it dengue?\n  Patient's concerns: Frightened due to local dengue cases\n  Patient's expectations: Wants to know if it is dengue\n\nO:\n  Temp 38.9\u00b0C\n  Mild conjunctival injection\n  Throat slightly red\n  Chest clear on auscultation\n  Abdomen soft, non-tender, liver not enlarged\n  No rash or petechiae\n  Capillary refill normal\n  Alert and well hydrated appearance\n\nA:\n  Possible Dengue Fever (day 3)\n  Viral fever (differential diagnosis)\n\nP:\n  Full Blood Count (FBC)\n  Dengue NS1 antigen test\n  Paracetamol only for fever (avoid ibuprofen/NSAIDs)\n  Encourage oral fluids frequently (water, king coconut, kanji, jeewani)\n  Review tomorrow with blood results\n  Safety netting: return immediately or go to hospital if worsening symptoms (severe abdominal pain, persistent vomiting, bleeding, lethargy/confusion, oliguria, cold extremities) especially after fever subsides\n"
  },
  {
   "script": "03_diabetes_review_en.md",
-  "claims": 29,
-  "cited": 29,
-  "coverage": "31/33",
-  "coverage_pct": 94,
+  "claims": 34,
+  "cited": 34,
+  "coverage": "30/34",
+  "coverage_pct": 88,
   "missed": [
-   "statin not yet started",
-   "creatinine/eGFR"
+   "Problems: statin not yet started",
+   "Plan: creatinine/eGFR",
+   "Plan: lipid profile",
+   "Plan: urine ACR"
   ],
   "discrepancies": [],
-  "note_plain": "S:\n  3 month diabetes check-up\n  Feels generally 'not too bad'\n  Reports increased thirst\n  Burning, tingling feet at night for ~2 months, wakes her up\n  Symptoms in both feet equally\n  Some numbness in feet ('walking on cushions')\n  No wounds or ulcers on feet; checks regularly\n  Medications: Metformin 1g BD, Gliclazide 80mg AM, Losartan 50mg OD\n  No episodes of hypoglycaemia (shaking, sweating, faintness)\n  Checks blood sugar at home; fasting ~160-170 mg/dL\n  Diet: Rice in afternoon, bread/string hoppers at night. Tea with 2 tsp sugar BD\n  No regular exercise due to knee pain\n  No chest pain or breathlessness\n  Eyes 'alright' but no check >1 year\n\nO:\n  BP 140/85 mmHg\n  Weight 68 kg\n  Feet: Skin healthy, no cracks/ulcers. Pulses palpable bilaterally\n  Neuropathy screen: Reduced sensation to monofilament in toes and ankle\n\nA:\n  Poorly controlled T2DM (HbA1c 8.4, fasting ~160-170)\n  Diabetic peripheral neuropathy\n  Hypertension (controlled on Losartan)\n\nP:\n  Increase Gliclazide to 80mg BD\n  Start Atorvastatin 1mg nocte\n  Order HbA1c, kidney function tests, cholesterol, urine protein\n  Referral for diabetic eye screening\n  Dietary advice: Reduce rice by half (replace with vegetables), eliminate sugar from tea\n  Exercise advice: Start walking 15 mins daily on flat ground\n  Foot care advice: Daily inspection for wounds/changes\n  Review in 3 months with results\n"
+  "note_plain": "S:\n  Routine diabetes check-up\n  Feels generally 'not too bad'\n  Reports increased thirst\n  Reports burning, tingling in both feet at night for ~2 months, sometimes waking her up\n  Feet also feel a little numb\n  Denies wounds or ulcers on feet; checks regularly\n  Medications: Metformin 1g BD, Gliclazide 80mg AM, Losartan 50mg OD\n  Denies episodes of low sugar (shaking, sweating, faintness)\n  Checks blood sugar at home; fasting glucose ~160-170 mg/dL\n  Last HbA1c 8.4%\n  Diet: Rice in afternoon, bread/string hoppers at night. Tea with 2 spoons sugar BD.\n  Reports eating a 'good plate' of rice\n  Limited exercise due to knee problems\n  Denies chest pain or breathlessness\n  Eyes feel alright, but eye check > 1 year ago\n  Patient's ideas: Unclear what is causing the foot symptoms.\n  Patient's concerns: Worried about the burning/tingling in feet.\n  Patient's expectations: Asked if neuropathy can be cured.\n\nO:\n  BP 140/85 mmHg\n  Weight 68 kg\n  Feet: Skin healthy, no cracks/ulcers. Pulses palpable bilaterally.\n  Neuropathy screen: Reduced sensation to monofilament in toes; ankle sensation intact.\n\nA:\n  Type 2 Diabetes Mellitus (T2DM)\n  Poor glycemic control\n  Hypertension (HTN)\n  Diabetic peripheral neuropathy\n\nP:\n  Increase Gliclazide to 80mg BD\n  Start Atorvastatin 1mg at night\n  Order HbA1c, kidney function tests, cholesterol, urine protein\n  Referral to eye screening service\n  Dietary advice: Reduce rice intake by half, increase vegetables/dhal. Eliminate sugar from tea.\n  Exercise advice: Start with 15 min walking daily on flat surface\n  Foot care advice: Daily inspection for wounds/changes\n  Review in 3 months with test results\n"
  },
  {
   "script": "04_asthma_en.md",
-  "claims": 26,
-  "cited": 26,
-  "coverage": "20/22",
-  "coverage_pct": 91,
-  "missed": [
-   "Key negatives: speaking in full sentences",
-   "Plan: continue salbutamol as reliever"
-  ],
+  "claims": 30,
+  "cited": 30,
+  "coverage": "23/23",
+  "coverage_pct": 100,
+  "missed": [],
   "discrepancies": [],
-  "note_plain": "S:\n  Asthma symptoms worsening over 1 month\n  Wheezing, nocturnal cough (wakes ~2x/week)\n  Using salbutamol 4-5x/week, sometimes twice daily\n  Ran out of salbutamol last week\n  No current preventer inhaler use (brown/orange)\n  Triggers: dust (sweeping), dry weather, stress (exams)\n  No recent fever, cold resolved 2 weeks ago\n  No chest pain\n  Can walk normally\n  Hospital admission for asthma once as a child (overnight)\n  Never ICU, no repeated nebulisers\n  Non-smoker\n  No household smokers\n\nO:\n  RR 18/min\n  SpO2 98% on room air\n  Mild expiratory wheeze bilaterally\n  Peak flow 380 (expected ~450)\n\nA:\n  Uncontrolled asthma\n\nP:\n  Start beclometasone MDI 2 puffs AM + 2 puffs PM daily\n  Provide spacer device\n  Educate on correct inhaler technique with spacer\n  Advise rinsing mouth after beclometasone use\n  Environmental advice: wet-dusting, mask if sweeping\n  Provide written asthma action plan\n  Safety netting: seek immediate medical attention for severe breathlessness unresponsive to salbutamol\n  Review in 1 month (peak flow, symptom control)\n"
+  "note_plain": "S:\n  Asthma symptoms worsening for ~1 month.\n  History of childhood asthma, quiescent for years.\n  Symptoms: wheezing, nocturnal cough (wakes 2x/week).\n  Using blue inhaler frequently: 4-5 times/week, sometimes twice daily.\n  Ran out of blue inhaler last week.\n  Only uses blue inhaler (salbutamol).\n  Triggers: dust (sweeping), dry weather, stress (exams).\n  No recent fever or cold symptoms.\n  No chest pain.\n  Can walk and speak normally currently.\n  Admitted to hospital overnight for asthma as a child, mother reports.\n  Never in ICU or required repeated nebulisers.\n  Non-smoker.\n  No one at home smokes.\n\nO:\n  RR 18/min.\n  SpO2 98% on room air.\n  Mild wheeze heard bilaterally on expiration.\n  Peak flow: best of three = 380 L/min.\n  Inhaler technique: pressing and breathing too fast.\n\nA:\n  Uncontrolled asthma.\n  Asthma exacerbation triggered by dust/stress.\n\nP:\n  Prescribe beclometasone (brown inhaler) 2 puffs AM and PM daily.\n  Continue salbutamol (blue inhaler) PRN for symptoms.\n  Provide spacer device.\n  Educate on correct inhaler technique with spacer.\n  Advise rinsing mouth after beclometasone use.\n  Environmental control: wet-dusting or mask when sweeping.\n  Provide written asthma action plan.\n  Safety netting: seek immediate medical attention if severe breathlessness unresponsive to salbutamol.\n  Review in 1 month: recheck peak flow, assess symptom control.\n"
  },
  {
   "script": "05_epigastric_pain_en.md",
-  "claims": 29,
-  "cited": 29,
+  "claims": 37,
+  "cited": 37,
   "coverage": "23/26",
   "coverage_pct": 88,
   "missed": [
@@ -60,22 +58,22 @@
    "Examination: no guarding"
   ],
   "discrepancies": [],
-  "note_plain": "S:\n  6 week hx burning epigastric pain\n  Pain worse when hungry & at night (wakes patient)\n  Pain relieved by food/Gelusil\n  Pain radiates slightly up chest after late meals\n  No weight loss, appetite normal\n  No dysphagia\n  No vomiting, haematemesis, or coffee ground vomitus\n  Stools normal colour, no melena\n  Takes ibuprofen 3-4 days/week (sometimes more) for back pain x >1 year\n  Drinks arrack weekends (~quarter bottle/night)\n  Non-smoker\n  Irregular meals due to delivery work\n  Reports job stress\n\nO:\n  Mild epigastric tenderness on palpation\n  Abdomen otherwise soft, no lumps\n  No pallor noted\n\nA:\n  Likely acid damage (irritation/ulcer) in stomach lining\n  Exacerbated by ibuprofen use\n  Contributing factors: empty stomach, alcohol, stress\n\nP:\n  Stop ibuprofen immediately\n  Use paracetamol for back pain\n  Start omeprazole 1 tab daily, 30 mins before breakfast x 4 weeks\n  Stool test for H. pylori\n  If H. pylori positive: add antibiotics (details not specified)\n  Advice on regular meals (every 3-4 hrs)\n  Advise reducing alcohol intake\n  Follow up in 2 weeks with stool result\n  Safety netting: attend hospital immediately if vomiting blood or melena\n  Consider endoscopy if pain persists after 4 weeks or warning signs develop\n"
+  "note_plain": "S:\n  6 week hx burning epigastric pain\n  Pain worse when hungry & at night (wakes patient)\n  Pain relieved by food/Gelusil\n  Pain located top of stomach, below chest, midline\n  Pain described as 'fire inside', sometimes gnawing\n  No pain radiating to back\n  Occasional burning up chest after late meals\n  No recent weight loss (possibly gained)\n  Normal appetite\n  No dysphagia\n  No vomiting\n  No haematemesis or coffee ground vomitus\n  Normal stool colour, no melaena\n  Takes ibuprofen 3-4 days/week (sometimes more) for back pain >1 year\n  Drinks arrack weekends (~quarter bottle/night)\n  Non-smoker\n  Irregular meals due to delivery work\n  Reports job stress (targets, traffic)\n  Patient's ideas: Thinks it's his stomach.\n  Patient's concerns: Asks if it is serious.\n  Patient's expectations: Wants to know what to do.\n\nO:\n  Mild epigastric tenderness on palpation\n  Abdomen otherwise soft, no lumps\n  No pallor noted in eyes\n\nA:\n  Acid damage/irritation/ulcer formation in stomach lining\n  Likely exacerbated by ibuprofen use\n  Contributing factors: irregular meals, alcohol, stress\n\nP:\n  Stop ibuprofen immediately\n  Start paracetamol for back pain (discuss further later)\n  Prescribe omeprazole 1 tab daily before breakfast x 4 weeks\n  Order stool test for H. pylori\n  If H. pylori positive, add antibiotics (details not specified)\n  Advise regular meals (every 3-4 hours)\n  Advise reducing alcohol intake\n  Review in 2 weeks with stool result\n  Safety netting: Attend hospital immediately if vomiting blood or melaena occurs\n  Consider endoscopy if symptoms persist after 4 weeks or warning signs develop\n"
  },
  {
   "script": "06_tia_funny_turn_en.md",
-  "claims": 22,
-  "cited": 22,
+  "claims": 30,
+  "cited": 30,
   "coverage": "4/4",
   "coverage_pct": 100,
   "missed": [],
   "discrepancies": [],
-  "note_plain": "S:\n  Patient reports sudden onset R hand weakness yesterday evening (~6pm) lasting ~15 mins, associated with slurred speech. Symptoms resolved completely.\n  No LOC, falls, fits or jerking movements during episode.\n  No headache or visual disturbance reported.\n  First such episode.\n  Currently asymptomatic; denies weakness, facial droop, speech difficulty.\n  History of HTN, takes amlodipine intermittently.\n  Reports borderline T2DM and stopped cholesterol medication long ago.\n  Smokes 5-6 cigarettes/day for 50 years.\n  Reports occasional palpitations ('heart does a little dance').\n\nO:\n  BP 165/95 mmHg.\n  Pulse irregularly irregular.\n  Neurological exam: Strength equal in both hands. Facial symmetry intact. Speech clear ('British constitution'). No arm drift.\n  Cardiac auscultation: Irregular rhythm, no murmurs.\n  Lungs clear.\n\nA:\n  Transient Ischaemic Attack (TIA).\n  Hypertension.\n  Suspected Atrial Fibrillation.\n  History of smoking.\n\nP:\n  ECG performed in clinic.\n  Aspirin 300mg given immediately.\n  Urgent referral to Medical Assessment Unit at Base Hospital today for brain scan and anticoagulation initiation.\n  Safety netting: Advised patient to attend ED immediately if any neurological symptoms recur.\n"
+  "note_plain": "S:\n  Patient reports a 'funny turn' yesterday evening around 6pm\n  Sudden onset right hand weakness; difficulty gripping teacup\n  Slurred speech reported by daughter\n  Symptoms lasted ~15 minutes, resolved completely\n  No loss of consciousness, falls, fits or jerking movements\n  No headache or visual changes reported\n  First episode of this type\n  Currently asymptomatic; denies weakness, facial droop, speech difficulty\n  History of hypertension, takes amlodipine intermittently\n  Borderline diabetes reported\n  Stopped cholesterol medication long ago\n  Smokes 5-6 cigarettes/day for 50 years\n  Reports occasional palpitations ('heart does a little dance')\n  Patient's ideas: Thinks it was 'probably nothing', a 'funny turn'\n  Patient's concerns: Worried about the seriousness of the irregular heartbeat\n  Patient's expectations: Wanted reassurance that everything is normal and to go home\n\nO:\n  BP 165/95 mmHg\n  Pulse irregularly irregular\n  Neurological exam: Strength equal in both hands, symmetrical smile, no drift with arms raised, speech clear ('British constitution')\n  Cardiac auscultation: Irregular rhythm, no murmurs\n  Lungs clear\n\nA:\n  Transient ischaemic attack (TIA) / mini-stroke\n  Atrial fibrillation suspected\n  Hypertension, poorly controlled\n  Smoking\n  Borderline diabetes\n\nP:\n  ECG performed in clinic\n  Aspirin 300mg given immediately\n  Urgent referral to medical assessment unit at base hospital today\n  Safety netting: Advised to attend ED immediately if symptoms recur\n"
  },
  {
   "script": "07_gi_bleed_en.md",
-  "claims": 24,
-  "cited": 24,
+  "claims": 23,
+  "cited": 23,
   "coverage": "16/19",
   "coverage_pct": 84,
   "missed": [
@@ -84,41 +82,40 @@
    "Examination: no masses"
   ],
   "discrepancies": [],
-  "note_plain": "S:\n  6 week hx burning epigastric pain, worse when hungry/at night, relieved by food/Gelusil.\n  New onset melena x 2 days (black tarry stools, sticky).\n  Associated postural dizziness, near-syncope this morning.\n  Sweating, weakness.\n  Mild SOB on exertion (stairs) today.\n  Regular ibuprofen use for back pain >1 year, 3-4 days/week sometimes more.\n  Weekend alcohol use (arrack, quarter bottle+).\n  No known previous ulcer.\n  No blood thinners/aspirin.\n  No vomiting or haematemesis reported.\n  No chest pain.\n\nO:\n  Pale conjunctivae.\n  BP 100/70.\n  Pulse 104 bpm.\n  Epigastric tenderness on palpation.\n\nA:\n  Likely bleeding peptic ulcer (gastric).\n  Significant blood loss / anaemia.\n  NSAID-induced gastropathy.\n\nP:\n  Urgent hospital admission via ambulance.\n  Referral letter to hospital.\n  Investigations: Blood count, cross-match blood, urgent endoscopy.\n  Management: IV fluids, possible transfusion.\n  Stop ibuprofen immediately.\n  Safety netting: Advise patient to inform ambulance crew if vomiting blood or feeling faint.\n"
+  "note_plain": "S:\n  6 week history of burning epigastric pain, worse when hungry & at night, relieved by food/Gelusil.\n  New onset black tarry stools (melena) x 3 in last ~36 hrs, foul smelling.\n  Postural dizziness ('head spins') on standing quickly, near syncope this morning.\n  Unexplained sweating & weakness.\n  Mild dyspnoea on exertion (climbing stairs).\n  Regular ibuprofen use for back pain, ~3-4 days/week for >1 year.\n  Weekend alcohol use: Arrack, quarter bottle or more.\n  No known history of ulcer.\n  No blood thinners/aspirin.\n  Patient's ideas: Believes it is 'gastritis', which he has had for weeks.\n  Patient's concerns: Expresses fear following the doctor's explanation.\n  Patient's expectations: Initially hoped to drive himself to hospital.\n\nO:\n  Pale conjunctivae.\n  BP 100/70 mmHg.\n  Pulse 104 bpm.\n  Epigastric tenderness on palpation.\n\nA:\n  Likely bleeding peptic ulcer.\n  Significant blood loss leading to hypovolemia/anaemia.\n\nP:\n  Urgent hospital admission via ambulance.\n  Referral letter written.\n  Inform patient's wife.\n  Stop ibuprofen immediately.\n  Safety netting: Advise patient to inform ambulance crew if vomiting blood or feeling faint.\n"
  },
  {
   "script": "08_pulmonary_embolism_en.md",
-  "claims": 26,
-  "cited": 26,
-  "coverage": "21/22",
-  "coverage_pct": 95,
-  "missed": [
-   "Differential: pulmonary embolism (leading, with DVT source), pneumonia/pleurisy, musculoskeletal chest pain, cardiac cause"
-  ],
-  "discrepancies": [],
-  "note_plain": "S:\n  Acute SOB since yesterday morning\n  Sudden onset while hanging washing\n  Sharp R chest pain, worse on deep breath/coughing\n  No fever, chills, phlegm\n  No hemoptysis\n  R calf swelling x 3 days, painful to walk, warm\n  Leg symptoms preceded breathing difficulty\n  Takes daily OCP for 5 years\n  No personal or family history of VTE\n  Non-smoker\n  Recent long bus journey (Jaffna)\n\nO:\n  RR 24/min\n  SpO2 92% on room air\n  Pulse 110 bpm, regular\n  BP 125/80 mmHg\n  Chest clear to auscultation\n  R calf swollen (+3cm vs L), warm, tender\n\nA:\n  Suspected DVT R leg\n  Suspected PE\n\nP:\n  Admit to hospital urgently\n  Call ambulance\n  Apply oxygen\n  Investigations: Lung scan (implied)\n  Treatment: Anticoagulation (injections)\n  Stop OCP\n  Referral to hospital\n"
- },
- {
-  "script": "09_septic_child_en.md",
-  "claims": 28,
-  "cited": 28,
+  "claims": 36,
+  "cited": 36,
   "coverage": "22/22",
   "coverage_pct": 100,
   "missed": [],
   "discrepancies": [],
-  "note_plain": "S:\n  6yo F presents with 4 days fever.\n  Acute change today: drowsy, not waking properly.\n  Refusing fluids (water, king coconut) since this morning.\n  Vomited x4 since last night.\n  Last urine output ~5am this morning.\n  No bleeding (gums, nose, vomit).\n  No rash observed by mother.\n  Mother notes blotchy skin on legs, cold hands/feet, hot body.\n  Cold extremities noted ~1 hour ago.\n  No fits or shaking.\n  Dengue contact in lane (neighbour recovered), 2 more houses now have fever.\n  Mother notes child is drowsy, mumbles, asked strange question ('where school bag?').\n\nO:\n  Rousable but very drowsy.\n  Temp 39.5C.\n  Hands cold to wrists, body hot.\n  Capillary refill time 4 seconds.\n  Pulse 145/min, weak.\n  Legs mottled.\n  Abdomen: winces slightly on palpation.\n  Neck: no stiffness.\n  No rash or petechiae observed.\n\nA:\n  Shock (likely secondary to severe dengue or serious bacterial infection).\n\nP:\n  Immediate transfer to General Hospital via ambulance.\n  Call ambulance (1990) - child in shock, suspected severe dengue.\n  Referral note for hospital team: fever x4d, shock signs from morning, dengue contact.\n  NPO (nothing by mouth).\n  Positioning: flat, legs slightly elevated.\n  Reassurance to mother.\n"
+  "note_plain": "S:\n  Acute SOB since yesterday morning\n  Difficulty breathing even walking short distances\n  Sudden onset while hanging washing\n  Sharp right-sided chest pain, like a knife\n  Pain worse on deep inspiration\n  Taking small breaths due to pain\n  No significant cough\n  No fever, chills or phlegm\n  No haemoptysis\n  Right calf swelling for 3 days\n  Calf pain on walking, feels warm\n  Swelling started after long overnight bus journey to Jaffna last week\n  Leg symptoms preceded breathing problems\n  Takes combined oral contraceptive pill daily for 5 years\n  No personal history of blood clots (DVT/PE)\n  No family history of blood clots\n  Non-smoker\n  Patient's ideas: Thought leg swelling might be muscle strain from bus journey\n  Patient's concerns: Worried about the danger/severity of a clot in the lung\n  Patient's expectations: Needs to go to hospital today\n\nO:\n  RR 24/min (tachypnoeic)\n  SpO2 92% on room air\n  Pulse 110 bpm, regular (tachycardic)\n  BP 125/80 mmHg\n  Lungs clear to auscultation bilaterally\n  Right calf swollen, approx. 3cm larger circumference than left\n  Right calf warm and tender on palpation\n  Left calf normal\n\nA:\n  Suspected deep vein thrombosis (DVT) right leg\n  Suspected pulmonary embolism (PE)\n\nP:\n  Urgent hospital admission via ambulance\n  Commence oxygen therapy\n  Referral to hospital for CTPA (implied)\n  Initiate anticoagulation (blood thinning injections) in hospital\n  Advise stopping combined oral contraceptive pill\n  Discuss alternative contraception post-treatment\n"
+ },
+ {
+  "script": "09_septic_child_en.md",
+  "claims": 30,
+  "cited": 30,
+  "coverage": "20/21",
+  "coverage_pct": 95,
+  "missed": [
+   "Differential: severe dengue / dengue with warning signs, bacterial sepsis, septic shock; meningitis to consider"
+  ],
+  "discrepancies": [],
+  "note_plain": "S:\n  6yo F presents with 4 days fever [1].\n  Today acutely drowsy, difficult to wake [1].\n  Reduced intake: nothing drunk today (water, king coconut) [5].\n  Vomited 4x since last night [5].\n  Last urine output ~5am this morning; usually frequent urination [7].\n  No bleeding (gums, nose, vomit) [8].\n  No rash observed by mother [8].\n  Mottled skin on legs noted by mother [9].\n  Cold hands/feet, hot body noted ~1hr ago [9, 11].\n  No fits or shaking observed [13].\n  Dengue contact in lane (neighbour recovered from hospital) [14].\n  Two more houses in lane now have fever [15].\n  Patient's ideas: Suspects dengue [17].\n  Patient's concerns: Worried about Sanuki's prognosis ('Is she going to be alright?') [19].\n  Patient's expectations: Reassurance about outcome [19].\n\nO:\n  Rousable but very drowsy [16].\n  Temp 39.5\u00b0C [16].\n  Hands cold to wrists, body hot [16].\n  Capillary refill time 4 seconds [16].\n  Pulse 145/min, weak [16].\n  Legs mottled [16].\n  Abdomen: winces slightly on palpation [16].\n  Neck: no stiffness [16].\n  Skin: no rash, no petechiae/purpura noted [16].\n\nA:\n  Shock (likely secondary to severe dengue or serious bacterial infection) [18].\n\nP:\n  Call ambulance for immediate transfer to General Hospital [20].\n  Referral note to hospital detailing fever, shock signs, suspected severe dengue [22].\n  Advise NPO (nothing by mouth) [21].\n  Positioning: keep flat with legs slightly elevated [22].\n  Safety netting: advise mother to call father from ambulance, stay with child until ambulance arrives [23, 24].\n"
  },
  {
   "script": "10_testicular_torsion_en.md",
-  "claims": 21,
-  "cited": 21,
-  "coverage": "12/14",
-  "coverage_pct": 86,
+  "claims": 24,
+  "cited": 23,
+  "coverage": "13/14",
+  "coverage_pct": 93,
   "missed": [
-   "Key positives: abdomen soft, no rebound, McBurney's point non-tender",
    "Key negatives: no urethral discharge"
   ],
   "discrepancies": [],
-  "note_plain": "S:\n  15yo M presents with acute onset R lower abdominal pain radiating to R groin/testicle since 5 am this morning.\n  Pain started suddenly, severe ('like a cricket ball hit me'), woke him from sleep.\n  Initially came in waves, now constant.\n  Associated nausea and vomiting x2 (home & en route).\n  No fever, chills reported.\n  Bowel movements normal yesterday, no diarrhoea/constipation.\n  Urination normal, no dysuria or haematuria.\n  No recent injury, fall, or trauma. Played cricket yesterday evening without incident.\n  No unusual food intake. No other household members unwell.\n  Pain radiates to R groin/testicle, possibly worse than abdominal pain. Pain exacerbated by underwear contact.\n\nO:\n  Patient in apparent distress due to pain.\n  Abdomen: Tenderness on deep palpation R lower quadrant. No guarding/rebound noted (implied by 'soft' and lack of further comment).\n  Genitalia: R testicle swollen, high-riding compared to L.\n  R testicle exquisitely tender on palpation.\n  Absent cremasteric reflex on R side. Present on L side.\n\nA:\n  Right testicular torsion.\n\nP:\n  Urgent surgical referral to hospital.\n  Nil by mouth (NBM) immediately.\n  Inform mother of situation and arrange hospital transport via uncle.\n  Provide referral letter to surgical team.\n  Patient safety-netting: Advise patient to report any future testicular pain immediately.\n"
+  "note_plain": "S:\n  15yo M presents with acute onset R lower abdominal pain radiating to R groin/testicle, started 5am this morning.\n  Pain woke him from sleep, severe ('like a cricket ball hit me'), initially in waves now constant.\n  Associated nausea and vomiting x2 (home & en route).\n  No fever or chills reported.\n  Normal bowel movements yesterday, no diarrhoea/constipation.\n  Normal urination, no dysuria or haematuria.\n  No recent injury, played cricket yesterday evening without incident.\n  No unusual food intake, no other household members unwell.\n  Patient initially hesitant to report testicular pain but confirmed R-sided groin/testicular pain is present and severe, worse than abdominal pain.\n  Patient's ideas: Unclear what it is, but worried about the pain.\n  Patient's concerns: Worried something is wrong with his testicle.\n  Patient's expectations: Wants to know if it can be fixed ('Can they untwist it?').\n\nO:\n  BP not recorded.\n  Abdomen soft on palpation, mild tenderness R lower quadrant deep palpation. No rebound/guarding mentioned.\n  Right testicle swollen, high-riding compared to left.\n  Right testicle markedly tender on light palpation.\n  Absent cremasteric reflex on R side. Normal on L side.\n\nA:\n  Clinical diagnosis: Right testicular torsion.\n\nP:\n  Immediate referral to surgical team at hospital.\n  Phoned surgical registrar with details (15yo M, R testicular pain since 5am, high-riding tender testis, absent cremasteric reflex).\n  Patient to go straight to hospital via uncle's motorbike.\n  Nil by mouth (NBM) from now.\n  Provided referral letter.\n  Patient education: Explained diagnosis of torsion, urgency of surgery, importance of reporting testicular pain promptly in future.\n"
  }
 ]
