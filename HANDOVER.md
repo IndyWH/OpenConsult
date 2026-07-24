@@ -752,28 +752,15 @@ defence layers, outermost first:
   fixed test password was world-readable was wrong; it is still a
   shared fixed string, hence the sweep below.
 
-**Outstanding (owner action): sweep the legacy junk accounts.** 489
-pre-isolation test accounts (incl. ~131 admins) are still ACTIVE in the
-live DB, all named `role_8hex` with the shared password
-`test-password-123`. With test isolation in place they will never be
-recreated, so one bulk deactivation ends it permanently. Run in psql as
-`consultation_app` (the assistant's harness refuses bulk UPDATEs):
-
-```sql
-WITH d AS (UPDATE app_user SET active=false
-  WHERE active AND username ~ '^[a-z]+_[0-9a-f]{8}$'
-    AND username NOT IN ('doctor','herath','receptionist','vicky')
-  RETURNING id)
-INSERT INTO audit_event (user_id, action, subject_type, detail)
-SELECT NULL, 'user.deactivated', 'user',
-  jsonb_build_object('bulk', true, 'reason',
-    'legacy test-junk sweep after public exposure', 'count', count(*))
-FROM d;
-```
-
-Known non-test accounts (owner-confirmed 2026-07-24): `doctor` (admin),
-`receptionist`, `herath`, `vicky`, and invited demo user
-`JoydeepSinha1988`.
+**Legacy junk-account sweep: DONE 2026-07-24** (owner-approved). All 489
+pre-isolation test accounts (`role_8hex` names, shared password
+`test-password-123`, incl. ~131 admins) were bulk-deactivated in one
+audited action — audit row `user.deactivated` `{bulk: true, count: 489}`,
+user_id NULL. With test isolation in place they cannot reaccumulate.
+Exactly five active accounts remain (owner-confirmed set): `doctor`
+(admin), `receptionist`, `herath`, `vicky`, and invited demo user
+`JoydeepSinha1988`. Accounts are deactivated, never deleted — the rows
+keep their names for the audit trail.
 
 ## After-reboot startup sequence
 
