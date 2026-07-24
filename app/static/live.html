@@ -3,123 +3,173 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Consultation AI — Live Transcription</title>
+<title>Consultation AI — Live consultation</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body {
-    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-    max-width: 1200px; margin: 0 auto; padding: 1.5rem;
+  /* ---- session header ---- */
+  .session-head {
+    max-width: 1080px; margin: 1.1rem auto 0; padding: 0 1.4rem;
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
   }
-  .columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1rem; }
-  @media (max-width: 800px) { .columns { grid-template-columns: 1fr; } }
-  .banner {
-    background: #fff3cd; color: #664d03; border: 1px solid #ffe69c;
-    border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; margin-bottom: 1rem;
+  .patient { display: flex; align-items: baseline; gap: .6rem; }
+  .patient .name { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; }
+  .patient .demo { color: var(--ink-soft); font-size: .95rem; }
+
+  /* ---- right cluster: timer · mic · start/stop ---- */
+  .live-cluster { margin-left: auto; display: flex; align-items: center; gap: .8rem; position: relative; }
+  .timer {
+    font-variant-numeric: tabular-nums; font-size: .95rem; color: var(--ink-soft);
+    display: inline-flex; align-items: center; gap: .35rem;
   }
-  @media (prefers-color-scheme: dark) {
-    .banner { background: #3a3000; color: #ffe69c; border-color: #665c00; }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red);
+             animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  .mic {
+    display: inline-flex; align-items: center; gap: .5rem;
+    border: 1px solid var(--line); background: var(--panel);
+    border-radius: 999px; padding: .32rem .75rem; font-size: .85rem; color: var(--ink-soft);
+    cursor: pointer; max-width: 260px;
   }
-  h1 { font-size: 1.3rem; margin: 0 0 1rem; }
-  .controls { display: flex; align-items: center; gap: .75rem; margin-bottom: 1rem; }
-  button {
-    font-size: 1rem; padding: .55rem 1.4rem; border-radius: 8px;
-    border: 1px solid #888; cursor: pointer; background: #1a7f37; color: white;
+  .mic .dev { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mic svg.micicon { flex: none; opacity: .6; }
+  .bars { display: inline-flex; align-items: flex-end; gap: 2px; height: 14px; }
+  .bars i { width: 3.5px; border-radius: 2px; background: var(--green);
+            transform: scaleY(.28); transform-origin: bottom;
+            transition: transform 90ms linear; }
+  .bars i:nth-child(1) { height: 6px;  }
+  .bars i:nth-child(2) { height: 11px; }
+  .bars i:nth-child(3) { height: 14px; }
+  .bars i:nth-child(4) { height: 9px;  }
+  .bars i:nth-child(5) { height: 5px;  }
+  .mic .chev { opacity: .5; font-size: .7rem; }
+  .mic.dead { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
+  .mic.dead .bars i { background: var(--red); transform: scaleY(.28); }
+  .mic.dead svg.micicon { opacity: .9; stroke: var(--red); }
+  .mic.disabled { cursor: default; }
+
+  .mic-menu {
+    position: absolute; right: 0; top: calc(100% + .5rem); z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 6px 24px #29231F14; min-width: 280px; padding: .45rem; display: none;
   }
-  button.stop { background: #b02a37; }
-  button.ready { background: #0b5ed7; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  #status { font-size: .9rem; opacity: .8; }
-  #status::before {
-    content: "●"; margin-right: .35rem; color: #999;
+  .mic-menu.open { display: block; }
+  .mic-menu button.item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    border-radius: 7px; padding: .5rem .6rem; font-size: .88rem; color: var(--ink);
   }
-  #status.recording::before { color: #d32f2f; animation: blink 1.2s infinite; }
-  @keyframes blink { 50% { opacity: .3; } }
-  #transcript {
-    border: 1px solid #8884; border-radius: 8px; padding: 1rem;
-    min-height: 14rem; line-height: 1.7; font-size: 1.05rem;
+  .mic-menu button.item:hover { background: #F3EDE6; }
+
+  /* ---- stacked layout, owner's priority order ---- */
+  .stack {
+    max-width: 1080px; margin: 1rem auto 2rem; padding: 0 1.4rem;
+    display: flex; flex-direction: column; gap: 1.1rem;
   }
-  #transcript p { margin: 0 0 .4rem; }
-  .ts { opacity: .45; font-size: .8rem; font-variant-numeric: tabular-nums; margin-right: .5rem; }
-  #partial { opacity: .55; font-style: italic; }
-  #cds {
-    border: 1px solid #8884; border-radius: 8px; padding: 1rem;
-    font-size: .92rem; line-height: 1.5;
+  .stack .pane { margin-top: 0; padding: 1.1rem 1.25rem; }
+  .stack .pane h2 { margin-bottom: .45rem; }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+  @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
+  .cds ul { margin: 0; padding-left: 1.15rem; }
+  .cds li { margin-bottom: .4rem; font-size: .98rem; }
+  .cds .why { display: block; color: var(--ink-faint); font-size: .8rem; font-weight: 400; }
+  .idle { color: var(--ink-faint); font-style: italic; font-size: .9rem; margin: 0; }
+
+  details.gl summary {
+    cursor: pointer; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--ink-faint); font-weight: 600; margin-top: .9rem;
   }
-  #cds h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em;
-            opacity: .6; margin: 1rem 0 .35rem; }
-  #cds h2:first-child { margin-top: 0; }
-  #cds ul { margin: 0; padding-left: 1.2rem; }
-  #cds li { margin-bottom: .3rem; }
-  .likelihood { font-size: .7rem; font-weight: 600; border-radius: 4px;
-                padding: .05rem .35rem; margin-right: .35rem; vertical-align: middle; }
-  .likelihood.high { background: #d32f2f22; color: #d32f2f; }
-  .likelihood.moderate { background: #ed6c0222; color: #ed6c02; }
-  .likelihood.low { background: #55555522; color: inherit; opacity: .8; }
-  .rationale { display: block; opacity: .6; font-size: .82rem; }
-  #cds .idle { opacity: .5; font-style: italic; }
-  .urgent {
-    border: 2px solid #d32f2f; background: #d32f2f14; border-radius: 8px;
-    padding: .6rem .75rem; margin-bottom: 1rem;
-  }
-  .urgent h2 { color: #d32f2f; margin-top: 0 !important; }
-  .urgent li { font-weight: 600; }
-  .urgent .rationale { font-weight: 400; }
-  #guidelines {
-    border: 1px solid #8884; border-radius: 8px; padding: 1rem;
-    font-size: .92rem; line-height: 1.5; margin-top: 1rem;
-  }
-  #guidelines h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em;
-                   opacity: .6; margin: 0 0 .35rem; }
-  #guidelines .cite {
-    font-size: .8rem; opacity: .75; margin: .5rem 0 0; padding-left: 1.1rem; text-indent: -1.1rem;
-  }
-  #guidelines .provenance {
-    font-size: .72rem; opacity: .5; margin-top: .75rem; border-top: 1px solid #8883;
-    padding-top: .4rem;
-  }
-  #guidelines .refusal { opacity: .6; font-style: italic; }
-  .patient-banner { margin: .2rem 0 .8rem; padding: .55rem .9rem; border-radius: 8px;
-                    background: #8882; border: 1px solid #8885; font-size: 1rem; }
-  .patient-banner.active { background: #1a7f371a; border-color: #1a7f3766; }
-  .patient-banner.warn { background: #ed6c021a; border-color: #ed6c0266; }
-  .patient-banner .name { font-weight: 700; font-size: 1.2rem; }
-  .patient-banner .demo { opacity: .85; margin-left: .4rem; }
-  .live-walkin { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center;
-                 margin: 0 0 .8rem; }
-  .live-walkin input, .live-walkin select { padding: .4rem .6rem; border-radius: 6px;
-                 border: 1px solid #8886; background: transparent; color: inherit; }
-  /* Keep select dropdown options readable in dark mode (see login.html). */
-  select, option { background: Canvas; color: CanvasText; }
-  .live-walkin a { font-size: .85rem; opacity: .8; }
-  button:disabled { opacity: .45; cursor: not-allowed; }
+  details.gl .summary-text { margin: .5rem 0 0; font-size: .92rem; }
+  details.gl .refusal { color: var(--ink-faint); font-style: italic; }
+
+  #transcript p { margin: 0 0 .55rem; font-size: .95rem; }
+  #transcript .ts { color: var(--ink-faint); font-size: .78rem;
+                    font-variant-numeric: tabular-nums; margin-right: .55rem; }
+  .partial { color: var(--ink-faint); font-style: italic; }
+
+  .walkin-box { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
+  .walkin-box a { font-size: .85rem; color: var(--ink-soft); }
+  #status { font-size: .82rem; color: var(--ink-faint); width: 100%; }
 </style>
 </head>
 <body>
-<div class="banner">⚠️ Research/educational prototype — not a medical device. Synthetic consultations only.</div>
-<h1 id="pageTitle">Live consultation</h1>
-<div id="patientBanner" class="patient-banner">Checking for an active patient…</div>
-<form id="liveWalkin" class="live-walkin" style="display:none">
-  <input name="name" placeholder="Walk-in patient name (synthetic)" required>
-  <input name="age" type="number" min="0" max="120" placeholder="Age" style="width:5.5rem">
-  <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
-  <button type="submit">Start walk-in consultation</button>
-  <a href="/today">Go to Today queue</a>
-</form>
-<div class="controls">
-  <button id="btn" disabled title="Recording needs a linked patient">Start</button>
-  <span id="status">idle</span>
-</div>
-<div class="columns">
-  <div id="transcript"><span id="partial"></span></div>
-  <div>
-    <div id="cds"><p class="idle">Clinical decision support will appear here once the
-    conversation gets going. All suggestions are AI drafts for the doctor —
-    not medical advice.</p></div>
-    <div id="guidelines"><h2>Guidelines</h2><p class="refusal">Guideline summaries
-    appear here once a working differential exists. Grounded in the local corpus
-    only — every claim cited, or the panel declines.</p></div>
+
+<div class="session-head">
+  <div class="patient">
+    <span class="name" id="pName">Live consultation</span>
+    <span class="demo" id="pDemo"></span>
   </div>
+  <div class="chips">
+    <span class="chip linked" id="linkedChip" style="display:none">✓ linked from Today queue</span>
+    <span class="chip">English</span>
+  </div>
+  <div class="live-cluster">
+    <span class="timer" id="timer"><span class="rec-dot" id="recDot" style="display:none"></span><span id="timerText">00:00</span></span>
+    <span class="mic" id="micPill" title="Input device — click to change">
+      <svg class="micicon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg>
+      <span class="dev" id="devName">Requesting microphone…</span>
+      <span class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="chev">▾</span>
+    </span>
+    <div class="mic-menu" id="micMenu"></div>
+    <button class="primary" id="btn" disabled title="Recording needs a linked patient">Start</button>
+  </div>
+  <div id="status" class="hint"></div>
+</div>
+
+<div class="stack">
+
+  <!-- unlinked state: walk-in registration (recording stays gated) -->
+  <div class="pane" id="walkinPane" style="display:none">
+    <h2>No linked patient</h2>
+    <p class="hint" id="walkinHint" style="margin:.2rem 0 .7rem"></p>
+    <form id="liveWalkin" class="walkin-box">
+      <input name="name" placeholder="Walk-in patient name (synthetic)" required>
+      <input name="age" type="number" min="0" max="120" placeholder="Age" style="width:5.5rem">
+      <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
+      <button type="submit" class="primary">Start walk-in consultation</button>
+      <a href="/today">Go to Today queue</a>
+    </form>
+  </div>
+
+  <!-- 1. URGENT ACTIONS — always first -->
+  <div class="urgent" id="urgentBox" style="display:none">
+    <h2 class="pane-label">⚠ Urgent actions</h2>
+    <ul id="urgentList"></ul>
+  </div>
+
+  <!-- 2. QUESTIONS TO ASK · SIGNS TO CHECK -->
+  <div class="duo">
+    <div class="pane cds">
+      <h2>Questions to ask</h2>
+      <ul id="qList"></ul>
+      <p class="idle" id="qIdle">Suggestions appear once the conversation gets going.</p>
+    </div>
+    <div class="pane cds">
+      <h2>Signs to check</h2>
+      <ul id="sList"></ul>
+      <p class="idle" id="sIdle">Suggestions appear once the conversation gets going.</p>
+    </div>
+  </div>
+
+  <!-- 3. DIFFERENTIAL DIAGNOSIS (guidelines tucked beneath) -->
+  <div class="pane cds">
+    <h2>Differential diagnosis</h2>
+    <ul id="dxList"></ul>
+    <p class="idle" id="dxIdle">Clinical decision support appears here once the
+    conversation gets going. All suggestions are AI drafts for the doctor —
+    not medical advice.</p>
+    <details class="gl" open id="glDetails" style="display:none">
+      <summary>Guidelines — grounded in local corpus</summary>
+      <div id="glBody"></div>
+    </details>
+  </div>
+
+  <!-- 4. LIVE TRANSCRIPT — last -->
+  <div class="pane">
+    <h2 class="pane-label">Live transcript</h2>
+    <div id="transcript" style="margin-top:.5rem"><span id="partial" class="partial"></span></div>
+  </div>
+
 </div>
 
 <script src="/static/nav.js"></script>
@@ -133,17 +183,26 @@ const PATIENT = {
   queue: params.get('queue') ? +params.get('queue') : null,
 };
 
+const btn = document.getElementById('btn');
+const statusEl = document.getElementById('status');
+
+function setStatus(text) { statusEl.textContent = text; }
+
 async function loadPatientBanner() {
-  const bannerEl = document.getElementById('patientBanner');
-  const startBtn = document.getElementById('btn');
-  const walkinEl = document.getElementById('liveWalkin');
+  const walkinPane = document.getElementById('walkinPane');
+  const nameEl = document.getElementById('pName');
+  const demoEl = document.getElementById('pDemo');
+  const linkedChip = document.getElementById('linkedChip');
   // Recording is gated on a server-linked patient: no identity, no Start.
-  const unlinked = (cls, text) => {
+  const unlinked = (text) => {
     PATIENT.id = null;
-    startBtn.disabled = true;
-    walkinEl.style.display = '';
-    bannerEl.className = 'patient-banner ' + cls;
-    bannerEl.textContent = text +
+    btn.disabled = true;
+    btn.title = 'Recording needs a linked patient';
+    walkinPane.style.display = '';
+    linkedChip.style.display = 'none';
+    nameEl.textContent = 'Live consultation';
+    demoEl.textContent = '';
+    document.getElementById('walkinHint').textContent = text +
       ' Recording is disabled until a patient is linked — start a walk-in below, or go to the Today queue.';
   };
   const url = PATIENT.queue ? `/api/queue/${PATIENT.queue}` : '/api/queue/current';
@@ -153,24 +212,23 @@ async function loadPatientBanner() {
     if (response.ok) entry = await response.json();
   } catch (e) { /* fall through to unlinked */ }
   if (!entry) {
-    unlinked('', 'No active patient found for today.');
+    unlinked('No active patient found for today.');
     return;
   }
   if (entry.status !== 'in_consultation') {
-    unlinked('warn', `${entry.name} is not in consultation (status: ${entry.status.replace('_', ' ')}).`);
+    unlinked(`${entry.name} is not in consultation (status: ${entry.status.replace('_', ' ')}).`);
     return;
   }
   PATIENT.id = entry.patient_id;          // server-sourced binding for the record
   PATIENT.queue = entry.entry_id;
-  walkinEl.style.display = 'none';
-  startBtn.disabled = false;
-  startBtn.title = '';
-  bannerEl.className = 'patient-banner active';
-  bannerEl.innerHTML = '<span class="name"></span><span class="demo"></span>';
-  bannerEl.querySelector('.name').textContent = entry.name;
+  walkinPane.style.display = 'none';
+  btn.disabled = false;
+  btn.title = '';
+  linkedChip.style.display = '';
+  nameEl.textContent = entry.name;
   const demo = [entry.age != null ? `${entry.age} y` : null, entry.sex || null]
     .filter(Boolean).join(' · ');
-  bannerEl.querySelector('.demo').textContent = demo ? `· ${demo}` : '';
+  demoEl.textContent = demo;
   document.title = 'Consultation — ' + entry.name;
 }
 const patientReady = loadPatientBanner();
@@ -194,22 +252,156 @@ document.getElementById('liveWalkin').addEventListener('submit', async (e) => {
   await loadPatientBanner();
 });
 
-const btn = document.getElementById('btn');
-const statusEl = document.getElementById('status');
+// ============================================================ mic cluster
+// One capture only: the stream acquired here feeds BOTH the level meter
+// (always, from page load) and, once recording starts, the transcription
+// worklet — the meter can never disagree with what the server hears.
+const micPill = document.getElementById('micPill');
+const devNameEl = document.getElementById('devName');
+const micMenu = document.getElementById('micMenu');
+const barEls = document.getElementById('bars').querySelectorAll('i');
+const BAR_GAIN = [1.3, 1.0, 0.8, 1.1, 1.4];   // slight per-bar variation
+
+let stream = null, audioCtx = null, sourceNode = null, analyser = null;
+let workletNode = null;
+let currentDeviceId = null;
+let silentSinceMs = null;   // for the no-signal (dead) state
+let recording = false;
+
+async function acquireStream(deviceId) {
+  const constraints = {
+    audio: {
+      channelCount: 1, echoCancellation: true, noiseSuppression: true,
+      ...(deviceId ? {deviceId: {exact: deviceId}} : {}),
+    },
+  };
+  const next = await navigator.mediaDevices.getUserMedia(constraints);
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = next;
+  if (!audioCtx) {
+    audioCtx = new AudioContext();
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    // Autoplay policy: a context created without a user gesture may start
+    // suspended, which would read as silence and false-trigger the red
+    // no-signal pill. Resume now and again on the first interaction.
+    if (audioCtx.state === 'suspended') {
+      audioCtx.resume().catch(() => {});
+      const kick = () => { audioCtx.resume().catch(() => {}); };
+      document.addEventListener('pointerdown', kick, {once: true});
+      document.addEventListener('keydown', kick, {once: true});
+    }
+  }
+  if (sourceNode) sourceNode.disconnect();
+  sourceNode = audioCtx.createMediaStreamSource(stream);
+  sourceNode.connect(analyser);
+  if (workletNode) sourceNode.connect(workletNode);  // mid-recording safety
+  const track = stream.getAudioTracks()[0];
+  currentDeviceId = track.getSettings().deviceId || deviceId || null;
+  devNameEl.textContent = track.label || 'Microphone';
+  micPill.title = 'Input device — click to change';
+}
+
+async function initMic() {
+  try {
+    await acquireStream(null);
+  } catch (err) {
+    devNameEl.textContent = 'Microphone unavailable';
+    micPill.classList.add('dead');
+    micPill.title = 'Microphone access denied or unavailable: ' + err.message;
+    return;
+  }
+  // Level meter: RMS of the analyser's time-domain signal → 5 bars, ~10 fps.
+  const buf = new Float32Array(analyser.fftSize);
+  setInterval(() => {
+    if (!analyser || audioCtx.state !== 'running') return;  // no data ≠ no signal
+    analyser.getFloatTimeDomainData(buf);
+    let sum = 0;
+    for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+    const rms = Math.sqrt(sum / buf.length);
+    // No-signal defence (docket #78 mic-check fabrication / #70 degraded
+    // audio): sustained near-zero RMS for 3 s turns the pill red. Hysteresis
+    // so a breath of noise doesn't flicker it back and forth.
+    const now = performance.now();
+    if (rms < 1e-4) {
+      if (silentSinceMs === null) silentSinceMs = now;
+      if (now - silentSinceMs > 3000) micPill.classList.add('dead');
+    } else if (rms > 5e-4) {
+      silentSinceMs = null;
+      micPill.classList.remove('dead');
+    }
+    const level = Math.min(1, rms * 8);
+    barEls.forEach((bar, k) => {
+      bar.style.transform = `scaleY(${Math.max(.28, Math.min(1, level * BAR_GAIN[k] * 4))})`;
+    });
+  }, 100);
+  refreshDeviceMenu();
+  navigator.mediaDevices.addEventListener('devicechange', refreshDeviceMenu);
+}
+
+async function refreshDeviceMenu() {
+  const devices = await navigator.mediaDevices.enumerateDevices();
+  micMenu.innerHTML = '';
+  for (const d of devices.filter(d => d.kind === 'audioinput')) {
+    const item = document.createElement('button');
+    item.type = 'button'; item.className = 'item';
+    item.textContent = (d.deviceId === currentDeviceId ? '✓ ' : ' ') +
+      (d.label || 'Microphone');
+    item.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      micMenu.classList.remove('open');
+      if (d.deviceId === currentDeviceId) return;
+      try {
+        await acquireStream(d.deviceId);
+        silentSinceMs = null;
+        micPill.classList.remove('dead');
+      } catch (err) {
+        setStatus('could not switch microphone: ' + err.message);
+      }
+      refreshDeviceMenu();
+    });
+    micMenu.appendChild(item);
+  }
+}
+
+micPill.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (recording) return;      // device switch mid-recording is v2
+  micMenu.classList.toggle('open');
+});
+document.addEventListener('click', (e) => {
+  if (!micMenu.contains(e.target)) micMenu.classList.remove('open');
+});
+initMic();
+
+// ------------------------------------------------------------------ timer
+const recDot = document.getElementById('recDot');
+const timerText = document.getElementById('timerText');
+let recStartMs = null, timerInterval = null;
+
+function startTimer() {
+  recStartMs = Date.now();
+  recDot.style.display = '';
+  timerInterval = setInterval(() => {
+    const s = Math.floor((Date.now() - recStartMs) / 1000);
+    timerText.textContent =
+      `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+  }, 500);
+}
+function stopTimer() {
+  recDot.style.display = 'none';
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
+}
+
+// ==================================================== transcription plumbing
 const transcriptEl = document.getElementById('transcript');
 const partialEl = document.getElementById('partial');
 
 const TARGET_RATE = 16000;
 const CHUNK_SAMPLES = 4000;           // send ~0.25 s of audio per frame
 
-let ws = null, audioCtx = null, stream = null, workletNode = null;
+let ws = null;
 let sendQueue = new Float32Array(0);
-let recording = false;
-
-function setStatus(text, isRecording) {
-  statusEl.textContent = text;
-  statusEl.classList.toggle('recording', !!isRecording);
-}
 
 // Linear-interpolation resampler: browser rate (often 48 kHz) → 16 kHz.
 function resample(input, fromRate) {
@@ -247,8 +439,7 @@ function enqueue(samples) {
   }
 }
 
-const cdsEl = document.getElementById('cds');
-
+// ================================================================ CDS panes
 function el(tag, className, text) {
   const node = document.createElement(tag);
   if (className) node.className = className;
@@ -256,55 +447,56 @@ function el(tag, className, text) {
   return node;
 }
 
-function renderCDS(a) {
-  cdsEl.innerHTML = '';
-  if (a.urgent_actions && a.urgent_actions.length) {
-    const box = el('div', 'urgent');
-    box.appendChild(el('h2', null, '⚠ Urgent actions'));
-    const uList = el('ul');
-    for (const u of a.urgent_actions) {
-      const li = el('li', null, u.action);
-      li.appendChild(el('span', 'rationale', u.reason));
-      uList.appendChild(li);
-    }
-    box.appendChild(uList);
-    cdsEl.appendChild(box);
-  }
-  cdsEl.appendChild(el('h2', null, 'Differential diagnosis'));
-  const dxList = el('ul');
-  for (const d of a.differentials) {
-    const li = el('li');
-    li.appendChild(el('span', 'likelihood ' + d.likelihood, d.likelihood));
-    li.appendChild(document.createTextNode(d.condition));
-    li.appendChild(el('span', 'rationale', d.rationale));
-    dxList.appendChild(li);
-  }
-  cdsEl.appendChild(dxList);
-  cdsEl.appendChild(el('h2', null, 'Questions to ask'));
-  const qList = el('ul');
-  for (const q of a.questions_to_ask) qList.appendChild(el('li', null, q));
-  cdsEl.appendChild(qList);
-  cdsEl.appendChild(el('h2', null, 'Signs to check'));
-  const sList = el('ul');
-  for (const s of a.signs_to_check) sList.appendChild(el('li', null, s));
-  cdsEl.appendChild(sList);
+function fillList(listEl, idleEl, items, build) {
+  listEl.innerHTML = '';
+  idleEl.style.display = items.length ? 'none' : '';
+  for (const item of items) listEl.appendChild(build(item));
 }
 
-const glEl = document.getElementById('guidelines');
+function renderCDS(a) {
+  const urgentBox = document.getElementById('urgentBox');
+  const urgent = a.urgent_actions || [];
+  urgentBox.style.display = urgent.length ? '' : 'none';
+  const uList = document.getElementById('urgentList');
+  uList.innerHTML = '';
+  for (const u of urgent) {
+    const li = el('li', null, u.action);
+    li.appendChild(el('span', 'why', u.reason));
+    uList.appendChild(li);
+  }
+  fillList(document.getElementById('qList'), document.getElementById('qIdle'),
+           a.questions_to_ask || [], q => el('li', null, q));
+  fillList(document.getElementById('sList'), document.getElementById('sIdle'),
+           a.signs_to_check || [], s => el('li', null, s));
+  fillList(document.getElementById('dxList'), document.getElementById('dxIdle'),
+           a.differentials || [], d => {
+    const li = el('li');
+    li.appendChild(el('span', 'lk ' + d.likelihood, d.likelihood));
+    li.appendChild(document.createTextNode(d.condition));
+    li.appendChild(el('span', 'why', d.rationale));
+    return li;
+  });
+}
 
 function renderGuidelines(msg) {
-  glEl.innerHTML = '';
-  glEl.appendChild(el('h2', null, 'Guidelines'));
+  const details = document.getElementById('glDetails');
+  const body = document.getElementById('glBody');
+  details.style.display = '';
+  body.innerHTML = '';
   if (!msg.covered) {
-    glEl.appendChild(el('p', 'refusal', msg.summary));
+    body.appendChild(el('p', 'summary-text refusal', msg.summary));
   } else {
-    glEl.appendChild(el('p', null, msg.summary));
+    body.appendChild(el('p', 'summary-text', msg.summary));
     for (const c of msg.citations) {
-      glEl.appendChild(el('p', 'cite', `[${c.n}] ${c.publisher} — ${c.source}: ${c.section}`));
+      const cite = el('p', 'cite');
+      const n = el('b', null, `[${c.n}]`);
+      cite.appendChild(n);
+      cite.appendChild(document.createTextNode(` ${c.publisher} — ${c.source}: ${c.section}`));
+      body.appendChild(cite);
     }
   }
   const p = msg.provenance;
-  glEl.appendChild(el('p', 'provenance',
+  body.appendChild(el('p', 'provenance',
     `${p.corpus_name} · v${p.corpus_version} · ${p.n_sources} sources, ${p.n_chunks} passages · ingested ${p.date_ingested}`));
 }
 
@@ -323,18 +515,17 @@ function addFinal(msg) {
   transcriptEl.insertBefore(p, partialEl);
 }
 
+// ============================================================= start / stop
 async function start() {
   if (!PATIENT.id) return;  // unlinked recording is impossible, not warned
   btn.disabled = true;
-  setStatus('requesting microphone…');
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true }
-    });
-  } catch (err) {
-    setStatus('microphone access denied: ' + err.message);
-    btn.disabled = false;
-    return;
+  if (!stream) {            // permission was denied at load — try again now
+    try { await acquireStream(null); }
+    catch (err) {
+      setStatus('microphone access denied: ' + err.message);
+      btn.disabled = false;
+      return;
+    }
   }
 
   const proto = location.protocol === 'https:' ? 'wss' : 'ws';
@@ -347,7 +538,10 @@ async function start() {
     else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
     else if (msg.type === 'cds') { renderCDS(msg.assessment); }
     else if (msg.type === 'guidelines') { renderGuidelines(msg); }
-    else if (msg.type === 'cds_unavailable') { cdsEl.innerHTML = ''; cdsEl.appendChild(el('p', 'idle', msg.detail)); }
+    else if (msg.type === 'cds_unavailable') {
+      document.getElementById('dxIdle').style.display = '';
+      document.getElementById('dxIdle').textContent = msg.detail;
+    }
     else if (msg.type === 'done') {
       ws.close(); ws = null;
       if (msg.consultation_id) {
@@ -372,29 +566,28 @@ async function start() {
     ws.send(JSON.stringify({patient_id: PATIENT.id, queue_entry_id: PATIENT.queue}));
   }
 
-  audioCtx = new AudioContext();
+  // Attach the transcription worklet to the SAME source the meter reads.
   await audioCtx.audioWorklet.addModule('/static/recorder-worklet.js');
-  const source = audioCtx.createMediaStreamSource(stream);
   workletNode = new AudioWorkletNode(audioCtx, 'pcm-forwarder');
   workletNode.port.onmessage = (e) => enqueue(resample(e.data, audioCtx.sampleRate));
-  source.connect(workletNode);
+  sourceNode.connect(workletNode);
 
   recording = true;
   btn.textContent = 'Stop';
-  btn.classList.add('stop');
   btn.disabled = false;
-  setStatus('listening — speak normally', true);
+  startTimer();
+  setStatus('listening — speak normally');
 }
 
 async function stop() {
   recording = false;
   btn.disabled = true;
   btn.textContent = 'Please wait…';
-  btn.classList.remove('stop');
+  stopTimer();
   setStatus('finishing…');
+  // Detach the worklet but KEEP the stream and analyser — the level meter
+  // stays live after recording ends.
   if (workletNode) { workletNode.disconnect(); workletNode = null; }
-  if (stream) { stream.getTracks().forEach(t => t.stop()); stream = null; }
-  if (audioCtx) { await audioCtx.close(); audioCtx = null; }
   if (ws && ws.readyState === WebSocket.OPEN) {
     ws.send('stop'); // server replies "done", which starts the results wait
   } else {
@@ -419,7 +612,6 @@ async function awaitResults(cid) {
     if (row.status === 'awaiting_review' || row.status === 'approved') {
       resultUrl = '/review/' + cid;
       btn.textContent = 'See results';
-      btn.classList.add('ready');
       btn.disabled = false;
       setStatus('note ready for review');
       return;
