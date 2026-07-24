@@ -98,9 +98,10 @@ async function load() {
   for (const c of rows) {
     const tr = document.createElement('tr');
     if (c.voided_at) tr.className = 'voided';
+    const label = c.status === 'queued' ? 'processing (queued)' : c.status.replace('_',' ');
     const status = c.voided_at
       ? '<span class="chip status voided">voided</span>'
-      : `<span class="chip status ${c.status}">${c.status.replace('_',' ')}</span>`;
+      : `<span class="chip status ${c.status}">${label}</span>`;
     const reason = c.voided_at
       ? `<span class="voidreason">voided ${c.voided_at}${c.voided_by ? ' by ' + c.voided_by : ''}: ${c.void_reason}</span>` : '';
     tr.innerHTML =

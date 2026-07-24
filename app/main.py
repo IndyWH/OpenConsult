@@ -57,10 +57,37 @@ async def lifespan(app: FastAPI):
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
     app.state.cds_engine = CDSEngine()
     app.state.rag = RAGService()
-    app.state.finalize_tasks = set()  # keep refs so tasks aren't GC'd mid-run
+    # Finalisation is serialised through a single-consumer queue: exactly
+    # one pipeline touches the GPU at a time (finalize.py's VRAM
+    # sequencing assumes sole ownership of the 24 GB). Consultations wait
+    # as status 'queued'. Crash recovery: anything left 'queued' with
+    # audio on disk is re-enqueued at startup.
+    app.state.finalize_queue = asyncio.Queue()
+    app.state.finalize_worker = asyncio.create_task(finalize_worker(app))
+    for cid, wav_path in await consultations.queued_finalisations():
+        app.state.finalize_queue.put_nowait((cid, wav_path))
+        logger.info("Re-enqueued consultation %d for finalisation", cid)
+    # One live consultation at a time, enforced at the WebSocket layer
+    # (the queue's one-active-entry guard is UI-level; this is the wall).
+    app.state.live_active = None
     app.state.retention_task = asyncio.create_task(retention.retention_loop())
     yield
     app.state.retention_task.cancel()
+    app.state.finalize_worker.cancel()
+
+async def finalize_worker(app: FastAPI) -> None:
+    """Single consumer for the finalisation queue. Never dies: a failed
+    pipeline marks its own consultation failed (finalize_consultation
+    catches internally); anything unexpected is logged and skipped."""
+    while True:
+        cid, wav_path = await app.state.finalize_queue.get()
+        try:
+            await finalize_consultation(cid, wav_path)
+        except Exception:  # noqa: BLE001 - the worker must survive any job
+            logger.exception("Finalisation worker error for consultation %d", cid)
+        finally:
+            app.state.finalize_queue.task_done()
+
 
 app = FastAPI(
     title="Consultation AI",
@@ -764,6 +791,23 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         return
 
     await websocket.accept()
+    # One live consultation at a time, globally: a second concurrent
+    # stream would share the one faster-whisper model (commit latency
+    # blows past the 2-5 s target) and race the finalisation GPU
+    # hand-off. The Today-queue guard already makes this unreachable
+    # through the UI; this is the server-side wall.
+    state = websocket.app.state
+    if getattr(state, "live_active", None) is not None:
+        await websocket.send_json({
+            "type": "busy",
+            "detail": "Another live consultation is already in progress "
+                      f"(started by {state.live_active['user']}). "
+                      "One live consultation at a time.",
+        })
+        await websocket.close(code=4409)
+        return
+    state.live_active = {"user": user["username"]}
+
     session = LiveSession(websocket.app.state.transcriber)
     engine: CDSEngine = websocket.app.state.cds_engine
     patient_id: int | None = None
@@ -900,15 +944,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 "Consultation %d: %d unresolved urgent action(s) recorded",
                 cid, len(unresolved),
             )
-        task = asyncio.create_task(finalize_consultation(cid, wav_path))
-        websocket.app.state.finalize_tasks.add(task)
-        task.add_done_callback(websocket.app.state.finalize_tasks.discard)
+        # Hand the recording to the serialised finalisation worker: with
+        # one GPU, pipelines must run one at a time. The consultation
+        # waits as 'queued' (worklist shows "processing (queued)").
+        await consultations.set_status(cid, "queued", audio_path=wav_path)
+        websocket.app.state.finalize_queue.put_nowait((cid, wav_path))
 
         await websocket.send_json({"type": "done", "consultation_id": cid})
         await websocket.close()
     except WebSocketDisconnect:
         pass
     finally:
+        state.live_active = None
         if cds_task is not None:
             cds_task.cancel()
         if gl_task is not None:

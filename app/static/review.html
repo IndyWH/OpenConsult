@@ -162,7 +162,8 @@ function renderHead() {
   }
   chips.appendChild(el('span', 'chip', 'English'));
   const statusChip = el('span', 'chip status ' + state.status,
-                        state.status.replace('_', ' '));
+                        state.status === 'queued' ? 'processing (queued)'
+                                                  : state.status.replace('_', ' '));
   chips.appendChild(statusChip);
   if (state.note) chips.appendChild(el('span', 'chip', 'note v' + state.note.version));
   if (state.voided_at) {
@@ -290,7 +291,7 @@ async function refresh() {
   }
   state = body;
   renderHead();
-  if (state.status === 'processing' || state.status === 'live') {
+  if (state.status === 'processing' || state.status === 'queued' || state.status === 'live') {
     processingEl.style.display = 'block'; contentEl.style.display = 'none';
     setTimeout(refresh, 3000);
     return;

@@ -306,6 +306,39 @@ Built after the Phase 6 verification, admin-only, all 403-tested:
   two deliberate steps by design. Tests: `tests/test_admin.py`
   (RBAC, last-admin guard via rolled-back transaction, void-then-purge).
 
+## Concurrent capacity (2026-07-24, investigated + enforced)
+
+**Capacity statement: any number of concurrent logins/browsing sessions
+is fine (I/O-bound reads); exactly ONE live consultation and ONE
+finalisation pipeline run at a time, both enforced server-side.**
+
+Investigation findings (why the limits exist):
+
+- Two Stops within seconds — reachable today with a single doctor,
+  because the queue's one-active-entry guard releases at Stop while
+  finalisation keeps running — used to launch two concurrent
+  `finalize_consultation` tasks: both load WhisperX+pyannote (6–8 GB
+  each) while MedGemma (~17 GB) reloads for whichever reaches the note
+  step first (24 GB card ⇒ OOM territory), and
+  `transcribe_and_diarise` briefly monkeypatches the process-global
+  `torch.load`, which two threads corrupt for each other.
+- Two live WebSocket streams — unreachable through the UI (Start gates
+  on the single global in-consultation queue entry) but the WS endpoint
+  had no server-side guard; two streams would share the one
+  faster-whisper model and blow the 2–5 s commit-latency target.
+
+Enforcement (tests `tests/test_capacity.py`):
+
+- **Finalisation queue:** single-consumer asyncio queue in main.py
+  (`finalize_worker`); Stop sets status `queued` (worklist/review show
+  "processing (queued)") and enqueues; the worker runs pipelines FIFO,
+  one at a time, and survives failing jobs. Startup re-enqueues any
+  consultation left `queued` with audio on disk, so a crash never
+  strands a recording.
+- **Live-session wall:** `/ws/transcribe` refuses a second concurrent
+  stream with a `busy` message naming the active user (client stands
+  down cleanly and shows the reason); slot freed on any disconnect.
+
 ## Audio retention (2026-07-24, plan §8)
 
 `app/retention.py`; tests `tests/test_retention.py`. Audio ONLY — the

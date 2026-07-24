@@ -141,6 +141,21 @@ async def list_consultations(
     ]
 
 
+async def queued_finalisations() -> list[tuple[int, str]]:
+    """Consultations enqueued for finalisation when the app last stopped
+    (status 'queued', audio on disk) — re-enqueued at startup so a crash
+    or restart never strands a recording."""
+    async with await _conn() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT id, audio_path FROM consultation"
+                " WHERE status = 'queued' AND audio_path IS NOT NULL"
+                " ORDER BY id"
+            )
+        ).fetchall()
+    return [(r[0], r[1]) for r in rows]
+
+
 async def set_audio_path(cid: int, path: str) -> None:
     """Post-approval FLAC compression updates the stored location."""
     async with await _conn() as conn:

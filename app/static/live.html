@@ -538,6 +538,18 @@ async function start() {
     else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
     else if (msg.type === 'cds') { renderCDS(msg.assessment); }
     else if (msg.type === 'guidelines') { renderGuidelines(msg); }
+    else if (msg.type === 'busy') {
+      // One live consultation at a time (server-enforced). The message
+      // can arrive after start() already flipped into recording state,
+      // so stand down completely: worklet, timer, flags, button.
+      recording = false;
+      if (workletNode) { workletNode.disconnect(); workletNode = null; }
+      stopTimer();
+      if (ws) { ws.close(); ws = null; }
+      btn.textContent = 'Start';
+      btn.disabled = false;
+      setStatus(msg.detail);
+    }
     else if (msg.type === 'cds_unavailable') {
       document.getElementById('dxIdle').style.display = '';
       document.getElementById('dxIdle').textContent = msg.detail;
