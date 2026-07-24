@@ -43,6 +43,27 @@ _BOILERPLATE = re.compile(
 )
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 
+# Tense fidelity for investigations (owner's QA finding on the #66 letter):
+# planned ≠ performed ≠ resulted. A paragraph claiming a result-class verb
+# whose cited note lines only use planned-class wording is an upgrade the
+# note never made.
+_RESULT_WORDS = re.compile(
+    r"\b(performed|undertaken|carried out|showed|shows|showing|revealed|"
+    r"demonstrated|confirmed|was (?:normal|abnormal)|were (?:normal|abnormal))\b",
+    re.IGNORECASE,
+)
+_PLANNED_WORDS = re.compile(
+    r"\b(arranged|planned|requested|ordered|booked|organised|organized|"
+    r"will be|to be done)\b", re.IGNORECASE,
+)
+
+# The approved note's plain-text section headings, as the review UI
+# serialises them ("S:" … "P:"; long forms tolerated defensively).
+_HEADING = re.compile(
+    r"^(s|o|a|p|subjective|objective|assessment|plan)\s*:?\s*$", re.IGNORECASE
+)
+_SECTION_KEY = {"s": "subjective", "o": "objective", "a": "assessment", "p": "plan"}
+
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS letter (
     id serial PRIMARY KEY,
@@ -134,20 +155,54 @@ LETTER_SCHEMA = {
     "required": ["reasoning", "paragraphs"],
 }
 
+# Owner's clinical framework (REFERRAL_LETTER_STYLE.md addendum,
+# 2026-07-24): a real GP letter presents the evidence and lets the
+# specialist draw the conclusion. Structure and hard rules below are the
+# owner's; the citation/masking gates in code are the guarantee.
 LETTER_PROMPT = """\
-You draft the body of a UK-style GP referral letter ("Dear Colleague" \
-register, formal and concise) to the requested specialty.
+You draft the body of a GP referral letter to the requested specialty, \
+in the register of a real GP letter: concise, evidence-first, well under \
+a page, every sentence carrying clinical information. No essay style, no \
+sympathy padding, no repetition of demographics.
 
-Your ONLY source is the numbered APPROVED CONSULTATION NOTE provided. \
-Rules, all hard:
-- Each paragraph's `note_lines` lists the note line number(s) it draws \
-on. Every clinical statement must come from those lines. Do not add \
-findings, doses, dates, or history the note does not contain.
-- Where a referral letter would normally include something the note \
-lacks (e.g. examination findings), either omit it or write exactly \
-"[to be completed by the referring doctor]" in its place.
+Body paragraphs, in this order:
+1. Opening sentence — who is being referred and the presenting problem \
+stated as SYMPTOMS, never a diagnosis (e.g. "I would be grateful if you \
+would see this 55-year-old man with a two-week history of exertional \
+chest tightness."). Add "urgently" only when the note's plan says so.
+2. History — the positive and relevant negative points from the note: \
+symptoms with duration and pattern, past medical history, family \
+history, drug history and allergies, relevant social history. \
+Compressed, bullet-like prose; no narrative padding.
+3. Examination findings — as recorded in the note, nothing more. Omit \
+if none are recorded.
+4. Investigations — results only if the note records them. If a test \
+was arranged but no result is in the note, say exactly that ("An ECG \
+was arranged today") — never upgrade to performed/showed. Planned, \
+performed, and resulted are different claims; use the note's wording \
+class.
+5. Patient expectation — ONE sentence, ONLY if the note contains a \
+"Patient's expectations:" entry; cite that line. If there is no such \
+entry, omit this entirely — never invent it.
+6. Close — at most one neutral sentence ("Thank you for seeing him."). \
+Nothing else.
+
+Hard rules:
+- NEVER state or imply a diagnosis or differential, yours or the GP's. \
+The selection of facts carries the differential; the letter must not \
+name it. The note's Assessment section is withheld and must not be \
+cited.
+- No advice to the consultant: nothing that reads as directing \
+specialist management, no "please arrange X", no restating the GP's \
+actions as instructions.
+- Your ONLY source is the numbered APPROVED CONSULTATION NOTE. Each \
+paragraph's `note_lines` lists the line number(s) it draws on; every \
+clinical statement must come from those lines. Do not add findings, \
+doses, dates, or history the note does not contain — where something is \
+missing, omit it or write exactly "[to be completed by the referring \
+doctor]".
 - Do NOT write the salutation, the "Re:" line, or the sign-off — only \
-the body paragraphs. A short courtesy closing sentence is fine.
+the body paragraphs.
 
 Fill `reasoning` first (under 60 words). Output JSON only.\
 """
@@ -184,8 +239,47 @@ def note_lines(note_text: str) -> list[str]:
     return [line.strip() for line in note_text.splitlines() if line.strip()]
 
 
-def format_note_lines(lines: list[str]) -> str:
-    return "\n".join(f"[{i + 1}] {line}" for i, line in enumerate(lines))
+def line_sections(lines: list[str]) -> list[str | None]:
+    """Which SOAP section each line belongs to; heading lines are
+    'heading'. Lines before any heading are None (cite-able free text)."""
+    out: list[str | None] = []
+    current: str | None = None
+    for line in lines:
+        match = _HEADING.match(line)
+        if match:
+            key = match.group(1).lower()
+            current = _SECTION_KEY.get(key, key)
+            out.append("heading")
+        else:
+            out.append(current)
+    return out
+
+
+def citable_line_numbers(lines: list[str]) -> set[int]:
+    """1-based line numbers a letter may cite: Subjective, Objective, and
+    Plan content. NEVER Assessment (owner's rule: the letter presents the
+    evidence and lets the specialist draw the conclusion — a paragraph
+    grounded in the GP's stated differential would name it), and headings
+    carry no content to ground anything in."""
+    return {
+        i + 1 for i, section in enumerate(line_sections(lines))
+        if section not in ("assessment", "heading")
+    }
+
+
+def format_note_lines(lines: list[str], for_letter: bool = False) -> str:
+    """Numbered note. With for_letter, Assessment content is masked in the
+    model's copy — the drafting model never even sees the differential, so
+    it cannot leak what the citation gate would anyway reject. Numbering
+    is preserved so citations validate against the same indices."""
+    sections = line_sections(lines) if for_letter else None
+    out = []
+    for i, line in enumerate(lines):
+        text = line
+        if for_letter and sections[i] == "assessment":
+            text = "[assessment — withheld from referral letters]"
+        out.append(f"[{i + 1}] {text}")
+    return "\n".join(out)
 
 
 async def suggest_referrals(note_text: str) -> list[dict]:
@@ -198,11 +292,15 @@ async def suggest_referrals(note_text: str) -> list[dict]:
 
 
 def validate_letter(paragraphs: list[dict], lines: list[str],
-                    allowed_numbers: set[str] | None = None) -> dict:
+                    allowed_numbers: set[str] | None = None,
+                    citable: set[int] | None = None) -> dict:
     """Code-side grounding gate, the letter counterpart of
     notes.validate_and_gate. Per paragraph:
 
-    - citations must point at real note lines;
+    - citations must point at real, CITABLE note lines — Subjective /
+      Objective / Plan content only; a citation into the Assessment
+      section is discarded (owner's rule: the letter must not carry the
+      differential), so a paragraph grounded solely there is replaced;
     - a paragraph with clinical load-bearing content (numbers, dose units,
       laterality — the classes that hurt when invented) and no valid
       citations is replaced by the explicit placeholder;
@@ -210,10 +308,16 @@ def validate_letter(paragraphs: list[dict], lines: list[str],
       lines (or in allowed_numbers, e.g. the patient's age which code adds
       to the Re: line) — an unmatched number is an invented number, and
       the paragraph is replaced rather than trusted;
+    - tense fidelity for investigations: a result-class verb (performed /
+      showed / revealed…) whose cited lines carry only planned-class
+      wording (arranged / requested…) is an upgrade the note never made —
+      replaced;
     - a paragraph with no load-bearing content passes uncited only when it
       reads as courtesy boilerplate; otherwise it too must cite.
     """
     allowed = allowed_numbers or set()
+    if citable is None:
+        citable = citable_line_numbers(lines)
     out: list[str] = []
     total = grounded = placeholders = 0
     for para in paragraphs:
@@ -221,16 +325,18 @@ def validate_letter(paragraphs: list[dict], lines: list[str],
         if not text:
             continue
         total += 1
-        valid = [n for n in para.get("note_lines", []) if 1 <= n <= len(lines)]
+        valid = [n for n in para.get("note_lines", []) if n in citable]
         cited_text = " ".join(lines[n - 1] for n in valid)
         cited_numbers = set(_NUMBER.findall(cited_text)) | allowed
         numbers_ok = all(n in cited_numbers for n in _NUMBER.findall(text))
         needs_citation = bool(_LOAD_BEARING.search(text)) or not _BOILERPLATE.search(text)
-        if needs_citation and not valid:
-            out.append(PLACEHOLDER)
-            placeholders += 1
-            continue
-        if not numbers_ok:
+        tense_upgrade = bool(
+            valid
+            and _RESULT_WORDS.search(text)
+            and _PLANNED_WORDS.search(cited_text)
+            and not _RESULT_WORDS.search(cited_text)
+        )
+        if (needs_citation and not valid) or not numbers_ok or tense_upgrade:
             out.append(PLACEHOLDER)
             placeholders += 1
             continue
@@ -271,7 +377,7 @@ async def draft_letter(note_text: str, specialty: str, patient: dict,
     result = await _chat(
         LETTER_PROMPT,
         f"SPECIALTY: {specialty}\n\nAPPROVED CONSULTATION NOTE:\n"
-        + format_note_lines(lines),
+        + format_note_lines(lines, for_letter=True),
         LETTER_SCHEMA,
     )
     allowed = {str(patient["age"])} if patient.get("age") is not None else set()

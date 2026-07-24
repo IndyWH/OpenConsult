@@ -15,8 +15,8 @@ from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
 from app import audit, auth, consultations, letters
-from app.letters import (PLACEHOLDER, assemble_letter, note_lines,
-                         validate_letter)
+from app.letters import (PLACEHOLDER, assemble_letter, citable_line_numbers,
+                         format_note_lines, note_lines, validate_letter)
 
 load_dotenv()
 
@@ -79,6 +79,57 @@ def test_uncited_non_boilerplate_prose_becomes_placeholder():
         [{"text": "He has a strong family history of ischaemic heart disease.",
           "note_lines": []}], LINES)
     assert result["body_paragraphs"] == [PLACEHOLDER]
+
+
+# --------- owner's letter framework (REFERRAL_LETTER_STYLE.md addendum)
+
+FULL_NOTE = note_lines(
+    "S:\n  Chest tightness on exertion for two weeks.\n"
+    "A:\n  Concern for angina.\n"
+    "P:\n  An ECG was arranged today.\n  Refer cardiology.")
+# 1 "S:" | 2 tightness | 3 "A:" | 4 angina | 5 "P:" | 6 ECG arranged | 7 refer
+
+
+def test_assessment_and_heading_lines_are_not_citable():
+    assert citable_line_numbers(FULL_NOTE) == {2, 6, 7}
+
+
+def test_paragraph_grounded_only_in_assessment_becomes_placeholder():
+    # The gate is the guarantee that a letter never carries the
+    # differential: "angina" lives only in the Assessment section.
+    result = validate_letter(
+        [{"text": "There is concern for angina.", "note_lines": [4]}], FULL_NOTE)
+    assert result["body_paragraphs"] == [PLACEHOLDER]
+    assert "angina" not in " ".join(result["body_paragraphs"])
+
+
+def test_assessment_masked_in_model_input_but_numbering_kept():
+    masked = format_note_lines(FULL_NOTE, for_letter=True)
+    assert "angina" not in masked            # the model never sees the differential
+    assert "[4] [assessment — withheld from referral letters]" in masked
+    assert "[6] An ECG was arranged today." in masked  # numbering unchanged
+
+
+def test_tense_upgrade_arranged_to_performed_becomes_placeholder():
+    # QA finding on the #66 letter: planned ≠ performed ≠ resulted.
+    result = validate_letter(
+        [{"text": "An ECG was performed and showed no ischaemia.",
+          "note_lines": [6]}], FULL_NOTE)
+    assert result["body_paragraphs"] == [PLACEHOLDER]
+
+
+def test_planned_wording_kept_when_note_says_planned():
+    result = validate_letter(
+        [{"text": "An ECG was arranged today.", "note_lines": [6]}], FULL_NOTE)
+    assert result["body_paragraphs"] == ["An ECG was arranged today."]
+
+
+def test_result_wording_allowed_when_note_records_a_result():
+    lines = note_lines("O:\n  ECG performed: sinus rhythm, no acute changes.")
+    result = validate_letter(
+        [{"text": "An ECG performed today showed sinus rhythm.",
+          "note_lines": [2]}], lines)
+    assert result["body_paragraphs"] == ["An ECG performed today showed sinus rhythm."]
 
 
 def test_assemble_letter_uses_server_demographics():
