@@ -34,7 +34,7 @@ def test_cited_paragraph_passes():
         [{"text": "He reports chest tightness since last night.", "note_lines": [2]}],
         LINES)
     assert result["body_paragraphs"] == ["He reports chest tightness since last night."]
-    assert result["paragraphs_grounded"] == 1
+    assert result["sentences_grounded"] == 1
     assert result["placeholders"] == 0
 
 
@@ -63,7 +63,7 @@ def test_allowed_numbers_cover_code_supplied_demographics():
     result = validate_letter(
         [{"text": "I would be grateful for your review of this 54-year-old.",
           "note_lines": [2]}], LINES, allowed_numbers={"54"})
-    assert result["paragraphs_grounded"] == 1
+    assert result["sentences_grounded"] == 1
 
 
 def test_courtesy_boilerplate_passes_uncited():
@@ -130,6 +130,54 @@ def test_result_wording_allowed_when_note_records_a_result():
         [{"text": "An ECG performed today showed sinus rhythm.",
           "note_lines": [2]}], lines)
     assert result["body_paragraphs"] == ["An ECG performed today showed sinus rhythm."]
+
+
+def test_validation_is_sentence_level_not_paragraph_level():
+    # Seen on the #66 regen: the model under-cited one line and the whole
+    # history paragraph died. A bad sentence now costs itself only.
+    result = validate_letter(
+        [{"text": "He reports chest tightness since last night. "
+                  "Episodes last 5-10 minutes.",
+          "note_lines": [2]}], LINES)
+    assert result["body_paragraphs"] == [
+        "He reports chest tightness since last night. " + PLACEHOLDER]
+    assert result["sentences_grounded"] == 1
+    assert result["placeholders"] == 1
+
+
+def test_adjacent_failing_sentences_collapse_to_one_placeholder():
+    result = validate_letter(
+        [{"text": "Episodes last 5-10 minutes. His BP was 180/110. "
+                  "He reports chest tightness since last night.",
+          "note_lines": [2]}], LINES)
+    assert result["body_paragraphs"] == [
+        PLACEHOLDER + " He reports chest tightness since last night."]
+    assert result["placeholders"] == 2
+
+
+ICE_NOTE = note_lines(
+    "S:\n  Cough for three weeks.\n  Patient's expectations: hoping for a chest X-ray.\n"
+    "P:\n  Refer respiratory clinic.")
+# 1 "S:" | 2 cough | 3 expectations | 4 "P:" | 5 refer
+
+
+def test_invented_expectation_is_dropped_not_placeholdered():
+    # Seen on the #66 regen: "Patient wants investigation of his chest
+    # pain" invented from a Plan line. No ICE bullet → no sentence.
+    result = validate_letter(
+        [{"text": "The patient was hoping for further investigation.",
+          "note_lines": [5]}], ICE_NOTE)
+    assert result["body_paragraphs"] == []
+    assert result["dropped_expectations"] == 1
+    assert result["placeholders"] == 0
+
+
+def test_expectation_kept_when_note_records_it():
+    result = validate_letter(
+        [{"text": "He is hoping for a chest X-ray.", "note_lines": [3]}],
+        ICE_NOTE)
+    assert result["body_paragraphs"] == ["He is hoping for a chest X-ray."]
+    assert result["dropped_expectations"] == 0
 
 
 def test_assemble_letter_uses_server_demographics():

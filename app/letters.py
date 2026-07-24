@@ -57,6 +57,16 @@ _PLANNED_WORDS = re.compile(
     r"will be|to be done)\b", re.IGNORECASE,
 )
 
+# Expectation-class sentences may exist ONLY when the note records the
+# patient's expectations (the ICE bullet): seen live on the #66 regen —
+# the model invented "Patient wants investigation of his chest pain"
+# from a Plan line. No bullet → no sentence, dropped not placeholdered.
+_EXPECTATION_CLASS = re.compile(
+    r"patient'?s expectations|patient (?:wants|would like|hopes|expects|"
+    r"was hoping|is hoping)", re.IGNORECASE,
+)
+_EXPECTATION_LINE = re.compile(r"^patient'?s expectations\s*:", re.IGNORECASE)
+
 # The approved note's plain-text section headings, as the review UI
 # serialises them ("S:" … "P:"; long forms tolerated defensively).
 _HEADING = re.compile(
@@ -295,8 +305,14 @@ def validate_letter(paragraphs: list[dict], lines: list[str],
                     allowed_numbers: set[str] | None = None,
                     citable: set[int] | None = None) -> dict:
     """Code-side grounding gate, the letter counterpart of
-    notes.validate_and_gate. Per paragraph:
+    notes.validate_and_gate. Validation is per SENTENCE (owner's spec:
+    "every clinical sentence traceable to the note"), each sentence
+    checked against its paragraph's cited lines — a bad sentence costs
+    itself, not its paragraph. Rules:
 
+    - an expectation-class sentence is kept only when the paragraph cites
+      a "Patient's expectations:" note line (the ICE bullet); otherwise
+      it is DROPPED entirely — no bullet, no sentence;
     - citations must point at real, CITABLE note lines — Subjective /
       Objective / Plan content only; a citation into the Assessment
       section is discarded (owner's rule: the letter must not carry the
@@ -304,10 +320,10 @@ def validate_letter(paragraphs: list[dict], lines: list[str],
     - a paragraph with clinical load-bearing content (numbers, dose units,
       laterality — the classes that hurt when invented) and no valid
       citations is replaced by the explicit placeholder;
-    - every number in a paragraph must literally appear in its cited note
+    - every number in a sentence must literally appear in the cited note
       lines (or in allowed_numbers, e.g. the patient's age which code adds
       to the Re: line) — an unmatched number is an invented number, and
-      the paragraph is replaced rather than trusted;
+      the sentence is replaced rather than trusted;
     - tense fidelity for investigations: a result-class verb (performed /
       showed / revealed…) whose cited lines carry only planned-class
       wording (arranged / requested…) is an upgrade the note never made —
@@ -319,34 +335,56 @@ def validate_letter(paragraphs: list[dict], lines: list[str],
     if citable is None:
         citable = citable_line_numbers(lines)
     out: list[str] = []
-    total = grounded = placeholders = 0
+    total = grounded = placeholders = dropped_expectations = 0
     for para in paragraphs:
         text = para["text"].strip()
         if not text:
             continue
-        total += 1
         valid = [n for n in para.get("note_lines", []) if n in citable]
         cited_text = " ".join(lines[n - 1] for n in valid)
         cited_numbers = set(_NUMBER.findall(cited_text)) | allowed
-        numbers_ok = all(n in cited_numbers for n in _NUMBER.findall(text))
-        needs_citation = bool(_LOAD_BEARING.search(text)) or not _BOILERPLATE.search(text)
-        tense_upgrade = bool(
-            valid
-            and _RESULT_WORDS.search(text)
-            and _PLANNED_WORDS.search(cited_text)
-            and not _RESULT_WORDS.search(cited_text)
+        cites_expectation_line = any(
+            _EXPECTATION_LINE.match(lines[n - 1]) for n in valid
         )
-        if (needs_citation and not valid) or not numbers_ok or tense_upgrade:
-            out.append(PLACEHOLDER)
-            placeholders += 1
-            continue
-        grounded += 1
-        out.append(text)
+        # Sentence-level, per the owner's spec ("every clinical sentence
+        # traceable"): one bad sentence costs itself, not the paragraph.
+        # All sentences share the paragraph's cited lines.
+        kept: list[str] = []
+        for sentence in re.split(r"(?<=[.!?])\s+", text):
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+            total += 1
+            if _EXPECTATION_CLASS.search(sentence) and not cites_expectation_line:
+                # An expectation the note never recorded is an invention;
+                # the rule is omission ("no bullet → no sentence"), not a
+                # placeholder inviting the doctor to fill it in.
+                dropped_expectations += 1
+                continue
+            numbers_ok = all(n in cited_numbers for n in _NUMBER.findall(sentence))
+            needs_citation = (bool(_LOAD_BEARING.search(sentence))
+                              or not _BOILERPLATE.search(sentence))
+            tense_upgrade = bool(
+                valid
+                and _RESULT_WORDS.search(sentence)
+                and _PLANNED_WORDS.search(cited_text)
+                and not _RESULT_WORDS.search(cited_text)
+            )
+            if (needs_citation and not valid) or not numbers_ok or tense_upgrade:
+                placeholders += 1
+                if not kept or kept[-1] != PLACEHOLDER:  # collapse runs
+                    kept.append(PLACEHOLDER)
+                continue
+            grounded += 1
+            kept.append(sentence)
+        if kept:
+            out.append(" ".join(kept))
     return {
         "body_paragraphs": out,
-        "paragraphs_total": total,
-        "paragraphs_grounded": grounded,
+        "sentences_total": total,
+        "sentences_grounded": grounded,
         "placeholders": placeholders,
+        "dropped_expectations": dropped_expectations,
     }
 
 
@@ -386,7 +424,8 @@ async def draft_letter(note_text: str, specialty: str, patient: dict,
     return {
         "body": body,
         "grounding": {k: validated[k] for k in
-                      ("paragraphs_total", "paragraphs_grounded", "placeholders")},
+                      ("sentences_total", "sentences_grounded", "placeholders",
+                       "dropped_expectations")},
     }
 
 
