@@ -25,7 +25,7 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 57 tests; heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 103 tests; heavy ones self-skip if Ollama/Postgres/
   corpus are absent. Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
@@ -699,7 +699,9 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
 The app is reachable from the project owner's other devices over their
 private tailnet at **https://mlrig.tail93fa1d.ts.net** — HTTPS is
 mandatory for remote microphone access (browsers only allow getUserMedia
-on secure origins). Nothing is exposed to the public internet.
+on secure origins). Since 2026-07-24 the app is ALSO reachable from the
+public internet via Tailscale Funnel (owner's decision, external demo) —
+see the public-exposure posture section below.
 
 How the pieces fit (each is required):
 
@@ -721,6 +723,57 @@ How the pieces fit (each is required):
    port 8000. The config persists across reboots; it needed a one-time
    "enable Serve" approval in the admin console. WebSockets are proxied
    fine; live.html already picks wss:// under https.
+
+## Public-exposure posture (Tailscale Funnel, 2026-07-24)
+
+The owner exposed the app to the public internet via Tailscale Funnel
+for the external demo. Everything below exists because of that; the
+defence layers, outermost first:
+
+- **The logged-in wall** stands everywhere except `GET /api/monitor/pulse`
+  (deliberate, aggregate-only — see the monitoring-pulse section).
+- **Approve-to-activate registration**: a public registrant gets an
+  inactive account until the admin approves it in the Users view (see
+  the admin-governance section). Approval is the gate: an approved
+  public account has real clinical-role access, including the single
+  live-consultation slot — approve only people you know.
+- **Per-IP rate limits** on login and registration (`app/ratelimit.py`,
+  env-tunable, clear 429 + Retry-After). `client_ip` trusts
+  X-Forwarded-For only when the direct peer is loopback, which is where
+  Tailscale Serve/Funnel terminates — direct peers cannot spoof it.
+- **Source-IP forensics**: `user.login` / `user.login_failed` (new; has
+  the typed username + reason) / `user.registered_pending` audit events
+  all carry `ip` in their detail.
+- **Test isolation**: pytest runs in a disposable `consultation_ai_test`
+  database and can no longer create accounts (or anything else) in the
+  live one.
+- **Repo visibility**: verified PRIVATE on GitHub 2026-07-24
+  (`gh repo view --json visibility`) — an earlier assumption that the
+  fixed test password was world-readable was wrong; it is still a
+  shared fixed string, hence the sweep below.
+
+**Outstanding (owner action): sweep the legacy junk accounts.** 489
+pre-isolation test accounts (incl. ~131 admins) are still ACTIVE in the
+live DB, all named `role_8hex` with the shared password
+`test-password-123`. With test isolation in place they will never be
+recreated, so one bulk deactivation ends it permanently. Run in psql as
+`consultation_app` (the assistant's harness refuses bulk UPDATEs):
+
+```sql
+WITH d AS (UPDATE app_user SET active=false
+  WHERE active AND username ~ '^[a-z]+_[0-9a-f]{8}$'
+    AND username NOT IN ('doctor','herath','receptionist','vicky')
+  RETURNING id)
+INSERT INTO audit_event (user_id, action, subject_type, detail)
+SELECT NULL, 'user.deactivated', 'user',
+  jsonb_build_object('bulk', true, 'reason',
+    'legacy test-junk sweep after public exposure', 'count', count(*))
+FROM d;
+```
+
+Known non-test accounts (owner-confirmed 2026-07-24): `doctor` (admin),
+`receptionist`, `herath`, `vicky`, and invited demo user
+`JoydeepSinha1988`.
 
 ## After-reboot startup sequence
 
