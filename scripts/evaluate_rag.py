@@ -27,17 +27,24 @@ from app.rag import RAGService
 
 OUT_PATH = Path(__file__).parent.parent / "evals" / "rag_results.json"
 
-# (label, conditions as the CDS layer produces them, expected source keyword)
+# (label, conditions as the CDS layer produces them, expected source keyword —
+#  a tuple means any of the keywords is an acceptable top-cited source)
 IN_CORPUS = [
-    ("chest pain (script 01)", ["Stable Angina", "Acute Coronary Syndrome (ACS)"], "chest pain"),
+    # Corpus v2026-07-24.1 added CG126 (stable angina management), the more
+    # specific match for the "Stable Angina" condition; CG95 (chest pain
+    # assessment) is still retrieved alongside it. Either topping the
+    # citations is correct.
+    ("chest pain (script 01)", ["Stable Angina", "Acute Coronary Syndrome (ACS)"], ("chest pain", "angina")),
     ("dyspepsia (script 05)", ["Peptic ulcer disease", "NSAID-related gastritis"], "dyspepsia"),
     ("dengue child (script 02)", ["Dengue fever", "Viral fever"], "dengue"),
     ("asthma (script 04)", ["Poorly controlled asthma"], "asthma"),
     ("diabetes (script 03)", ["Diabetic Peripheral Neuropathy", "Poorly Controlled Diabetes Mellitus"], "diabetes"),
+    # Moved from OUT_OF_CORPUS at corpus v2026-07-24.1: the expansion added
+    # NG128 (stroke/TIA) and NG196 (AF), so a covered answer is now correct.
+    ("TIA (script 06)", ["Transient ischaemic attack", "Atrial fibrillation"], "stroke"),
 ]
 
 OUT_OF_CORPUS = [
-    ("TIA (script 06)", ["Transient ischaemic attack", "Atrial fibrillation"]),
     ("torsion (script 10)", ["Testicular torsion"]),
     ("unrelated specialty", ["Postpartum haemorrhage"]),
     ("non-medical", ["Cricket batting technique"]),
@@ -51,7 +58,8 @@ async def main() -> None:
     for label, conditions, expected_source in IN_CORPUS:
         answer = await svc.answer_for_conditions(conditions)
         top_source = answer["citations"][0]["source"].lower() if answer["citations"] else ""
-        ok = answer["covered"] and bool(answer["citations"]) and expected_source in top_source
+        accepted = (expected_source,) if isinstance(expected_source, str) else expected_source
+        ok = answer["covered"] and bool(answer["citations"]) and any(k in top_source for k in accepted)
         results.append(
             {
                 "case": label,
