@@ -145,3 +145,50 @@ ollama pull embeddinggemma
 uv run python scripts/ingest_guidelines.py
 uv run python scripts/evaluate_rag.py
 ```
+
+## Addendum 2026-07-24 — corpus expanded for public demo; eval re-run
+
+The corpus grew from 7 sources / ~250 chunks (five mock-script topics) to
+**38 sources / 1301 chunks** (corpus v2026-07-24.1) covering the
+presentations external demo users are likely to record — common UK
+primary-care topics plus dengue. See `corpus/manifest.yaml` for the full
+list and the new validation convention: every source now carries
+`expect_title` (checked at fetch time; a redirect to a different page is
+a fetch failure) and 2–3 `expected_queries` that must retrieve a chunk
+from their own source within the global top 8 at similarity ≥ 0.45, or
+ingestion exits non-zero. All 82 expected queries passed (almost all at
+global rank 1, sims 0.57–0.79) — no NG28-vs-CG173-class crowding.
+
+Verified-at-fetch findings (the NG28 lesson recurring): NG51 (sepsis) is
+replaced by NG253/NG254/NG255 — NG253+NG254 ingested; NG138 (CAP) is
+replaced by NG250 — NG250 ingested; both guidelines' /Recommendations
+URLs silently redirect to research-only chapters, so clinical chapters
+are listed explicitly. The BSR giant cell arteritis full text
+(academic.oup.com) blocks automated fetch (403, also via the BSR site);
+the NICE CKS GCA topic — written from that BSR guideline — is ingested
+as its retrievable equivalent. No NICE guideline exists for
+iron-deficiency anaemia or adult eczema management; CKS topics fill both.
+
+Eval changes with the expanded corpus (both are corrections of
+expectations that only held while the corpus was tiny, not regressions):
+
+- **TIA (script 06) moved from OUT_OF_CORPUS to IN_CORPUS** — NG128
+  (stroke/TIA) and NG196 (AF) are now in corpus, so a covered answer is
+  correct. It passes: top-cited NG128, 4 valid citations.
+- **Chest pain (script 01) now accepts CG126 or CG95 as top-cited** —
+  the case queries conditions "Stable Angina" + "ACS"; with a dedicated
+  stable-angina guideline (CG126) in corpus it correctly tops the
+  citations, and CG95 (assessment) is still cited alongside (2+2
+  passages — the per-source cap keeping the set diverse).
+
+**Result: 9/9** (6 in-corpus covered with valid citations and the right
+top source; 3 out-of-corpus refused, all at the retrieval floor).
+Raw per-case JSON: `rag_results.json` (regenerated).
+
+End-to-end spot-checks of three new topics via the live chain
+(transcript → CDS conditions → guideline panel): script 13 migraine
+(CG150, incl. medication-overuse criteria), script 14 GCA (CKS/BSR
+source for GCA suspicion features + ultrasound/biopsy, CG150/CG173
+cross-cited for the rest of the differential), manual hypertension query
+(NG136 targets/white-coat + NG203 CKD blood-pressure crossover). All
+claims cited; no uncited assertions observed.

@@ -7,10 +7,10 @@
    "Acute Coronary Syndrome (ACS)"
   ],
   "covered": true,
-  "top_similarity": 0.596,
-  "n_citations": 2,
-  "top_cited_source": "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)",
-  "summary_first_120": "For suspected ACS, initiate management immediately without delaying hospital transfer [1]. Offer pain relief with GTN or",
+  "top_similarity": 0.667,
+  "n_citations": 4,
+  "top_cited_source": "Stable angina: management (CG126)",
+  "summary_first_120": "For stable angina, consider aspirin 75 mg daily [1], ACE inhibitors if diabetic [1], statins [1], and hypertension treat",
   "verdict": "PASS"
  },
  {
@@ -22,9 +22,9 @@
   ],
   "covered": true,
   "top_similarity": 0.608,
-  "n_citations": 2,
+  "n_citations": 4,
   "top_cited_source": "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)",
-  "summary_first_120": "For peptic ulcer disease, offer full-dose PPI or H2RA therapy for 4 to 8 weeks to people who have tested negative for H ",
+  "summary_first_120": "For peptic ulcer disease (PUD), consider a COX-2 selective NSAID instead of a standard NSAID if NSAID continuation is ne",
   "verdict": "PASS"
  },
  {
@@ -36,9 +36,9 @@
   ],
   "covered": true,
   "top_similarity": 0.652,
-  "n_citations": 4,
+  "n_citations": 6,
   "top_cited_source": "Dengue and severe dengue \u2014 fact sheet",
-  "summary_first_120": "Dengue is a viral infection transmitted by mosquitoes [1][2]. Most infections are asymptomatic or mild, but severe dengu",
+  "summary_first_120": "Dengue is a viral infection transmitted by mosquitoes, common in tropical/subtropical areas [1][2]. Symptoms include hig",
   "verdict": "PASS"
  },
  {
@@ -70,16 +70,16 @@
  },
  {
   "case": "TIA (script 06)",
-  "kind": "out-of-corpus",
+  "kind": "in-corpus",
   "conditions": [
    "Transient ischaemic attack",
    "Atrial fibrillation"
   ],
-  "covered": false,
-  "top_similarity": 0.353,
-  "n_citations": 0,
-  "refusal_layer": "retrieval floor",
-  "summary_first_120": "The local guideline corpus does not cover this topic.",
+  "covered": true,
+  "top_similarity": 0.592,
+  "n_citations": 4,
+  "top_cited_source": "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+  "summary_first_120": "For acute ischaemic stroke within 4.5 hours, administer alteplase or tenecteplase in an organised stroke service with tr",
   "verdict": "PASS"
  },
  {
@@ -89,7 +89,7 @@
    "Testicular torsion"
   ],
   "covered": false,
-  "top_similarity": 0.213,
+  "top_similarity": 0.221,
   "n_citations": 0,
   "refusal_layer": "retrieval floor",
   "summary_first_120": "The local guideline corpus does not cover this topic.",
@@ -102,7 +102,7 @@
    "Postpartum haemorrhage"
   ],
   "covered": false,
-  "top_similarity": 0.314,
+  "top_similarity": 0.373,
   "n_citations": 0,
   "refusal_layer": "retrieval floor",
   "summary_first_120": "The local guideline corpus does not cover this topic.",
@@ -115,7 +115,7 @@
    "Cricket batting technique"
   ],
   "covered": false,
-  "top_similarity": 0.167,
+  "top_similarity": 0.213,
   "n_citations": 0,
   "refusal_layer": "retrieval floor",
   "summary_first_120": "The local guideline corpus does not cover this topic.",

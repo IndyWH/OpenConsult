@@ -38,7 +38,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 1 — Streaming transcription | **Done** | Voice-tested; lag inside the 2–5 s target. |
 | 2 — Post-consultation note | **Done, real-audio validation begun** | Full pipeline + review UI + eval. The 2026-07-12 recordings ran through the full live→Stop→review pipeline as they were made (five consultations; three approved, two awaiting review as of that date) — diarisation and notes held up in use; the formal check against marking schemes + a real-audio section in the note-quality eval are still to do. |
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
-| 4 — RAG guidelines | **Done** | 9/9 eval; fidelity spot-check logged; corpus is UK/CDC/WHO starter content. |
+| 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **Recordings eval run (2026-07-12); decision pending adjudication** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). Owner's transliteration adjudication pending (`evals/adjudication_03_si_worksheet.md`); fine-tune fallback squarely in scope. See `evals/2026-07-12_sinhala_asr_recordings_eval.md`. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
 
@@ -119,6 +119,32 @@ cross-referenced content (the NG28-vs-CG173 finding). The corpus is
 gitignored; `corpus/manifest.yaml` + `scripts/ingest_guidelines.py`
 rebuild it. Chunking is section-based with heading trails, list items
 kept with their stems, never mid-sentence (`app/chunking.py`).
+
+**Corpus scope + ingestion validation (2026-07-24 expansion):** the
+corpus grew from the five mock-script topics to 38 sources / 1301 chunks
+covering the presentations external demo users are likely to record
+(cardiovascular, respiratory/ENT, urinary, MSK/neuro, mental health,
+endocrine/renal/haematology, skin, women's health, paediatrics, sepsis,
+dengue) — the app is publicly demoable and common topics should retrieve
+rather than refuse. Content is third-party (NICE/CKS/CDC/WHO), local
+research use only, never committed or redistributed; the committed
+manifest is the provenance record. **Validation convention** (the NG28
+lesson, now enforced in code): every manifest source carries
+`expect_title` — checked against each fetched page's `<title>`, with any
+redirect to a different page treated as a fetch failure — and 2–3
+`expected_queries`, each of which must retrieve a chunk from its own
+source within the global top 8 at similarity ≥ the refusal floor after
+ingestion, or `ingest_guidelines.py` exits non-zero listing every failed
+source. The expansion itself caught three instances of guideline drift:
+NG51 (sepsis) replaced by NG253/NG254, NG138 (CAP) replaced by NG250,
+and both replacements' /Recommendations URLs silently redirecting to
+research-only chapters. Where no NICE guideline exists, CKS topics fill
+in (iron-deficiency anaemia, adult eczema, giant cell arteritis — the
+CKS GCA topic is written from the BSR guideline, whose full text on
+academic.oup.com blocks automated fetch). Eval expectation changes that
+came with coverage (documented in the eval record addendum): TIA is now
+an in-corpus case, and the chest-pain case accepts CG126 or CG95 as
+top-cited.
 
 **Note citation architecture (app/notes.py):** same pattern as RAG —
 every SOAP claim cites transcript turn numbers, validated in code,
