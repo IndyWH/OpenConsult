@@ -70,7 +70,16 @@ per entry.
 
 Sections:
 - subjective: history as the patient gave it — symptoms, timeline, risk \
-factors, medications, relevant negatives.
+factors, medications, relevant negatives. IF (and only if) the \
+transcript contains them, END this section with the patient's ICE as up \
+to three labelled entries, in this order: "Patient's ideas: …" (what \
+they think is going on), "Patient's concerns: …" (what they are worried \
+about), "Patient's expectations: …" (what they hoped for from the \
+visit — a test, a referral, reassurance, a certificate). ICE is what \
+the PATIENT volunteered or answered, never what the doctor proposed or \
+offered. Each ICE entry cites its turns like any claim. If the \
+transcript has no ICE content, omit the labelled entries entirely — no \
+"not elicited" filler.
 - objective: examination findings and measurements actually stated.
 - assessment: the diagnoses/impressions THE DOCTOR stated or clearly \
 implied in the consultation — do not add your own.
