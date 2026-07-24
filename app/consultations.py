@@ -33,6 +33,11 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS doctor_id int;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS voided_at timestamptz;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS voided_by int;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS void_reason text;
+-- Audio retention (plan §8): research flag exempts a recording from the
+-- retention sweep; audio_deleted_at records that the sweep removed it
+-- (audio only — transcripts and notes are never deleted by retention).
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS keep_for_research boolean NOT NULL DEFAULT false;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS audio_deleted_at timestamptz;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -114,7 +119,8 @@ async def list_consultations(
         rows = await (
             await conn.execute(
                 "SELECT c.id, c.started_at, c.status, p.name, u.display_name,"
-                " c.voided_at, c.void_reason, v.display_name"
+                " c.voided_at, c.void_reason, v.display_name,"
+                " c.audio_path, c.keep_for_research, c.audio_deleted_at"
                 " FROM consultation c"
                 " LEFT JOIN patient p ON p.id = c.patient_id"
                 " LEFT JOIN app_user u ON u.id = c.doctor_id"
@@ -128,9 +134,30 @@ async def list_consultations(
         {"id": r[0], "started_at": str(r[1])[:16], "status": r[2],
          "patient_name": r[3] or "—", "doctor_name": r[4] or "—",
          "voided_at": str(r[5])[:16] if r[5] else None,
-         "void_reason": r[6], "voided_by": r[7]}
+         "void_reason": r[6], "voided_by": r[7],
+         "audio_path": r[8], "keep_for_research": r[9],
+         "audio_deleted_at": str(r[10])[:16] if r[10] else None}
         for r in rows
     ]
+
+
+async def set_audio_path(cid: int, path: str) -> None:
+    """Post-approval FLAC compression updates the stored location."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET audio_path = %s WHERE id = %s", (path, cid)
+        )
+
+
+async def set_keep_for_research(cid: int, value: bool) -> bool:
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET keep_for_research = %s WHERE id = %s"
+                " RETURNING id", (value, cid),
+            )
+        ).fetchone()
+    return row is not None
 
 
 async def set_status(cid: int, status: str, *, audio_path: str | None = None,

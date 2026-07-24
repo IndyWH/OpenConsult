@@ -306,6 +306,28 @@ Built after the Phase 6 verification, admin-only, all 403-tested:
   two deliberate steps by design. Tests: `tests/test_admin.py`
   (RBAC, last-admin guard via rolled-back transaction, void-then-purge).
 
+## Audio retention (2026-07-24, plan §8)
+
+`app/retention.py`; tests `tests/test_retention.py`. Audio ONLY — the
+sweep never touches transcripts or notes.
+
+- **On approval** the consultation's WAV is compressed to lossless FLAC
+  (16-bit PCM, sample rate untouched, bit-exact round-trip tested);
+  best-effort, approval never fails on compression.
+- **Retention sweep** runs at startup and daily (lifespan task): deletes
+  audio older than `AUDIO_RETENTION_DAYS` (env, default 90) unless the
+  consultation is flagged **keep_for_research** (admin checkbox in the
+  Consultations view; audit `consultation.keep_for_research`). Deleted
+  rows get `audio_deleted_at` stamped and show "purged (retention)".
+  Audit per sweep: `data.audio_purged` {consultation_ids, bytes_freed}.
+- Admin Consultations view shows per-recording size and a total-disk
+  line. `keep_for_research`/`audio_deleted_at`/sizes are admin-only
+  (stripped from the shared worklist payload).
+- **Test-safety convention:** `sweep_expired_audio(only_ids=…)` — tests
+  MUST scope the sweep (same rule as `purge_voided`); an unscoped sweep
+  in a test would delete real recordings the day they age past the
+  window.
+
 ## Phase 6 — agreed UI structure (do not re-litigate)
 
 Three tabs, mirroring a Sri Lankan GP surgery:

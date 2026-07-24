@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk, letters
+from app import audit, auth, consultations, frontdesk, letters, retention
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
@@ -58,7 +58,9 @@ async def lifespan(app: FastAPI):
     app.state.cds_engine = CDSEngine()
     app.state.rag = RAGService()
     app.state.finalize_tasks = set()  # keep refs so tasks aren't GC'd mid-run
+    app.state.retention_task = asyncio.create_task(retention.retention_loop())
     yield
+    app.state.retention_task.cancel()
 
 app = FastAPI(
     title="Consultation AI",
@@ -230,8 +232,34 @@ async def admin_reactivate_user(
 
 @app.get("/api/admin/consultations")
 async def admin_consultations(user: dict = Depends(api_user("admin"))) -> list[dict]:
-    """All consultations, any status or doctor, voided included."""
-    return await consultations.list_consultations(include_voided=True)
+    """All consultations, any status or doctor, voided included — plus
+    per-recording disk usage for the retention view."""
+    rows = await consultations.list_consultations(include_voided=True)
+    for row in rows:
+        size = None
+        if row["audio_path"]:
+            with contextlib.suppress(OSError):
+                size = os.path.getsize(row["audio_path"])
+        row["audio_bytes"] = size
+        del row["audio_path"]  # server filesystem detail, size is the point
+    return rows
+
+
+class KeepBody(BaseModel):
+    value: bool
+
+
+@app.post("/api/admin/consultations/{cid}/keep-for-research")
+async def admin_keep_for_research(
+    cid: int, body: KeepBody, user: dict = Depends(api_user("admin"))
+) -> JSONResponse:
+    """Exempts (or re-includes) a recording from the retention sweep.
+    Audio-governance flag only — clinical content is unaffected."""
+    if not await consultations.set_keep_for_research(cid, body.value):
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    await audit.log(user["id"], "consultation.keep_for_research",
+                    "consultation", cid, {"value": body.value})
+    return JSONResponse(content={"ok": True})
 
 
 class VoidBody(BaseModel):
@@ -448,7 +476,10 @@ async def consultation_list(user: dict = Depends(api_user())) -> list[dict]:
     own consultations (plus unowned legacy rows); admin and receptionist
     behaviour unchanged (receptionist rows are status-only anyway)."""
     doctor_id = user["id"] if user["role"] == "doctor" else None
-    return await consultations.list_consultations(doctor_id=doctor_id)
+    rows = await consultations.list_consultations(doctor_id=doctor_id)
+    for row in rows:  # retention/audio fields are the admin view's concern
+        del row["audio_path"], row["keep_for_research"], row["audio_deleted_at"]
+    return rows
 
 
 @app.get("/review/{cid}")
@@ -540,6 +571,9 @@ async def approve(
         )
     await consultations.approve_note(cid, body.text)
     await audit.log(user["id"], "note.approved", "consultation", cid)
+    # Retention step 1 (plan §8): the signed consultation's WAV becomes a
+    # lossless FLAC. Best-effort — approval never fails on compression.
+    await retention.compress_on_approval(cid, consultation["audio_path"])
     return JSONResponse(content={"ok": True})
 
 

@@ -20,10 +20,12 @@
 <p class="hint" id="hint">Worklist and archive. Approved consultations are read-only.</p>
 <div class="pane">
 <table>
-  <thead><tr><th>#</th><th>Patient</th><th>Doctor</th><th>Started</th><th>Status</th><th></th></tr></thead>
+  <thead><tr><th>#</th><th>Patient</th><th>Doctor</th><th>Started</th><th>Status</th>
+    <th class="audiocol" style="display:none">Audio</th><th></th></tr></thead>
   <tbody id="rows"></tbody>
 </table>
 </div>
+<p class="hint" id="diskTotal" style="display:none"></p>
 
 <div class="err" id="err"></div>
 <button id="purge" class="small danger" style="display:none">Purge voided test data…</button>
@@ -33,6 +35,13 @@
 <script>
 let ME = null;
 const errEl = document.getElementById('err');
+
+function fmtBytes(n) {
+  if (n >= 1024 * 1024 * 1024) return (n / 1024 / 1024 / 1024).toFixed(2) + ' GB';
+  if (n >= 1024 * 1024) return (n / 1024 / 1024).toFixed(1) + ' MB';
+  if (n >= 1024) return (n / 1024).toFixed(0) + ' KB';
+  return n + ' B';
+}
 
 async function voidConsultation(cid) {
   const reason = prompt(`Void consultation #${cid} — reason (required):`);
@@ -74,6 +83,16 @@ async function load() {
     document.getElementById('purge').style.display = '';
   }
   const rows = await (await fetch(admin ? '/api/admin/consultations' : '/api/consultations')).json();
+  if (admin) {
+    for (const th of document.querySelectorAll('.audiocol')) th.style.display = '';
+    const totalBytes = rows.reduce((sum, c) => sum + (c.audio_bytes || 0), 0);
+    const withAudio = rows.filter(c => c.audio_bytes != null).length;
+    const diskEl = document.getElementById('diskTotal');
+    diskEl.style.display = '';
+    diskEl.textContent = `Recordings on disk: ${withAudio} file(s), ${fmtBytes(totalBytes)} total. ` +
+      'Retention: audio (never transcripts or notes) is deleted after the retention window ' +
+      'unless flagged “keep”. Approved consultations are stored as lossless FLAC.';
+  }
   const tbody = document.getElementById('rows');
   tbody.innerHTML = '';
   for (const c of rows) {
@@ -87,7 +106,32 @@ async function load() {
     tr.innerHTML =
       `<td>${c.id}</td>` +
       `<td><span class="${c.voided_at ? 'strike' : ''}">${c.patient_name}</span>${reason}</td>` +
-      `<td>${c.doctor_name}</td><td>${c.started_at}</td><td>${status}</td><td></td>`;
+      `<td>${c.doctor_name}</td><td>${c.started_at}</td><td>${status}</td>` +
+      (admin ? '<td class="audio"></td>' : '') + '<td></td>';
+    if (admin) {
+      const audioCell = tr.querySelector('.audio');
+      if (c.audio_bytes != null) {
+        audioCell.append(fmtBytes(c.audio_bytes) + ' ');
+        const keep = document.createElement('label');
+        keep.className = 'hint';
+        keep.title = 'Exempt this recording from the retention sweep';
+        const box = document.createElement('input');
+        box.type = 'checkbox'; box.style.width = 'auto';
+        box.checked = !!c.keep_for_research;
+        box.addEventListener('change', async () => {
+          const response = await fetch(`/api/admin/consultations/${c.id}/keep-for-research`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({value: box.checked})});
+          if (!response.ok) { errEl.textContent = (await response.json()).error || 'failed'; }
+          load();
+        });
+        keep.append(box, ' keep');
+        audioCell.appendChild(keep);
+      } else {
+        audioCell.textContent = c.audio_deleted_at
+          ? `purged ${c.audio_deleted_at} (retention)` : '—';
+      }
+    }
     const cell = tr.lastElementChild;
     if (clinical && !c.voided_at) {
       const a = document.createElement('a');
@@ -120,7 +164,7 @@ async function load() {
     }
     tbody.appendChild(tr);
   }
-  if (!rows.length) tbody.innerHTML = '<tr><td colspan="6" class="hint">No consultations yet.</td></tr>';
+  if (!rows.length) tbody.innerHTML = '<tr><td colspan="7" class="hint">No consultations yet.</td></tr>';
 }
 
 document.getElementById('purge').addEventListener('click', purgeVoided);
