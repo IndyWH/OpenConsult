@@ -3,118 +3,108 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Consultation AI — Note Review</title>
+<title>Consultation AI — Note review</title>
+<link rel="stylesheet" href="/static/theme.css">
 <style>
-  :root { color-scheme: light dark; }
-  * { box-sizing: border-box; }
-  body { font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
-         max-width: 1250px; margin: 0 auto; padding: 1.5rem; }
-  .banner { background: #fff3cd; color: #664d03; border: 1px solid #ffe69c;
-            border-radius: 8px; padding: .5rem .75rem; font-size: .85rem; margin-bottom: 1rem; }
-  @media (prefers-color-scheme: dark) {
-    .banner { background: #3a3000; color: #ffe69c; border-color: #665c00; }
-  }
-  h1 { font-size: 1.25rem; margin: 0 0 .25rem; }
-  #status { font-size: .85rem; opacity: .75; margin-bottom: 1rem; }
-  #status .badge { border-radius: 5px; padding: .1rem .5rem; font-weight: 600;
-                   background: #8883; margin-left: .3rem; }
-  #status .badge.approved { background: #1a7f3733; color: #1a7f37; }
-  .columns { display: grid; grid-template-columns: 3fr 2fr; gap: 1.25rem; }
-  @media (max-width: 900px) { .columns { grid-template-columns: 1fr; } }
-  .pane { border: 1px solid #8884; border-radius: 8px; padding: 1rem; }
-  .pane h2 { font-size: .8rem; text-transform: uppercase; letter-spacing: .05em;
-             opacity: .6; margin: 0 0 .5rem; }
-  h3.soap { font-size: .95rem; margin: 1rem 0 .3rem; }
-  h3.soap:first-of-type { margin-top: 0; }
-  .claim { margin: 0 0 .35rem; line-height: 1.5; }
+  .session-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .patient .name { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margin-right: .5rem; }
+  .patient .demo { color: var(--ink-soft); font-size: .95rem; }
+  .actions { margin-left: auto; display: flex; gap: .6rem; align-items: center; position: relative; }
+
+  /* urgency banner — acknowledge-gated */
+  .urgency { margin: 1rem 0 0; display: flex; gap: .9rem; align-items: flex-start; }
+  .urgency .icon { font-size: 1.1rem; color: var(--red); line-height: 1.4; }
+  .urgency h3 { margin: 0 0 .2rem; font-size: .95rem; color: var(--red); }
+  .urgency p { margin: 0; font-size: .86rem; color: var(--ink-soft); }
+  .urgency .when { font-size: .76rem; color: var(--ink-faint); }
+  .urgency ul { margin: .2rem 0 0; padding-left: 1.1rem; font-size: .9rem; }
+  .urgency li { font-weight: 600; margin-bottom: .2rem; }
+  .urgency .why { display: block; font-weight: 400; color: var(--ink-soft); font-size: .84rem; }
+  .urgency .ack { margin-left: auto; flex: none; align-self: center; }
+
+  /* SOAP note */
+  .soap h3 { font-family: var(--serif); font-size: 1.02rem; margin: 1rem 0 .35rem; }
+  .soap h3:first-child { margin-top: 0; }
+  .claim { margin: 0 0 .35rem; line-height: 1.5; font-size: .95rem; }
   .claim .text { outline: none; padding: .1rem .2rem; border-radius: 4px; }
-  .claim .text:focus { background: #8882; }
-  .claim.flagged .text { border-bottom: 2px dotted #ed6c02; }
-  .flagmark { color: #ed6c02; font-size: .8rem; cursor: help; }
-  .uncited { color: #b02a37; font-size: .75rem; }
-  .chip { font-size: .72rem; background: #8882; border-radius: 4px;
-          padding: .05rem .35rem; margin-left: .25rem; cursor: pointer;
-          font-variant-numeric: tabular-nums; }
-  .chip:hover { background: #1a7f3744; }
-  .controls { margin-top: 1rem; display: flex; gap: .6rem; flex-wrap: wrap; }
-  button { font-size: .92rem; padding: .45rem 1rem; border-radius: 7px;
-           border: 1px solid #888; cursor: pointer; background: transparent; }
-  button.primary { background: #1a7f37; border-color: #1a7f37; color: white; }
-  button:disabled { opacity: .5; cursor: not-allowed; }
-  #transcript { max-height: 75vh; overflow-y: auto; }
-  .turn { margin: 0 0 .5rem; font-size: .88rem; line-height: 1.45;
-          padding: .3rem .45rem; border-radius: 6px; }
-  .turn .who { font-weight: 700; }
-  .turn .ts { opacity: .45; font-size: .75rem; margin-left: .3rem;
-              font-variant-numeric: tabular-nums; }
-  .turn.doctor { background: #1a7f3711; }
-  .turn.lowconf { border-left: 3px solid #ed6c02; }
-  .turn.cited-highlight { background: #ed6c0233; }
-  .turn .ttext[contenteditable="true"]:focus { background: #8882; outline: none; }
-  .hint { font-size: .75rem; opacity: .55; margin: .4rem 0 .8rem; }
-  #urgentBanner {
-    border: 2px solid #d32f2f; background: #d32f2f14; border-radius: 8px;
-    padding: .75rem 1rem; margin-bottom: 1rem;
+  .claim .text:focus { background: #F3EDE6; }
+  .claim.flagged .text { border-bottom: 2px dotted var(--amber); }
+  .uncited { color: var(--red); font-size: .75rem; }
+  .note-foot {
+    display: flex; align-items: center; gap: .6rem; padding: .7rem 1.1rem;
+    border-top: 1px solid var(--line); font-size: .78rem; color: var(--ink-faint);
   }
-  #urgentBanner h2 { color: #d32f2f; font-size: .85rem; text-transform: uppercase;
-                     letter-spacing: .05em; margin: 0 0 .4rem; }
-  #urgentBanner li { font-weight: 600; margin-bottom: .3rem; }
-  #urgentBanner .why { font-weight: 400; display: block; opacity: .75; font-size: .85rem; }
-  #urgentBanner .fired { font-weight: 400; opacity: .6; font-size: .8rem;
-                         font-variant-numeric: tabular-nums; }
-  #urgentBanner .caveat { font-size: .82rem; opacity: .8; margin: .5rem 0; }
-  #urgentBanner button { background: #d32f2f; border-color: #d32f2f; color: white; }
-  #urgentBanner .acked { font-size: .82rem; color: #1a7f37; font-weight: 600; }
-  .refusal { border: 1px solid #b02a37; background: #b02a3714; border-radius: 8px;
+  .note-foot .grounding { margin-right: auto; }
+
+  /* transcript turns: theme classes + editing affordance */
+  #transcript { max-height: 75vh; overflow-y: auto; }
+  .turn .ttext[contenteditable="true"]:focus { background: #F3EDE6; outline: none; }
+
+  .refusal { border: 1px solid var(--red); background: #FBF1EF; border-radius: var(--radius);
              padding: .75rem 1rem; }
-  .refusal h3 { color: #b02a37; font-size: .9rem; margin: 0 0 .4rem; }
-  .refusal .detail { font-size: .85rem; opacity: .8; }
-  #processing { text-align: center; padding: 3rem 1rem; opacity: .7; }
+  .refusal h3 { color: var(--red); font-size: .9rem; margin: 0 0 .4rem; }
+  .refusal .detail { font-size: .85rem; color: var(--ink-soft); }
+
+  #processing { text-align: center; padding: 3rem 1rem; color: var(--ink-soft); }
   .spinner { display: inline-block; width: 1.2rem; height: 1.2rem; margin-right: .5rem;
-             border: 3px solid #8885; border-top-color: #1a7f37; border-radius: 50%;
+             border: 3px solid var(--line); border-top-color: var(--plum); border-radius: 50%;
              animation: spin 1s linear infinite; vertical-align: -0.3rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
 </style>
 </head>
 <body>
-<div class="banner">⚠️ Research/educational prototype — not a medical device. All AI
-output is a draft requiring doctor review and sign-off.</div>
-<h1 id="pageTitle">Consultation note review</h1>
-<div id="status"></div>
-
-<div id="processing"><span class="spinner"></span>Finalising: re-transcribing,
-identifying speakers, drafting the note… this takes a minute or two.</div>
-
-<div class="columns" id="content" style="display:none">
-  <div>
-  <div id="urgentBanner" style="display:none"></div>
-  <div class="pane">
-    <h2>Draft note — review and edit</h2>
-    <p class="hint">Text is editable in place. <span class="flagmark">⚠</span> marks a
-    number/drug/side that rests on a low-confidence transcript segment — click its
-    [turn] chip to verify against what was heard. The transcript is the audit trail;
-    the note is what you're signing.</p>
-    <div id="note"></div>
-    <div class="controls">
-      <button class="primary" id="approve">Approve</button>
+<div class="wrap">
+  <div class="session-head">
+    <div class="patient">
+      <span class="name" id="pName">Consultation</span>
+      <span class="demo" id="pDemo"></span>
+    </div>
+    <div class="chips" id="metaChips"></div>
+    <div class="actions" id="actionsBox">
       <button id="regen">Regenerate</button>
-      <button id="copy">Copy as plain text</button>
+      <button id="copy">Copy as text</button>
+      <button class="primary" id="approve">Approve</button>
     </div>
   </div>
-  </div>
-  <div class="pane">
-    <h2>Diarised transcript (audit artifact)</h2>
-    <p class="hint">Double-click a line to correct it, then Regenerate. Orange bar =
-    low ASR confidence.</p>
-    <button id="swap" style="font-size:.8rem; padding:.25rem .6rem">Swap Doctor/Patient</button>
-    <div id="transcript"></div>
+
+  <div id="processing"><span class="spinner"></span>Finalising: re-transcribing,
+  identifying speakers, drafting the note… this takes a minute or two.</div>
+
+  <div id="content" style="display:none">
+    <div class="urgency" id="urgentBanner" style="display:none"></div>
+
+    <!-- 1. DRAFT NOTE — the document the doctor is here to sign -->
+    <div class="pane">
+      <div class="pane-head"><h2>Draft SOAP note</h2>
+        <div class="tools"><span id="noteTools">draft — nothing is final until approved</span></div>
+      </div>
+      <div class="pane-body soap" id="note"></div>
+      <div class="note-foot" id="noteFoot" style="display:none">
+        <span class="grounding" id="grounding"></span>
+        <span id="noteMeta"></span>
+      </div>
+    </div>
+
+    <!-- (letter panes will sit here, between note and transcript) -->
+    <div id="letters"></div>
+
+    <!-- 2. DIARISED TRANSCRIPT — reference material, at the bottom -->
+    <div class="pane">
+      <div class="pane-head"><h2>Diarised transcript</h2>
+        <div class="tools">
+          <span>click a citation chip in the note to highlight its source turn ·
+          double-click a line to correct it, then Regenerate</span>
+          <button id="swap" class="small">Swap Doctor/Patient</button>
+        </div>
+      </div>
+      <div class="pane-body" id="transcript"></div>
+    </div>
   </div>
 </div>
 
 <script src="/static/nav.js"></script>
 <script>
 const cid = location.pathname.split('/').pop();
-const statusEl = document.getElementById('status');
 const processingEl = document.getElementById('processing');
 const contentEl = document.getElementById('content');
 const noteEl = document.getElementById('note');
@@ -130,29 +120,41 @@ function el(tag, className, text) {
 
 function fmt(s) { const m = Math.floor(s/60); return `${m}:${String(Math.floor(s%60)).padStart(2,'0')}`; }
 
-function renderStatus() {
-  statusEl.innerHTML = '';
-  statusEl.append(`Consultation #${state.id} · started ${state.started_at.slice(0,16)} · status`);
-  const badge = el('span', 'badge' + (state.status === 'approved' ? ' approved' : ''), state.status.replace('_',' '));
-  statusEl.appendChild(badge);
-  if (state.note) statusEl.append(` · note v${state.note.version}`);
+function renderHead() {
+  if (state.patient_name) {
+    document.getElementById('pName').textContent = state.patient_name;
+    document.title = 'Note review — ' + state.patient_name;
+  }
+  const chips = document.getElementById('metaChips');
+  chips.innerHTML = '';
+  chips.appendChild(el('span', 'chip', state.started_at.slice(0, 16)));
+  if (state.turns && state.turns.length) {
+    const last = state.turns[state.turns.length - 1];
+    chips.appendChild(el('span', 'chip', fmt(last.end) + ' recorded'));
+  }
+  chips.appendChild(el('span', 'chip', 'English'));
+  const statusChip = el('span', 'chip status ' + state.status,
+                        state.status.replace('_', ' '));
+  chips.appendChild(statusChip);
+  if (state.note) chips.appendChild(el('span', 'chip', 'note v' + state.note.version));
   if (state.voided_at) {
-    const voided = el('span', 'badge', 'VOIDED: ' + (state.void_reason || ''));
-    voided.style.color = '#b02a37';
-    statusEl.appendChild(voided);
+    const voided = el('span', 'chip status voided', 'VOIDED: ' + (state.void_reason || ''));
+    chips.appendChild(voided);
   }
 }
 
 function renderTranscript() {
   transcriptEl.innerHTML = '';
   for (const t of state.turns) {
-    const div = el('div', 'turn ' + (t.role === 'Doctor' ? 'doctor' : '') +
+    const div = el('div', 'turn ' + (t.role === 'Doctor' ? 'doctor' : 'patient') +
                           (t.confidence < 0.6 ? ' lowconf' : ''));
     div.id = 'turn-' + t.idx;
-    const head = el('span', 'who', `[${t.idx}] ${t.role}`);
-    head.appendChild(el('span', 'ts', fmt(t.start)));
-    div.appendChild(head);
-    div.appendChild(document.createTextNode(' '));
+    if (t.confidence < 0.6) div.title = `ASR confidence ${t.confidence.toFixed(2)} on this turn`;
+    div.appendChild(el('span', 'n', String(t.idx)));
+    const who = el('span', 'who', t.role);
+    who.appendChild(document.createElement('br'));
+    who.appendChild(el('span', 'ts', fmt(t.start)));
+    div.appendChild(who);
     const body = el('span', 'ttext', t.text);
     body.addEventListener('dblclick', () => {
       if (state.status === 'approved') return;
@@ -173,6 +175,7 @@ function renderTranscript() {
 
 function renderNote() {
   noteEl.innerHTML = '';
+  const foot = document.getElementById('noteFoot');
   if (state.note && state.note.content.refusal) {
     const box = el('div', 'refusal');
     box.appendChild(el('h3', null, 'No draft note — insufficient clinical content'));
@@ -184,40 +187,52 @@ function renderNote() {
     noteEl.appendChild(box);
     document.getElementById('approve').style.display = 'none';
     document.getElementById('copy').style.display = 'none';
+    foot.style.display = 'none';
     return;
   }
   document.getElementById('approve').style.display = '';
   document.getElementById('copy').style.display = '';
-  const sections = [['subjective','S — Subjective'], ['objective','O — Objective'],
-                    ['assessment','A — Assessment'], ['plan','P — Plan']];
+  const sections = [['subjective','Subjective'], ['objective','Objective'],
+                    ['assessment','Assessment'], ['plan','Plan']];
+  let total = 0, cited = 0, flagged = 0;
   for (const [key, heading] of sections) {
-    noteEl.appendChild(el('h3', 'soap', heading));
+    noteEl.appendChild(el('h3', null, heading));
     for (const claim of state.note.content[key]) {
+      total += 1;
+      if (claim.turns && claim.turns.length) cited += 1;
+      if (claim.flagged) flagged += 1;
       const div = el('div', 'claim' + (claim.flagged ? ' flagged' : ''));
       div.dataset.section = key;
-      if (claim.flagged) {
-        const mark = el('span', 'flagmark', '⚠ ');
-        mark.title = 'Contains a number/drug/side resting on a low-confidence transcript segment — verify';
-        div.appendChild(mark);
-      }
       const text = el('span', 'text', claim.text);
       text.contentEditable = 'true';
       div.appendChild(text);
       for (const n of claim.turns) {
-        const chip = el('span', 'chip', `[${n}]`);
+        const chip = el('span', 'cchip', String(n));
         chip.addEventListener('click', () => {
           const target = document.getElementById('turn-' + n);
           if (!target) return;
           target.scrollIntoView({behavior: 'smooth', block: 'center'});
-          target.classList.add('cited-highlight');
-          setTimeout(() => target.classList.remove('cited-highlight'), 2500);
+          document.querySelectorAll('.turn.hl').forEach(t => t.classList.remove('hl'));
+          target.classList.add('hl');
+          setTimeout(() => target.classList.remove('hl'), 2500);
         });
         div.appendChild(chip);
+      }
+      if (claim.flagged) {
+        const mark = el('span', 'flag', '⚠ low-confidence audio');
+        mark.title = 'Contains a number/drug/side resting on a low-confidence transcript segment — click its citation chip to verify against what was heard';
+        div.appendChild(mark);
       }
       if (claim.uncited) div.appendChild(el('span', 'uncited', ' (uncited — verify manually)'));
       noteEl.appendChild(div);
     }
   }
+  foot.style.display = '';
+  document.getElementById('grounding').textContent =
+    `Grounding: ${cited}/${total} claims cited` +
+    (flagged ? ` · ${flagged} flagged for low-confidence audio` : '');
+  document.getElementById('noteMeta').textContent =
+    `MedGemma 27B · draft v${state.note.version}`;
 }
 
 function currentPlainText() {
@@ -237,7 +252,7 @@ function currentPlainText() {
 async function refresh() {
   const response = await fetch(`/api/consultations/${cid}`);
   state = await response.json();
-  renderStatus();
+  renderHead();
   if (state.status === 'processing' || state.status === 'live') {
     processingEl.style.display = 'block'; contentEl.style.display = 'none';
     setTimeout(refresh, 3000);
@@ -250,10 +265,6 @@ async function refresh() {
     return;
   }
   contentEl.style.display = '';
-  if (state.patient_name) {
-    document.getElementById('pageTitle').textContent =
-      'Consultation note review — ' + state.patient_name;
-  }
   renderUrgentBanner();
   renderTranscript();
   renderNote();
@@ -269,6 +280,8 @@ function applyReadOnly() {
   document.getElementById('approve').style.display = (locked || refused) ? 'none' : '';
   document.getElementById('regen').style.display = locked ? 'none' : '';
   document.getElementById('swap').style.display = locked ? 'none' : '';
+  document.getElementById('noteTools').textContent = locked
+    ? 'approved — read-only' : 'draft — nothing is final until approved';
   if (locked) {
     for (const t of noteEl.querySelectorAll('.text')) t.contentEditable = 'false';
     for (const t of transcriptEl.querySelectorAll('.ttext')) t.contentEditable = 'false';
@@ -281,31 +294,41 @@ function renderUrgentBanner() {
   const approveBtn = document.getElementById('approve');
   if (!actions.length) { banner.style.display = 'none'; return; }
   banner.style.display = '';
+  banner.className = 'urgency' + (state.urgent_ack_at ? ' acked' : '');
   banner.innerHTML = '';
-  banner.appendChild(el('h2', null, '⚠ Urgent actions unresolved at end of consultation'));
+  banner.appendChild(el('span', 'icon', state.urgent_ack_at ? '✓' : '⚠'));
+  const box = el('div');
+  box.appendChild(el('h3', null, state.urgent_ack_at
+    ? 'Urgent-action alert acknowledged'
+    : 'Unresolved urgent actions from the live session'));
   const list = el('ul');
   for (const a of actions) {
     const li = el('li', null, a.action);
-    if (a.first_fired_s != null) li.appendChild(el('span', 'fired', ` — first flagged at ${fmt(a.first_fired_s)}`));
     li.appendChild(el('span', 'why', a.reason));
+    if (a.first_fired_s != null) {
+      li.appendChild(el('span', 'when', `First fired at ${fmt(a.first_fired_s)} of the recording`));
+    }
     list.appendChild(li);
   }
-  banner.appendChild(list);
-  banner.appendChild(el('p', 'caveat',
-    'The transcript does not show these as done or arranged. AI-flagged during the live consultation — clinical judgement remains yours.'));
+  box.appendChild(list);
+  box.appendChild(el('p', 'when',
+    'The transcript does not show these as done or arranged. AI-flagged during the live consultation — clinical judgement remains yours.' +
+    (state.urgent_ack_at ? ` · acknowledged ${state.urgent_ack_at.slice(0,16)}` : '')));
+  banner.appendChild(box);
   if (state.urgent_ack_at) {
-    banner.appendChild(el('p', 'acked', `Acknowledged ${state.urgent_ack_at.slice(0,16)}`));
     approveBtn.disabled = false;
     approveBtn.title = '';
   } else {
-    const ack = el('button', null, 'Acknowledge urgent items');
+    const ackWrap = el('span', 'ack');
+    const ack = el('button', null, 'Acknowledge');
     ack.addEventListener('click', async () => {
       await fetch(`/api/consultations/${cid}/acknowledge-urgent`, {method: 'POST'});
       refresh();
     });
-    banner.appendChild(ack);
+    ackWrap.appendChild(ack);
+    banner.appendChild(ackWrap);
     approveBtn.disabled = true;
-    approveBtn.title = 'Acknowledge the urgent items before approving';
+    approveBtn.title = 'Acknowledge the urgent-action alert first';
   }
 }
 
@@ -327,7 +350,7 @@ document.getElementById('regen').addEventListener('click', async () => {
 document.getElementById('copy').addEventListener('click', async (e) => {
   await navigator.clipboard.writeText(currentPlainText());
   e.target.textContent = 'Copied ✓';
-  setTimeout(() => e.target.textContent = 'Copy as plain text', 1500);
+  setTimeout(() => e.target.textContent = 'Copy as text', 1500);
 });
 
 document.getElementById('swap').addEventListener('click', async () => {
