@@ -28,6 +28,10 @@ CREATE TABLE IF NOT EXISTS audit_event (
 );
 CREATE INDEX IF NOT EXISTS audit_event_subject_idx
     ON audit_event (subject_type, subject_id);
+-- The monitoring pulse counts today's events per action; this index
+-- keeps that query an index-range scan however large the log grows.
+CREATE INDEX IF NOT EXISTS audit_event_action_at_idx
+    ON audit_event (action, at);
 """
 
 

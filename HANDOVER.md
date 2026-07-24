@@ -59,6 +59,7 @@ app/finalize.py        Stop-triggered pipeline: WhisperX + pyannote + roles + no
 app/notes.py           cited SOAP note generation + plain-text serialiser
 app/consultations.py   Postgres persistence (consultation/turns/notes/urgency)
 app/letters.py         referral letters: suggest/draft calls + grounding gate
+app/monitor.py         public monitoring pulse: aggregate counts, 10 s cache
 app/mock_scripts.py    mock-script parser (turns)
 app/static/theme.css   shared design system (2026-07-24 pass; light only)
 app/static/live.html   live page; review.html  review page; nav.js app chrome
@@ -415,6 +416,38 @@ sweep never touches transcripts or notes.
   MUST scope the sweep (same rule as `purge_voided`); an unscoped sweep
   in a test would delete real recordings the day they age past the
   window.
+
+## Public monitoring pulse (2026-07-24)
+
+`GET /api/monitor/pulse` — **deliberately unauthenticated** (the one
+exception to the logged-in wall), for watching an external demo without
+logging in. `app/monitor.py`; tests in `tests/test_monitor.py` plus the
+RBAC assertions in `tests/test_rbac.py`.
+
+- **Aggregate counts ONLY**: `server_time`, `registrations_today`,
+  `logins_today`, `consultations_started_today`,
+  `finalisations_failed_today`, `live_consultation_active`,
+  `live_slot_rejections_today`, `errors_last_hour`,
+  `audio_disk_used_mb`. Never a username, patient name, or clinical
+  content — enforced structurally (every value is a number/boolean plus
+  one ISO timestamp) and tested against the actual names in the
+  database. Keep it that way: any new field must be a count or boolean.
+- **"Today" is Europe/London** (`monitor.london_day_start`, DST-correct).
+- **Cheap by construction**: the per-day counters are one grouped query
+  over the audit log's new `(action, at)` index; DB + disk aggregates
+  are cached ~10 s (`PULSE_CACHE_TTL_S`) so external polling cannot
+  load the database. `server_time`, the live boolean, and the error
+  counter are in-memory and always fresh.
+- **New audit events feeding it**: `live.slot_rejected` (the
+  one-active-consultation guard firing — logged at all four refusal
+  sites: walk-in 409, queue-start 409, WS global wall, WS duplicate
+  tab; detail carries `via`. Expected under concurrent demo users, so
+  counted separately from errors) and `finalisation.failed` (system
+  event, user_id NULL). Being audit rows, the counts survive restarts.
+- **`errors_last_hour`** counts unhandled exceptions and 5xx responses
+  via the `count_errors` middleware into an in-process ring buffer
+  (maxlen 1000, pruned on read). 4xx refusals — RBAC probes, guards —
+  are deliberately NOT errors. In-process by design: restarts zero it.
 
 ## Phase 6 — agreed UI structure (do not re-litigate)
 

@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk, letters, retention
+from app import audit, auth, consultations, frontdesk, letters, monitor, retention
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
@@ -115,6 +115,20 @@ async def no_stale_app_code(request, call_next):
     content_type = response.headers.get("content-type", "")
     if request.url.path.startswith("/static") or content_type.startswith("text/html"):
         response.headers["cache-control"] = "no-cache"
+    return response
+
+
+@app.middleware("http")
+async def count_errors(request, call_next):
+    """Feed the pulse's errors_last_hour: unhandled exceptions and 5xx
+    responses only — 4xx refusals (RBAC probes, guards) are not errors."""
+    try:
+        response = await call_next(request)
+    except Exception:
+        monitor.record_error()
+        raise
+    if response.status_code >= 500:
+        monitor.record_error()
     return response
 
 
@@ -423,6 +437,8 @@ async def queue_walk_in(
         return JSONResponse(status_code=400, content={"error": "name is required"})
     entry = await frontdesk.start_walk_in(name, body.age, body.sex)
     if entry is None:  # concurrency guard: another consultation is active
+        await audit.log(user["id"], "live.slot_rejected", None, None,
+                        {"via": "walk_in"})
         return JSONResponse(status_code=409, content={
             "error": "another consultation is already in progress",
             "active": await frontdesk.current_entry(),
@@ -440,6 +456,8 @@ async def queue_start(
     if started is None:
         active = await frontdesk.current_entry()
         if active and active["entry_id"] != entry_id:  # concurrency guard
+            await audit.log(user["id"], "live.slot_rejected", "queue_entry",
+                            entry_id, {"via": "queue_start"})
             return JSONResponse(status_code=409, content={
                 "error": "another consultation is already in progress",
                 "active": active,
@@ -916,6 +934,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         logger.info("Live session %s: reconnected at seq %d", session_id,
                     entry["last_seq"])
     elif entry is not None:  # attached elsewhere — duplicate tab/device
+        await audit.log(user["id"], "live.slot_rejected", None, None,
+                        {"via": "ws_duplicate"})
         await websocket.send_json({
             "type": "busy",
             "detail": "This consultation is already streaming from another "
@@ -931,6 +951,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # the UI; this is the server-side wall.
         if any(e["attached"] for e in sessions.values()):
             active = next(e for e in sessions.values() if e["attached"])
+            await audit.log(user["id"], "live.slot_rejected", None, None,
+                            {"via": "ws"})
             await websocket.send_json({
                 "type": "busy",
                 "detail": "Another live consultation is already in progress "
@@ -1112,6 +1134,18 @@ def root(session: str | None = Cookie(default=None, alias=COOKIE_NAME)) -> Redir
     """Land on Today when a session cookie is valid, else the login page."""
     destination = "/today" if auth.verify_session(session) else "/login"
     return RedirectResponse(destination, status_code=307)
+
+
+@app.get("/api/monitor/pulse")
+async def monitor_pulse() -> JSONResponse:
+    """Public monitoring pulse — deliberately unauthenticated, for
+    external-demo observation. Aggregate counts ONLY: never a username,
+    patient name, or clinical content (tested in test_rbac.py). The
+    database/disk aggregates are cached ~10 s (app/monitor.py) so
+    polling cannot load the database."""
+    sessions = getattr(app.state, "live_sessions", None) or {}
+    live = any(entry["attached"] for entry in sessions.values())
+    return JSONResponse(content=await monitor.pulse(live, RECORDINGS_DIR))
 
 
 @app.get("/health")

@@ -104,6 +104,73 @@ def test_anonymous_is_locked_out():
     assert response.status_code == 307 and response.headers["location"] == "/login"
 
 
+def test_monitor_pulse_is_deliberately_public_and_aggregate_only(clients):
+    """/api/monitor/pulse is the one deliberate exception to the
+    logged-in wall: unauthenticated by design for external-demo
+    observation. The counterpart obligation is that it exposes aggregate
+    counts ONLY — never a username, patient name, or clinical content —
+    which the shape assertion makes structural: every value is a number
+    or boolean except one ISO timestamp, so a name cannot leak."""
+    from app import monitor
+    from app.main import app
+
+    anon = TestClient(app)  # no session cookie at all
+    monitor.invalidate_cache()
+    response = anon.get("/api/monitor/pulse")
+    assert response.status_code == 200
+    body = response.json()
+    assert set(body) == {
+        "server_time", "registrations_today", "logins_today",
+        "consultations_started_today", "finalisations_failed_today",
+        "live_consultation_active", "live_slot_rejections_today",
+        "errors_last_hour", "audio_disk_used_mb",
+    }
+    assert isinstance(body["live_consultation_active"], bool)
+    assert isinstance(body["server_time"], str)
+    for key in body.keys() - {"server_time", "live_consultation_active"}:
+        assert isinstance(body[key], (int, float)), key
+    # This module's fixture registered users today, so the counters are
+    # provably live, not hardcoded zeros.
+    assert body["registrations_today"] >= 2
+
+    # Belt and braces on top of the shape assertion: no username,
+    # display name, or patient name actually in the database appears
+    # anywhere in the serialised response.
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        names = [r[0] for r in conn.execute(
+            "SELECT username FROM app_user"
+            " UNION SELECT display_name FROM app_user"
+            " UNION SELECT name FROM patient").fetchall()]
+    text = response.text.lower()
+    for name in names:
+        if name and len(name) >= 4:  # short test junk can't match digits anyway
+            assert name.lower() not in text
+
+
+def test_monitor_pulse_counts_slot_rejections(clients):
+    """The one-active-consultation guard firing is expected under
+    concurrent demo users — the pulse counts it separately from errors."""
+    from app import monitor
+    from app.main import app
+
+    doctor = clients["doctor"]
+    _close_active(doctor)
+    monitor.invalidate_cache()
+    before = TestClient(app).get("/api/monitor/pulse").json()
+
+    first = doctor.post("/api/queue/walk-in", json={"name": "Pulse Guard Patient"})
+    assert first.status_code == 200
+    blocked = doctor.post("/api/queue/walk-in", json={"name": "Pulse Second Patient"})
+    assert blocked.status_code == 409  # the guard fired…
+
+    monitor.invalidate_cache()
+    after = TestClient(app).get("/api/monitor/pulse").json()
+    # …and was counted as a rejection, not an error.
+    assert after["live_slot_rejections_today"] == before["live_slot_rejections_today"] + 1
+    assert after["errors_last_hour"] == before["errors_last_hour"]
+    _close_active(doctor)
+
+
 def test_receptionist_gets_403_on_all_clinical_content(clients, consultation_id):
     recep = clients["receptionist"]
     cid = consultation_id

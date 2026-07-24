@@ -28,7 +28,7 @@ import time
 
 import httpx
 
-from app import consultations
+from app import audit, consultations
 from app.notes import draft_note
 
 logger = logging.getLogger(__name__)
@@ -199,6 +199,9 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
     except Exception as exc:
         logger.exception("Finalisation failed for consultation %d", cid)
         await consultations.set_status(cid, "failed", error=str(exc))
+        # System event (no acting user): the monitoring pulse counts these.
+        await audit.log(None, "finalisation.failed", "consultation", cid,
+                        {"error": str(exc)[:300]})
 
 
 async def regenerate_note(cid: int) -> None:
