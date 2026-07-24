@@ -14,14 +14,14 @@ from pathlib import Path
 
 import psycopg
 from dotenv import load_dotenv
-from fastapi import Cookie, FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import Cookie, FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk, letters, monitor, retention
+from app import audit, auth, consultations, frontdesk, letters, monitor, ratelimit, retention
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
@@ -157,7 +157,14 @@ def register_page() -> FileResponse:
 
 
 @app.post("/api/register")
-async def register(body: RegisterBody) -> JSONResponse:
+async def register(body: RegisterBody, request: Request) -> JSONResponse:
+    ip = ratelimit.client_ip(request)
+    retry = ratelimit.register_limiter.retry_after(ip)
+    if retry is not None:
+        return JSONResponse(
+            status_code=429, headers={"Retry-After": str(retry)},
+            content={"error": f"too many registration attempts from your address"
+                              f" — try again in {retry} seconds"})
     if body.role not in ("doctor", "receptionist"):
         return JSONResponse(status_code=400, content={"error": "role must be doctor or receptionist"})
     if len(body.password) < 8:
@@ -172,29 +179,46 @@ async def register(body: RegisterBody) -> JSONResponse:
         # Approve-to-activate (public exposure): no session until the
         # administrator activates the account in the Users view.
         await audit.log(
-            user["id"], "user.registered_pending", "user", user["id"], {"role": user["role"]}
+            user["id"], "user.registered_pending", "user", user["id"],
+            {"role": user["role"], "ip": ip},
         )
         return JSONResponse(content={
             "ok": True, "pending": True, "user": user,
             "message": "Account created — awaiting the administrator's approval."
         })
     # First-account bootstrap only: active immediately, session as before.
-    await audit.log(user["id"], "user.registered", "user", user["id"], {"role": user["role"]})
+    await audit.log(
+        user["id"], "user.registered", "user", user["id"],
+        {"role": user["role"], "ip": ip},
+    )
     response = JSONResponse(content={"ok": True, "pending": False, "user": user})
     response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
     return response
 
 
 @app.post("/api/login")
-async def login(body: LoginBody) -> JSONResponse:
+async def login(body: LoginBody, request: Request) -> JSONResponse:
+    ip = ratelimit.client_ip(request)
+    retry = ratelimit.login_limiter.retry_after(ip)
+    if retry is not None:
+        return JSONResponse(
+            status_code=429, headers={"Retry-After": str(retry)},
+            content={"error": f"too many login attempts from your address"
+                              f" — try again in {retry} seconds"})
     user, reason = await auth.authenticate(body.username, body.password)
     if user is None:
+        # Failures are audited with their source for forensics; the
+        # username is whatever the caller typed, truncated, never echoed.
+        await audit.log(
+            None, "user.login_failed", None, None,
+            {"username": body.username[:200], "ip": ip, "reason": reason},
+        )
         if reason == "awaiting_approval":
             return JSONResponse(status_code=403, content={
                 "error": "account awaiting administrator approval — "
                          "you will be able to sign in once it is activated"})
         return JSONResponse(status_code=401, content={"error": "invalid credentials"})
-    await audit.log(user["id"], "user.login", "user", user["id"])
+    await audit.log(user["id"], "user.login", "user", user["id"], {"ip": ip})
     response = JSONResponse(content={"ok": True, "user": user})
     response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
     return response

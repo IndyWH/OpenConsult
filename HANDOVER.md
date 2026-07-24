@@ -64,6 +64,7 @@ app/notes.py           cited SOAP note generation + plain-text serialiser
 app/consultations.py   Postgres persistence (consultation/turns/notes/urgency)
 app/letters.py         referral letters: suggest/draft calls + grounding gate
 app/monitor.py         public monitoring pulse: aggregate counts, 10 s cache
+app/ratelimit.py       per-IP auth rate limits + proxy-aware client_ip
 app/mock_scripts.py    mock-script parser (turns)
 app/static/theme.css   shared design system (2026-07-24 pass; light only)
 app/static/live.html   live page; review.html  review page; nav.js app chrome

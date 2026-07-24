@@ -132,6 +132,20 @@ def approve_account(username: str) -> None:
         )
 
 
+@pytest.fixture(autouse=True)
+def _reset_auth_rate_limits():
+    """Every TestClient shares one synthetic address, so the suite's
+    registrations/logins would trip the per-IP auth limits across test
+    boundaries. Reset between tests; within a test the limits are real
+    (that's what test_auth_hardening exercises)."""
+    if _DB_READY:  # app modules are only imported once the test DB exists
+        from app import ratelimit
+
+        ratelimit.login_limiter.reset()
+        ratelimit.register_limiter.reset()
+    yield
+
+
 @pytest.fixture(scope="session", autouse=True)
 def test_database():
     yield
