@@ -76,6 +76,9 @@ def test_pulse_caches_db_aggregates_for_ttl(tmp_path):
     first, cached, fresh = asyncio.run(run())
     assert cached["live_slot_rejections_today"] == first["live_slot_rejections_today"]
     assert fresh["live_slot_rejections_today"] == first["live_slot_rejections_today"] + 1
+    # A just-logged event is inside both windows, so the rolling counter
+    # moves in step with the daily one.
+    assert fresh["live_slot_rejections_last_hour"] == first["live_slot_rejections_last_hour"] + 1
     # The uncached fields stay live even while aggregates are cached.
     assert cached["live_consultation_active"] is False
     assert cached["server_time"] != ""

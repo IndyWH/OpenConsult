@@ -11,10 +11,11 @@ most one indexed query every ~10 s. server_time, the live-consultation
 boolean, and the error counter are in-memory reads and stay fresh on
 every call.
 
-All per-day counters come from the audit log (one grouped query over the
-(action, at) index): registrations and logins were already audited;
-finalisation failures and live-slot rejections write their own audit
-events precisely so this endpoint can count them after a restart.
+All per-day counters — and their rolling last-hour equivalents — come
+from the audit log (one grouped query over the (action, at) index, two
+filtered counts per action): registrations and logins were already
+audited; finalisation failures and live-slot rejections write their own
+audit events precisely so this endpoint can count them after a restart.
 """
 
 from __future__ import annotations
@@ -22,7 +23,7 @@ from __future__ import annotations
 import os
 import time
 from collections import deque
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 
@@ -36,7 +37,8 @@ LONDON = ZoneInfo("Europe/London")
 PULSE_CACHE_TTL_S = 10.0
 
 # audit action → pulse field. Adding a counter is one audit.log call at
-# the event site plus one row here.
+# the event site plus one row here; each field automatically gets a
+# rolling *_last_hour twin computed from the same query.
 _DAY_COUNTERS = {
     "user.registered": "registrations_today",
     "user.login": "logins_today",
@@ -44,6 +46,10 @@ _DAY_COUNTERS = {
     "finalisation.failed": "finalisations_failed_today",
     "live.slot_rejected": "live_slot_rejections_today",
 }
+
+
+def _last_hour_field(day_field: str) -> str:
+    return day_field.replace("_today", "_last_hour")
 
 # Unhandled exceptions / 5xx responses, as timestamps in a ring buffer —
 # maxlen bounds memory if something errors in a tight loop; entries older
@@ -96,16 +102,25 @@ def _audio_disk_bytes(recordings_dir: Path) -> int:
 
 async def _aggregates(recordings_dir: Path) -> dict:
     counts = dict.fromkeys(_DAY_COUNTERS.values(), 0)
+    counts.update(dict.fromkeys(map(_last_hour_field, _DAY_COUNTERS.values()), 0))
+    day_start = london_day_start()
+    hour_ago = datetime.now(timezone.utc) - timedelta(hours=1)
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
         rows = await (
             await conn.execute(
-                "SELECT action, count(*) FROM audit_event"
+                "SELECT action,"
+                " count(*) FILTER (WHERE at >= %s),"
+                " count(*) FILTER (WHERE at >= %s)"
+                " FROM audit_event"
                 " WHERE at >= %s AND action = ANY(%s) GROUP BY action",
-                (london_day_start(), list(_DAY_COUNTERS)),
+                # Just after a London midnight the last hour reaches back
+                # into yesterday, so the scan starts at the earlier cutoff.
+                (day_start, hour_ago, min(day_start, hour_ago), list(_DAY_COUNTERS)),
             )
         ).fetchall()
-    for action, n in rows:
-        counts[_DAY_COUNTERS[action]] = n
+    for action, day_n, hour_n in rows:
+        counts[_DAY_COUNTERS[action]] = day_n
+        counts[_last_hour_field(_DAY_COUNTERS[action])] = hour_n
     counts["audio_disk_used_mb"] = round(
         _audio_disk_bytes(recordings_dir) / (1024 * 1024), 1
     )

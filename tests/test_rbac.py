@@ -123,6 +123,9 @@ def test_monitor_pulse_is_deliberately_public_and_aggregate_only(clients):
         "server_time", "registrations_today", "logins_today",
         "consultations_started_today", "finalisations_failed_today",
         "live_consultation_active", "live_slot_rejections_today",
+        "registrations_last_hour", "logins_last_hour",
+        "consultations_started_last_hour", "finalisations_failed_last_hour",
+        "live_slot_rejections_last_hour",
         "errors_last_hour", "audio_disk_used_mb",
     }
     assert isinstance(body["live_consultation_active"], bool)
