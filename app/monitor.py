@@ -146,8 +146,20 @@ async def _aggregates(recordings_dir: Path) -> dict:
         counts[_last_hour_field(_DAY_COUNTERS[action])] += hour_n
     counts["registrations_pending_activation_today"] = pending_row[0]
     counts["registrations_pending_activation_last_hour"] = pending_row[1]
+    # MB means 10^6 bytes. This used to divide by 1024^2 and call the
+    # result "mb", which is MiB under an SI label — the same mislabelling
+    # the admin worklist had. Decimal was chosen over renaming the field
+    # to `_mib` because this field is public and the hourly demo sentry
+    # consumes it by name; a rename would break that consumer silently,
+    # whereas a corrected value is just a more accurate number.
+    #
+    # NOTE, because it looks like a discrepancy and is not: this walks the
+    # recordings DIRECTORY, while the admin worklist sums only recordings
+    # linked to a consultation row. The two legitimately differ whenever
+    # orphan files exist on disk. Fixing the units does not make them
+    # agree, and it was never going to — see HANDOVER.
     counts["audio_disk_used_mb"] = round(
-        _audio_disk_bytes(recordings_dir) / (1024 * 1024), 1
+        _audio_disk_bytes(recordings_dir) / 1_000_000, 1
     )
     return counts
 

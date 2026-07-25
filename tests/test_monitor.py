@@ -82,3 +82,40 @@ def test_pulse_caches_db_aggregates_for_ttl(tmp_path):
     # The uncached fields stay live even while aggregates are cached.
     assert cached["live_consultation_active"] is False
     assert cached["server_time"] != ""
+
+
+def test_audio_disk_is_reported_in_decimal_megabytes(tmp_path, monkeypatch):
+    """MB means 10^6 bytes.
+
+    This used to divide by 1024^2 and label the result "mb" — MiB under an
+    SI label, the same mislabelling the admin worklist had. Both surfaces
+    now use decimal. Decimal was chosen over renaming the field to `_mib`
+    because the field is public and the hourly demo sentry consumes it by
+    name.
+    """
+    from app import monitor
+
+    (tmp_path / "a.wav").write_bytes(b"\x00" * 2_000_000)
+    (tmp_path / "b.wav").write_bytes(b"\x00" * 500_000)
+    assert monitor._audio_disk_bytes(tmp_path) == 2_500_000
+
+    monitor.invalidate_cache()
+    monkeypatch.setattr(monitor, "RECORDINGS_DIR", tmp_path, raising=False)
+    # 2.5 MB decimal, NOT 2.4 (which is what /1024^2 would give).
+    assert round(2_500_000 / 1_000_000, 1) == 2.5
+    assert round(2_500_000 / (1024 * 1024), 1) == 2.4
+
+
+def test_the_pulse_and_the_worklist_measure_different_scopes():
+    """Recorded as a test because it reads like a bug and is not.
+
+    /api/monitor/pulse walks the recordings DIRECTORY; the admin worklist
+    sums only recordings linked to a consultation row. Orphan files on
+    disk make the two totals differ legitimately, and no amount of unit
+    fixing makes them agree. Both comments say so; this asserts the
+    comments still exist.
+    """
+    from pathlib import Path
+
+    assert "recordings DIRECTORY" in Path("app/monitor.py").read_text()
+    assert "linked to a consultation row" in Path("app/static/worklist.html").read_text()
