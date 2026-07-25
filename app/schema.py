@@ -46,9 +46,11 @@ load_dotenv()
 
 logger = logging.getLogger(__name__)
 
-# Application order matters: `letter` references `consultation`, `queue_entry`
-# references `patient` and `app_user`. This tuple is the single ordering.
-MODULE_NAMES = ("auth", "frontdesk", "consultations", "letters", "audit")
+# Application order matters: `letter` and `system_utterance` reference
+# `consultation`, `queue_entry` references `patient` and `app_user`. This
+# tuple is the single ordering.
+MODULE_NAMES = ("auth", "frontdesk", "consultations", "letters",
+                "system_utterances", "audit")
 
 
 class _Rollback(Exception):

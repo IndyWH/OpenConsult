@@ -21,12 +21,13 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk, letters, monitor, ratelimit, retention, schema, speech
+from app import (audit, auth, consultations, frontdesk, letters, monitor, ratelimit,
+                 retention, schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
 from app import transcript_quality
-from app.live import PROCESS_INTERVAL_S, LiveSession
+from app.live import PROCESS_INTERVAL_S, LiveSession, bytes_to_ms
 from app.notes import note_as_plain_text
 from app.rag import RAGService
 from app.transcription import LiveTranscriber
@@ -944,6 +945,9 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
     banner: the tail may be missing)."""
     session: LiveSession = entry["session"]
     user = entry["user"]
+    # Close any window still open — an utterance interrupted by a hard
+    # disconnect must still exclude the audio it was speaking over.
+    _cancel_playback(entry, "cancelled")
     cid = await consultations.create_consultation(entry["patient_id"], user["id"])
     if entry["queue_entry_id"] is not None:
         await frontdesk.finish_entry(entry["queue_entry_id"])
@@ -954,6 +958,16 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
     duration = session.save_recording(wav_path)
     logger.info("Consultation %d: %.1fs of audio saved%s", cid, duration,
                 " (connection lost — tail may be missing)" if connection_lost else "")
+
+    # System utterances and their exclusion spans, persisted BEFORE the
+    # recording is enqueued for finalisation: from here on the spans live
+    # in the database, not in this session object, which is how a
+    # connection_lost or post-restart finalisation still excludes our
+    # voice from the final transcript (spec §2.3).
+    if entry.get("utterances"):
+        await system_utterances.save(cid, entry["utterances"])
+        logger.info("Consultation %d: %d system utterance(s) recorded",
+                    cid, len(entry["utterances"]))
 
     # Persist urgent actions still unresolved at session end (the CDS
     # engine clears an action once the transcript shows it arranged, so
@@ -995,6 +1009,34 @@ async def _grace_finalise(app_state, session_id: str) -> None:
     logger.warning("Live session %s: no reconnect within %.0fs — finalising "
                    "received audio", session_id, LIVE_RECONNECT_GRACE_S)
     await _complete_session(app_state, entry, connection_lost=True)
+
+
+def _cancel_playback(entry: dict, reason: str) -> None:
+    """End any in-flight utterance without a client `speak_ended`.
+
+    Used on reconnect and at session end. The window closes at whatever it
+    had reached; an utterance that never started leaves no window at all
+    and is recorded `failed_to_play` — no window means no exclusion, which
+    is correct, because nothing was played into the room.
+    """
+    utterance = entry.get("pending_utterance")
+    if utterance is None:
+        return
+    session: LiveSession = entry["session"]
+    span = session.close_speaking_window(reason) if session.speaking else None
+    entry["utterances"].append({
+        "utterance_id": utterance.utterance_id, "text": utterance.text,
+        "ref_kind": utterance.ref_kind, "ref_detail": utterance.ref_detail,
+        "cds_rationale": utterance.cds_rationale, "voice": utterance.voice,
+        "synth_ms": utterance.synth_ms, "stale": utterance.stale,
+        "end_reason": reason if span is not None else "failed_to_play",
+        "cut_latency_ms": None,
+        "start_byte": span["start_byte"] if span else None,
+        "end_byte": span["end_byte"] if span else None,
+        "started_offset_ms": bytes_to_ms(span["start_byte"]) if span else None,
+        "ended_offset_ms": bytes_to_ms(span["end_byte"]) if span else None,
+    })
+    entry["pending_utterance"] = None
 
 
 def _detach_for_grace(app_state, session_id: str, entry: dict) -> None:
@@ -1063,6 +1105,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 entry["grace_task"].cancel()
             entry["grace_task"] = None
         entry["attached"] = True
+        # Playback is never resumed across a reconnect (spec §2.3): the
+        # client has stopped, so the window must close at whatever it
+        # reached rather than keep excluding live patient audio.
+        _cancel_playback(entry, "cancelled")
         await websocket.send_json({"type": "resume", "last_seq": entry["last_seq"]})
         logger.info("Live session %s: reconnected at seq %d", session_id,
                     entry["last_seq"])
@@ -1116,6 +1162,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "attached": True,
             "grace_task": None,
             "stopped": False,
+            # Phase 7a: the server's own copy of the question agenda, and
+            # every utterance it has been asked to speak this session.
+            "agenda": speech.AgendaLog(),
+            "utterances": [],          # dicts, persisted at session end
+            "pending_utterance": None,  # prepared, not yet started
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -1139,6 +1190,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             try:
                 entry["assessment"] = cds_task.result()
                 cds_failures = 0
+                # Version the agenda before sending it, so the version the
+                # client tap refers to is one the server can resolve.
+                assessment_version = entry["agenda"].record(entry["assessment"])
+                entry["assessment"]["assessment_version"] = assessment_version
                 for action in entry["assessment"].get("urgent_actions", []):
                     entry["urgent_first_fired"].setdefault(
                         action["action"], round(session.audio_seconds, 1)
@@ -1189,6 +1244,115 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             gl_conditions = conditions
             gl_task = asyncio.create_task(rag.answer_for_conditions(list(conditions)))
 
+    async def refuse_speech(reason: str, detail: dict | None = None) -> None:
+        """Every refusal is loud and audited. A rejected message is a bug
+        report; a quietly sanitised one is a silent hole."""
+        await audit.log(user["id"], "speech.failed", None, None,
+                        {"reason": reason, **(detail or {})})
+        await websocket.send_json({"type": "speak_refused", "detail": reason})
+
+    async def handle_speak(payload: dict) -> None:
+        """Prepare an utterance from a REFERENCE — never from client text.
+
+        PHASE_7A_SPEC.md §2.1. This is where hard rule 1 is enforced in
+        code: there is no branch that reads words from the client, so no
+        client — buggy, modified or compromised — can make the system
+        advise, reassure or diagnose to the patient.
+        """
+        if "text" in payload or "text" in (payload.get("ref") or {}):
+            # Rejected outright rather than stripped. Sanitising would make
+            # this a filter; refusing keeps it a closed channel.
+            await refuse_speech("speak may not carry text; send a ref",
+                                {"ref_kind": (payload.get("ref") or {}).get("kind")})
+            return
+        if user["id"] != entry["user"]["id"]:
+            await refuse_speech("only the doctor running this consultation may speak")
+            return
+        if session.speaking or entry["pending_utterance"] is not None:
+            # One utterance at a time, queue depth zero (spec §2.3): two
+            # overlapping windows would make the exclusion span ambiguous.
+            await refuse_speech("an utterance is already in flight")
+            return
+        try:
+            utterance = await asyncio.to_thread(
+                state.speech.prepare, payload.get("ref") or {}, entry["agenda"],
+                user_id=user["id"])
+        except speech.SpeechRefused as exc:
+            await refuse_speech(str(exc))
+            return
+        except speech.SpeechUnavailable as exc:
+            await refuse_speech(f"speech unavailable: {exc}")
+            return
+        entry["pending_utterance"] = utterance
+        await audit.log(user["id"], "speech.requested", None, None,
+                        {"utterance_id": utterance.utterance_id,
+                         "ref_kind": utterance.ref_kind,
+                         "ref_detail": utterance.ref_detail,
+                         "stale": utterance.stale})
+        await websocket.send_json({
+            "type": "speak_ready", "utterance_id": utterance.utterance_id,
+            "duration_ms": utterance.duration_ms,
+            "url": f"/api/speech/{utterance.utterance_id}.wav"})
+
+    def record_utterance(utterance, span: dict | None, end_reason: str,
+                         cut_latency_ms: int | None = None) -> None:
+        row = {
+            "utterance_id": utterance.utterance_id, "text": utterance.text,
+            "ref_kind": utterance.ref_kind, "ref_detail": utterance.ref_detail,
+            "cds_rationale": utterance.cds_rationale, "voice": utterance.voice,
+            "synth_ms": utterance.synth_ms, "stale": utterance.stale,
+            "end_reason": end_reason, "cut_latency_ms": cut_latency_ms,
+            "start_byte": None, "end_byte": None,
+            "started_offset_ms": None, "ended_offset_ms": None,
+        }
+        if span is not None:
+            row.update(
+                start_byte=span["start_byte"], end_byte=span["end_byte"],
+                started_offset_ms=bytes_to_ms(span["start_byte"]),
+                ended_offset_ms=bytes_to_ms(span["end_byte"]))
+        entry["utterances"].append(row)
+
+    async def handle_speak_started(payload: dict) -> None:
+        """Open the exclusion window at actual playback start (§2.2 step 2)."""
+        utterance = entry["pending_utterance"]
+        if utterance is None or payload.get("utterance_id") != utterance.utterance_id:
+            await refuse_speech("speak_started for an unknown utterance",
+                                {"utterance_id": payload.get("utterance_id")})
+            return
+        start = session.open_speaking_window(
+            utterance.utterance_id, utterance.duration_ms,
+            speech.SPEECH_EXCLUSION_TAIL_MS)
+        # The client's declared seq is a cross-check only. The server's own
+        # byte count is what says where in the file playback began, and
+        # trusting the client here would put the guarantee in its hands.
+        declared = payload.get("seq")
+        if declared is not None and int(declared) != entry["last_seq"] + 1:
+            logger.warning(
+                "Live session %s: speak_started declared seq %s, server expected %d "
+                "— using the server's byte offset (%d)",
+                session_id, declared, entry["last_seq"] + 1, start)
+
+    async def handle_speak_ended(payload: dict) -> None:
+        utterance = entry["pending_utterance"]
+        if utterance is None or not session.speaking:
+            await refuse_speech("speak_ended with no window open")
+            return
+        reason = payload.get("reason") or "complete"
+        if reason not in system_utterances.END_REASONS:
+            reason = "complete"
+        span = session.close_speaking_window(reason)
+        cut_latency = payload.get("cut_latency_ms")
+        record_utterance(utterance, span, reason,
+                         int(cut_latency) if cut_latency is not None else None)
+        entry["pending_utterance"] = None
+        await audit.log(
+            user["id"], "speech.barge_in" if reason == "barge_in" else "speech.spoken",
+            None, None,
+            {"utterance_id": utterance.utterance_id, "reason": reason,
+             "excluded_ms": bytes_to_ms(
+                 span["end_byte"] - span["start_byte"]),
+             **({"cut_latency_ms": int(cut_latency)} if cut_latency is not None else {})})
+
     try:
         while True:
             try:
@@ -1209,9 +1373,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                            session_id, entry["last_seq"], seq)
                         session.append_pcm16(data[4:])
                         entry["last_seq"] = seq
-                elif message.get("text") == "stop":
+                elif (text_message := message.get("text")) == "stop":
                     entry["stopped"] = True
                     break
+                elif text_message and text_message.startswith("{"):
+                    payload = json.loads(text_message)
+                    kind = payload.get("type")
+                    if kind == "speak":
+                        await handle_speak(payload)
+                    elif kind == "speak_started":
+                        await handle_speak_started(payload)
+                    elif kind == "speak_ended":
+                        await handle_speak_ended(payload)
 
             if session.new_audio_seconds >= PROCESS_INTERVAL_S:
                 committed, partial = await session.process()

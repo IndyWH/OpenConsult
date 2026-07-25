@@ -34,7 +34,8 @@ def test_ensure_all_covers_every_module_in_one_order():
     """The point of the module: one ordering, not five call sites."""
     names = [name for name, _ in schema.statements()]
     assert names == list(schema.MODULE_NAMES)
-    assert set(names) == {"auth", "frontdesk", "consultations", "letters", "audit"}
+    assert set(names) == {"auth", "frontdesk", "consultations", "letters",
+                          "system_utterances", "audit"}
 
 
 def test_ensure_all_is_idempotent():
