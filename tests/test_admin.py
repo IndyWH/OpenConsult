@@ -88,6 +88,7 @@ def test_admin_endpoints_are_403_for_other_roles(role):
     client = _client_for(_make_user(role))
     assert client.get("/api/admin/users").status_code == 403
     assert client.get("/api/admin/consultations").status_code == 403
+    assert client.get("/api/admin/purge-preview").status_code == 403
     assert client.get("/users", follow_redirects=False).status_code == 403
     for url in ADMIN_POSTS:
         assert client.post(url, json={"reason": "x"}).status_code == 403, url

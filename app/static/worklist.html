@@ -70,16 +70,34 @@ async function voidConsultation(cid) {
 }
 
 async function purgeVoided() {
-  if (!confirm('Permanently DELETE all voided consultations, their notes, ' +
-      'transcripts, recordings, and any synthetic patients left with no ' +
-      'other consultations?\n\nThis cannot be undone.')) return;
-  if (!confirm('Second confirmation: really hard-delete the voided data now?')) return;
+  // Name the numbers before asking. A blind "delete all voided data?" is
+  // how the clinical-safety fixture would have been lost.
   errEl.textContent = '';
+  const preview = await fetch('/api/admin/purge-preview');
+  if (!preview.ok) { errEl.textContent = 'could not read purge preview'; return; }
+  const {purgeable, protected: guarded} = await preview.json();
+  if (!purgeable) {
+    alert(guarded
+      ? `Nothing to purge.\n\n${guarded} voided consultation(s) are protected as ` +
+        `clinical safety and are never purged.`
+      : 'Nothing to purge — there are no voided consultations.');
+    return;
+  }
+  const guardLine = guarded
+    ? `\n\n${guarded} clinical-safety consultation(s) are PROTECTED and will NOT ` +
+      `be purged.` : '';
+  if (!confirm(`Permanently DELETE ${purgeable} voided consultation(s), their notes, ` +
+      `transcripts, recordings, and any synthetic patients left with no ` +
+      `other consultations?${guardLine}\n\nThis cannot be undone.`)) return;
+  if (!confirm(`Second confirmation: really hard-delete ${purgeable} voided ` +
+      `consultation(s) now?`)) return;
   const response = await fetch('/api/admin/purge-voided', {method: 'POST'});
   const body = await response.json();
   if (!response.ok) { errEl.textContent = body.error || 'failed'; return; }
   alert(`Purged ${body.consultations} consultation(s), ${body.patients} patient(s), ` +
-        `${body.audio_files} recording(s).`);
+        `${body.audio_files} recording(s).` +
+        (body.protected ? `\n\nProtected (clinical safety, not purged): ` +
+                          `${body.protected_ids.map(i => '#' + i).join(', ')}.` : ''));
   load();
 }
 

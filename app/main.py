@@ -443,7 +443,9 @@ async def admin_unvoid_consultation(
 @app.post("/api/admin/purge-voided")
 async def admin_purge_voided(user: dict = Depends(api_user("admin"))) -> dict:
     """The second deliberate step after voiding: hard-delete voided
-    consultations and their orphaned synthetic patients. UI double-confirms."""
+    consultations and their orphaned synthetic patients. UI double-confirms.
+
+    Clinical-safety voids are skipped and reported — see purge_voided."""
     purged = await consultations.purge_voided()
     removed_files = 0
     for path in purged["audio_paths"]:
@@ -454,9 +456,20 @@ async def admin_purge_voided(user: dict = Depends(api_user("admin"))) -> dict:
                     {"consultations": purged["consultations"],
                      "consultation_ids": purged["consultation_ids"],
                      "patients": purged["patients"],
-                     "audio_files": removed_files})
+                     "audio_files": removed_files,
+                     "protected": purged["protected"],
+                     "protected_ids": purged["protected_ids"]})
     return {"ok": True, "consultations": purged["consultations"],
-            "patients": purged["patients"], "audio_files": removed_files}
+            "patients": purged["patients"], "audio_files": removed_files,
+            "protected": purged["protected"],
+            "protected_ids": purged["protected_ids"]}
+
+
+@app.get("/api/admin/purge-preview")
+async def admin_purge_preview(user: dict = Depends(api_user("admin"))) -> dict:
+    """Counts for the purge confirmation, so it can name what it will and
+    will not destroy rather than asking for a blind yes."""
+    return await consultations.purge_preview()
 
 
 # -------------------------------------------------------------------- queue

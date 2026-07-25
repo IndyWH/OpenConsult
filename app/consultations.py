@@ -456,14 +456,36 @@ async def purge_voided(only_ids: list[int] | None = None) -> dict:
     left with no remaining consultations. Never touches un-voided rows.
     only_ids narrows the purge (tests use it to stay surgical); the admin
     endpoint purges all voided. Returns counts + audio paths for the
-    caller to unlink after commit."""
+    caller to unlink after commit.
+
+    **Clinical-safety voids are never purged.** A `clinical_safety` void
+    marks a record judged unsafe and deliberately kept as evidence — #70
+    is the regression fixture for the transcript-quality gate and the
+    object of study in the confound pre-registration. `keep_for_research`
+    protects audio from the *retention sweep* only, not from purge, so
+    without this guard one click on "Purge voided test data" would
+    destroy both. Skipped rows are REPORTED, never silently omitted.
+    """
+    protected_clause = (" AND COALESCE(void_reason_class, %s) <> %s")
     async with await _conn() as conn:
+        protected = await (
+            await conn.execute(
+                "SELECT id FROM consultation WHERE voided_at IS NOT NULL"
+                " AND void_reason_class = %s"
+                + (" AND id = ANY(%s)" if only_ids is not None else "")
+                + " ORDER BY id",
+                (VOID_CLASS_CLINICAL_SAFETY,)
+                + ((only_ids,) if only_ids is not None else ()),
+            )
+        ).fetchall()
         rows = await (
             await conn.execute(
                 "SELECT id, audio_path, patient_id FROM consultation"
                 " WHERE voided_at IS NOT NULL"
+                + protected_clause
                 + (" AND id = ANY(%s)" if only_ids is not None else ""),
-                ((only_ids,) if only_ids is not None else ()),
+                (VOID_CLASS_TEST_DATA, VOID_CLASS_CLINICAL_SAFETY)
+                + ((only_ids,) if only_ids is not None else ()),
             )
         ).fetchall()
         cids = [r[0] for r in rows]
@@ -482,6 +504,30 @@ async def purge_voided(only_ids: list[int] | None = None) -> dict:
         "consultation_ids": cids,
         "patients": len(purged_patients),
         "audio_paths": [r[1] for r in rows if r[1]],
+        # Reported, not silently omitted — the caller audits these.
+        "protected": len(protected),
+        "protected_ids": [r[0] for r in protected],
+    }
+
+
+async def purge_preview(only_ids: list[int] | None = None) -> dict:
+    """What a purge WOULD do, without doing it — so the UI's confirmation
+    can name the numbers instead of asking for a blind yes."""
+    async with await _conn() as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT COALESCE(void_reason_class, %s), count(*)"
+                " FROM consultation WHERE voided_at IS NOT NULL"
+                + (" AND id = ANY(%s)" if only_ids is not None else "")
+                + " GROUP BY 1",
+                (VOID_CLASS_TEST_DATA,)
+                + ((only_ids,) if only_ids is not None else ()),
+            )
+        ).fetchall()
+    counts = {r[0]: r[1] for r in rows}
+    return {
+        "purgeable": counts.get(VOID_CLASS_TEST_DATA, 0),
+        "protected": counts.get(VOID_CLASS_CLINICAL_SAFETY, 0),
     }
 
 
