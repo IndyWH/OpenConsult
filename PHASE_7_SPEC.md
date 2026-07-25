@@ -35,6 +35,8 @@ CDS panel questions become tappable. Doctor taps → local TTS speaks the questi
 ### Stage 7b — The face (kindalive integration; can land with 7a)
 https://github.com/smithandrewjohn/kindalive — MIT (attribution in NOTICE), Python, drives emotion from local Ollama-compatible models, renders a retro LED dot-matrix face via 12 FACS-based muscles from a simulated-neurochemistry state that evolves smoothly.
 
+> **Build brief: `PHASE_7B_KINDALIVE.md`** (owner's own conclusions from reviewing upstream, 2026-07-25 — **to be followed as written**). It covers the upstream assessment, the architecture as understood, and six build decisions: vendor the zero-dependency core at a pinned commit; skip the upstream LLM interpreter and inject impulses deterministically; a damped `[clinical]` personality preset plus hard caps in our own mapping layer; `face3d.js` over the existing WebSocket with no new transport; bedside-device styling; and an expected calibration pass. It also records the CARE-measure study design behind the face-off requirement below.
+
 - Embed the web face renderer in the live page (renderer-agnostic per upstream; a canvas/web component beside or replacing the idle CDS space in auto mode).
 - Drive it cheaply: add one optional field to the existing CDS assessment JSON (e.g. patient_affect_hint or situation summary line) and feed that to kindalive's impulse input — zero additional model calls on the 4090. Direct small-model mode via Ollama is the fallback if the hint quality disappoints.
 - The face listens in 7a already (reacts while the patient talks, blinks, attends) even though the doctor still taps the questions — presence before autonomy.
