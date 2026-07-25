@@ -530,6 +530,13 @@ us the guarantee holds in the room**, and it should be run before Phase
 
 The app must be restarted first to pick up this code
 (`sudo systemctl restart consultation-ai`) — it runs without `--reload`.
+**That restart is also what creates the `system_utterance` table**: the
+drift check on 2026-07-25 confirmed the live database does not have it
+yet (see "Shared schema module"). Re-run
+`uv run python scripts/migrate.py --check` afterwards; it should print
+"no drift". Until the restart happens, none of what follows exists in the
+running app — the pulse fetched at 12:30 on 2026-07-25 still had no
+`silence_hallucinations_today` field, which is the tell.
 
 1. Log in as a doctor and start a consultation from Today (or a walk-in).
 2. **Before disclosure:** confirm the question chips and the Invitation /
@@ -599,6 +606,28 @@ an `information_schema` snapshot either side, and always rolls back (the
 same rolled-back-transaction technique `tests/test_admin.py` uses for the
 last-admin guard). Rows are not compared — the backfill UPDATEs in
 `SCHEMA_SQL` touch data, and data is not drift.
+
+**First live run, 2026-07-25 — it found real drift on its first outing.**
+Run against the live database (owner-authorised, after confirming
+`live_consultation_active` was false on a cache-busted pulse fetch):
+
+```
+consultation_ai: schema drift — 1 item(s) the code expects and the
+database does not have:
+  missing table: system_utterance (17 columns)
+```
+
+Confirmed directly against `information_schema`. **This is the expected
+self-healing case, not an incident:** `system_utterance` was added in
+Phase 7a and the schema is applied by the app's lifespan, but
+`consultation-ai.service` has not been restarted since. The restart that
+picks up the Phase 7a code creates the table. Nothing was applied by hand
+— the design is deliberately that the app applies the schema, and
+`--check` reports.
+
+The useful part is that the tool answered the question it was built for
+in one command, and the answer was specific: one table, named, with a
+column count. Worth re-running after any restart-free deployment.
 
 Two things it deliberately is **not**, both decided before the build:
 
@@ -833,6 +862,35 @@ RBAC assertions in `tests/test_rbac.py`.
   tab; detail carries `via`. Expected under concurrent demo users, so
   counted separately from errors) and `finalisation.failed` (system
   event, user_id NULL). Being audit rows, the counts survive restarts.
+- **Fetch it with a cache-busting query parameter.** On 2026-07-25 the
+  hourly demo sentry was found to have been blind for roughly a day: its
+  bare `WebFetch` of the pulse URL was being served a **cached payload
+  from 2026-07-24 15:44**, predating the `_last_hour` counters. So it
+  reported "no activity" every hour, and could not have reported a dead
+  Funnel either — **a cached 200 never fails**. That is the failure mode
+  worth remembering: a monitor that cannot fail is not a monitor.
+  **The endpoint was never at fault.** The stale payload's missing
+  fields produced a confident, entirely wrong bug report against
+  `/api/monitor/pulse` that nearly became a commit; the fix was in the
+  scheduled task's own prompt (cache-busting parameter, a `server_time`
+  freshness check, and an explicit rule not to diagnose the app's code
+  from a stale payload), and was verified by a manual fire. Anything
+  reading this endpoint programmatically should do the same:
+  `?cb=<UTC date+hour>`, then check `server_time` before believing a word
+  of it.
+- **`audio_disk_used_mb` is decimal MB (10⁶), since 2026-07-25.** It
+  previously divided by 1024² and called the result "mb" — MiB under an
+  SI label. The admin worklist had the identical mislabelling and both
+  now use decimal. Decimal was chosen over renaming the field to `_mib`
+  because this field is public and the sentry consumes it *by name*.
+  **The pulse total and the admin Consultations total still differ, and
+  legitimately so:** the pulse walks the recordings *directory*, the
+  admin page sums only recordings *linked to a consultation row*. On
+  2026-07-25 that was 37 files (213.7 MB) against 9 files (203.9 MB) —
+  **28 orphan WAVs on disk with no consultation row**, which the
+  retention sweep will never collect because it works from consultations.
+  Flagged, not deleted. If the two numbers are ever reported as
+  disagreeing again, this is why, and it is not a units bug.
 - **`errors_last_hour`** counts unhandled exceptions and 5xx responses
   via the `count_errors` middleware into an in-process ring buffer
   (maxlen 1000, pruned on read). 4xx refusals — RBAC probes, guards —
@@ -1334,10 +1392,25 @@ pre-isolation test accounts (`role_8hex` names, shared password
 `test-password-123`, incl. ~131 admins) were bulk-deactivated in one
 audited action — audit row `user.deactivated` `{bulk: true, count: 489}`,
 user_id NULL. With test isolation in place they cannot reaccumulate.
-Exactly five active accounts remain (owner-confirmed set): `doctor`
+The active set was five at that point (owner-confirmed): `doctor`
 (admin), `receptionist`, `herath`, `vicky`, and invited demo user
 `JoydeepSinha1988`. Accounts are deactivated, never deleted — the rows
 keep their names for the audit trail.
+
+**The active set is now six** (verified against `app_user` and the audit
+log 2026-07-25). The list above was correct when written; approve-to-
+activate then did its job and added one:
+
+| | |
+|---|---|
+| `claudia` (id 572, receptionist) | registered 2026-07-25 11:37:27 from **100.94.144.52 — mlrig's own tailnet address**, approved 37 s later by user 10 (the `doctor` admin account), first login 11:38:17 from the same address |
+
+That shape — self-registration from the host machine, approved by the
+owner within the minute — reads as the owner exercising the
+approve-to-activate flow rather than an outside registrant. Worth
+re-checking the count after any demo: a growing set is the *expected*
+behaviour of a public registration page, not a defect, and the number
+here should be treated as a snapshot rather than an invariant.
 
 ## After-reboot startup sequence
 
