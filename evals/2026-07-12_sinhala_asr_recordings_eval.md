@@ -242,3 +242,8 @@ six cells as successes. Keep both fields in any future adjudication.
 
 None of this accounts for a 7-versus-0 gap in clinical survival, but the
 design should be blinded if the adjudication is ever repeated.
+
+**What followed from this result:** on 2026-07-25 the owner decided that
+Consultation AI is **English-only for v1** and closed Phase 5 with this
+negative result — recorded in PROJECT_PLAN.md §4 (Scope decision), the
+decision header of `evals/2026-07-17_finetune_plan.md`, and HANDOVER.md.

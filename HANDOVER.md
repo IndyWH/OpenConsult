@@ -82,6 +82,27 @@ clinical outputs is temperature 0, seed 42 (`CDS_TEMPERATURE`/`CDS_SEED`).
 
 ## Key design decisions and why
 
+**English-only for v1 (owner decision, 2026-07-25).** Sinhala
+transcription, the translation layer, and dual-language transcript
+generation are **out of scope for v1** — not postponed. The reason is
+measured, not resourcing: the pre-registered benchmark and recordings
+eval established that no off-the-shelf model handles code-switched
+clinical Sinhala, and the 2026-07-25 adjudication established that four
+of twelve curated clinical terms — including two drug names — survive in
+no model at all. Phase 5 is closed with a negative result; that result
+is the finding. Full statement in PROJECT_PLAN.md §4 (Scope decision).
+Two deliberate retentions, so nobody "tidies" them away later: (1) **all
+Sinhala research artifacts stay** — both `_si` scripts, the
+`03_diabetes_review_si` recording and its frozen reference,
+`scripts/evaluate_sinhala_asr.py`, the benchmark, the recordings eval,
+the adjudication worksheet and the fine-tune plan — because they are a
+standalone research contribution (a pre-registered negative result on
+code-switched clinical ASR) intended for external collaboration; and (2)
+**the si/en seam in the `FinalTranscript` design is retained on
+purpose**, even though nothing populates the Sinhala side in v1, because
+removing and later restoring it would be a schema migration against a
+database holding approved clinical notes.
+
 **Live ASR: distil-large-v3, beam 5, clinical initial prompt.** The
 original small.en garbled drug names on accented speech ("gliclazide" →
 "nucleoside"). distil-large-v3 is more accurate AND faster (67× real
@@ -657,7 +678,8 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   benchmark, plan §4) and dual-language transcript generation. The
   project-wide English-only decision and its two deliberate retentions
   (research artifacts; the si/en seam in `FinalTranscript`) are recorded
-  in PROJECT_PLAN.md §§4, 7 and in the English-only section below.
+  in PROJECT_PLAN.md §§4, 7 and under "English-only for v1" in Key
+  design decisions above.
 
 ## CDS restraint dimension — built and evaluated (2026-07-17)
 

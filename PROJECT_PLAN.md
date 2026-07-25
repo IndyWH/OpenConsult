@@ -79,8 +79,8 @@ Browser (mic + UI)
 | Live speech-to-text | **faster-whisper** (CTranslate2) | Whisper-quality transcription, fast enough for near-real-time on a 4090 |
 | Voice activity detection | Silero VAD (built into faster-whisper) | Chunks audio at natural pauses so transcription streams smoothly |
 | Final transcription + diarisation | **WhisperX** + **pyannote.audio** | Word-level timestamps + "who spoke when"; `num_speakers=2` for the doctor–patient case |
-| Sinhala ASR | Whisper large-v3 fine-tuned for Sinhala (existing HF fine-tunes first; own fine-tune if needed) | Base Whisper's Sinhala is weak; fine-tunes on Common Voice / OpenSLR Sinhala close the gap. Whisper handles Sinhala–English code-switching better than monolingual models |
-| Translation | LLM-based (Gemma 3 27B) or dedicated NMT model — to be benchmarked | Sinhala→English medical translation quality is a key experiment |
+| Sinhala ASR | ~~Whisper large-v3 fine-tuned for Sinhala~~ — **OUT OF SCOPE FOR v1** (2026-07-25, see below) | Investigated and closed with a negative result: no off-the-shelf model handles code-switched clinical Sinhala |
+| Translation | ~~LLM-based (Gemma 3 27B) or dedicated NMT model~~ — **OUT OF SCOPE FOR v1** (2026-07-25, see below) | The translation layer has no Sinhala transcript to consume once Sinhala ASR is out of scope |
 | Clinical reasoning LLM | **MedGemma 27B** (quantised) | Medically tuned, fits a 4090, runs locally |
 | Guideline grounding | RAG with **pgvector** (inside PostgreSQL) | Traceable recommendations; no extra database to run |
 | Backend | **FastAPI** + WebSockets | Async Python framework; handles streaming audio and live UI updates |
@@ -90,6 +90,37 @@ Browser (mic + UI)
 | Packaging | Docker Compose (later phases) | One-command demo setup |
 
 *(Why not Gradio: it's excellent for demos of a single model, but user accounts, roles, a patient database, and audit trails need a real web application.)*
+
+### Scope decision: English-only for v1 (2026-07-25, owner)
+
+**Consultation AI is English-only for v1.** Sinhala transcription, the
+translation layer, and dual-language transcript generation are **out of
+scope for v1**.
+
+**The reason is measured, not resourcing.** The pre-registered benchmark
+(`evals/2026-07-10_sinhala_asr_benchmark.md`) and recordings evaluation
+(`evals/2026-07-12_sinhala_asr_recordings_eval.md`) established that no
+off-the-shelf model handles code-switched clinical Sinhala. The
+adjudication of 2026-07-25 (§ Step 6 of the recordings eval) established
+that **four of twelve curated clinical terms — including two drug names
+— survive in no model at all.** Phase 5 is therefore closed with a
+negative result rather than paused; the negative result is itself the
+finding.
+
+Two retentions, both deliberate:
+
+1. **All Sinhala research artifacts stay in the tree** — both `_si`
+   scripts, the `03_diabetes_review_si` recording and its frozen
+   reference, `scripts/evaluate_sinhala_asr.py`, the benchmark record,
+   the recordings eval, the adjudication worksheet, and the fine-tune
+   plan. They are a standalone research contribution — a pre-registered
+   negative result on code-switched clinical ASR — and are intended for
+   external collaboration. Nothing here is dead weight to be tidied
+   away.
+2. **The si/en seam in the `FinalTranscript` design is retained on
+   purpose**, even though nothing populates the Sinhala side in v1.
+   Removing it and later restoring it would be a schema migration
+   against a database holding approved clinical notes.
 
 ## 5. Data model (first cut)
 
@@ -142,8 +173,8 @@ Phases 1–2 are sequential; 3, 4, and 5 are largely independent after that, so 
 
 | Risk | Mitigation |
 |---|---|
-| Sinhala ASR quality is poor | Whole pipeline built English-first; language layer is a swappable module. Benchmark existing fine-tunes before training. Fine-tuning is itself a demonstrable result |
-| Code-switched speech mangles English medical terms | Use Whisper-family models (multilingual by design); measure this explicitly on the mock set |
+| Sinhala ASR quality is poor | **This risk materialised.** The mitigation worked as designed — pipeline built English-first, language layer swappable, benchmark before training — and the benchmark's answer was that no candidate is usable. Resolved 2026-07-25 by scoping Sinhala out of v1 (§4, Scope decision), not by training |
+| Code-switched speech mangles English medical terms | **This risk materialised, and was the decisive one.** Measured explicitly on the mock set as planned: mechanical English-term recall 0/106 for every fine-tune, and four of twelve curated clinical terms unrecoverable in every model |
 | CDS suggestions flip-flop or hallucinate | Structured JSON prompting, low temperature, carry previous state into each prompt; treat as an explicit experiment |
 | Guideline hallucination | RAG-only guideline content with visible citations; nothing from model memory |
 | Real-time performance on one GPU | Live path uses a smaller/faster Whisper model; heavy models (MedGemma 27B, WhisperX) run post-consultation |
