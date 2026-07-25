@@ -15,13 +15,13 @@ from pathlib import Path
 import psycopg
 from dotenv import load_dotenv
 from fastapi import Cookie, FastAPI, Request, WebSocket, WebSocketDisconnect
-from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk, letters, monitor, ratelimit, retention, schema
+from app import audit, auth, consultations, frontdesk, letters, monitor, ratelimit, retention, schema, speech
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
@@ -55,6 +55,10 @@ async def lifespan(app: FastAPI):
     schema.ensure_all()
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
+    # Speech is constructed unconditionally; the Piper voice loads lazily
+    # on first synthesis, so a machine without piper-tts starts normally
+    # and simply cannot speak.
+    app.state.speech = speech.SpeechService()
     app.state.cds_engine = CDSEngine()
     app.state.rag = RAGService()
     # Finalisation is serialised through a single-consumer queue: exactly
@@ -234,6 +238,23 @@ async def logout() -> JSONResponse:
 @app.get("/api/me")
 async def me(user: dict = Depends(api_user())) -> dict:
     return user
+
+
+@app.get("/api/speech/{utterance_id}.wav")
+async def speech_audio(utterance_id: str, user: dict = Depends(api_user(*CLINICAL_ROLES))):
+    """The audio for one prepared utterance (PHASE_7A_SPEC.md §2.2 step 2).
+
+    Bound to the doctor who requested it: an utterance is not fetchable by
+    anyone who guesses an id. Unknown and foreign ids answer the same 404,
+    so the endpoint does not confirm that an id exists.
+    """
+    utterance = app.state.speech.get(utterance_id)
+    if utterance is None or (
+        utterance.user_id is not None and utterance.user_id != user["id"]
+    ):
+        return JSONResponse(status_code=404, content={"error": "unknown utterance"})
+    return Response(content=utterance.wav, media_type="audio/wav",
+                    headers={"Cache-Control": "no-store"})
 
 
 class ChangePasswordBody(BaseModel):
