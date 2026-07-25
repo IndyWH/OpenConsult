@@ -627,3 +627,38 @@ def test_the_anomaly_has_a_pulse_counter():
 
     assert (monitor._DAY_COUNTERS["transcript.exclusion_anomaly"]
             == "exclusion_anomalies_today")
+
+
+# --- the live page must land on the refusal, not spin ----------------------
+
+def test_the_live_page_lands_on_every_terminal_status():
+    """Consultation 445: the gate refused, status became
+    `unreliable_transcript`, and the poll loop — which enumerated the good
+    outcomes — spun forever on "processing…". The doctor waited for a note
+    that was never coming.
+
+    The list is now inverted: only in-progress statuses continue. A status
+    nobody thought of lands on the review page rather than hanging,
+    because a page that says something beats a spinner that says nothing.
+    """
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "IN_PROGRESS_STATUSES = ['live', 'queued', 'processing']" in html
+    assert "unreliable_transcript:" in html
+    # The unknown-status fallback exists and lands.
+    assert "finalisation finished (' + row.status + ')" in html
+
+
+def test_every_status_the_pipeline_sets_is_either_in_progress_or_lands():
+    """Guard against the next status being forgotten the same way."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    in_progress = {"live", "queued", "processing"}
+    landing = {"awaiting_review", "approved", "failed", "unreliable_transcript"}
+    assert transcript_quality.STATUS_UNRELIABLE in landing
+
+    source = Path("app/finalize.py").read_text() + Path("app/main.py").read_text()
+    for status in in_progress | landing:
+        assert status in html or status in source, status

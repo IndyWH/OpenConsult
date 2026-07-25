@@ -1276,6 +1276,31 @@ async function stop() {
 
 let resultUrl = null;
 
+// Statuses that mean finalisation is still running. EVERYTHING ELSE is a
+// landing, deliberately inverted from the old list of good outcomes.
+//
+// Consultation 445 (2026-07-25): the transcript-quality gate refused, set
+// status `unreliable_transcript`, and this loop — which enumerated
+// awaiting_review / approved / failed — spun forever. The doctor sat on
+// "processing…" with a "Please wait…" button waiting for a note that was
+// never coming.
+//
+// Listing the NON-terminal states instead means a status nobody thought
+// of here lands on the review page rather than hanging. Landing on a page
+// that says something is always better than a spinner that says nothing:
+// the review page already renders every refusal correctly.
+const IN_PROGRESS_STATUSES = ['live', 'queued', 'processing'];
+
+const LANDING_MESSAGES = {
+  awaiting_review: ['See results', 'note ready for review'],
+  approved: ['See results', 'note ready for review'],
+  failed: ['See details', 'finalisation failed — open the consultation for details'],
+  unreliable_transcript: [
+    'See details',
+    'the transcript did not pass the quality gate — no note was drafted. ' +
+    'Open the consultation to see why.'],
+};
+
 async function awaitResults(cid) {
   setStatus('processing — diarisation and note drafting (usually about a minute)…');
   while (true) {
@@ -1286,20 +1311,16 @@ async function awaitResults(cid) {
       row = rows.find(c => c.id === cid);
     } catch (e) { continue; }  // transient network error — keep waiting
     if (!row) continue;
-    if (row.status === 'awaiting_review' || row.status === 'approved') {
-      resultUrl = '/review/' + cid;
-      btn.textContent = 'See results';
-      btn.disabled = false;
-      setStatus('note ready for review');
-      return;
-    }
-    if (row.status === 'failed') {
-      resultUrl = '/review/' + cid;
-      btn.textContent = 'See details';
-      btn.disabled = false;
-      setStatus('finalisation failed — open the consultation for details');
-      return;
-    }
+    if (IN_PROGRESS_STATUSES.includes(row.status)) continue;
+
+    const [label, message] = LANDING_MESSAGES[row.status]
+      || ['See details', 'finalisation finished (' + row.status + ') — ' +
+                        'open the consultation for details'];
+    resultUrl = '/review/' + cid;
+    btn.textContent = label;
+    btn.disabled = false;
+    setStatus(message);
+    return;
   }
 }
 
