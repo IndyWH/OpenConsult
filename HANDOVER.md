@@ -32,7 +32,7 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 333 tests; heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 346 tests; heavy ones self-skip if Ollama/Postgres/
   corpus are absent. Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
@@ -735,6 +735,98 @@ carrying two words, which is anomalous regardless of energy. One caveat
 from the measurements: the 7:32 filler reads 0.054 because a 3-second
 window there straddles real speech, so window sizing matters.
 
+### Consultations 446 and 447 — the doctor could not stop the machine
+
+The second and third room runs, same evening as 445. One hard-rule
+breach and two reasons the owner did not see what the interface was
+telling him.
+
+**Hard rule 3 was breached: there was no way to stop an utterance.**
+`PHASE_7_SPEC.md` rule 3 — the doctor always wins, one tap, immediate. In
+447 the owner tapped a long question, wanted to cut it off, found nothing
+to press, tapped the chip again (speaking it a second time), and in the
+end **stopped the whole consultation recording to silence the machine**.
+Ending a consultation is not an acceptable way to cancel an utterance.
+
+**The control was never absent — it was invisible.** `#speakStop` had
+been in the DOM since it was built; it is one of the two elements reading
+"Stop" that the DOM snapshot found (the other is the main Start/Stop
+button). The defect was **position**: the speaking bar sat in normal flow
+at the top of `.stack`, above the urgent box, while the question chips
+that trigger it are further down the page. On any page taller than the
+viewport it scrolled out of sight exactly when it was needed.
+
+It is now **fixed to the viewport** (bottom centre, z-index 60), moved
+out of `.stack` so a layout change cannot re-parent it back into the
+scroll, and made loud: solid accent background, white bold Stop,
+`role="alert"`. **Escape is a second one-tap path.** The CSS carries a
+comment saying position is the point and not cosmetic, because to the
+next reader it will look like a style choice. Tests assert
+`position: fixed` and non-membership of `.stack` — a test asserting only
+"the control exists" would have passed throughout the incident.
+
+Also: a question that has been asked now shows **"✓ asked"** and its icon
+becomes ↻. Re-asking stays allowed and logged — the panel lags a revision
+behind and repetition is sometimes right — but 447 spoke *"Have you
+noticed any white patches on your tonsils"* three times (86.8 s, 123.5 s,
+133.0 s) because nothing showed it had gone out. Tracked by question
+**text**, not index, since the index moves when the agenda revises.
+
+**The sound-check offer was eating taps.** In 446 the owner tapped
+question chips repeatedly and nothing was spoken; the banner *"No sound
+check yet this session"* was consuming the tap. Confirmed in the data:
+**two system utterances all evening, both phrases, not one
+`cds_question`**. Two things were wrong, and the spec asking for it was
+one of them — an offer must not consume the action, and there was never a
+reason for a spoken phrase to bypass a check a spoken question does not.
+That asymmetry is what made it unreadable from the room, because the
+machine plainly *could* speak. The offer is now passive and holds no
+callback; questions and phrases take the identical path.
+
+**`doctor_stop` is now proven on real audio.** 447's last utterance
+closed with `end_reason = doctor_stop` at 133.00–134.95 s — cut to 1.95 s
+where the same question ran 4.68 s when it played through — against a
+134.8 s recording. Status `awaiting_review`, `quality_outcome` **pass**,
+and **no exclusion anomaly and no silence hallucination** for either 446
+or 447. Stopping the recording mid-utterance closes the window correctly;
+that edge case is no longer only a unit test.
+
+### The standing rule: never swallow an action
+
+**Adopted 2026-07-25 after the third instance in one evening.** Three
+separate controls did nothing while a small banner elsewhere explained
+why: the "Not connected — cannot speak" panel, the finalisation page that
+never left "processing", and the sound-check offer. The owner missed all
+three.
+
+> **Either PERFORM the action, or VISIBLY DISABLE the control with the
+> reason attached to the control itself. Never accept a tap, do nothing,
+> and explain it somewhere else on the page.**
+
+**This is an accessibility requirement, not a preference.** The owner is
+dyslexic with ADHD; a quiet explanation placed away from the control just
+pressed is, for him, no explanation at all — and in a consultation room
+with a patient waiting it is no explanation for anyone. The rule is
+written at the top of `live.html`'s script *with that reason attached*,
+and a test asserts the reason survives: a rule stripped of its why reads
+as a style opinion and gets traded away.
+
+A banner may **accompany** a refusal that arrives asynchronously from the
+server. It may never **substitute** for a control that looks live and is
+not.
+
+Auditing the page against the rule found two more violations, both fixed:
+
+- **Speak controls stayed enabled after a WebSocket drop**, so a tap
+  produced the "Not connected" panel. `onWsClose` now refreshes them and
+  `openSocket` re-enables them. The in-function guard survives as a
+  documented last resort against a race.
+- **The mic picker silently ignored clicks during recording** — a bare
+  `return`, keeping its pointer cursor and chevron. `.mic.disabled`
+  already existed in the CSS and **nothing had ever applied it**. Now
+  applied, chevron hidden so it stops inviting a click, reason in the
+  control's own title.
+
 ### The real-room check — this, not the suite, is what proves it
 
 The suite is evidence about the code. Nothing in it drives a browser, and
@@ -772,8 +864,12 @@ running app — the pulse fetched at 12:30 on 2026-07-25 still had no
    Confirm: it speaks, the pill shows it, all other chips grey out while
    it does, and **the spoken question does not appear as patient or
    doctor text in the live transcript** — only in the grey channel.
-6. Tap a chip and press **Stop** mid-sentence. Playback must cut
-   immediately.
+6. **Hard rule 3 — do this one properly, it is what 447 failed.** Tap a
+   long question, then *scroll down to the transcript* while it speaks.
+   The speaking bar must still be on screen (it is fixed to the viewport);
+   press **Stop** and playback must cut immediately. Repeat using **Esc**.
+   Then confirm the chip you used now reads **✓ asked** with a ↻ icon, and
+   that tapping it again still works.
 7. Speak normally straight after an utterance ends and confirm your
    speech still reaches the transcript (the 200 ms tail should cost you
    nothing at conversational pace).
@@ -1193,12 +1289,13 @@ lost while Phase 7 takes attention:**
    envelope-proportional threshold needs, and it is already being
    recorded. The good/faint ratios there are uncalibrated guesses and
    should be set from the same run.
-7. **The Phase 7a real-room check has been run ONCE, on 2026-07-25, and
-   it found a serious defect** — consultation 445, "the missing six
-   minutes" (see its section). The defect is fixed and pinned by a
-   regression test built from 445's real data. **The check has not been
-   re-run since the fix**, so the guarantee is again proven in code and
-   not in the room. Re-run it before calling 7a done.
+7. **The Phase 7a real-room check has been run THREE times on 2026-07-25
+   (consultations 445, 446, 447) and found a serious defect each time** —
+   the missing six minutes, then the offer eating taps, then no way to
+   stop an utterance. All are fixed and pinned by tests. **None has been
+   re-run since its fix**, so the guarantee is again proven in code and
+   not in the room. Re-run before calling 7a done — and note the pattern:
+   every round of room testing has found something no test would have.
 8. **Hallucinated filler on ordinary silence: assessed, not built.** About
    fifteen phantom "Thank you." turns in 445's LIVE transcript. Confidence
    cannot catch it (there is none on the live path, and on the final path
@@ -1383,6 +1480,18 @@ docket item 5.
    rather than add one), and the transcript-quality gate is what surfaced
    it — the layer that refused was doing its job, and without it a
    four-turn transcript would have been drafted from.
+
+9c. **Interface lesson, 2026-07-25 (446/447): a control that cannot act
+   must not look as if it can.** Three controls in one evening accepted a
+   tap, did nothing, and explained themselves in a banner elsewhere; the
+   owner missed all three. The standing rule and its accessibility
+   reasoning are recorded in its own section above and in `live.html`.
+   The generalisable part for the failure-mode library: **the bug was
+   never in the explaining, it was in the accepting.** Each of the three
+   had a perfectly good message that nobody read, because the place a
+   person looks after pressing a control is the control. Worth applying
+   to the other pages (Today, Consultations, review) — this audit covered
+   the live page only.
 
 9. **Safety note carried forward from the adjudication:** any future
    Sinhala transcription path must be evaluated **specifically on
