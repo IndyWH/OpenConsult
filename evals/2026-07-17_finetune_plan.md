@@ -1,5 +1,37 @@
 # Phase 5 fine-tune plan — groundwork (no training yet)
 
+> ## DECISION: DEFERRED (2026-07-25, owner)
+>
+> The Phase 5 fine-tune is **deferred to v2**. The eight sign-offs in §7
+> were **deliberately not sought** — this is a decision not to start, not
+> a decision stalled awaiting them.
+>
+> **Rationale.** The pre-registered off-the-shelf investigation is now
+> complete through step 6 (adjudication, 2026-07-25 — see
+> `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6). Its
+> conclusion stands: no off-the-shelf model is usable for code-switched
+> clinical Sinhala. The project's remaining pre-Phase-7 obligations take
+> priority over acting on that conclusion now.
+>
+> **The plan below is preserved unchanged** and remains the starting
+> point if Sinhala restarts.
+>
+> **One substantive change, from the adjudication.** The base-model
+> choice leads with **`seniruk/whisper-small-si`**, not xlsr-sinhala.
+> The CER ranking in the recordings eval favoured xlsr (0.462 vs 0.504);
+> adjudicated clinical survival favours seniruk-small **7 to 1**, and
+> clinical survival is the metric that matters for this use case. This
+> **reverses a ranking the recordings eval reported**. (§4 already made
+> seniruk-small Arm A, on CER-proximity and downstream-fit grounds and
+> with xlsr rejected as a base; the adjudication now supplies an
+> independent and considerably stronger reason for the same choice, so
+> §4 needs no edit.)
+>
+> **Restart conditions.** Sinhala work resumes when a Sinhala arm is
+> needed for a demo or study commitment, or when a new candidate model
+> or code-switched dataset appears. **Whoever restarts it reads the step
+> 6 section of the recordings eval first.**
+
 **Date:** 2026-07-17
 **Status:** planning document only. Nothing here has been executed; no
 training data has been downloaded beyond what the benchmark already
