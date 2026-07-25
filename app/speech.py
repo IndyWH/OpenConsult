@@ -125,22 +125,27 @@ class SpeechRefused(ValueError):
 
 # --- the fixed phrase table ------------------------------------------------
 #
-# Reviewed in advance, wording from PHASE_7A_SPEC.md Part 5. This is half
-# of the answer to "what can the system say?" — the other half is the CDS
-# agenda, which the CDS engine already constrains to questions.
+# Reviewed in advance. This is half of the answer to "what can the system
+# say?" — the other half is the CDS agenda, which the CDS engine already
+# constrains to questions.
 #
-# NOTE FOR THE OWNER: the four spec-quoted phrases are verbatim. The
-# `disclosure` wording is NOT in the spec — hard rule 4 requires only that
-# the patient is told they are talking to a machine, so the sentence below
-# is a first draft written by the implementer and needs the owner's
-# sign-off as a clinical-communication decision, like the marking schemes.
+# `{doctor}` is interpolated SERVER-SIDE from the session's doctor
+# account, in code and never by a model — the same convention as
+# `app/letters.py`, where the salutation, the Re: line and the sign-off
+# are code precisely because they are the parts that must not be invented.
 
 PHRASES: dict[str, str] = {
-    # Hard rule 4 — disclosure. DRAFT WORDING, awaiting the owner.
+    # Hard rule 4 — disclosure. Wording APPROVED BY THE OWNER 2026-07-25,
+    # verbatim; do not edit without them.
+    #
+    # It deliberately says NOTHING about interrupting the system, so that
+    # it stays true whether or not barge-in is enabled and stays constant
+    # across the face study's arms. Do not add an interruption line when
+    # the detector lands.
     "disclosure": (
-        "Before we begin — I am a computer, not a person. "
-        "I will ask you some questions about what has brought you in. "
-        "Doctor Herath is here with you and will examine you."
+        "Hello. I'm a computer, not a person. I'll ask you some questions "
+        "about what's brought you in. Dr {doctor} is here with you and you "
+        "can speak to him at any time."
     ),
     # Golden minutes: the single opening invitation (spec Part 5, and the
     # behaviour policy in PHASE_7_SPEC.md).
@@ -151,10 +156,38 @@ PHRASES: dict[str, str] = {
     "i_see": "I see.",
     "go_on": "Go on.",
     # Examination handover: the system never pretends to examine.
-    "examination_handover": "Thank you — Doctor Herath will examine you now.",
+    "examination_handover": "Thank you — Dr {doctor} will examine you now.",
 }
 
 ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
+
+# Phrases the patient must have heard the disclosure before (hard rule 4).
+# The encouragers are exempt: "mm-hm" is not a clinical interaction, and
+# gating them would make the lock feel like a nuisance rather than a rule.
+DISCLOSURE_GATED_PHRASES = ("invitation", "examination_handover")
+
+
+def doctor_name_for(user: dict | None) -> str:
+    """The name to speak, from the session's doctor account.
+
+    Fallback order is display name, then username. **No title is ever
+    invented**: every phrase that needs one carries "Dr " in its own
+    template, so this returns the name exactly as the account records it.
+    If an account's display name already began "Dr", the spoken line would
+    read "Dr Dr ..." — no active account does today, and correcting that
+    is a data decision for the owner rather than a transform to apply
+    silently here.
+    """
+    if not user:
+        return "the doctor"
+    return (user.get("display_name") or "").strip() or user.get("username", "the doctor")
+
+
+def render_phrase(phrase_id: str, doctor: str | None = None) -> str:
+    """A phrase with its server-side fields filled in."""
+    if phrase_id not in PHRASES:
+        raise SpeechRefused(f"unknown phrase id: {phrase_id!r}")
+    return PHRASES[phrase_id].format(doctor=doctor or "the doctor")
 
 
 # --- the server's own copy of the CDS agenda -------------------------------
@@ -222,12 +255,14 @@ class Resolution:
     stale: bool = False   # the question has since left the agenda
 
 
-def resolve(ref: dict, agenda: AgendaLog | None = None) -> Resolution:
+def resolve(ref: dict, agenda: AgendaLog | None = None,
+            doctor: str | None = None) -> Resolution:
     """Turn a client reference into server-authored text.
 
     Raises SpeechRefused for anything unrecognised. It never falls back to
     a client-supplied string, because there is no client-supplied string:
-    that is the whole design.
+    that is the whole design. `doctor` is likewise server-side — the
+    client cannot choose whose name the machine says.
     """
     if not isinstance(ref, dict):
         raise SpeechRefused("speak.ref must be an object")
@@ -238,7 +273,7 @@ def resolve(ref: dict, agenda: AgendaLog | None = None) -> Resolution:
         phrase_id = ref.get("id")
         if phrase_id not in PHRASES:
             raise SpeechRefused(f"unknown phrase id: {phrase_id!r}")
-        return Resolution(text=PHRASES[phrase_id], ref_kind="phrase",
+        return Resolution(text=render_phrase(phrase_id, doctor), ref_kind="phrase",
                           ref_detail={"id": phrase_id})
 
     if kind == "cds_question":
@@ -435,10 +470,10 @@ class SpeechService:
     # -- utterances ----------------------------------------------------
 
     def prepare(self, ref: dict, agenda: AgendaLog | None = None, *,
-                user_id: int | None = None,
-                consultation_id: int | None = None) -> Utterance:
+                user_id: int | None = None, consultation_id: int | None = None,
+                doctor: str | None = None) -> Utterance:
         """Resolve a reference, synthesise it, and register the result."""
-        resolution = resolve(ref, agenda)
+        resolution = resolve(ref, agenda, doctor)
         wav_bytes, duration_ms, synth_ms = self.synthesise(resolution.text)
         utterance = Utterance(
             utterance_id=secrets.token_hex(8),

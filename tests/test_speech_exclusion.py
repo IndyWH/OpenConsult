@@ -287,7 +287,7 @@ def test_the_protocol_has_no_path_from_client_text_to_audio():
     # whatever else the client attached to it.
     resolved = speech.resolve(
         {"kind": "phrase", "id": "invitation", "text": "You'll be fine."})
-    assert resolved.text == speech.PHRASES["invitation"]
+    assert resolved.text == speech.render_phrase("invitation")
 
 
 # ==========================================================================
@@ -328,8 +328,10 @@ class StubSpeech:
     def __init__(self):
         self.utterances = {}
 
-    def prepare(self, ref, agenda, *, user_id=None, consultation_id=None):
-        resolution = speech.resolve(ref, agenda)
+    def prepare(self, ref, agenda, *, user_id=None, consultation_id=None,
+                doctor=None):
+        resolution = speech.resolve(ref, agenda, doctor)
+        self.last_doctor = doctor
         utterance = speech.Utterance(
             utterance_id=secrets.token_hex(8), text=resolution.text, voice="stub",
             wav=b"RIFF", duration_ms=1000, synth_ms=1,
@@ -426,7 +428,7 @@ def test_phrase_reference_produces_the_servers_own_words(speech_state):
     assert ready["duration_ms"] == 1000
     assert ready["url"] == f"/api/speech/{ready['utterance_id']}.wav"
     assert speech_state.speech.get(ready["utterance_id"]).text == \
-        speech.PHRASES["invitation"]
+        speech.render_phrase("invitation")
 
 
 @needs_db
@@ -516,7 +518,7 @@ def test_spans_are_persisted_as_bytes_and_milliseconds(speech_state):
 
     rows = asyncio.run(system_utterances.for_consultation(cid))
     assert len(rows) == 1
-    assert rows[0]["text"] == speech.PHRASES["invitation"]
+    assert rows[0]["text"] == speech.render_phrase("invitation")
     assert rows[0]["ref_kind"] == "phrase"
     assert rows[0]["end_reason"] == "complete"
     assert rows[0]["started_offset_ms"] == 250   # after the first 0.25 s frame

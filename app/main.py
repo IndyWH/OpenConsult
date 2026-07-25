@@ -7,6 +7,7 @@ patient/consultation views described in PROJECT_PLAN.md.
 
 import asyncio
 import contextlib
+import functools
 import json
 import logging
 import os
@@ -1275,13 +1276,22 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         try:
             utterance = await asyncio.to_thread(
-                state.speech.prepare, payload.get("ref") or {}, entry["agenda"],
-                user_id=user["id"])
+                functools.partial(
+                    state.speech.prepare, payload.get("ref") or {}, entry["agenda"],
+                    user_id=user["id"],
+                    # Server-side, from the session's own doctor account —
+                    # the client cannot choose whose name the machine says.
+                    doctor=speech.doctor_name_for(entry["user"])))
         except speech.SpeechRefused as exc:
             await refuse_speech(str(exc))
             return
         except speech.SpeechUnavailable as exc:
             await refuse_speech(f"speech unavailable: {exc}")
+            return
+        except speech.SpeechFailed as exc:
+            # A fault, not a configuration state: it must show as an error
+            # rather than as a system that chose not to speak.
+            await refuse_speech(f"synthesis failed: {exc}")
             return
         entry["pending_utterance"] = utterance
         await audit.log(user["id"], "speech.requested", None, None,

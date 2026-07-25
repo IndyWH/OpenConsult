@@ -57,21 +57,32 @@ def test_phrase_table_holds_exactly_the_specified_phrases():
 
 
 def test_spec_quoted_wording_is_verbatim():
-    """PHASE_7A_SPEC.md Part 5 quotes four of these exactly. The handover
-    line names the doctor, per the build prompt."""
+    """PHASE_7A_SPEC.md Part 5 quotes four of these exactly."""
     assert speech.PHRASES["invitation"] == "Please, tell me what's brought you in."
     assert speech.PHRASES["mm-hm"] == "Mm-hm."
     assert speech.PHRASES["i_see"] == "I see."
     assert speech.PHRASES["go_on"] == "Go on."
-    assert "Herath" in speech.PHRASES["examination_handover"]
-    assert "examine you" in speech.PHRASES["examination_handover"]
+    assert speech.render_phrase("examination_handover", "Herath") == \
+        "Thank you — Dr Herath will examine you now."
 
 
-def test_disclosure_says_the_patient_is_talking_to_a_machine():
-    """Hard rule 4. The exact wording is the owner's to approve; that it
-    discloses at all is not negotiable, so assert the substance only."""
+def test_the_approved_disclosure_is_verbatim():
+    """Owner-approved 2026-07-25. Asserted word for word, not by substance:
+    this is the sentence a patient hears, and a silent edit to it is a
+    clinical-communication change nobody signed off."""
+    assert speech.render_phrase("disclosure", "Herath") == (
+        "Hello. I'm a computer, not a person. I'll ask you some questions "
+        "about what's brought you in. Dr Herath is here with you and you "
+        "can speak to him at any time.")
+
+
+def test_the_disclosure_says_nothing_about_interrupting():
+    """Deliberate: it must stay true whether or not barge-in is enabled,
+    and constant across the face study's arms. Session 3 must not add an
+    interruption line."""
     text = speech.PHRASES["disclosure"].lower()
-    assert "computer" in text and "not a person" in text
+    for word in ("interrupt", "stop me", "cut in", "talk over"):
+        assert word not in text
 
 
 def test_no_phrase_advises_reassures_or_diagnoses():
@@ -81,10 +92,73 @@ def test_no_phrase_advises_reassures_or_diagnoses():
                  "don't worry", "do not worry", "try not to worry",
                  "nothing to worry", "likely", "diagnos", "i think you",
                  "recommend", "you need to take", "it sounds like")
-    for phrase_id, text in speech.PHRASES.items():
-        lowered = text.lower()
+    for phrase_id in speech.PHRASES:
+        lowered = speech.render_phrase(phrase_id, "Herath").lower()
         for bad in forbidden:
             assert bad not in lowered, f"{phrase_id} may be advising: {text!r}"
+
+
+# --- the doctor's name, interpolated server-side ---------------------------
+
+def test_the_doctor_name_comes_from_the_account_display_name():
+    assert speech.doctor_name_for(
+        {"display_name": "Herath", "username": "herath"}) == "Herath"
+
+
+def test_the_doctor_name_falls_back_to_the_username():
+    """Every account has a username (NOT NULL, unique), so there is always
+    something true to say. Reported to the owner rather than prettified."""
+    assert speech.doctor_name_for(
+        {"display_name": "", "username": "herath"}) == "herath"
+    assert speech.doctor_name_for(
+        {"display_name": None, "username": "vicky"}) == "vicky"
+
+
+def test_no_title_is_ever_invented_from_the_account_data():
+    """The 'Dr' comes from the phrase template, never from a transform on
+    the name. No active account carries a title today."""
+    assert "Dr" not in speech.doctor_name_for(
+        {"display_name": "Herath", "username": "herath"})
+    assert speech.render_phrase("examination_handover", "Herath").startswith(
+        "Thank you — Dr Herath")
+
+
+def test_a_missing_user_still_yields_a_sayable_line():
+    assert speech.doctor_name_for(None) == "the doctor"
+    assert "Dr the doctor" in speech.render_phrase("disclosure", None)
+
+
+def test_phrases_without_a_doctor_field_are_unaffected():
+    for phrase_id in ("invitation", "mm-hm", "i_see", "go_on"):
+        assert speech.render_phrase(phrase_id, "Herath") == speech.PHRASES[phrase_id]
+
+
+def test_the_name_is_not_client_supplied():
+    """resolve() takes the doctor as a server-side argument; nothing in the
+    ref can influence it."""
+    resolution = speech.resolve(
+        {"kind": "phrase", "id": "examination_handover", "doctor": "Kildare"},
+        None, "Herath")
+    assert "Herath" in resolution.text and "Kildare" not in resolution.text
+
+
+def test_different_doctors_get_different_cache_entries():
+    """The rendered text is the cache key's input, so two doctors cannot
+    be served each other's audio."""
+    a = speech.cache_key(speech.render_phrase("disclosure", "Herath"), "v")
+    b = speech.cache_key(speech.render_phrase("disclosure", "Victoria"), "v")
+    assert a != b
+
+
+def test_the_disclosure_gate_list_exempts_the_encouragers():
+    """Gating "mm-hm" would make the lock feel like a nuisance rather than
+    a rule; it is not a clinical interaction."""
+    assert set(speech.DISCLOSURE_GATED_PHRASES) == {"invitation",
+                                                    "examination_handover"}
+    for encourager in speech.ENCOURAGER_IDS:
+        assert encourager not in speech.DISCLOSURE_GATED_PHRASES
+    assert "disclosure" not in speech.DISCLOSURE_GATED_PHRASES, (
+        "the disclosure cannot require itself")
 
 
 # --- reference resolution: the client cannot supply words ------------------
