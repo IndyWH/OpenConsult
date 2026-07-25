@@ -196,13 +196,15 @@ def test_unvoid_restores_a_mistaken_void():
     doctor_client = _client_for(doctor)
 
     # Unvoiding something that isn't voided is refused.
-    assert admin_client.post(f"/api/admin/consultations/{cid}/unvoid").status_code == 409
+    assert admin_client.post(f"/api/admin/consultations/{cid}/unvoid",
+                             json={"reason": "not voided"}).status_code == 409
 
     assert admin_client.post(f"/api/admin/consultations/{cid}/void",
                              json={"reason": "oops, wrong one"}).status_code == 200
     assert doctor_client.get(f"/api/consultations/{cid}").status_code == 410
 
-    assert admin_client.post(f"/api/admin/consultations/{cid}/unvoid").status_code == 200
+    assert admin_client.post(f"/api/admin/consultations/{cid}/unvoid",
+                             json={"reason": "voided the wrong row"}).status_code == 200
 
     # Back in working views, prior status intact, editable again.
     state = doctor_client.get(f"/api/consultations/{cid}").json()

@@ -47,10 +47,23 @@ async function voidConsultation(cid) {
   const reason = prompt(`Void consultation #${cid} — reason (required):`);
   if (reason === null) return;
   if (!reason.trim()) { errEl.textContent = 'A reason is required to void.'; return; }
+  // The class decides whether this void can ever be reversed here.
+  // test_data is the default because it is the common case; a
+  // clinical_safety void is irreversible over HTTP by design.
+  const clinical = confirm(
+    `Reason class for #${cid}.\n\n` +
+    `OK  = clinical safety — the record is unsafe (bad transcript, wrong ` +
+    `patient, fabricated note). This void CANNOT be undone from this ` +
+    `screen; reversal is break-glass on the server shell.\n\n` +
+    `Cancel = test data — routine, freely reversible with Unvoid.`);
+  if (clinical && !confirm(
+      `Confirm: void #${cid} as CLINICAL SAFETY.\n\n` +
+      `There is no Unvoid button for this class. Continue?`)) return;
   errEl.textContent = '';
   const response = await fetch(`/api/admin/consultations/${cid}/void`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
-    body: JSON.stringify({reason: reason.trim()})
+    body: JSON.stringify({reason: reason.trim(),
+                          reason_class: clinical ? 'clinical_safety' : 'test_data'})
   });
   if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
   load();
@@ -145,16 +158,37 @@ async function load() {
         a.className = 'open'; a.href = `/review/${c.id}`; a.textContent = 'inspect →';
         cell.appendChild(a);
         cell.appendChild(document.createTextNode(' '));
+        if (c.void_reason_class === 'clinical_safety') {
+          // No button at all for a clinical-safety void. The API refuses
+          // it too; this just stops anyone reaching for it.
+          const locked = document.createElement('span');
+          locked.className = 'hint';
+          locked.textContent = 'clinical safety — unvoid is break-glass only';
+          cell.appendChild(locked);
+        } else {
         const btn = document.createElement('button');
         btn.className = 'small'; btn.textContent = 'Unvoid';
         btn.addEventListener('click', async () => {
-          if (!confirm(`Restore consultation #${c.id} to the working views?`)) return;
+          // Show WHY it was voided before allowing the reversal. #70 was
+          // unvoided twice because nothing made anyone read this.
+          if (!confirm(
+              `Consultation #${c.id} was voided${c.voided_at ? ' on ' + c.voided_at : ''}` +
+              `${c.voided_by ? ' by ' + c.voided_by : ''} for this reason:\n\n` +
+              `    ${c.void_reason || '(no reason recorded)'}\n\n` +
+              `Restore it to the working views?`)) return;
+          const reason = prompt(`Why are you unvoiding #${c.id}? (required)`);
+          if (reason === null) return;
+          if (!reason.trim()) { errEl.textContent = 'A reason is required to unvoid.'; return; }
           errEl.textContent = '';
-          const response = await fetch(`/api/admin/consultations/${c.id}/unvoid`, {method: 'POST'});
+          const response = await fetch(`/api/admin/consultations/${c.id}/unvoid`, {
+            method: 'POST', headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({reason: reason.trim()})
+          });
           if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
           load();
         });
         cell.appendChild(btn);
+        }
       } else {
         cell.appendChild(document.createTextNode(' '));
         const btn = document.createElement('button');

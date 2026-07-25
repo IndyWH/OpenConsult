@@ -352,6 +352,16 @@ async def admin_keep_for_research(
 
 class VoidBody(BaseModel):
     reason: str
+    # Defaults to test_data, the common case. clinical_safety marks a void
+    # that must never be reversed over HTTP (see the unvoid guard below).
+    reason_class: str = consultations.VOID_CLASS_TEST_DATA
+
+
+class UnvoidBody(BaseModel):
+    # Unvoid gained its own mandatory typed reason on 2026-07-25: #70 was
+    # unvoided twice because nothing made the person state why, or read
+    # why it had been voided. See HANDOVER docket 5.
+    reason: str
 
 
 @app.post("/api/admin/consultations/{cid}/void")
@@ -363,7 +373,13 @@ async def admin_void_consultation(
     reason = body.reason.strip()
     if not reason:
         return JSONResponse(status_code=400, content={"error": "a reason is required to void"})
-    voided = await consultations.void_consultation(cid, user["id"], reason)
+    reason_class = body.reason_class.strip()
+    if reason_class not in consultations.VOID_CLASSES:
+        return JSONResponse(status_code=400, content={
+            "error": "reason_class must be one of "
+                     + ", ".join(consultations.VOID_CLASSES)})
+    voided = await consultations.void_consultation(cid, user["id"], reason,
+                                                  reason_class)
     if voided is None:
         return JSONResponse(status_code=409, content={"error": "not found or already voided"})
     # Free any open queue entry for this patient today so a voided live
@@ -376,21 +392,49 @@ async def admin_void_consultation(
                 await audit.log(user["id"], "queue.cancelled", "queue_entry",
                                 entry["entry_id"], {"via": "consultation.voided"})
     await audit.log(user["id"], "consultation.voided", "consultation", cid,
-                    {"reason": reason, "from_status": voided["from_status"]})
+                    {"reason": reason, "reason_class": reason_class,
+                     "from_status": voided["from_status"]})
     return JSONResponse(content={"ok": True})
 
 
 @app.post("/api/admin/consultations/{cid}/unvoid")
 async def admin_unvoid_consultation(
-    cid: int, user: dict = Depends(api_user("admin"))
+    cid: int, body: UnvoidBody, user: dict = Depends(api_user("admin"))
 ) -> JSONResponse:
     """Reverse a mistaken void; the consultation returns to working views
-    in its prior state. The audit trail keeps both the void and this."""
+    in its prior state. The audit trail keeps both the void and this.
+
+    A `clinical_safety` void is refused here unconditionally — there is no
+    override parameter, so no HTTP caller can reach the reversal at all.
+    Break-glass reversal is `scripts/manage_consultations.py`, server
+    shell only. The refusal is audited: `consultation.unvoid_refused` is
+    the event that shows whether this guard earned its place.
+    """
+    reason = body.reason.strip()
+    if not reason:
+        return JSONResponse(status_code=400, content={
+            "error": "a reason is required to unvoid"})
+
+    state = await consultations.void_state(cid)
+    if state is not None and state["voided"] and \
+            state["reason_class"] == consultations.VOID_CLASS_CLINICAL_SAFETY:
+        await audit.log(user["id"], "consultation.unvoid_refused",
+                        "consultation", cid,
+                        {"reason_class": state["reason_class"],
+                         "attempted_reason": reason})
+        return JSONResponse(status_code=409, content={
+            "error": "this consultation was voided as clinical_safety and "
+                     "cannot be unvoided here. Reversal is break-glass only: "
+                     "scripts/manage_consultations.py on the server shell.",
+            "reason_class": state["reason_class"]})
+
     reverted = await consultations.unvoid_consultation(cid)
     if reverted is None:
         return JSONResponse(status_code=409, content={"error": "not found or not voided"})
     await audit.log(user["id"], "consultation.unvoided", "consultation", cid,
                     {"reverted_reason": reverted["reverted_reason"],
+                     "reverted_class": reverted["reverted_class"],
+                     "reason": reason,
                      "status": reverted["status"]})
     return JSONResponse(content={"ok": True})
 

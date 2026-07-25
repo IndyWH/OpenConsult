@@ -33,6 +33,22 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS doctor_id int;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS voided_at timestamptz;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS voided_by int;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS void_reason text;
+-- Void reason class (2026-07-25). 'test_data' voids stay freely
+-- reversible; 'clinical_safety' voids CANNOT be unvoided over HTTP at
+-- all — reversal is break-glass only (scripts/manage_consultations.py).
+-- Added because a written "don't unvoid real rows" lesson failed twice:
+-- #70 was unvoided 2026-07-22 and again 2026-07-24, six minutes after
+-- the commit documenting the first recurrence. See HANDOVER docket 5.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS void_reason_class text;
+-- Backfill: anything already voided was test data (the pre-2026-07-25
+-- voids were all governance/test rows), EXCEPT #70, the Sinhala
+-- hallucination that is the transcript-quality gate's regression
+-- fixture. Guarded on voided_at so an unvoided row never carries a
+-- stale class.
+UPDATE consultation SET void_reason_class = 'test_data'
+ WHERE voided_at IS NOT NULL AND void_reason_class IS NULL AND id <> 70;
+UPDATE consultation SET void_reason_class = 'clinical_safety'
+ WHERE voided_at IS NOT NULL AND id = 70;
 -- Audio retention (plan §8): research flag exempts a recording from the
 -- retention sweep; audio_deleted_at records that the sweep removed it
 -- (audio only — transcripts and notes are never deleted by retention).
@@ -124,7 +140,8 @@ async def list_consultations(
             await conn.execute(
                 "SELECT c.id, c.started_at, c.status, p.name, u.display_name,"
                 " c.voided_at, c.void_reason, v.display_name,"
-                " c.audio_path, c.keep_for_research, c.audio_deleted_at"
+                " c.audio_path, c.keep_for_research, c.audio_deleted_at,"
+                " c.void_reason_class"
                 " FROM consultation c"
                 " LEFT JOIN patient p ON p.id = c.patient_id"
                 " LEFT JOIN app_user u ON u.id = c.doctor_id"
@@ -140,7 +157,8 @@ async def list_consultations(
          "voided_at": str(r[5])[:16] if r[5] else None,
          "void_reason": r[6], "voided_by": r[7],
          "audio_path": r[8], "keep_for_research": r[9],
-         "audio_deleted_at": str(r[10])[:16] if r[10] else None}
+         "audio_deleted_at": str(r[10])[:16] if r[10] else None,
+         "void_reason_class": r[11]}
         for r in rows
     ]
 
@@ -331,40 +349,83 @@ async def latest_note(cid: int) -> dict | None:
             "approved_text": row[3]}
 
 
-async def void_consultation(cid: int, admin_id: int, reason: str) -> dict | None:
+# A void is one of two kinds, and the kind decides whether it can ever be
+# reversed over HTTP. test_data is the common case and stays freely
+# reversible; clinical_safety is irreversible except by break-glass.
+VOID_CLASS_TEST_DATA = "test_data"
+VOID_CLASS_CLINICAL_SAFETY = "clinical_safety"
+VOID_CLASSES = (VOID_CLASS_TEST_DATA, VOID_CLASS_CLINICAL_SAFETY)
+
+
+async def void_consultation(cid: int, admin_id: int, reason: str,
+                            reason_class: str = VOID_CLASS_TEST_DATA) -> dict | None:
     """Admin error-correction: mark voided (any status, including approved
     — that is the point). Content stays in the database; working views
     filter on voided_at. Returns the prior status, or None when the
     consultation doesn't exist or is already voided."""
+    if reason_class not in VOID_CLASSES:
+        raise ValueError(f"unknown void reason class: {reason_class!r}")
     async with await _conn() as conn:
         row = await (
             await conn.execute(
                 "UPDATE consultation SET voided_at = now(), voided_by = %s,"
-                " void_reason = %s WHERE id = %s AND voided_at IS NULL"
+                " void_reason = %s, void_reason_class = %s"
+                " WHERE id = %s AND voided_at IS NULL"
                 " RETURNING status, patient_id",
-                (admin_id, reason, cid),
+                (admin_id, reason, reason_class, cid),
             )
         ).fetchone()
     return {"from_status": row[0], "patient_id": row[1]} if row else None
 
 
-async def unvoid_consultation(cid: int) -> dict | None:
+async def void_state(cid: int) -> dict | None:
+    """The void columns alone, for guard checks before attempting a
+    reversal. None when the consultation doesn't exist."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT voided_at IS NOT NULL, void_reason, void_reason_class"
+                " FROM consultation WHERE id = %s", (cid,),
+            )
+        ).fetchone()
+    if row is None:
+        return None
+    return {"voided": row[0], "reason": row[1], "reason_class": row[2]}
+
+
+async def unvoid_consultation(cid: int, *, allow_clinical_safety: bool = False
+                              ) -> dict | None:
     """Reverse a mistaken void: clear the flags, restoring the consultation
     to working views exactly as it was (voiding only ever set these three
     columns). Returns the reverted reason for the audit trail, or None if
-    the consultation doesn't exist or isn't voided."""
+    the consultation doesn't exist or isn't voided.
+
+    A `clinical_safety` void is refused unless the caller explicitly opts
+    in — the HTTP layer never does, so that class is reversible only from
+    the server shell (scripts/manage_consultations.py). The guard lives
+    in the UPDATE's WHERE clause rather than in a prior read, so two
+    concurrent callers cannot race past it.
+    """
     async with await _conn() as conn:
         # Self-join to hand back the PRE-update reason (RETURNING alone
         # would give the freshly-NULLed column).
         row = await (
             await conn.execute(
                 "UPDATE consultation c SET voided_at = NULL, voided_by = NULL,"
-                " void_reason = NULL FROM consultation old"
+                " void_reason = NULL, void_reason_class = NULL"
+                " FROM consultation old"
                 " WHERE c.id = %s AND old.id = c.id AND c.voided_at IS NOT NULL"
-                " RETURNING c.status, old.void_reason", (cid,),
+                + ("" if allow_clinical_safety else
+                   " AND COALESCE(c.void_reason_class, %s) <> %s")
+                + " RETURNING c.status, old.void_reason, old.void_reason_class",
+                (cid,) if allow_clinical_safety
+                else (cid, VOID_CLASS_TEST_DATA, VOID_CLASS_CLINICAL_SAFETY),
             )
         ).fetchone()
-    return {"status": row[0], "reverted_reason": row[1]} if row else None
+    if row is None:
+        return None
+    return {"status": row[0], "reverted_reason": row[1],
+            "reverted_class": row[2]}
 
 
 async def purge_voided(only_ids: list[int] | None = None) -> dict:
