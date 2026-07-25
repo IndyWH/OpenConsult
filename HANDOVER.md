@@ -527,8 +527,15 @@ must not open transcripts or notes.
 ## Pre-Phase-7 build item: finalisation transcript-quality gate
 
 **Promoted out of the deferred review docket on 2026-07-25** (was docket
-item 5) and now the third item of the Phase 7 gate. Not implemented in
-this batch — **the spec is coming separately.**
+item 5) and now the third item of the Phase 7 gate.
+
+**Spec: `TRANSCRIPT_QUALITY_GATE_SPEC.md`** (repo root), revised
+2026-07-25 after the calibration run — **read its §11 first**, which
+supersedes the signal selection in §3, the outcomes in §5, the config in
+§6 and the tests in §8. §§1–10 are left standing so the superseded
+reasoning stays visible beside its correction. Calibration harness:
+`scripts/calibrate_transcript_quality.py`; measured table in
+`evals/transcript_quality_calibration.json`.
 
 **Why it was promoted.** Declaring the project English-only (2026-07-25)
 makes this gate load-bearing rather than a nice-to-have. The app is
