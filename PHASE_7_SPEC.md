@@ -30,6 +30,16 @@ Each of these is measurable (see eval design) — the policy is written to be sc
 ## Staged build
 
 ### Stage 7a — Tap-to-ask (the stepping stone; ~1/10 of the work)
+
+> **HARD REQUIREMENT (added 2026-07-25), alongside the hard rules above and equally non-negotiable.**
+>
+> **System-spoken utterances must be excluded from the patient transcript BY CONSTRUCTION — never by prompt instruction and never by post-hoc filtering.** The server knows precisely when it is speaking; that knowledge is the mechanism, and it is the only acceptable one.
+>
+> Why this is a hard rule rather than an implementation detail: 7a introduces **audio output** into a system whose entire safety guarantee is that *the transcript is faithful to the room*. If the system's own voice can enter the transcript, the system can put words in the patient's mouth — and every downstream defence inherits the corruption, because the note grounding gate would faithfully cite a fabricated turn. That is **a new fabrication vector of exactly the class the transcript-quality gate was built to close** (consultation #70: a note faithful to a transcript that was not faithful to the audio).
+>
+> **Echo handling and ASR gating during playback are part of this requirement, not an optimisation.** Muting or AEC-gating the recogniser while the system speaks is how the guarantee is kept in the presence of an open microphone; it is not a quality improvement to be deferred to a later pass.
+>
+> A prompt asking the model to ignore its own utterances does not satisfy this rule. Neither does stripping matched strings from the transcript afterwards. Both are detection; the requirement is prevention.
 CDS panel questions become tappable. Doctor taps → local TTS speaks the question to the patient → answer flows through the existing ASR/CDS pipeline. No turn-taking AI, no end-of-turn detection, no barge-in problem — the doctor IS the turn-taker. Builds and battle-tests: TTS integration (Piper or equivalent, fully local), audio output path alongside capture (echo handling: mute/AEC-gate the ASR while the system speaks, and exclude system utterances from the patient transcript by construction — the system knows when it is speaking), spoken-question logging, and patient reaction to a machine voice.
 
 ### Stage 7b — The face (kindalive integration; can land with 7a)
@@ -76,5 +86,15 @@ Phase 7 starts only after the current docket obligations are stable (Phase 5 adj
 1. Record `05_epigastric_pain_en`.
 2. Docker Compose packaging **plus** the two-role demo script.
 3. **The finalisation transcript-quality gate** (docket build item — flag the review as unreliable on language mismatch or low average confidence instead of presenting a normal draft). Declaring the project English-only makes this load-bearing: a non-English speaker at the publicly reachable demo would otherwise receive a fluent fabricated note, which is exactly what happened with consultation #70.
+
+**Gate amendment 2026-07-25 — PHASE 7 IS OPEN.** Owner decision: Phase 7 opens now, with **two of the three gate items deliberately carried rather than met**. This is a decision to proceed knowingly, not a decision that the items stopped mattering.
+
+| Gate item | State | Why it is carried |
+|---|---|---|
+| 1. `05_epigastric_pain_en` | **carried** | Cannot be recorded for roughly 8 days (reader availability). |
+| 2. Docker Compose + demo script | **carried** | Spec exists but awaits the owner's decisions. |
+| 3. Transcript-quality gate | **MET, for its refuse path** | The refuse tier is built and live: S2 below 0.60 and S4 above 20 s each refuse independently, no note is drafted, status `unreliable_transcript`. See `TRANSCRIPT_QUALITY_GATE_SPEC.md` §11. |
+
+Outstanding work carried alongside, recorded so none of it is lost — see HANDOVER's "Phase 7 opened" section for the full list: the gate's **flag tier** is specified but unbuilt; the **S1 multi-window** and **S3 within-segment** redesigns are pending, and must share one measurement function with the calibration harness; the **schema-drift** recommendation is agreed in principle but not built; **Phase 2 real-audio validation** still needs `05_epigastric_pain_en`; and consultations **#78 and #162** await the owner's review.
 
 7a+7b make a strong demo milestone on their own and are the recommended first commitment; 7c is committed separately after 7a/7b review.

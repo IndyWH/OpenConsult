@@ -51,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **Spec'd 2026-07-24; nothing started** | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25** (owner decision; two gate items deliberately carried — see "Phase 7 opened" below). Spec'd 2026-07-24; build not started. | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -524,6 +524,58 @@ Explicitly v2 (out of scope): a demographics tab, calendar/appointment
 scheduling. Roles per plan: doctor / receptionist / admin; receptionist
 must not open transcripts or notes.
 
+## Phase 7 opened (2026-07-25) — with two gate items carried
+
+**Owner decision: Phase 7 is open.** Two of the three entry-gate items
+were **deliberately carried rather than met**. This is a decision to
+proceed knowingly; the items did not stop mattering.
+
+| Gate item | State | Why |
+|---|---|---|
+| `05_epigastric_pain_en` | **carried** | Cannot be recorded for roughly 8 days (reader availability). |
+| Docker Compose packaging + two-role demo script | **carried** | Spec exists but awaits the owner's decisions. |
+| Finalisation transcript-quality gate | **MET, for its refuse path** | Built and live (commit `1277a31`): S2 < 0.60 and S4 > 20 s refuse independently, no note drafted, status `unreliable_transcript`. |
+
+First commitment inside Phase 7 remains **7a (tap-to-ask) + 7b (face)**,
+with 7c committed separately after review. 7b's build brief is
+`PHASE_7B_KINDALIVE.md`; note the **new hard requirement on 7a** in
+`PHASE_7_SPEC.md` — system-spoken utterances excluded from the patient
+transcript by construction, never by prompt or post-hoc filtering.
+
+**Outstanding work carried alongside — recorded here so none of it is
+lost while Phase 7 takes attention:**
+
+1. **The transcript-quality gate's flag tier is specified but unbuilt.**
+   Thresholds are recorded (S2 < 0.70, S4 > 10 s) and the config keys
+   sit unused in `.env.example`, so the follow-up sets behaviour rather
+   than inventing numbers. It needs the acknowledge-gated amber banner
+   and the 409 approval block — `TRANSCRIPT_QUALITY_GATE_SPEC.md` §11,
+   "v1 build scope".
+2. **S1 and S3 redesigns are pending.** S1 must go multi-window
+   (single-window detection returns English at p=0.90 for #70); S3 must
+   measure *within* segments (cross-segment run length is 1 everywhere).
+   Neither may act until re-calibrated against 66–70. **Shared-measurement
+   requirement:** S1 is currently measured inside
+   `app/finalize.py::transcribe_and_diarise` (reusing the already-loaded
+   WhisperX model) while `scripts/calibrate_transcript_quality.py`
+   measures it independently — two code paths for one signal. The
+   redesign must collapse them into **one shared measurement function**
+   used by both, or the calibration will stop describing what the
+   pipeline actually does.
+3. **Schema-drift protection: agreed in principle, not built.** The
+   recommendation stands — a shared `app/schema.py::ensure_all()` called
+   by the app lifespan, every script, and `conftest.py`, plus
+   `scripts/migrate.py --check` reporting drift and exiting non-zero,
+   added to the after-reboot checklist. Estimated 2–3 hours. Explicitly
+   **not** a startup refuse-to-start gate (the app is what applies the
+   schema; a gate would convert a self-healing restart into an outage)
+   and **not** a test against the live database (it would break the
+   deliberate test isolation). See the troubleshooting entry below.
+4. **Phase 2 real-audio validation still needs `05_epigastric_pain_en`**
+   — the same recording as gate item 1, so the two unblock together.
+5. **Consultations #78 and #162 await the owner's review** (both
+   `awaiting_review` in the live database, verified 2026-07-25).
+
 ## Pre-Phase-7 build item: finalisation transcript-quality gate
 
 **Promoted out of the deferred review docket on 2026-07-25** (was docket
@@ -853,14 +905,15 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   demo script.
 - **Whole-project:** the end-of-project review docket above.
 - **Phase 7 (queued, not started):** supervised auto history-taking is
-  spec'd in `PHASE_7_SPEC.md`. **Gate as of 2026-07-25:** the Phase 5
-  precondition is satisfied **by closure** (adjudication + Phase 5 closed
-  with a negative result, Sinhala out of scope for v1). Three items
-  remain: (1) record `05_epigastric_pain_en`; (2) Docker Compose
-  packaging plus the two-role demo script; (3) the **finalisation
-  transcript-quality gate** (pre-Phase-7 build item section) — load-bearing
-  now the project is English-only. First commitment when it opens is 7a
-  (tap-to-ask) + 7b (face), with 7c decided separately after review.
+  spec'd in `PHASE_7_SPEC.md`. **OPENED 2026-07-25 by owner decision**,
+  with `05_epigastric_pain_en` and the Docker/demo work **deliberately
+  carried** rather than met; the transcript-quality gate item is **met
+  for its refuse path**, which is live. Full amendment, plus the five
+  pieces of outstanding work carried alongside, in the "Phase 7 opened"
+  section above. First commitment is 7a (tap-to-ask) + 7b (face — build
+  brief in `PHASE_7B_KINDALIVE.md`), with 7c decided separately after
+  review. Note 7a's new hard requirement: system-spoken utterances stay
+  out of the patient transcript **by construction**.
 
 ## Remote access (Tailscale, set up 2026-07-10)
 
