@@ -266,13 +266,25 @@ encryption at rest for the database and audio files, role-based access control, 
 
 ## 9. Out of scope for v1
 
-Live (streaming) diarisation · more than two speakers · prescription generation · calendar-based appointment scheduling, patient self-booking, and SMS reminders (the queue covers v1) · EHR/EMR integration · mobile app · Tamil language support (a natural v2 candidate for Sri Lanka).
+Live (streaming) diarisation · more than two speakers · prescription generation · calendar-based appointment scheduling, patient self-booking, and SMS reminders (the queue covers v1) · EHR/EMR integration · mobile app · Tamil language support (a natural v2 candidate for Sri Lanka — see §10 for the recorded position: a testable question with the method already built, gated on finding a clinically-knowledgeable native Tamil speaker to adjudicate).
 
 ## 10. Roadmap ideas beyond v1
 
 - **Evaluation paper: code-switched Sinhala clinical ASR benchmark** — *promoted; this one has a finished result rather than a planned one.* The pre-registered protocol is complete through adjudication (benchmark → recordings eval → step 6), and it returned a clean negative: no off-the-shelf model handles code-switched clinical Sinhala, with four of twelve curated clinical terms — two of them drug names — unrecoverable in every model. The negative result strengthens the paper rather than weakening it.
 - Fine-tuned Sinhala medical ASR model published to Hugging Face — **conditional**, on the same restart trigger recorded in the fine-tune plan header: a materially better Sinhala or multilingual model, or a code-switched clinical dataset, appearing. Not proceeding as of 2026-07-25.
-- Tamil support (Sri Lanka's second consultation language)
+- **Tamil support (Sri Lanka's second consultation language)** — *neither demoted nor promoted by the Sinhala result; recorded 2026-07-25 as a **testable question** with a method already built.*
+
+  **The Sinhala result is evidence about Tamil, but does not settle it.** Tamil is the better-resourced language — notably, Common Voice collects Tamil and never collected Sinhala — so the no-public-test-set problem that shaped the whole Sinhala benchmark may simply not apply.
+
+  **What the Sinhala evidence does not establish.** The CER collapse from 0.035 on read speech to 0.46 on the real recording confounds three variables the eval did not separate: read versus conversational speech, clean corpus audio versus real-room audio, and monolingual versus code-switched content. That number alone therefore does *not* establish that code-switching was the cause.
+
+  **What it does establish, with a clean mechanism.** The 0/106 English-term recall failure — every Sinhala fine-tune transliterated or lost every English medical term — has a language-independent cause: fine-tuning on monolingual data destroys the model's ability to emit Latin-script English tokens. Any monolingual Tamil fine-tune should be expected to fail the same way.
+
+  **Strategic consequence, which reverses the Phase 5 approach.** Sinhala required fine-tuning because stock Whisper produced degenerate repetition loops at every model size. Tamil is far better represented in Whisper's training data, so stock `large-v3` or a successor may not loop — and if it does not, the reason to fine-tune disappears, taking with it the very mechanism that erased the English terms. **The first Tamil candidate should therefore be a strong multilingual model, not a Tamil fine-tune.** That is a cheap prediction to test with the existing harness.
+
+  **The method transfers.** `scripts/evaluate_sinhala_asr.py`, the curated-term-list design, the frozen-reference pre-registration and the adjudication instrument all carry over to Tamil; only the scripts and the term list need writing.
+
+  **The real blocker is not technical.** The adjudication step requires a native Tamil speaker with clinical knowledge. The owner adjudicated Sinhala himself; Tamil would need a collaborator. **That is the gating dependency for any Tamil work** — not GPU time, not the harness.
 - Sri Lankan national guideline corpus for the RAG layer
 - Proper appointment scheduling (calendar slots, patient self-booking, SMS reminders)
 
