@@ -771,11 +771,13 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   the two consultations left awaiting review, check diarisation/roles and
   confidence flags (first real test) against marking schemes, and append
   a real-audio section to the note-quality eval.
-- **Phase 5: closed for now — nothing outstanding.** Recordings eval run
-  on `03_diabetes_review_si`, adjudicated 2026-07-25, and the fine-tune
-  **deferred to v2** by owner decision the same day (the eight sign-offs
-  in the groundwork plan were deliberately not sought, not left
-  pending). See the status table, the eval record's § Step 6, and the
+- **Phase 5: CLOSED with a negative result — nothing outstanding, and
+  nothing queued.** Recordings eval run on `03_diabetes_review_si`,
+  adjudicated 2026-07-25, and the fine-tune **NOT PROCEEDING** by owner
+  decision the same day (the eight sign-offs in the groundwork plan were
+  deliberately not sought, not left pending). **Sinhala is out of scope
+  for v1, not postponed** — see "English-only for v1" in Key design
+  decisions. See the status table, the eval record's § Step 6, and the
   decision header in `evals/2026-07-17_finetune_plan.md` — which stays
   the restart point, with its data sources/licences, code-switch
   synthesis strategy, base-model arms, 4090-sized recipe and
