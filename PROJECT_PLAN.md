@@ -285,7 +285,7 @@ Live (streaming) diarisation · more than two speakers · prescription generatio
   **The method transfers.** `scripts/evaluate_sinhala_asr.py`, the curated-term-list design, the frozen-reference pre-registration and the adjudication instrument all carry over to Tamil; only the scripts and the term list need writing.
 
   **The real blocker is not technical.** The adjudication step requires a native Tamil speaker with clinical knowledge. The owner adjudicated Sinhala himself; Tamil would need a collaborator. **That is the gating dependency for any Tamil work** — not GPU time, not the harness.
-- Sri Lankan national guideline corpus for the RAG layer
+- Sri Lankan national guideline corpus for the RAG layer — **checked against the English-only decision on 2026-07-25 and unaffected.** Recorded as verified rather than assumed, because this is the other Sri Lanka-specific roadmap item and a future reader would otherwise have to re-derive it. Two independent reasons: Sri Lankan national guidelines are published in English, and the RAG layer never depended on Sinhala transcription in the first place — it retrieves against guideline text, not against the consultation transcript's language.
 - Proper appointment scheduling (calendar slots, patient self-booking, SMS reminders)
 
 ---
