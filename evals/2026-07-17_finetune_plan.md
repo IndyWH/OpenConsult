@@ -1,20 +1,22 @@
 # Phase 5 fine-tune plan — groundwork (no training yet)
 
-> ## DECISION: DEFERRED (2026-07-25, owner)
+> ## DECISION: NOT PROCEEDING (2026-07-25, owner)
 >
-> The Phase 5 fine-tune is **deferred to v2**. The eight sign-offs in §7
-> were **deliberately not sought** — this is a decision not to start, not
-> a decision stalled awaiting them.
+> The Phase 5 fine-tune **is not proceeding**. Consultation AI is
+> **English-only for v1**: Sinhala is **out of scope, not postponed**.
+> The eight sign-offs in §7 were **deliberately not sought** — this is a
+> decision not to start, not a decision stalled awaiting them.
 >
-> **Rationale.** The pre-registered off-the-shelf investigation is now
+> **Rationale.** The pre-registered off-the-shelf investigation is
 > complete through step 6 (adjudication, 2026-07-25 — see
 > `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6). Its
 > conclusion stands: no off-the-shelf model is usable for code-switched
-> clinical Sinhala. The project's remaining pre-Phase-7 obligations take
-> priority over acting on that conclusion now.
+> clinical Sinhala, and four of the twelve curated clinical terms —
+> including two drug names — survive in no model at all. Phase 5 is
+> closed with a **negative result**, which is itself the finding.
 >
 > **The plan below is preserved unchanged** and remains the starting
-> point if Sinhala restarts.
+> point if Sinhala is ever restarted.
 >
 > **One substantive change, from the adjudication.** The base-model
 > choice leads with **`seniruk/whisper-small-si`**, not xlsr-sinhala.
@@ -27,10 +29,12 @@
 > independent and considerably stronger reason for the same choice, so
 > §4 needs no edit.)
 >
-> **Restart conditions.** Sinhala work resumes when a Sinhala arm is
-> needed for a demo or study commitment, or when a new candidate model
-> or code-switched dataset appears. **Whoever restarts it reads the step
-> 6 section of the recordings eval first.**
+> **Restart trigger (narrow).** Only a **materially better Sinhala or
+> multilingual model**, or a **code-switched clinical dataset**,
+> appearing. A demo or study commitment is **not** a restart trigger —
+> the blocker is measured model capability, and a commitment does not
+> change it. **Whoever restarts it reads the step 6 section of the
+> recordings eval first.**
 
 **Date:** 2026-07-17
 **Status:** planning document only. Nothing here has been executed; no
