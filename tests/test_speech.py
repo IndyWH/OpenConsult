@@ -18,6 +18,8 @@ What these tests are evidence about, stated plainly because it matters:
 from __future__ import annotations
 
 import io
+import secrets
+import sys
 import wave
 
 import pytest
@@ -211,48 +213,119 @@ def test_empty_text_is_refused(tmp_path):
         service.synthesise("   ")
 
 
-def test_over_long_synthesis_is_refused_after_the_fact(tmp_path, monkeypatch):
-    """The real bound: whatever Piper produced, an utterance longer than
-    the cap is refused, because the exclusion window is only as
+def fake_command(tmp_path, seconds: float = 1.0, exit_code: int = 0,
+                 stderr: str = "", sleep: float = 0.0, write: bool = True) -> str:
+    """A TTS_COMMAND that is a real subprocess, standing in for Piper.
+
+    Deliberately a real process rather than a monkeypatched method: the
+    adapter's job IS running a subprocess, so faking at the function
+    boundary would test nothing about the part that can actually fail.
+    """
+    script = tmp_path / f"fake_tts_{secrets.token_hex(4)}.py"
+    script.write_text(
+        "import sys, time, wave\n"
+        f"time.sleep({sleep})\n"
+        "sys.stdin.buffer.read()\n"
+        f"if {write!r}:\n"
+        "    with wave.open(sys.argv[sys.argv.index('--output-file') + 1], 'wb') as w:\n"
+        "        w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)\n"
+        f"        w.writeframes(b'\\x00\\x00' * int({seconds} * 22050))\n"
+        f"sys.stderr.write({stderr!r})\n"
+        f"sys.exit({exit_code})\n")
+    model = tmp_path / "voice.onnx"
+    model.write_bytes(b"not a real model, the fake command never reads it")
+    return f"{sys.executable} {script} --model {{model}} --output-file {{output}}"
+
+
+def service_with(tmp_path, **kwargs) -> speech.SpeechService:
+    return speech.SpeechService(
+        voice="test", model_path=str(tmp_path / "voice.onnx"),
+        cache_dir=tmp_path / "cache", command=fake_command(tmp_path, **kwargs))
+
+
+def test_over_long_synthesis_is_refused_after_the_fact(tmp_path):
+    """The real bound: whatever the synthesiser produced, an utterance
+    longer than the cap is refused, because the exclusion window is only as
     trustworthy as its length is known."""
-    service = speech.SpeechService(voice="test", model_path="x", cache_dir=tmp_path)
-
-    class FakePiper:
-        def synthesize_wav(self, text, wav_file):
-            long_wav = make_wav(speech.SPEECH_MAX_UTTERANCE_S + 5)
-            with wave.open(io.BytesIO(long_wav), "rb") as src:
-                wav_file.setnchannels(1)
-                wav_file.setsampwidth(2)
-                wav_file.setframerate(src.getframerate())
-                wav_file.writeframes(src.readframes(src.getnframes()))
-
-    monkeypatch.setattr(service, "_load", lambda: FakePiper())
+    service = service_with(tmp_path, seconds=speech.SPEECH_MAX_UTTERANCE_S + 5)
     with pytest.raises(speech.SpeechRefused, match="exceeds"):
         service.synthesise("a short string that synthesises to something long")
-    assert list(tmp_path.glob("*.wav")) == [], "an over-cap utterance must not be cached"
+    assert list((tmp_path / "cache").glob("*.wav")) == [], \
+        "an over-cap utterance must not be cached"
+
+
+def test_a_failed_command_raises_and_never_degrades_to_silence(tmp_path):
+    """A dead speaker must look like a fault. Silence that looks like a
+    choice is the failure mode this guards against."""
+    service = service_with(tmp_path, exit_code=3, stderr="espeak-ng data missing")
+    with pytest.raises(speech.SpeechFailed, match="exited 3"):
+        service.synthesise("Any nausea?")
+    assert "espeak-ng data missing" in _last_error(service)
+
+
+def _last_error(service) -> str:
+    try:
+        service.synthesise("Any nausea?")
+    except speech.SpeechFailed as exc:
+        return str(exc)
+    return ""
+
+
+def test_a_command_producing_no_audio_is_a_failure_not_an_empty_wav(tmp_path):
+    service = service_with(tmp_path, write=False)
+    with pytest.raises(speech.SpeechFailed, match="no audio"):
+        service.synthesise("Any nausea?")
+
+
+def test_a_hanging_command_times_out(tmp_path, monkeypatch):
+    monkeypatch.setattr(speech, "TTS_TIMEOUT_S", 0.5)
+    service = service_with(tmp_path, sleep=5.0)
+    with pytest.raises(speech.SpeechFailed, match="timed out"):
+        service.synthesise("Any nausea?")
+
+
+def test_a_failed_synthesis_leaves_nothing_in_the_cache(tmp_path):
+    service = service_with(tmp_path, exit_code=1)
+    with pytest.raises(speech.SpeechFailed):
+        service.synthesise("Any nausea?")
+    cache = tmp_path / "cache"
+    assert list(cache.glob("*")) == [], "a failed synthesis left files behind"
+
+
+def test_the_text_goes_on_stdin_never_on_argv(tmp_path):
+    """argv is world-readable in /proc, and a consultation's questions are
+    clinical content. The command template must carry no text placeholder."""
+    assert "{text}" not in speech.TTS_COMMAND
+    script = tmp_path / "echo_argv.py"
+    script.write_text(
+        "import sys, wave\n"
+        "text = sys.stdin.buffer.read().decode()\n"
+        "assert text.strip() not in ' '.join(sys.argv), 'text leaked into argv'\n"
+        "with wave.open(sys.argv[sys.argv.index('--output-file') + 1], 'wb') as w:\n"
+        "    w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)\n"
+        "    w.writeframes(b'\\x00\\x00' * 22050)\n")
+    model = tmp_path / "voice.onnx"; model.write_bytes(b"x")
+    service = speech.SpeechService(
+        voice="test", model_path=str(model), cache_dir=tmp_path / "cache",
+        command=f"{sys.executable} {script} --model {{model}} --output-file {{output}}")
+    wav_bytes, duration_ms, _ = service.synthesise("Does the pain radiate?")
+    assert duration_ms == 1000
+
+
+def test_no_cuda_flag_is_passed(tmp_path):
+    """finalize.py's VRAM sequencing assumes sole ownership of the card."""
+    assert "--cuda" not in speech.TTS_COMMAND
 
 
 # --- the cache -------------------------------------------------------------
 
 def test_synthesis_is_cached_and_the_second_call_does_not_synthesise(tmp_path):
-    service = speech.SpeechService(voice="test", model_path="x", cache_dir=tmp_path)
-    calls = []
-
-    class FakePiper:
-        def synthesize_wav(self, text, wav_file):
-            calls.append(text)
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(22050)
-            wav_file.writeframes(b"\x00\x00" * 22050)
-
-    service._load = lambda: FakePiper()
-
+    service = service_with(tmp_path)
     wav_a, duration_a, synth_a = service.synthesise("Any nausea?")
     wav_b, duration_b, synth_b = service.synthesise("Any nausea?")
 
-    assert calls == ["Any nausea?"], "the cache did not prevent a second synthesis"
     assert wav_a == wav_b and duration_a == duration_b == 1000
+    assert synth_a > 0, "a cache miss should report real synthesis time"
     assert synth_b == 0, "a cache hit reports no synthesis time"
 
 
@@ -267,6 +340,7 @@ def test_cache_is_not_shared_across_voices(tmp_path):
 def test_service_reports_unavailable_without_a_model_path(tmp_path):
     service = speech.SpeechService(model_path="", cache_dir=tmp_path)
     assert service.available is False
+    assert "TTS_MODEL_PATH" in service.unavailable_reason()
     with pytest.raises(speech.SpeechUnavailable, match="TTS_MODEL_PATH"):
         service.synthesise("Any nausea?")
 
@@ -279,19 +353,21 @@ def test_service_reports_unavailable_for_a_missing_model_file(tmp_path):
         service.synthesise("Any nausea?")
 
 
+def test_service_reports_unavailable_for_a_missing_command(tmp_path):
+    """The reason names the fix, because the doctor sees this text."""
+    model = tmp_path / "voice.onnx"; model.write_bytes(b"x")
+    service = speech.SpeechService(
+        model_path=str(model), cache_dir=tmp_path,
+        command="definitely-not-installed --model {model} --output-file {output}")
+    assert service.available is False
+    assert "definitely-not-installed" in service.unavailable_reason()
+    assert "uv tool install" in service.unavailable_reason()
+
+
 # --- prepare(): resolution plus synthesis ----------------------------------
 
 def test_prepare_registers_an_utterance_carrying_its_provenance(tmp_path):
-    service = speech.SpeechService(voice="test", model_path="x", cache_dir=tmp_path)
-
-    class FakePiper:
-        def synthesize_wav(self, text, wav_file):
-            wav_file.setnchannels(1)
-            wav_file.setsampwidth(2)
-            wav_file.setframerate(22050)
-            wav_file.writeframes(b"\x00\x00" * 11025)
-
-    service._load = lambda: FakePiper()
+    service = service_with(tmp_path, seconds=0.5)
     agenda = agenda_with("Does the pain radiate?", reasoning="cardiac vs musculoskeletal")
 
     utterance = service.prepare(
@@ -308,19 +384,60 @@ def test_prepare_registers_an_utterance_carrying_its_provenance(tmp_path):
     assert service.get("not-a-real-id") is None
 
 
-# --- real Piper, if it is ever installed -----------------------------------
+# --- real Piper ------------------------------------------------------------
+#
+# This is THE JOIN between the arithmetic the synthetic-WAV tests exercise
+# and what Piper actually does. Everything above proves the adapter handles
+# a subprocess correctly; only this proves the numbers describe real audio.
 
-@pytest.mark.skipif(not speech.SpeechService().available,
-                    reason="piper-tts / voice model not installed (optional)")
+_REAL = speech.SpeechService()
+
+
+@pytest.mark.skipif(
+    not _REAL.available,
+    reason=f"real TTS unavailable: {_REAL.unavailable_reason()}")
 def test_real_synthesis_produces_plausible_audio(tmp_path):
-    """Only runs once someone installs Piper and points TTS_MODEL_PATH at a
-    voice. Until then the module's synthesis path is UNVERIFIED against the
-    real library — the tests above exercise the arithmetic around it."""
     service = speech.SpeechService(cache_dir=tmp_path)
-    wav_bytes, duration_ms, synth_ms = service.synthesise(speech.PHRASES["invitation"])
+    question = "Does the pain go anywhere else, or does it stay in one place?"
+    wav_bytes, duration_ms, synth_ms = service.synthesise(question)
+
     assert wav_bytes[:4] == b"RIFF"
-    assert 500 < duration_ms < speech.SPEECH_MAX_UTTERANCE_S * 1000
-    assert (tmp_path / f"{speech.cache_key(speech.PHRASES['invitation'], service.voice)}.wav").exists()
+    assert 1000 < duration_ms < speech.SPEECH_MAX_UTTERANCE_S * 1000
+    assert synth_ms > 0
+    assert (tmp_path / f"{speech.cache_key(question, service.voice)}.wav").exists()
+
+
+@pytest.mark.skipif(
+    not _REAL.available,
+    reason=f"real TTS unavailable: {_REAL.unavailable_reason()}")
+def test_real_wav_duration_matches_the_arithmetic_the_other_tests_use(tmp_path):
+    """The join. wav_duration_ms() is what sets the exclusion window's
+    ceiling, and every synthetic-WAV test above trusts it. Here it is
+    applied to audio Piper genuinely produced, and cross-checked against
+    the WAV header read independently."""
+    service = speech.SpeechService(cache_dir=tmp_path)
+    wav_bytes, duration_ms, _ = service.synthesise(speech.PHRASES["invitation"])
+
+    with wave.open(io.BytesIO(wav_bytes), "rb") as w:
+        independent_ms = round(1000 * w.getnframes() / w.getframerate())
+        assert w.getnchannels() == 1 and w.getsampwidth() == 2
+    assert duration_ms == independent_ms
+
+    # And the exclusion arithmetic downstream: the window ceiling is
+    # duration + tail, in bytes of 16 kHz mono PCM.
+    from app.live import BYTES_PER_MS
+    ceiling_bytes = (duration_ms + speech.SPEECH_EXCLUSION_TAIL_MS) * BYTES_PER_MS
+    assert ceiling_bytes > duration_ms * BYTES_PER_MS
+
+
+@pytest.mark.skipif(
+    not _REAL.available,
+    reason=f"real TTS unavailable: {_REAL.unavailable_reason()}")
+def test_real_synthesis_is_cached_so_the_second_tap_is_instant(tmp_path):
+    service = speech.SpeechService(cache_dir=tmp_path)
+    _, _, cold_ms = service.synthesise(speech.PHRASES["go_on"])
+    _, _, warm_ms = service.synthesise(speech.PHRASES["go_on"])
+    assert cold_ms > 0 and warm_ms == 0
 
 
 # --- the audio route -------------------------------------------------------

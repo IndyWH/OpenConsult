@@ -1,0 +1,104 @@
+NOTICE — third-party components used by Consultation AI
+=======================================================
+
+Consultation AI is a research/education prototype. Not a medical device.
+This file records third-party components whose licences ask for
+attribution, or whose relationship to this codebase is worth stating
+precisely.
+
+
+Piper (text to speech) — invoked as a separate process, not linked
+------------------------------------------------------------------
+
+  Component : piper-tts
+  Upstream  : https://github.com/OHF-Voice/piper1-gpl
+  Version   : 1.6.0 (installed 2026-07-25)
+  Licence   : GPL-3.0-or-later
+              (it bundles/links espeak-ng, which is GPL-3.0-or-later)
+
+**Relationship, stated deliberately.** Piper is NOT a dependency of this
+application. It is not in `pyproject.toml`, it is not in `uv.lock`, it is
+not installed in the app's virtual environment, and there is no
+`import piper` anywhere in `app/`. It lives in its own environment
+(`uv tool install piper-tts`) and this application invokes the `piper`
+executable as a **separate process** through a configurable command
+(`TTS_COMMAND` — see `app/speech.py` and `.env.example`), passing text on
+stdin and receiving a WAV file.
+
+That arrangement is the owner's decision of 2026-07-25 and exists for two
+reasons, recorded here so nobody removes it as an unnecessary
+indirection: the licence relationship above, and the fact that adding
+Piper to the app's lockfile would re-resolve its dependency graph — churn
+that has corrupted this machine's CUDA wheels before.
+
+Anyone redistributing this project should form their own view of the
+licence position rather than relying on this note. Nothing here is legal
+advice.
+
+
+Voice model: en_GB-alba-medium
+------------------------------
+
+  Source    : https://huggingface.co/rhasspy/piper-voices
+              (en/en_GB/alba/medium)
+  Installed : outside the repository, at the path in TTS_MODEL_PATH.
+              The model is ~63 MB and is deliberately NOT committed.
+
+**What the model card actually says**, quoted rather than assumed — the
+card records a licence for the *training dataset* and does not state a
+separate licence for the model weights:
+
+    # Model card for alba (medium)
+    * Language: en_GB (English, Great Britain)
+    * Speakers: 1
+    * Quality: medium
+    * Samplerate: 22,050Hz
+    ## Dataset
+    * URL: https://datashare.ed.ac.uk/handle/10283/3270
+    * License: https://creativecommons.org/licenses/by/4.0/
+    ## Training
+    * Finetuned from U.S. English lessac voice (medium quality).
+
+So: **dataset CC BY 4.0** (attribution required — the dataset is the
+University of Edinburgh CSTR corpus at the datashare URL above), and the
+weights' own licence is **not stated on the card**. The gap is recorded
+rather than filled in: it is the voice the face study will be run with,
+and if this project is ever published the position should be confirmed
+with the voice's publisher rather than inferred.
+
+
+kindalive (Phase 7b — not yet integrated)
+-----------------------------------------
+
+  Upstream  : https://github.com/smithandrewjohn/kindalive
+  Licence   : MIT
+
+Planned to be vendored at a pinned commit per `PHASE_7B_KINDALIVE.md`
+build decision 1. **Not vendored yet** — this entry is a placeholder so
+the attribution requirement is not discovered late; the pinned commit
+hash goes here when the work starts.
+
+
+Clinical guideline corpus
+-------------------------
+
+Third-party content (NICE, CKS, CDC, WHO) is fetched for local research
+use only. It is **never committed and never redistributed** — the
+corpus directory is gitignored. `corpus/manifest.yaml` is the committed
+provenance record of what was fetched and from where.
+
+
+Models used at runtime
+----------------------
+
+  MedGemma 27B (Q4_K_M GGUF, via Ollama)  — clinical reasoning, notes, RAG
+  embeddinggemma (via Ollama)             — 768-d embeddings
+  faster-whisper distil-large-v3          — live ASR
+  WhisperX large-v3                       — final-pass ASR
+  pyannote speaker-diarization-3.1        — diarisation (gated model;
+                                            licence accepted on Hugging
+                                            Face by the operator)
+
+These are obtained by the operator through Ollama and Hugging Face and are
+subject to their own licences and, in pyannote's case, an access
+agreement. None of them is redistributed with this repository.

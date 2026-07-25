@@ -19,19 +19,37 @@ That is why `resolve()` takes a ref and never a string, and why the
 sanitising it. A rejected message is a bug report; a sanitised one is a
 silent hole.
 
-**CPU only, deliberately.** `app/finalize.py`'s VRAM sequencing assumes
-sole ownership of the 24 GB card — MedGemma at ~17 GB plus
-WhisperX+pyannote at 6–8 GB leaves no room for a guest. `PiperVoice.load`
-is called with an explicit `use_cuda=False` rather than relying on its
-default, so the intent is visible at the call site.
+## Piper runs as a SUBPROCESS, at arm's length. Do not "simplify" this.
 
-Piper is an optional dependency, absent from `pyproject.toml` as of
-2026-07-25 pending the owner's decision (it is GPL-3.0-or-later, and
-adding it re-resolves the lockfile on a machine where resolution churn has
-corrupted the CUDA wheels before — see HANDOVER). Everything here that
-does not need Piper works without it; synthesis raises
-`SpeechUnavailable`, and the tests that need real audio self-skip, exactly
-as the Ollama/corpus-dependent tests already do.
+Owner's decision, 2026-07-25. There is no `import piper` anywhere in this
+application and there must not be one. Synthesis goes through a
+configurable command (`TTS_COMMAND`) run as a separate process, which
+writes a WAV and exits. Two reasons, both of which survive whoever reads
+this next:
+
+1. **Licence.** `piper-tts` is **GPL-3.0-or-later** and links espeak-ng.
+   Invoking a separate program at arm's length is a different
+   relationship from linking it into our own process, and this project is
+   intended for external collaboration. See `NOTICE`.
+2. **The lockfile.** Adding it to `pyproject.toml` would re-resolve the
+   app's dependency graph. On this machine, resolution churn corrupted the
+   venv's CUDA wheels once already (HANDOVER, Troubleshooting). Piper
+   lives in its own environment — `uv tool install piper-tts` — and the
+   app's `uv.lock` never learns it exists.
+
+**CPU only, structurally.** `app/finalize.py`'s VRAM sequencing assumes
+sole ownership of the 24 GB card: MedGemma at ~17 GB plus WhisperX and
+pyannote at 6–8 GB leaves no room for a guest. Piper's `--cuda` flag is
+opt-in and `TTS_COMMAND` does not pass it — but the stronger guarantee is
+that the onnxruntime installed in the tool environment is a CPU-only
+build with no CUDA execution provider available at all, so the flag could
+not work even if someone added it. Verified 2026-07-25.
+
+A missing command or model degrades to `SpeechUnavailable`; a non-zero
+exit or a timeout raises `SpeechFailed`, which is audited and surfaces to
+the client as a visible error state. Neither ever degrades to silence:
+a dead speaker must look like a fault, not like a system that chose not
+to speak.
 """
 
 from __future__ import annotations
@@ -41,6 +59,9 @@ import io
 import logging
 import os
 import secrets
+import shlex
+import shutil
+import subprocess
 import time
 import wave
 from dataclasses import dataclass, field
@@ -57,6 +78,11 @@ logger = logging.getLogger(__name__)
 TTS_ENABLED = os.getenv("TTS_ENABLED", "true").lower() != "false"
 TTS_VOICE = os.getenv("TTS_VOICE", "en_GB-alba-medium")
 TTS_MODEL_PATH = os.getenv("TTS_MODEL_PATH", "")
+# The command adapter. `{model}` and `{output}` are substituted; the text
+# to speak goes on stdin, never on the command line — argv is world-readable
+# in /proc and a consultation's questions are clinical content.
+TTS_COMMAND = os.getenv("TTS_COMMAND", "piper --model {model} --output-file {output}")
+TTS_TIMEOUT_S = float(os.getenv("TTS_TIMEOUT_S", "30"))
 SPEECH_MAX_UTTERANCE_S = float(os.getenv("SPEECH_MAX_UTTERANCE_S", "20"))
 SPEECH_EXCLUSION_TAIL_MS = int(os.getenv("SPEECH_EXCLUSION_TAIL_MS", "200"))
 SPEECH_CACHE_DIR = Path(os.getenv("SPEECH_CACHE_DIR", "data/speech_cache"))
@@ -75,7 +101,18 @@ AGENDA_HISTORY = 20
 
 
 class SpeechUnavailable(RuntimeError):
-    """Piper or its voice model is not installed on this machine."""
+    """The synthesis command or its voice model is not on this machine.
+
+    A configuration state, not a fault: the app runs fine without speech.
+    """
+
+
+class SpeechFailed(RuntimeError):
+    """The synthesis command ran and did not produce usable audio.
+
+    A fault, and it must reach the doctor as one. Silence that looks like
+    a choice is the failure mode being avoided here.
+    """
 
 
 class SpeechRefused(ValueError):
@@ -282,49 +319,68 @@ class SpeechService:
     """
 
     def __init__(self, voice: str | None = None, model_path: str | None = None,
-                 cache_dir: Path | None = None) -> None:
+                 cache_dir: Path | None = None, command: str | None = None) -> None:
         self.voice = voice or TTS_VOICE
         self.model_path = model_path if model_path is not None else TTS_MODEL_PATH
         self.cache_dir = Path(cache_dir) if cache_dir else SPEECH_CACHE_DIR
-        self._piper = None
+        self.command = command if command is not None else TTS_COMMAND
         self._utterances: dict[str, Utterance] = {}
 
     # -- availability --------------------------------------------------
 
+    def unavailable_reason(self) -> str | None:
+        """Why synthesis cannot happen, or None if it can. One place, so
+        the reason the doctor sees is the reason the code acted on."""
+        if not TTS_ENABLED:
+            return "TTS_ENABLED=false"
+        if not self.command.strip():
+            return "TTS_COMMAND is not set"
+        if not self.model_path:
+            return "TTS_MODEL_PATH is not set"
+        if not Path(self.model_path).exists():
+            return f"voice model not found: {self.model_path}"
+        executable = shlex.split(self.command)[0]
+        if shutil.which(executable) is None and not Path(executable).exists():
+            return (f"synthesis command not found: {executable} "
+                    f"(install it outside the app environment, e.g. "
+                    f"`uv tool install piper-tts`)")
+        return None
+
     @property
     def available(self) -> bool:
         """True when synthesis could actually happen right now."""
-        if not TTS_ENABLED or not self.model_path:
-            return False
-        if not Path(self.model_path).exists():
-            return False
-        try:
-            import piper  # noqa: F401
-        except ImportError:
-            return False
-        return True
+        return self.unavailable_reason() is None
 
-    def _load(self):
-        if self._piper is not None:
-            return self._piper
-        if not TTS_ENABLED:
-            raise SpeechUnavailable("TTS_ENABLED=false")
-        if not self.model_path:
-            raise SpeechUnavailable("TTS_MODEL_PATH is not set")
-        if not Path(self.model_path).exists():
-            raise SpeechUnavailable(f"voice model not found: {self.model_path}")
+    def _run_command(self, text: str, output: Path) -> None:
+        """Run the synthesis command as a separate process.
+
+        The text goes on **stdin**, deliberately: argv is world-readable in
+        /proc, and the questions in a consultation are clinical content.
+        No shell — the template is split with shlex and executed directly,
+        so nothing in a path or a question can become a shell metacharacter.
+        """
+        reason = self.unavailable_reason()
+        if reason is not None:
+            raise SpeechUnavailable(reason)
+
+        argv = [part.format(model=self.model_path, output=str(output))
+                for part in shlex.split(self.command)]
         try:
-            from piper import PiperVoice
-        except ImportError as exc:
-            raise SpeechUnavailable(
-                "piper-tts is not installed (optional dependency)") from exc
-        started = time.perf_counter()
-        # use_cuda=False is Piper's default; passed explicitly because the
-        # GPU rule is load-bearing here, not incidental (see module docstring).
-        self._piper = PiperVoice.load(self.model_path, use_cuda=False)
-        logger.info("Piper voice %s loaded in %.2fs (CPU)",
-                    self.voice, time.perf_counter() - started)
-        return self._piper
+            result = subprocess.run(
+                argv, input=text.encode(), capture_output=True,
+                timeout=TTS_TIMEOUT_S, check=False)
+        except subprocess.TimeoutExpired as exc:
+            raise SpeechFailed(
+                f"synthesis timed out after {TTS_TIMEOUT_S:.0f}s") from exc
+        except OSError as exc:
+            raise SpeechFailed(f"synthesis command failed to start: {exc}") from exc
+
+        if result.returncode != 0:
+            detail = result.stderr.decode(errors="replace").strip()[-300:]
+            raise SpeechFailed(
+                f"synthesis exited {result.returncode}: {detail or 'no output'}")
+        if not output.exists() or output.stat().st_size == 0:
+            raise SpeechFailed("synthesis produced no audio")
 
     # -- synthesis -----------------------------------------------------
 
@@ -352,26 +408,27 @@ class SpeechService:
             wav_bytes = cached.read_bytes()
             return wav_bytes, wav_duration_ms(wav_bytes), 0
 
-        piper = self._load()
-        started = time.perf_counter()
-        buffer = io.BytesIO()
-        with wave.open(buffer, "wb") as wav_file:
-            piper.synthesize_wav(text, wav_file)
-        wav_bytes = buffer.getvalue()
-        synth_ms = round(1000 * (time.perf_counter() - started))
-
-        duration_ms = wav_duration_ms(wav_bytes)
-        # The hard cap. Bounds the exclusion window as well as the
-        # utterance: a window is only as trustworthy as its length is known.
-        if duration_ms > SPEECH_MAX_UTTERANCE_S * 1000:
-            raise SpeechRefused(
-                f"synthesised {duration_ms / 1000:.1f}s exceeds "
-                f"SPEECH_MAX_UTTERANCE_S={SPEECH_MAX_UTTERANCE_S:.0f}")
-
+        # Synthesise to a temp file first: the cache must never hold audio
+        # that failed validation, and a torn file would be poison.
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        tmp = cached.with_suffix(".wav.tmp")
-        tmp.write_bytes(wav_bytes)
-        tmp.replace(cached)   # atomic: a torn cache file would be poison
+        tmp = cached.with_suffix(f".{os.getpid()}.wav.tmp")
+        started = time.perf_counter()
+        try:
+            self._run_command(text, tmp)
+            synth_ms = round(1000 * (time.perf_counter() - started))
+            wav_bytes = tmp.read_bytes()
+            duration_ms = wav_duration_ms(wav_bytes)
+            # The hard cap. Bounds the exclusion window as well as the
+            # utterance: a window is only as trustworthy as its length is
+            # known.
+            if duration_ms > SPEECH_MAX_UTTERANCE_S * 1000:
+                raise SpeechRefused(
+                    f"synthesised {duration_ms / 1000:.1f}s exceeds "
+                    f"SPEECH_MAX_UTTERANCE_S={SPEECH_MAX_UTTERANCE_S:.0f}")
+            tmp.replace(cached)              # atomic install
+        finally:
+            tmp.unlink(missing_ok=True)
+
         logger.info("Synthesised %d ms in %d ms: %r", duration_ms, synth_ms, text)
         return wav_bytes, duration_ms, synth_ms
 
