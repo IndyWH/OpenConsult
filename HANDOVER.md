@@ -32,7 +32,7 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 313 tests; heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 333 tests; heavy ones self-skip if Ollama/Postgres/
   corpus are absent. Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
@@ -523,8 +523,14 @@ because a real firing is the evidence that would justify it.
 
 ### The sound check — a dead speaker eats transcript, silently
 
-Spec Part 10 / D6, owner's addition 2026-07-25. **This is a safety
-feature, not a convenience**, and the reasoning is the whole point:
+Spec Part 10 / D6, owner's addition 2026-07-25. **Built, then POSTPONED
+by the owner 2026-07-25** in favour of the consultation-445 investigation
+below. The code is in the tree and tested; its specification is safe in
+`PHASE_7A_SPEC.md` Part 10. Nothing about it is retracted — it simply has
+not been through a room yet.
+
+**This is a safety feature, not a convenience**, and the reasoning is the
+whole point:
 
 A dead speaker fails **silently**. If the volume is down or the output
 device is wrong, playback still succeeds — nothing errors, because
@@ -598,6 +604,136 @@ barge-in detector's envelope-proportional threshold needs.
 `scripts/calibrate_barge_in.py` should **read these audit rows rather
 than re-measure from scratch** — that is why the numbers are stored flat
 and raw.
+
+### Consultation 445 — "the missing six minutes" (2026-07-25)
+
+**The first real-room test of 7a, and it lost about six minutes of a
+consultation.** 445 is the regression fixture and a failure-mode-library
+entry. **It must not be voided, purged or modified** — it is the
+evidence.
+
+What the doctor saw: an 11-minute consultation (669 s), 16 tapped
+utterances, finalisation completing with **four turns ending at 4:36**,
+the transcript-quality gate refusing on a 360.7 s trailing gap, status
+`unreliable_transcript`, and no note. Speech the live transcript had
+captured — including *"I have type 2 diabetes and I take metformin"* —
+was absent from the final transcript entirely.
+
+**The briefed hypothesis was that an exclusion window never closed and
+zero-filled the derived copy from 4:40 to the end. That is disproved.**
+Established by measurement before anything was changed:
+
+| Suspect | Verdict |
+|---|---|
+| Capture | **Innocent.** The original WAV holds the speech at full level — RMS 0.056 at 4:44, 0.089 at 7:11, 0.068 at 8:04. |
+| Exclusion windows | **Innocent.** All 16 spans well-formed, every `end_reason` `complete`, longest 8.9 s, none running to EOF, union 67.36 s = **10.1%** of the recording. |
+| The derived copy | **Innocent.** Measured directly, not reasoned about: bit-identical to the original outside those 16 spans, and *not* zero after 4:40. |
+| The quality gate | **Innocent, and the reason we found out.** Its arithmetic was exact including the excluded-span discount (360.66 computed, 360.662 stored). Refusing was correct: the transcript really had lost six minutes. |
+
+**The culprit was the silence invariant added the session before.**
+WhisperX's speaker merge joins consecutive same-speaker segments into one
+turn, and produced a single turn spanning **284.874–488.829 s**. That
+204-second turn *contained* four of our own short utterances totalling
+**12.69 s**. The invariant dropped a segment on **any** overlap — so it
+discarded all 204 seconds to remove 12.69. **Sixteen times more
+transcript than was ever muted.**
+
+The reasoning behind "any overlap" was sound for a segment *straddling* a
+boundary and catastrophic for one that *contains* spans. Two changes:
+
+1. **Majority rule.** A segment is discarded only when at least
+   `SEGMENT_MUTED_FRACTION` (0.5) of it lies inside muted audio. A
+   hallucination on silence sits wholly inside a span (fraction ~1.0); a
+   turn that merely contains one got its words from the real audio around
+   it (6.2% here).
+2. **Ordering.** The check now runs on **raw segments, before the speaker
+   merge**. After the merge, a hallucinated fragment can sit inside a turn
+   spanning minutes and take it down with it.
+
+The regression test uses 445's real numbers, read from `system_utterance`
+and the audit row rather than rounded. One pre-existing test asserted the
+old any-overlap behaviour *as if it were the requirement* — which is
+exactly how this shipped — so it was rewritten with a comment saying so.
+
+**Two backstops, because the deeper problem is that one utterance
+silenced six minutes and nothing objected:** no span may exceed
+`SPEECH_MAX_UTTERANCE_S` + tail (clamped, anomaly recorded), and the union
+may not exceed `MAX_EXCLUDED_FRACTION` of the recording (default 25%).
+Both audit `transcript.exclusion_anomaly` and feed
+`exclusion_anomalies_today` on the pulse. They are recorded, not refused —
+the quality gate already decides draftability, and a second refusal path
+would be a second thing to get wrong.
+
+**Stated plainly so it is not mistaken for a fix: 445 sat at 10.1% and
+would NOT have tripped the fraction limit.** It is a ceiling on absurdity,
+not a tight bound. What catches that class now is the majority rule.
+
+Also fixed from the same session: the live page had **no landing for the
+refusal** — it enumerated the good outcomes and spun on "processing…"
+forever while the doctor waited for a note that was never coming. The
+list is now inverted (only `live`/`queued`/`processing` continue), so an
+unforeseen status lands rather than hangs. Plus three UI faults: the live
+transcript logged **button labels** instead of spoken text; the
+disclosure never showed itself as **given** and invited a repeat tap; and
+the Say-to-patient buttons were tappable while disconnected.
+
+### Hallucinated filler on ordinary silence — ASSESSED, NOT BUILT
+
+445's **live** transcript carried about fifteen turns reading only
+"Thank you." (1:43, 3:27, 3:44, 3:47, 5:53, 7:32, 7:35, 7:42, 8:48, and a
+run of seven between 10:12 and 10:28). Nobody said them. This is Whisper
+filling ordinary room silence, **outside** any excluded span, so the
+invariant above does not and should not cover it. Owner's call on the
+shape of a defence; findings only:
+
+**1. It is overwhelmingly a live-path phenomenon.** Across all ten stored
+consultations there is exactly **one** filler-only turn in a *final*
+transcript (#162 turn 0, "Thank you.", 1.9–10.6 s). 445's final
+transcript has none. The two paths differ — live is faster-whisper
+`distil-large-v3` re-transcribing a short rolling buffer every ~1.5 s;
+final is WhisperX `large-v3` with silero VAD over the whole file — and
+repeatedly re-transcribing a near-silent rolling buffer is prime
+hallucination territory. **The note is grounded in the final transcript,
+so this is currently a display problem, not a note-fidelity one.** That
+is the reason it can wait; it is not a reason to ignore it, because the
+live transcript is what the doctor reads in the room.
+
+**2. Confidence cannot catch it — twice over.**
+
+- On the **live path there is no confidence at all**: `Segment` is
+  `(start, end, text)`. A confidence filter there is not merely
+  ineffective, it is structurally impossible without changing the
+  transcriber's output.
+- On the **final path it does not separate**: #162's "Thank you." scores
+  **0.646**, sitting inside the modal band (0.6–0.7 holds 74 of 263
+  stored turns; 0.7–0.8 holds 79). Genuine clinical turns run 0.58–0.82.
+  A threshold catching 0.646 would take out a large share of real
+  transcript. This is the same lesson as docket item 4, where two
+  load-bearing numbers were corrupted on *confident* turns.
+
+**3. Acoustic energy separates it cleanly, by more than an order of
+magnitude.** Measured on 445's own audio:
+
+| Region | RMS |
+|---|---|
+| Under the live filler timestamps | 0.0077 – 0.0105 |
+| Real speech at 7:11 | **0.153** |
+| #162's filler turn (1.9–10.6 s) | 0.0077 (file mean 0.0255) |
+
+**4. What a general defence would therefore look like** (sketch, not a
+decision): measure the RMS of the **original** audio under each segment's
+time range and reject segments whose audio is at the noise floor —
+generalising the existing invariant from *silence we created* to *silence
+we measured*, with the excluded-span case becoming the special case where
+we happen to know it is silent because we made it so. Two cautions worth
+carrying into that design: the threshold is a calibration number and
+needs real data from this room (same lesson as the sound check); and a
+quietly-spoken patient must not read as silence, so it should key on the
+noise floor rather than merely "low". A second, cheaper signal is
+available free — **words per second**: #162's turn is 8.7 seconds
+carrying two words, which is anomalous regardless of energy. One caveat
+from the measurements: the 7:32 filler reads 0.054 because a 3-second
+window there straddles real speech, so window sizing matters.
 
 ### The real-room check — this, not the suite, is what proves it
 
@@ -1057,10 +1193,20 @@ lost while Phase 7 takes attention:**
    envelope-proportional threshold needs, and it is already being
    recorded. The good/faint ratios there are uncalibrated guesses and
    should be set from the same run.
-7. **The Phase 7a real-room check has not been run** (see its section
-   below). Nothing in the suite drives a browser or plays audio into a
-   microphone, so the guarantee is proven in code and not yet in the
-   room.
+7. **The Phase 7a real-room check has been run ONCE, on 2026-07-25, and
+   it found a serious defect** — consultation 445, "the missing six
+   minutes" (see its section). The defect is fixed and pinned by a
+   regression test built from 445's real data. **The check has not been
+   re-run since the fix**, so the guarantee is again proven in code and
+   not in the room. Re-run it before calling 7a done.
+8. **Hallucinated filler on ordinary silence: assessed, not built.** About
+   fifteen phantom "Thank you." turns in 445's LIVE transcript. Confidence
+   cannot catch it (there is none on the live path, and on the final path
+   it does not separate); acoustic energy separates it by more than an
+   order of magnitude. Findings and a sketch are in its own section; the
+   shape of any defence is the owner's call.
+9. **The sound check is built but postponed** — untested in a room, and
+   its good/faint thresholds are uncalibrated guesses.
 
 ## Pre-Phase-7 build item: finalisation transcript-quality gate
 
@@ -1224,6 +1370,20 @@ docket item 5.
    three-wheeler substitution, specimen 3) — same failure class,
    reached by transliteration collision rather than acoustic confusion.
    For the claim-by-claim fidelity audit (item 2).
+9b. **Consultation 445 — an invariant that ate six minutes** (2026-07-25,
+   full account in its own section above). A safety check added to catch
+   one failure caused a worse one: the silence invariant dropped a
+   204-second turn to remove 12.7 s of muted audio. For the failure-mode
+   library, the generalisable lesson is not about spans — it is that
+   **a defence whose failure mode is deletion needs a proportionality
+   rule**. "Any overlap" seemed conservative and was the opposite: it
+   maximised what was thrown away. Two supporting observations worth
+   keeping: the test suite *encoded the bug as the requirement* (a test
+   asserted any-overlap dropping, so the fix had to rewrite an assertion
+   rather than add one), and the transcript-quality gate is what surfaced
+   it — the layer that refused was doing its job, and without it a
+   four-turn transcript would have been drafted from.
+
 9. **Safety note carried forward from the adjudication:** any future
    Sinhala transcription path must be evaluated **specifically on
    drug-name and numeric-marker recovery**, not on CER or WER alone.
