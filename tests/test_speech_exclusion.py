@@ -909,3 +909,64 @@ def test_an_already_asked_question_shows_that_it_was_asked():
     assert "askedQuestions.add(msg.text)" in html
     # And it must not disable the chip.
     assert "asked ? '↻' : '🔊'" in html
+
+
+# ===========================================================================
+# THE STANDING RULE (adopted 2026-07-25, third instance in one evening)
+#
+#   Never swallow an action and explain it in a banner. Either PERFORM the
+#   action, or VISIBLY DISABLE the control with the reason attached to the
+#   control itself.
+#
+# Three controls did nothing that evening while a small banner elsewhere
+# explained why: the "Not connected — cannot speak" panel, the
+# finalisation page stuck on "processing", and the sound-check offer
+# eating question-chip taps. The owner missed all three. This is an
+# accessibility requirement, not a preference — a quiet explanation placed
+# away from the control just pressed is, for a dyslexic reader with ADHD,
+# no explanation at all, and in a consultation room it is no explanation
+# for anyone.
+
+def test_the_rule_is_written_down_in_the_page():
+    html = _live_html()
+    assert "STANDING RULE FOR THIS PAGE — never swallow an action." in html
+    assert "VISIBLY DISABLE the control with the" in html
+    assert "reason attached to the control itself" in html
+    assert "dyslexic with ADHD" in html, (
+        "the rule must keep its reason, or it reads as a style preference")
+
+
+def test_speak_controls_go_dead_looking_when_the_socket_drops():
+    """They stayed enabled after a drop, so a tap produced the "Not
+    connected" banner — a swallowed action explained elsewhere."""
+    html = _live_html()
+    close = html[html.index("function onWsClose()"):]
+    close = close[:close.index("\n}")]
+    assert "refreshSpeechControls();" in close
+
+
+def test_the_not_connected_banner_is_only_a_last_resort():
+    html = _live_html()
+    assert "LAST-RESORT guard only" in html
+    assert "not as the way the doctor finds out" in html
+
+
+def test_the_mic_picker_is_visibly_disabled_during_recording():
+    """It used to `return` silently while recording, keeping its pointer
+    cursor and chevron. The .mic.disabled style existed and nothing ever
+    applied it."""
+    html = _live_html()
+    assert "function refreshMicPickerState()" in html
+    assert "micPill.classList.toggle('disabled', recording);" in html
+    assert "Microphone cannot be changed during a consultation" in html
+    assert ".mic.disabled .chev { display: none; }" in html
+
+
+def test_every_disabled_speak_control_carries_its_reason():
+    """The reason is on the control, via title, not in a banner."""
+    html = _live_html()
+    refresh = html[html.index("function refreshSpeechControls()"):]
+    refresh = refresh[:refresh.index("\nfunction ")]
+    assert "b.disabled =" in refresh and "b.title =" in refresh
+    assert "Start the consultation first" in refresh
+    assert "soundCheckBtn.title" in refresh

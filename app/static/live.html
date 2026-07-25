@@ -48,7 +48,8 @@
   .mic.dead svg.micicon { opacity: .9; stroke: var(--red); }
   .mic.reconnect { border-color: #E9DCC0; background: #F7F1E6; color: var(--amber); }
   .mic.reconnect .bars i { background: var(--amber); }
-  .mic.disabled { cursor: default; }
+  .mic.disabled { cursor: default; opacity: .75; }
+  .mic.disabled .chev { display: none; }   /* stop inviting a click */
 
   .mic-menu {
     position: absolute; right: 0; top: calc(100% + .5rem); z-index: 10;
@@ -384,6 +385,29 @@
 
 <script src="/static/nav.js"></script>
 <script>
+// =====================================================================
+// STANDING RULE FOR THIS PAGE — never swallow an action.
+//
+//   Either PERFORM the action, or VISIBLY DISABLE the control with the
+//   reason attached to the control itself. Never accept a tap, do
+//   nothing, and explain it somewhere else on the page.
+//
+// Adopted 2026-07-25 after the third instance in one evening: the
+// "Not connected — cannot speak" panel, the finalisation page that never
+// left "processing", and the sound-check offer that ate question-chip
+// taps. The owner missed all three, and they were all the same mistake.
+//
+// This is an accessibility requirement, not a preference. The owner is
+// dyslexic with ADHD; a quiet explanation placed away from the control he
+// just pressed is, for him, no explanation at all. In a consultation room
+// with a patient waiting it is no explanation for anyone.
+//
+// In practice: disabled attribute + title on the control, or do the
+// thing. A banner may ACCOMPANY a refusal that arrives asynchronously
+// from the server — it may never SUBSTITUTE for a control that looks
+// live and is not.
+// =====================================================================
+
 // URL params are POINTERS only (which queue entry); patient identity is
 // always fetched from the server — never display URL-supplied text
 // (patient-banner principle: wrong-patient-error prevention).
@@ -576,9 +600,21 @@ async function refreshDeviceMenu() {
 
 micPill.addEventListener('click', (e) => {
   e.stopPropagation();
+  // Standing rule: this used to `return` silently while recording, so the
+  // pill kept its pointer cursor and chevron and simply did nothing. The
+  // .mic.disabled style existed and was never applied by anything.
   if (recording) return;      // device switch mid-recording is v2
   micMenu.classList.toggle('open');
 });
+
+function refreshMicPickerState() {
+  // Visibly disabled, with the reason ON the control.
+  micPill.classList.toggle('disabled', recording);
+  micPill.title = recording
+    ? 'Microphone cannot be changed during a consultation — stop first'
+    : 'Input device — click to change';
+  if (recording) micMenu.classList.remove('open');
+}
 document.addEventListener('click', (e) => {
   if (!micMenu.contains(e.target)) micMenu.classList.remove('open');
 });
@@ -865,7 +901,13 @@ function refreshSpeechControls() {
 
 function requestSpeak(ref, label) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
+    // LAST-RESORT guard only. Under the standing rule the controls are
+    // already disabled with the reason on them whenever the socket is
+    // down (refreshSpeechControls, called from onWsClose), so this should
+    // be unreachable from the UI. It stays as a defence against a race,
+    // not as the way the doctor finds out.
     showSpeakError('Not connected — cannot speak.');
+    refreshSpeechControls();
     return;
   }
   speakError.classList.remove('on');
@@ -1240,6 +1282,12 @@ function onWsMessage(event) {
 
 function onWsClose() {
   ws = null;
+  // Standing rule: the moment the socket is gone the speak controls stop
+  // being able to do anything, so they must stop LOOKING as if they can.
+  // Without this they stayed enabled and a tap produced the "Not
+  // connected — cannot speak" panel — a swallowed action explained
+  // elsewhere, which is exactly what the rule forbids.
+  refreshSpeechControls();
   if (recording || awaitingDone) scheduleReconnect();
 }
 
@@ -1258,6 +1306,7 @@ async function openSocket(resume) {
     session_id: SESSION_ID, resume: !!resume,
     patient_id: PATIENT.id, queue_entry_id: PATIENT.queue,
   }));
+  refreshSpeechControls();   // back online: the controls become live again
 }
 
 function scheduleReconnect() {
@@ -1324,6 +1373,7 @@ async function start() {
   btn.disabled = false;
   startTimer();
   refreshSpeechControls();   // tap-to-ask becomes available
+  refreshMicPickerState();
   showSoundCheckOffer();     // passive: it never intercepts a tap
   setStatus('listening — speak normally');
 }
@@ -1332,6 +1382,7 @@ async function stop() {
   recording = false;
   stopSpeaking('doctor_stop');   // never leave a window open across Stop
   refreshSpeechControls();
+  refreshMicPickerState();
   btn.disabled = true;
   btn.textContent = 'Please wait…';
   stopTimer();
