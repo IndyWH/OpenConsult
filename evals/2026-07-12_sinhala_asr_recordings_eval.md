@@ -152,3 +152,93 @@ does nothing. Both no-ops for properly published models.
   characters; corpus CER weighting is trivial with one clip.
 - Chunk-boundary duplication penalises all models but not equally in
   principle (longer outputs suffer more insertions).
+
+## Step 6 — owner's transliteration adjudication (completed 2026-07-25)
+
+Executes step 6 of the pre-registration in
+`evals/2026-07-10_sinhala_asr_benchmark.md` § Pre-registration, over the
+worksheet `evals/adjudication_03_si_worksheet.md` — 12 frozen curated
+terms, 25 reference occurrences, each aligned against the top three
+models.
+
+**The pre-registered outcome measure was kept unchanged:** the binary
+*transliteration hit* or *genuine loss*, plus whether the clinical
+content survives. No middle band was added. Adjudicated by the project
+owner; **no verdicts were pre-filled by the assistant.**
+
+| Term | Model | Verdict | Clinical content survives |
+|---|---|---|---|
+| gliclazide | seniruk-small | transliteration hit | yes |
+| gliclazide | rrashmini-large-v2 | transliteration hit | no |
+| gliclazide | xlsr-sinhala | transliteration hit | no |
+| metformin | seniruk-small | transliteration hit | yes |
+| metformin | rrashmini-large-v2 | transliteration hit | no |
+| metformin | xlsr-sinhala | transliteration hit | no |
+| HbA1c | seniruk-small | genuine loss | no |
+| HbA1c | rrashmini-large-v2 | transliteration hit | no |
+| HbA1c | xlsr-sinhala | transliteration hit | no |
+| cholesterol | seniruk-small | transliteration hit | yes |
+| cholesterol | rrashmini-large-v2 | genuine loss | no |
+| cholesterol | xlsr-sinhala | genuine loss | no |
+| diabetes | seniruk-small | transliteration hit | yes |
+| diabetes | rrashmini-large-v2 | genuine loss | no |
+| diabetes | xlsr-sinhala | genuine loss | no |
+| monofilament | seniruk-small | transliteration hit | yes |
+| monofilament | rrashmini-large-v2 | genuine loss | no |
+| monofilament | xlsr-sinhala | genuine loss | no |
+| blood pressure | seniruk-small | genuine loss | no |
+| blood pressure | rrashmini-large-v2 | genuine loss | no |
+| blood pressure | xlsr-sinhala | transliteration hit | yes |
+| losartan | seniruk-small | genuine loss | no |
+| losartan | rrashmini-large-v2 | genuine loss | no |
+| losartan | xlsr-sinhala | genuine loss | no |
+| atorvastatin | seniruk-small | genuine loss | no |
+| atorvastatin | rrashmini-large-v2 | genuine loss | no |
+| atorvastatin | xlsr-sinhala | genuine loss | no |
+| neuropathy | seniruk-small | genuine loss | no |
+| neuropathy | rrashmini-large-v2 | genuine loss | no |
+| neuropathy | xlsr-sinhala | genuine loss | no |
+| ulcer | seniruk-small | transliteration hit | yes |
+| ulcer | rrashmini-large-v2 | genuine loss | no |
+| ulcer | xlsr-sinhala | genuine loss | no |
+| referral | seniruk-small | transliteration hit | yes |
+| referral | rrashmini-large-v2 | genuine loss | no |
+| referral | xlsr-sinhala | genuine loss | no |
+
+**Tallies.** seniruk-small: 7 of 12 transliteration hits, 7 of 12
+clinical content survives. rrashmini-large-v2: 3 of 12 hits, 0 of 12
+survives. xlsr-sinhala: 4 of 12 hits, 1 of 12 survives.
+
+**Finding 1 — the ranking flips.** Mechanical English-term recall was
+0/106 for every model, which scored all three as equally unusable.
+Adjudication separates them decisively: seniruk-small recovers
+clinically usable content for 7 of 12 curated terms, while the other two
+recover 0 and 1. The mechanical metric concealed the only difference
+with clinical meaning. This answers the pre-registered question of
+whether adjudicated term recovery changes the picture: it changes the
+model ranking; it does not change the verdict that off-the-shelf models
+are unusable for code-switched clinical Sinhala.
+
+**Finding 2 — four terms are unrecoverable across the entire
+off-the-shelf landscape.** `HbA1c`, `losartan`, `atorvastatin` and
+`neuropathy` have clinical content surviving in no model. Three of them
+— losartan, atorvastatin and neuropathy — are unanimous genuine loss in
+all three models. For a diabetes review that is two drug names, the
+three-month control marker, and the diagnosis.
+
+**Finding 3 — transliteration hit and clinical survival came apart in 6
+of 36 cells.** `gliclazide`, `metformin` and `HbA1c` are transliteration
+hits in rrashmini-large-v2 and xlsr-sinhala, yet the owner judged the
+clinical content not to survive. A single binary would have scored those
+six cells as successes. Keep both fields in any future adjudication.
+
+### Limitations of the adjudication
+
+- **Unblinded:** the adjudication instrument displayed model names.
+- Candidate spans were located and romanised **mechanically** by the
+  assistant, with the full hypothesis window available for override.
+- **Single adjudicator.**
+- One recording, 12 curated terms, 25 reference occurrences.
+
+None of this accounts for a 7-versus-0 gap in clinical survival, but the
+design should be blinded if the adjudication is ever repeated.
