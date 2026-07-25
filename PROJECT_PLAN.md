@@ -10,9 +10,31 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 
 ## What v1 is, and is not
 
-*(Scope block, added 2026-07-25. Deliberately unnumbered so the section
-numbering below — and the cross-references to it from HANDOVER.md and
-PHASE_7_SPEC.md — stay stable.)*
+> **This block is deliberately unnumbered, and the omission is
+> load-bearing — please do not "tidy" it into the sequence.** (Added
+> 2026-07-25.) Numbering it would renumber sections 1–10 and silently
+> break every cross-reference now pointing into this file's numbered
+> sections. Those references would still *resolve* — to the wrong
+> section — so nothing would fail visibly; the documents would simply
+> start citing the wrong thing. Verified 2026-07-25, the referring
+> documents are:
+>
+> - **HANDOVER.md** — `§§4, 7` (phase table, Phase 5 row), `§4` (Key
+>   design decisions), `§§4, 7` (Phase 5 section), plus `plan §4`
+>   (translation layer), `plan §7` (benchmark-first) and `plan §8`
+>   (audio retention).
+> - **PHASE_7_SPEC.md** — `§4` in hard rule 6 and in the sequencing-note
+>   gate update.
+> - **`evals/2026-07-10_sinhala_asr_benchmark.md`** and
+>   **`evals/2026-07-12_sinhala_asr_recordings_eval.md`** — both cite
+>   `plan §7` ("benchmark FIRST, train later").
+> - **This file** — §5's `FinalTranscript` entry, §7's risk row and the
+>   retention paragraph below all point at §4's Scope decision block.
+>
+> Note that `evals/2026-07-17_finetune_plan.md` is *not* in this list:
+> the `§4` and `§7` in its decision header refer to its own sections,
+> not to this file. If this block ever must be numbered, renumber and
+> fix all of the above in the same commit.
 
 The project asks whether a single consumer GPU in a spare room can
 support a general practice consultation end to end: listen, reason
