@@ -298,6 +298,7 @@ Each item is one commit, tests green before each, `git push origin main` after t
 5. Barge-in detector (second stream, envelope-proportional threshold, flag default off) +
    `scripts/calibrate_barge_in.py` reporting both sides of the D5 target.
 6. HANDOVER update: the guarantee, the two-path exclusion, the calibration result.
+7. Sound check (Part 10) — small, and best built alongside 5 since they share a measurement.
 
 7b (the face) can land alongside 4–6 per `PHASE_7B_KINDALIVE.md`; it needs `DESIGN_SPEC.md` and the
 approved mockups, which are in Downloads and not the repo.
@@ -320,6 +321,10 @@ confound.
 
 **D4 — Encourager phrases in 7a.** *Recommendation: yes.* They cost almost nothing and let you feel
 the golden-minutes policy with a real patient-actor before committing to 7c.
+
+**D6 — Sound check.** Owner's addition, 2026-07-25, specified in Part 10. Decided: a labelled
+control, not a cogwheel; acoustic verification rather than a bare play button; offered but never
+blocking.
 
 **D5 — Barge-in acceptance criteria.** *Recommendation, taken 2026-07-25 at the owner's delegation:
 a two-sided target, and a ship rule that resolves itself.*
@@ -357,3 +362,81 @@ Two cheap mitigations that buy accuracy before any threshold tuning:
 - **Cut means restart, never resume.** A cut question is re-offered as "cut — tap to repeat" on the
   chip. Resuming a half-delivered question mid-word is more confusing than repeating it, and
   auto-resuming would talk over a patient who genuinely did speak.
+
+---
+
+## Part 10 — Sound check (owner's addition, 2026-07-25)
+
+### 10.1 Why this is a safety feature, not a convenience
+
+7a introduced audio output, and a dead speaker fails **silently**. If the volume is down or the
+output device is wrong, playback still succeeds — nothing errors, because nothing failed — and the
+patient simply hears nothing. The doctor reads the silence as a patient not answering.
+
+Worse, the exclusion window opens anyway. For the length of that inaudible utterance the microphone
+feeds the detector only, so whatever the patient says during it is dropped from the transcript **by
+construction**. A dead speaker therefore converts quietly into missing transcript, with nothing on
+screen to say so. This is the same shape as every other failure this project has had to design
+against: not visibly broken, just wrong.
+
+The existing mic cluster answers "is the room being heard". This answers the other half — "is the
+room hearing us".
+
+### 10.2 Design
+
+- **A labelled control beside Start on the live page**: a speaker icon with the words *Sound check*.
+  **Not a cogwheel** — settings iconography reads as configuration, not as test, and icon-only
+  controls cost a beat on every use.
+- **User-initiated by necessity, not only by choice.** Browsers refuse to play audio before a user
+  gesture, so a check that ran automatically on page load could not make a sound.
+- **What it does**: plays a short fixed phrase (a new phrase id `sound_check`, wording below) through
+  the same output path a spoken question uses, measures microphone energy during playback from the
+  **existing** capture stream, and then asks the doctor a one-tap question.
+- **It reports a level, not a boolean.** Faint means the patient will struggle to hear and barge-in
+  will be unreliable; that is different from silence and should read differently.
+- **The human answer is authoritative.** The only true test of whether the room heard it is a person
+  in the room saying so. The acoustic measurement is corroboration, and it is the part that produces
+  a number.
+
+Result classes:
+
+| Result | Condition | What the doctor sees |
+|---|---|---|
+| Heard, good level | Mic energy clearly above the noise floor, and doctor confirms | Green, with the level |
+| Heard, faint | Energy only marginally above the floor, doctor confirms | Amber: the patient may struggle; barge-in will be unreliable at this volume |
+| Not heard | No energy above the floor, doctor says no | Red: speaker likely muted, wrong output device, or disconnected |
+| Unverified | Doctor declines to answer | Neutral; recorded as unverified rather than as a pass |
+
+**Headphones are a known confound**: with headphones there is no acoustic path back to the
+microphone, so energy reads as absent while the doctor says yes. Treat the human answer as
+authoritative, record the discrepancy, and do not warn.
+
+### 10.3 Constraints
+
+- **The mic-cluster invariant stands.** Measurement uses the same capture stream the transcriber
+  consumes. Do not open a second stream for this.
+- **Disabled while recording.** A test phrase played into a live consultation would be a system
+  utterance and would have to go through the whole exclusion machinery for no clinical benefit.
+  Simpler and safer to allow it only before recording starts.
+- **Offered, never blocking.** If no sound check has been done in the session, the first tap of a
+  question offers one — one tap to run, one tap to skip. The doctor may have good reason to decline
+  and the system does not get to overrule that.
+
+### 10.4 Wording
+
+    Sound check. If you can hear this clearly, press yes.
+
+Deliberately not clinical and not addressed to the patient — it is a check spoken in the room, and
+it should sound like one.
+
+### 10.5 Logging, and the reuse that makes this cheap
+
+Audit `speech.sound_check` carrying the measured level, the doctor's answer, the output device label
+if the browser exposes it, and the timestamp. A later question about a strange consultation — did
+anyone hear the machine? — then has an answer in the record rather than in memory.
+
+**The measured loopback level is exactly the input the barge-in detector needs.** The
+envelope-proportional threshold in build order item 5 has to know how loud our own voice comes back
+into the microphone; that is the number this check produces. `scripts/calibrate_barge_in.py` should
+read the recorded sound-check levels rather than re-measuring from scratch, which is why the two are
+best built together.
