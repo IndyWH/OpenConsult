@@ -715,6 +715,16 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   only a materially better Sinhala or multilingual model, or a
   code-switched clinical dataset, appearing — a demo or study commitment
   is not a trigger. Whoever restarts reads § Step 6 first.
+- **One piece of Sinhala work remains designed and available** (the
+  phase stays closed — this is not queued work): a pre-registered
+  decomposition of the 0.035 → 0.504 CER confound,
+  `evals/2026-07-25_sinhala_confound_prereg.md`, **designed 2026-07-25,
+  NOT RUN, no data collected.** Trigger: Prof Henry Potts replying with
+  interest, or the owner deciding to write up the benchmark. It cannot
+  change the English-only decision and is not intended to — it refines
+  the explanation of the collapse for the paper. Two solo read
+  recordings, no second reader needed, which is why it stays feasible
+  while the rest of Sinhala is closed.
 - **Out of scope for v1 with it:** the translation layer (Gemma/NMT
   benchmark, plan §4) and dual-language transcript generation. The
   project-wide English-only decision and its two deliberate retentions

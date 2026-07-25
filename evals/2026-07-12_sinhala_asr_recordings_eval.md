@@ -74,6 +74,22 @@ in the reference. Benchmark CERs shown for contrast (SLR52 sample).
    turn-taking, and dense code-switching are a different problem from
    short read phrases — exactly the gap the pre-registration predicted the
    public sets could not measure.
+
+   > **Limitation (added 2026-07-25) — this comparison is confounded.**
+   > The two cells differ in three ways at once: **delivery** (read vs
+   > conversational), **acoustics-plus-speaker** (corpus recordings and
+   > speakers vs this project's room, mic and readers), and **content**
+   > (monolingual vs code-switched clinical). The 0.035 → 0.504 number
+   > is unaffected and stands as measured; what is *not* established by
+   > this data is the natural reading of it — that code-switching caused
+   > the collapse. That specific attribution needs a decomposition this
+   > eval was not designed to provide. A pre-registered experiment to
+   > decompose it sits **designed and unrun** at
+   > `evals/2026-07-25_sinhala_confound_prereg.md`.
+   >
+   > **Finding 3 is unaffected by this confound and stands on its own:**
+   > the 0/106 mechanical English-term recall is a direct within-recording
+   > observation, not a cross-cell comparison, and needs no decomposition.
 2. **The ranking reshuffles: the CTC model takes best corpus CER**
    (xlsr-sinhala 0.462), overtaking seniruk-small (0.504, still best
    Whisper). But CER alone flatters CTC output, which is

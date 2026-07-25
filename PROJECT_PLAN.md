@@ -276,7 +276,7 @@ Live (streaming) diarisation · more than two speakers · prescription generatio
 
   **The Sinhala result is evidence about Tamil, but does not settle it.** Tamil is the better-resourced language — notably, Common Voice collects Tamil and never collected Sinhala — so the no-public-test-set problem that shaped the whole Sinhala benchmark may simply not apply.
 
-  **What the Sinhala evidence does not establish.** The CER collapse from 0.035 on read speech to 0.46 on the real recording confounds three variables the eval did not separate: read versus conversational speech, clean corpus audio versus real-room audio, and monolingual versus code-switched content. That number alone therefore does *not* establish that code-switching was the cause.
+  **What the Sinhala evidence does not establish.** The CER collapse from 0.035 on read speech to 0.46 on the real recording confounds three variables the eval did not separate: read versus conversational speech, clean corpus audio versus real-room audio, and monolingual versus code-switched content. That number alone therefore does *not* establish that code-switching was the cause. **The confound is unresolved, and the experiment that would resolve it is designed but unrun** — `evals/2026-07-25_sinhala_confound_prereg.md`; its A-vs-B contrast tests exactly the premise the Tamil prediction below rests on.
 
   **What it does establish, with a clean mechanism.** The 0/106 English-term recall failure — every Sinhala fine-tune transliterated or lost every English medical term — has a language-independent cause: fine-tuning on monolingual data destroys the model's ability to emit Latin-script English tokens. Any monolingual Tamil fine-tune should be expected to fail the same way.
 
