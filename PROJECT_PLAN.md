@@ -1,8 +1,8 @@
 # Consultation AI — Project Plan
 
-**A research/educational prototype for AI-assisted medical consultations in Sinhala and English.**
+**A research/educational prototype for AI-assisted medical consultations — English in v1, with code-switched clinical Sinhala as its founding research question.**
 
-Transcribes a doctor–patient consultation live, offers real-time clinical decision support (differentials, questions to ask, signs to elicit), then produces a diarised bilingual transcript, a concise doctor-style note, suggested investigations, and evidence-grounded guideline summaries — all running locally on consumer hardware.
+Transcribes a doctor–patient consultation live, offers real-time clinical decision support (differentials, questions to ask, signs to elicit), then produces a diarised English transcript, a concise doctor-style note, suggested investigations, and evidence-grounded guideline summaries — all running locally on consumer hardware. See *What v1 is, and is not* below for the scope line and where the Sinhala question landed.
 
 > ⚠️ **Status & intent:** This is an experimental prototype for research, education, and demonstration purposes only. It is **not** a medical device, has not undergone any regulatory assessment, and must never be used with real patients or real patient data. All development and demos use synthetic (scripted/acted) consultations.
 
@@ -61,7 +61,7 @@ si/en schema seam stays.)
 
 ## 1. Why this project
 
-- **Low-resource language clinical NLP.** Sinhala medical speech recognition is almost untouched territory. Sri Lankan consultations are conducted in Sinhala (heavily code-switched with English medical terms) while notes and prescriptions are written in English. This project models that exact workflow: *listen in Sinhala, document in English*.
+- **Low-resource language clinical NLP.** Sinhala medical speech recognition is almost untouched territory. Sri Lankan consultations are conducted in Sinhala (heavily code-switched with English medical terms) while notes and prescriptions are written in English. This project models that exact workflow: *listen in Sinhala, document in English*. **That was the question the project asked first, and answered first** — the answer, as of 2026-07-25, is that no off-the-shelf model can do it, established by benchmark, recordings eval and owner adjudication and recorded in `evals/` (see *What v1 is, and is not* above). The question stands; the equity case for it stands; what changed is that v1 now documents in English only.
 - **Local-first, privacy-first.** Everything — speech recognition, translation, clinical reasoning — runs on a single local machine. No consultation audio or text leaves the premises. This mirrors real-world data-protection constraints in healthcare.
 - **Human-in-the-loop by design.** Every AI output is a *draft*. Nothing enters the record until the doctor reviews, edits, and approves it.
 
