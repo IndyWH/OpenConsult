@@ -13,7 +13,7 @@ A small Auto toggle beside Start consultation. In auto mode, Consultation AI con
 3. The doctor always wins: doctor speech (barge-in) cancels the AI's current and queued utterances instantly. Toggling out of auto mode is one tap and immediate.
 4. Disclosure: the patient/actor is told they are talking to a machine. The robot face (deliberately non-human) reinforces rather than replaces this.
 5. Everything is logged: every question asked, its CDS rationale, its timing, and every doctor intervention — CDSSnapshot-style, for research and audit.
-6. English only until Sinhala TTS/ASR reach parity (realistically v2+).
+6. English only — now the **project-wide v1 position**, not a Phase 7 restriction: Consultation AI is English-only for v1 by owner decision 2026-07-25 (PROJECT_PLAN.md §4, Scope decision). Phase 7 inherits it rather than imposing it.
 7. Synthetic consultations only, as everywhere in this project.
 
 ## Consultation behaviour policy (owner's clinical spec)
@@ -67,6 +67,12 @@ Sinhala voice interaction; AI examination of any kind; AI communication of findi
 
 Phase 7 starts only after the current docket obligations are stable (Phase 5 adjudication/decision, Phase 0 recordings, Docker/demo packaging).
 
-**Gate update 2026-07-25.** The **Phase 5 precondition is satisfied**: the step 6 adjudication completed 2026-07-25 and the fine-tune was deferred to v2 by owner decision the same day (`evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6; decision header in `evals/2026-07-17_finetune_plan.md`). The **recordings precondition now means `05_epigastric_pain_en` only** — `01_chest_pain_si` is deferred alongside Phase 5, since it needs a Sinhala-speaking second reader and only feeds the paused Sinhala arm. **The remaining gate is therefore: `05_epigastric_pain_en`, Docker Compose packaging, and the two-role demo script.**
+**Gate update 2026-07-25.** The **Phase 5 precondition is satisfied — by closure, not by deferral**: the step 6 adjudication completed 2026-07-25 and Phase 5 was closed the same day with a negative result, Sinhala being out of scope for v1 rather than postponed (`evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6; decision header in `evals/2026-07-17_finetune_plan.md`; PROJECT_PLAN.md §4). The **recordings precondition means `05_epigastric_pain_en` only** — `01_chest_pain_si` is not being recorded for v1, since it needs a Sinhala-speaking second reader and only feeds an out-of-scope arm.
+
+**The remaining gate is three items:**
+
+1. Record `05_epigastric_pain_en`.
+2. Docker Compose packaging **plus** the two-role demo script.
+3. **The finalisation transcript-quality gate** (docket build item — flag the review as unreliable on language mismatch or low average confidence instead of presenting a normal draft). Declaring the project English-only makes this load-bearing: a non-English speaker at the publicly reachable demo would otherwise receive a fluent fabricated note, which is exactly what happened with consultation #70.
 
 7a+7b make a strong demo milestone on their own and are the recommended first commitment; 7c is committed separately after 7a/7b review.
