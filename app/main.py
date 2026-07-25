@@ -1413,6 +1413,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         await websocket.send_json({
             "type": "speak_ready", "utterance_id": utterance.utterance_id,
             "duration_ms": utterance.duration_ms,
+            # What the server decided to say. The client needs it to log
+            # the utterance faithfully rather than by button label — it
+            # showed "Disclosure" where the room heard three sentences
+            # (2026-07-25 room test). This is the server TELLING the
+            # client; it remains impossible for the client to supply text.
+            "text": utterance.text,
             "url": f"/api/speech/{utterance.utterance_id}.wav"})
 
     def record_utterance(utterance, span: dict | None, end_reason: str,

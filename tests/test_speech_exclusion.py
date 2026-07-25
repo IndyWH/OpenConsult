@@ -445,6 +445,10 @@ def test_phrase_reference_produces_the_servers_own_words(speech_state):
     assert ready["type"] == "speak_ready"
     assert ready["duration_ms"] == 1000
     assert ready["url"] == f"/api/speech/{ready['utterance_id']}.wav"
+    # The server tells the client WHAT IT WILL SAY, so the live transcript
+    # can log the utterance rather than the button label. This is the
+    # server informing the client; the client still cannot supply text.
+    assert ready["text"] == speech.render_phrase("invitation")
     assert speech_state.speech.get(ready["utterance_id"]).text == \
         speech.render_phrase("invitation")
 
@@ -767,3 +771,40 @@ def test_the_doctors_attestation_unlocks_and_is_audited(speech_state):
     assert row[0] == doctor["id"], "the audit row must carry the attesting user"
     assert row[1] is not None, "and its timestamp"
     assert row[2]["how"] == "doctor_attested"
+
+
+# --- UI faults found in the 2026-07-25 room test ---------------------------
+
+def test_the_live_transcript_logs_what_was_spoken_not_the_button_label():
+    """It logged "Disclosure" where the room heard three sentences. A
+    record whose whole purpose is fidelity must not show the label, and
+    the live page must agree with the review page, which was already
+    right."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "addSpoken(msg.text || label);" in html
+    assert "Log WHAT WAS SPOKEN, not the button that was pressed" in html
+
+
+def test_the_disclosure_button_shows_itself_as_given():
+    """It returned to looking like an outstanding action and could be
+    re-tapped, repeating it. It stays available on purpose — someone may
+    join the room — but it must stop looking outstanding."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "'✓ Disclosure given'" in html
+    assert ".phrase.given" in html
+    assert "tap again only if someone new has joined the room" in html
+
+
+def test_say_to_patient_buttons_explain_themselves_when_not_connected():
+    """They were tappable while disconnected, producing the red "Not
+    connected — cannot speak" panel, which reads as a fault when it is
+    only a not-started-yet."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "b.disabled = busy || !live || gated;" in html
+    assert "Start the consultation first — the system can only speak" in html

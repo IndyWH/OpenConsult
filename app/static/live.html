@@ -120,6 +120,8 @@
   .phrase:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   .phrase:disabled { opacity: .35; cursor: default; }
   .phrase.disclose { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  /* Given: done, not outstanding — but still available (someone may join). */
+  .phrase.given { border-color: var(--green); color: var(--green); font-weight: 400; }
   .tray .lock {
     font-size: .8rem; color: var(--ink-faint); margin: .5rem 0 0;
     display: flex; align-items: center; gap: .4rem;
@@ -792,6 +794,13 @@ function refreshSpeechControls() {
   document.querySelectorAll('.phrase').forEach(b => {
     const gated = GATED_PHRASES.includes(b.dataset.phrase) && !disclosed;
     b.disabled = busy || !live || gated;
+    // Say WHY on hover rather than letting a tap produce the red
+    // "Not connected — cannot speak" panel, which reads as a fault when
+    // it is only a not-started-yet.
+    b.title = !live ? 'Start the consultation first — the system can only speak into a live session'
+            : gated ? 'Play the disclosure first (the patient is told they are talking to a machine)'
+            : busy ? 'One utterance at a time'
+            : 'Speak this to the patient';
   });
   // Disabled while recording (spec 10.3): a test phrase inside a live
   // consultation would be a system utterance and would need the whole
@@ -847,11 +856,15 @@ async function onSpeakReady(msg) {
   // speak_started goes AFTER playback actually begins, carrying the seq of
   // the next frame we will send. WebSocket order means the server sees it
   // before any audio recorded during playback.
-  speaking = {utterance_id: msg.utterance_id, audio: audio, text: label};
+  speaking = {utterance_id: msg.utterance_id, audio: audio, text: msg.text || label};
   ws.send(JSON.stringify({type: 'speak_started', utterance_id: msg.utterance_id,
                           seq: seq + 1}));
   setSpeakingUI(true, label);
-  addSpoken(label);
+  // Log WHAT WAS SPOKEN, not the button that was pressed. A record whose
+  // whole purpose is fidelity must not show "Disclosure" where the room
+  // heard three sentences — the review page has always shown the full
+  // text, and the two must agree.
+  addSpoken(msg.text || label);
 }
 
 // ================================================ Phase 7a: the sound check
@@ -1135,6 +1148,16 @@ function onWsMessage(event) {
     discCheck.checked = true;
     discLock.classList.add('done');
     discLock.title = 'Recorded and audited (' + msg.how + ')';
+    // Show it as GIVEN. It stays tappable on purpose — someone may join
+    // the room and need to hear it again — but it must stop looking like
+    // an outstanding action, or it invites a re-tap that repeats it.
+    const btn = document.querySelector('.phrase[data-phrase="disclosure"]');
+    if (btn) {
+      btn.classList.remove('disclose');
+      btn.classList.add('given');
+      btn.textContent = '✓ Disclosure given';
+      btn.title = 'Already given and audited — tap again only if someone new has joined the room';
+    }
     refreshSpeechControls();
   }
   else if (msg.type === 'cds_unavailable') {
