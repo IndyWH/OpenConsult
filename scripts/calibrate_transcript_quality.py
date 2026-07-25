@@ -560,6 +560,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     args = parser.parse_args(argv)
 
+    # Every entry point applies the whole schema, in one order
+    # (app/schema.py). Read-only measurement still counts as an entry
+    # point: the drift this guards against is a database left in a state
+    # no single code path produces.
+    from app import schema
+
+    schema.ensure_all()
+
     try:
         data = fetch_consultations(list(CONSULTATIONS))
     except Exception as exc:

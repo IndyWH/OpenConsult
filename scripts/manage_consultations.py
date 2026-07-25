@@ -28,7 +28,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app import audit, consultations  # noqa: E402
+from app import audit, consultations, schema  # noqa: E402
 
 
 async def cmd_list_voided() -> int:
@@ -120,6 +120,8 @@ async def cmd_unvoid(cid: int, reason: str) -> int:
 
 
 def main() -> int:
+    # Every entry point applies the whole schema, in one order (app/schema.py).
+    schema.ensure_all()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list-voided", help="list voided consultations and their classes")

@@ -21,7 +21,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app import auth  # noqa: E402
+from app import auth, schema  # noqa: E402
 
 
 async def cmd_list() -> int:
@@ -69,6 +69,10 @@ async def cmd_set_role(username: str, role: str) -> int:
 
 
 def main() -> int:
+    # Every entry point applies the whole schema, in one order (app/schema.py)
+    # — a script must not be able to leave the database in a state no other
+    # code path produces.
+    schema.ensure_all()
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list", help="list all users with roles and status")

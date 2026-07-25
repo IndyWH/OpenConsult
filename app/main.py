@@ -21,7 +21,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import audit, auth, consultations, frontdesk, letters, monitor, ratelimit, retention
+from app import audit, auth, consultations, frontdesk, letters, monitor, ratelimit, retention, schema
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
@@ -49,11 +49,10 @@ RECORDINGS_DIR = Path(os.getenv("RECORDINGS_DIR", "data/recordings"))
 async def lifespan(app: FastAPI):
     # Load the Whisper model once, before serving traffic (takes a second or
     # two from the local cache; the first ever run downloads the model).
-    auth.ensure_schema()
-    frontdesk.ensure_schema()
-    consultations.ensure_schema()
-    letters.ensure_schema()
-    audit.ensure_schema()
+    # One entry point for the whole schema, in one order (app/schema.py).
+    # Applied, never gated on: the app is what applies the schema, so a
+    # refuse-to-start check would turn a self-healing restart into an outage.
+    schema.ensure_all()
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
     app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
     app.state.cds_engine = CDSEngine()

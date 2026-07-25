@@ -3,7 +3,9 @@
 At session start this conftest creates a fresh `consultation_ai_test`
 database on the same Postgres server, points DATABASE_URL at it BEFORE
 any app module is imported (they all bind the URL at import time), builds
-the schema via the app's own ensure_schema() functions, copies the
+the schema via the app's own `schema.ensure_all()` — the same entry point
+and the same ordering the app lifespan uses, so the test database can
+never be built from a different set of tables — copies the
 guideline corpus tables from the live database (read-only) so the RAG
 tests keep their coverage, and seeds a sentinel admin so auth's
 "first account becomes admin" bootstrap can't promote a mid-suite test
@@ -99,10 +101,12 @@ def _bootstrap_test_database() -> bool:
     # Every app module binds DATABASE_URL at import time — swap the env
     # first, then import; nothing imports the app before this conftest.
     os.environ["DATABASE_URL"] = TEST_URL
-    from app import audit, auth, consultations, frontdesk, letters
+    from app import auth, schema
 
-    for module in (auth, frontdesk, consultations, letters, audit):
-        module.ensure_schema()
+    # One entry point, one ordering — the same call the app lifespan makes,
+    # so the test database can never be built from a different set of
+    # tables than the running app has (app/schema.py).
+    schema.ensure_all()
 
     _copy_corpus_tables()
 

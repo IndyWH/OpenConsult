@@ -280,6 +280,47 @@ Five commits, "Design pass 1/5 … 5/5":
   approved v1 for the owner (13/16 sentences grounded; the one
   under-cited sentence and the dropped invention placeholdered).
 
+## Shared schema module (2026-07-25)
+
+`app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
+7a, because 7a adds a table and the live-versus-code drift found on
+2026-07-25 had just cost a debugging session.
+
+**What changed:** nothing about *how* the schema is expressed. The
+per-module `SCHEMA_SQL` strings stay next to the code that queries them —
+that locality is worth keeping. What there now is exactly one of is the
+**ordering** and the **entry point**:
+
+```python
+from app import schema
+schema.ensure_all()      # auth → frontdesk → consultations → letters → audit
+```
+
+Called by the app lifespan, by `tests/conftest.py`, and by every
+DB-touching script (`manage_users`, `manage_consultations`,
+`ingest_guidelines`, `calibrate_transcript_quality`). Before this, only
+the lifespan and conftest made all five calls, so a script that imported
+one module got that module's tables and nothing else — a database could
+sit in a state no single code path had ever produced.
+
+**`scripts/migrate.py`** applies it; **`--check`** reports drift and exits
+non-zero *without writing*: it runs the DDL inside a transaction, compares
+an `information_schema` snapshot either side, and always rolls back (the
+same rolled-back-transaction technique `tests/test_admin.py` uses for the
+last-admin guard). Rows are not compared — the backfill UPDATEs in
+`SCHEMA_SQL` touch data, and data is not drift.
+
+Two things it deliberately is **not**, both decided before the build:
+
+- **Not a startup refuse-to-start gate.** The app is what applies the
+  schema; a gate would convert a self-healing restart into an outage.
+- **Not a test against the live database.** That would break the
+  deliberate test isolation. `tests/test_schema.py` runs against the
+  disposable test database like everything else, and its "no drift"
+  assertion is evidence that `check_drift()` and `ensure_all()` agree with
+  each other — checking the *live* database is an operator action, which
+  is why `--check` is in the after-reboot checklist.
+
 ## Troubleshooting (read before touching dependencies)
 
 The dependency battle scars are documented in
@@ -562,15 +603,9 @@ lost while Phase 7 takes attention:**
    redesign must collapse them into **one shared measurement function**
    used by both, or the calibration will stop describing what the
    pipeline actually does.
-3. **Schema-drift protection: agreed in principle, not built.** The
-   recommendation stands — a shared `app/schema.py::ensure_all()` called
-   by the app lifespan, every script, and `conftest.py`, plus
-   `scripts/migrate.py --check` reporting drift and exiting non-zero,
-   added to the after-reboot checklist. Estimated 2–3 hours. Explicitly
-   **not** a startup refuse-to-start gate (the app is what applies the
-   schema; a gate would convert a self-healing restart into an outage)
-   and **not** a test against the live database (it would break the
-   deliberate test isolation). See the troubleshooting entry below.
+3. **Schema-drift protection: BUILT 2026-07-25** as commit 0 of Phase 7a
+   (`PHASE_7A_SPEC.md` §3.4 — 7a adds a table, which made this the
+   cheapest moment to pay for it). See "Shared schema module" below.
 4. **Phase 2 real-audio validation still needs `05_epigastric_pain_en`**
    — the same recording as gate item 1, so the two unblock together.
 5. **Consultations #78 and #162 await the owner's review** (both
@@ -996,7 +1031,14 @@ running services keep the VM alive). Then verify:
 systemctl is-active postgresql@18-main ollama consultation-ai
 # and that Serve still routes (config persists, this just checks):
 "/mnt/c/Program Files/Tailscale/tailscale.exe" serve status
+# and that the live database still matches the code (read-only; the DDL
+# runs in a transaction that is always rolled back). Exits 1 on drift:
+uv run python scripts/migrate.py --check
 ```
+
+`migrate.py --check` is the drift report added 2026-07-25 with
+`app/schema.py` — see "Shared schema module" below. It is a report, not a
+gate: the app applies the schema at startup, so a restart is the fix.
 
 Manual fallback (if ever needed): `ollama serve &` and
 `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000` — 0.0.0.0

@@ -245,6 +245,12 @@ def main() -> None:
     fetch_failures: list[str] = []
     ingested: list[str] = []
 
+    # The app's own schema, in one order (app/schema.py) — then this
+    # script's corpus tables, which it owns and the app never creates.
+    from app import schema
+
+    schema.ensure_all()
+
     with psycopg.connect(DATABASE_URL) as conn:
         conn.execute(SCHEMA_SQL)
 
