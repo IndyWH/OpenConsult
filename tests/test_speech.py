@@ -880,11 +880,35 @@ def test_the_check_measures_from_the_existing_capture_stream():
     assert html.count("navigator.mediaDevices.getUserMedia") == 1
 
 
-def test_the_offer_is_never_blocking():
-    """Skipping proceeds immediately, and the offer is made once per
-    session rather than once per tap."""
+def test_the_offer_never_intercepts_a_tap():
+    """Consultation 446: the offer SWALLOWED the first question-chip tap
+    and showed a banner instead — and only question chips, so phrases
+    spoke normally while questions silently did not. Two utterances went
+    out all evening, both phrases, no questions at all.
+
+    It is now passive: shown on connect, dismissed by running or skipping,
+    and it holds no callback to resume."""
     from pathlib import Path
 
     html = Path("app/static/live.html").read_text()
-    assert "soundCheckDone = true;   // asked once per session" in html
-    assert "Offered, NEVER blocking" in html
+    assert "offerSoundCheckThen" not in html, "the interceptor must not return"
+    assert "pendingQuestionTap" not in html, "nothing may hold a swallowed tap"
+    assert "The offer is PASSIVE. It never intercepts anything." in html
+    assert "soundCheckDone = true;   // offered once per session" in html
+
+
+def test_questions_and_phrases_take_the_same_path():
+    """There is no reason a spoken phrase should bypass a check that a
+    spoken question does not. Both now call requestSpeak directly."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    qlist = html[html.index("document.getElementById('qList').addEventListener"):]
+    qlist = qlist[:qlist.index("});")]
+    assert "requestSpeak({kind: 'cds_question'" in qlist
+    # Neither path consults the sound check before speaking.
+    phrases = html[html.index("document.querySelectorAll('.phrase').forEach(button"):]
+    phrases = phrases[:phrases.index("\n});")]
+    assert "requestSpeak(" in phrases
+    for path in (qlist, phrases):
+        assert "soundCheck" not in path, "speaking must not depend on the check"

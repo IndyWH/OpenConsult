@@ -940,7 +940,6 @@ const scOffer = document.getElementById('scOffer');
 
 let soundCheckDone = false;   // per page session; drives the one-time offer
 let soundCheckBusy = false;
-let pendingQuestionTap = null;
 
 // Measure from the EXISTING analyser — the same capture stream the
 // transcriber consumes. The mic-cluster invariant stands (spec 10.3): do
@@ -1071,9 +1070,6 @@ async function runSoundCheck() {
   } finally {
     soundCheckBusy = false;
     soundCheckBtn.disabled = recording;
-    // Whatever happened, a pending question tap proceeds — the check is
-    // offered, never blocking.
-    if (pendingQuestionTap) { const go = pendingQuestionTap; pendingQuestionTap = null; go(); }
   }
 }
 
@@ -1086,25 +1082,30 @@ function outputDeviceLabel() {
   return null;
 }
 
-// Offered, never blocking (spec 10.3). The first question tap of a
-// session with no check yet offers one; skipping proceeds immediately.
-function offerSoundCheckThen(proceed) {
-  if (soundCheckDone) { proceed(); return; }
-  pendingQuestionTap = proceed;
-  scOffer.classList.add('on');
+// The offer is PASSIVE. It never intercepts anything.
+//
+// It used to swallow the first question-chip tap of a session and show a
+// banner instead — and only question chips, so phrases spoke normally
+// while questions silently did not. In consultation 446 the doctor tapped
+// chips repeatedly and nothing was ever spoken: two utterances went out
+// all evening, both phrases, no questions at all.
+//
+// Two things were wrong and the specification asking for it was one of
+// them: an offer must not consume the action, and there is no reason a
+// spoken phrase should bypass a check a spoken question does not. It is
+// now shown on connect and dismissed by running or skipping the check;
+// taps always do what they say.
+function showSoundCheckOffer() {
+  if (!soundCheckDone && !recording) scOffer.classList.add('on');
 }
 
 document.getElementById('scOfferRun').addEventListener('click', () => {
   scOffer.classList.remove('on');
-  // Cannot actually play during recording, so honour the skip path.
-  if (recording) { const go = pendingQuestionTap; pendingQuestionTap = null; scResult.className = 'scresult on'; scResultWhat.textContent = 'A sound check cannot run during a consultation — it would become a system utterance in the transcript.'; if (go) go(); return; }
   runSoundCheck();
 });
 document.getElementById('scOfferSkip').addEventListener('click', () => {
   scOffer.classList.remove('on');
-  soundCheckDone = true;   // asked once per session, not once per tap
-  const go = pendingQuestionTap; pendingQuestionTap = null;
-  if (go) go();
+  soundCheckDone = true;   // offered once per session, and only offered
 });
 document.getElementById('scResultDismiss').addEventListener('click',
   () => scResult.classList.remove('on'));
@@ -1124,10 +1125,9 @@ document.getElementById('qList').addEventListener('click', (e) => {
   const button = e.target.closest('.say');
   if (!button || button.disabled) return;
   const text = button.parentElement.querySelector('.qtext').textContent;
-  const ref = {kind: 'cds_question',
-               assessment_version: Number(button.dataset.version),
-               index: Number(button.dataset.index)};
-  offerSoundCheckThen(() => requestSpeak(ref, text));
+  requestSpeak({kind: 'cds_question',
+                assessment_version: Number(button.dataset.version),
+                index: Number(button.dataset.index)}, text);
 });
 
 document.querySelectorAll('.phrase').forEach(button => {
@@ -1324,6 +1324,7 @@ async function start() {
   btn.disabled = false;
   startTimer();
   refreshSpeechControls();   // tap-to-ask becomes available
+  showSoundCheckOffer();     // passive: it never intercepts a tap
   setStatus('listening — speak normally');
 }
 
