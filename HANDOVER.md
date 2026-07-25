@@ -37,7 +37,7 @@ uv sync    # Python env (uv manages Python 3.12)
 
 | Phase | Status | Notes |
 |---|---|---|
-| 0 — Foundations | **Done except one recording** | Env, Postgres, app, tests all in. Seventeen mock scripts written: 10 English (5 routine, 4 red-flag variants, 1 held-out), 2 Sinhala/English code-switched (`_si`, for the Phase 5 ASR recordings eval), 5 UK private-GP (`_uk`, CDS restraint + buried-red-flag urgency) — see `mock_consultations/README.md`. **Real two-voice recordings made 2026-07-12** through the live app (consultations 66–70), copied to `mock_consultations/recordings/`: routine 01–04 English + `03_diabetes_review_si`. **Still to record: `05_epigastric_pain_en`** — required for Phase 2 real-audio validation and the note-quality eval, and the one item Phase 0 now closes out on. `01_chest_pain_si` is **deferred alongside Phase 5** (2026-07-25): it needs a Sinhala-speaking second reader and only feeds the paused Sinhala arm. WAVs gitignored; LFS decision still open. |
+| 0 — Foundations | **Done except one recording** | Env, Postgres, app, tests all in. Seventeen mock scripts written: 10 English (5 routine, 4 red-flag variants, 1 held-out), 2 Sinhala/English code-switched (`_si`, for the Phase 5 ASR recordings eval), 5 UK private-GP (`_uk`, CDS restraint + buried-red-flag urgency) — see `mock_consultations/README.md`. **Real two-voice recordings made 2026-07-12** through the live app (consultations 66–70), copied to `mock_consultations/recordings/`: routine 01–04 English + `03_diabetes_review_si`. **Still to record: `05_epigastric_pain_en`** — required for Phase 2 real-audio validation and the note-quality eval, and the one item Phase 0 now closes out on. `01_chest_pain_si` is **not being recorded for v1** (2026-07-25): it needs a Sinhala-speaking second reader and only feeds an out-of-scope arm. The script stays in the tree and is available if Sinhala ever restarts. WAVs gitignored; LFS decision still open. |
 | 1 — Streaming transcription | **Done** | Voice-tested; lag inside the 2–5 s target. |
 | 2 — Post-consultation note | **Done, real-audio validation begun** | Full pipeline + review UI + eval. The 2026-07-12 recordings ran through the full live→Stop→review pipeline as they were made (five consultations; three approved, two awaiting review as of that date) — diarisation and notes held up in use; the formal check against marking schemes + a real-audio section in the note-quality eval are still to do. |
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
@@ -728,9 +728,10 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   `mock_consultations/recordings/`, named per README). **Still to
   record: `05_epigastric_pain_en`** — required for Phase 2 real-audio
   validation and the note-quality eval. **Phase 0 closes out on that one
-  recording**: `01_chest_pain_si` is deferred alongside Phase 5
-  (2026-07-25), since it needs a Sinhala-speaking second reader and only
-  feeds the paused Sinhala arm. Decide Git LFS.
+  recording**: `01_chest_pain_si` is **not being recorded for v1**
+  (2026-07-25) — it needs a Sinhala-speaking second reader and only
+  feeds an out-of-scope arm. The script stays in the tree, available if
+  Sinhala ever restarts. Decide Git LFS.
 - **Phase 2 (validate on real audio):** the recordings already ran the
   full live→Stop→review pipeline as they were made; still to do: review
   the two consultations left awaiting review, check diarisation/roles and
