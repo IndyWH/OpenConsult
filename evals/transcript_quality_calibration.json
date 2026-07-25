@@ -1,0 +1,159 @@
+{
+  "generated_for": "TRANSCRIPT_QUALITY_GATE_SPEC.md §4 threshold setting",
+  "measurement_only": true,
+  "thresholds_set": false,
+  "thresholds_note": "Deliberately unset. Fixing S1 and S3 thresholds is the project owner's clinical judgement.",
+  "source_of_s2_s3": "stored transcript_turn rows (no re-transcription)",
+  "consultations": [
+    {
+      "consultation": 66,
+      "script": "01_chest_pain_en",
+      "expected": "known-good English",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_66.wav",
+      "audio_present": true,
+      "audio_duration_s": 299.5,
+      "stored_turns": 22,
+      "s1_language": "en",
+      "s1_language_probability": 0.98681640625,
+      "full": {
+        "segments": 22,
+        "s2_confidence_weighted": 0.7978783122161475,
+        "s2_confidence_unweighted": 0.7784545454545455,
+        "s3_max_4gram_share": 0.011379800853485065,
+        "s3_max_4gram": "straight to the hospital",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 0.14100000000001955
+      },
+      "scripted_close": {
+        "source": "auto-detected",
+        "idx": 20,
+        "containment": 1.0,
+        "boundary_s": 293.594,
+        "text": "No allergies that I know. All right, I'd like to examine you now. I'll check your pulse fi"
+      },
+      "truncated": {
+        "segments": 21,
+        "s2_confidence_weighted": 0.7981910077688231,
+        "s2_confidence_unweighted": 0.7812857142857143,
+        "s3_max_4gram_share": 0.011428571428571429,
+        "s3_max_4gram": "straight to the hospital",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 0.0,
+        "dropped_segments": 1
+      }
+    },
+    {
+      "consultation": 67,
+      "script": "02_febrile_child_en",
+      "expected": "known-good English",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_67.wav",
+      "audio_present": true,
+      "audio_duration_s": 329.0,
+      "stored_turns": 19,
+      "s1_language": "en",
+      "s1_language_probability": 0.9833984375,
+      "full": {
+        "segments": 19,
+        "s2_confidence_weighted": 0.8042276584622929,
+        "s2_confidence_unweighted": 0.7747894736842106,
+        "s3_max_4gram_share": 0.011577424023154847,
+        "s3_max_4gram": "let me look at",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 1.3220000000000027
+      }
+    },
+    {
+      "consultation": 68,
+      "script": "03_diabetes_review_en",
+      "expected": "known-good English",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_68.wav",
+      "audio_present": true,
+      "audio_duration_s": 408.0,
+      "stored_turns": 27,
+      "s1_language": "en",
+      "s1_language_probability": 0.9814453125,
+      "full": {
+        "segments": 27,
+        "s2_confidence_weighted": 0.8102254499132697,
+        "s2_confidence_unweighted": 0.7844814814814816,
+        "s3_max_4gram_share": 0.010416666666666666,
+        "s3_max_4gram": "in the morning and",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 4.350000000000023
+      },
+      "scripted_close": {
+        "source": "auto-detected",
+        "idx": 26,
+        "containment": 1.0,
+        "boundary_s": 403.65,
+        "text": "You'll get used to it in two weeks, I promise. Your feet Check them every day, like your d"
+      },
+      "truncated": {
+        "segments": 27,
+        "s2_confidence_weighted": 0.8102254499132697,
+        "s2_confidence_unweighted": 0.7844814814814816,
+        "s3_max_4gram_share": 0.010416666666666666,
+        "s3_max_4gram": "in the morning and",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 0.0,
+        "dropped_segments": 0,
+        "note": "NOT SEPARABLE: the scripted close falls inside the final stored segment, so the off-script speech is merged into the same segment. No turn-boundary truncation can exclude it; these figures equal the full-audio ones. Separating them would need word-level timestamps, which the stored turns do not carry."
+      }
+    },
+    {
+      "consultation": 69,
+      "script": "04_asthma_en",
+      "expected": "known-good English",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_69.wav",
+      "audio_present": true,
+      "audio_duration_s": 342.25,
+      "stored_turns": 25,
+      "s1_language": "en",
+      "s1_language_probability": 0.9833984375,
+      "full": {
+        "segments": 25,
+        "s2_confidence_weighted": 0.784712619578898,
+        "s2_confidence_unweighted": 0.75088,
+        "s3_max_4gram_share": 0.011461318051575931,
+        "s3_max_4gram": "five times a week",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 0.6680000000000064
+      }
+    },
+    {
+      "consultation": 70,
+      "script": "03_diabetes_review_si",
+      "expected": "known-bad (Sinhala via English-forced pipeline)",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_70.wav",
+      "audio_present": true,
+      "audio_duration_s": 450.5,
+      "stored_turns": 29,
+      "s1_language": "en",
+      "s1_language_probability": 0.89501953125,
+      "full": {
+        "segments": 29,
+        "s2_confidence_weighted": 0.504951125762069,
+        "s2_confidence_unweighted": 0.49403448275862066,
+        "s3_max_4gram_share": 0.06356413166855845,
+        "s3_max_4gram": "every morning and evening",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 33.26400000000001
+      }
+    }
+  ]
+}
