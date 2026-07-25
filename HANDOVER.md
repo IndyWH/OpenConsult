@@ -613,15 +613,50 @@ docket item 5.
    0.49, last 33 s dropped) — and a normal-looking draft note was
    presented and approved. Low average confidence or language mismatch
    should flag the review as unreliable, analogous to the note grounding
-   gate, not present a normal draft. (#70 voided 2026-07-17 for this.
-   **Void-state incident, investigated 2026-07-24:** the audit trail
-   shows #70 was Unvoided 2026-07-22 07:11 by the owner's admin account,
-   39 s before a batch of "Test case" voids — i.e. it was used to test
-   the then-new Unvoid button during a governance-testing session and
-   never re-voided, so it sat wrongly approved-and-visible for two days.
-   Re-voided 2026-07-24 with the original reason; the restoration audit
-   row carries user_id NULL and a `restoration` detail. Lesson for the
-   demo script: don't exercise governance actions on real rows.)
+   gate, not present a normal draft.
+
+   **Full void history of #70, from the audit trail (verified
+   2026-07-25).** Four events, not two:
+
+   | When | Action | By |
+   |---|---|---|
+   | 2026-07-17 17:02:46 | `consultation.voided` (the original, for the invalid transcription) | user 10 |
+   | 2026-07-22 07:11:20 | `consultation.unvoided` | user 10 |
+   | 2026-07-24 10:43:32 | `consultation.voided` — the documented restoration, `restoration` detail | user_id NULL |
+   | **2026-07-24 10:49:20** | **`consultation.unvoided` again — six minutes after the restoration** | user 10 |
+
+   The first unvoid (07-22) was the governance-testing incident
+   investigated on 2026-07-24: the Unvoid button was exercised on a real
+   row 39 s before a batch of "Test case" voids and never reverted, so
+   #70 sat wrongly approved-and-visible for two days. The restoration
+   re-voided it. **Six minutes later it was unvoided again**, and that
+   second recurrence went unrecorded until the 2026-07-25 calibration
+   run read the row directly.
+
+   **The lesson, honestly.** Item 5's existing lesson was *don't
+   exercise governance actions on real rows*. The identical failure
+   recurred **within six minutes of the fix that documented it**. A
+   written lesson did not prevent recurrence — which is why the
+   correction is the code guard below (void reason classes +
+   unvoid friction, `consultation.unvoid_refused`) and not a third note
+   telling people to be careful.
+
+   **⚠ #70's state is still wrong as of 2026-07-25 10:29.** The row
+   reads `status = approved`, `voided_at IS NULL`. The audit trail shows
+   no void after 2026-07-24 10:49:20 — the only `consultation.*` events
+   dated 2026-07-25 are the five `keep_for_research` flags at 03:06. So
+   the row has been approved-and-visible since 2026-07-24 and **re-voiding
+   it is still outstanding, and is the owner's action to take.** When it
+   is done it must be voided with reason class `clinical_safety`, which
+   the guard below makes irreversible over HTTP.
+
+   **#70 must never be purged.** It now carries `keep_for_research`
+   (set 2026-07-25 03:06), protecting its audio from the retention
+   sweep. It is the regression fixture for the transcript-quality gate
+   (`TRANSCRIPT_QUALITY_GATE_SPEC.md` §11) and the object of study in
+   `evals/2026-07-25_sinhala_confound_prereg.md`. **Its correct end
+   state is voided and preserved** — out of clinical worklists, retained
+   in full on disk.
 6. **Workflow observation — end-of-recording contamination**: recordings
    66 and 68 captured off-script reader speech after the scripted close
    (worst: 68's "I don't read the script but I do naturally"). Owner's
