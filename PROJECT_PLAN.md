@@ -194,6 +194,7 @@ Each phase produces something demonstrable on its own.
 **Phase 0 — Foundations (repo, environment)**
 Set up the GitHub repo, Python environment, Postgres, and a "hello world" FastAPI app. Write 3–5 scripted mock consultations (English first, then Sinhala) and record them — these become the permanent test set.
 *Done when:* repo runs locally with one command; test recordings exist.
+*Note (2026-07-25):* the Sinhala half was done — **both `_si` scripts were written and are retained** (`01_chest_pain_si`, `03_diabetes_review_si`), with marking schemes, as-spoken references and romanised reading guides. `03_diabetes_review_si` **was recorded** and is the recording the whole Phase 5 evaluation rests on. `01_chest_pain_si` is **not being recorded for v1** — it needs a Sinhala-speaking second reader and only feeds an out-of-scope arm; the script stays in the tree.
 
 **Phase 1 — Streaming transcription (highest technical risk)**
 Browser mic → WebSocket → faster-whisper → live transcript on screen. English only.
@@ -213,7 +214,10 @@ Build the pgvector store over guideline content; generate the investigations lis
 
 **Phase 5 — Sinhala language layer**
 Benchmark existing Sinhala Whisper fine-tunes on the mock recordings (word error rate, and how they handle code-switched English terms). Fine-tune Whisper on the 4090 if existing models fall short. Add the translation step; store dual-language transcripts.
-*Done when:* a Sinhala mock consultation produces a usable English note.
+*Done when:* **the question is answered** — whether off-the-shelf models can transcribe code-switched clinical Sinhala well enough to produce a usable English note, established by benchmark, recordings evaluation and owner adjudication.
+**Status: COMPLETE as of 2026-07-25. The answer is no.** This is why the phase reads *closed*, not *abandoned*: the pre-registered protocol ran to completion and returned a negative result, which is a finding. Shipping a Sinhala pipeline was contingent on that answer being yes; it was not.
+
+> **Criterion corrected 2026-07-25** (recorded here rather than changed silently). The original read: *"a Sinhala mock consultation produces a usable English note."* It was replaced for two reasons. First, it can never be met on the measured evidence, so it would leave Phase 5 permanently and misleadingly incomplete. Second, it conflated **investigating** whether this is possible with **shipping** it — the phase was designed and pre-registered to answer a question, and the corrected criterion is the one the protocol was actually built against.
 
 **Phase 6 — Users, roles, front desk, audit, polish**
 Registration and roles (doctor / receptionist / admin) with role-specific views: the receptionist's **front-desk view** (register patients, manage today's queue) and the doctor's **consulting view** (pick a patient from the queue, start the session). Role-based access enforced — the receptionist cannot open transcripts or notes. Plus patient records, audit log, Docker Compose packaging, and a demo script for the interview: *receptionist registers and queues a patient → doctor opens the queue and consults → live transcript + CDS → signed-off note in the record.*
