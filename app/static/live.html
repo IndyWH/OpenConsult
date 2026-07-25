@@ -105,6 +105,15 @@
   }
   .say:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
   .say:disabled { opacity: .35; cursor: default; }
+  /* Already spoken. Re-asking stays allowed — the panel lags, and
+     repetition is sometimes right — but it must be visible that it has
+     gone out once (consultation 447: the same question three times). */
+  .cds li.qrow.asked .qtext { color: var(--ink-faint); }
+  .cds li.qrow.asked .say { border-color: var(--green); color: var(--green); }
+  .cds li.qrow.asked .qtext::after {
+    content: ' ✓ asked'; font-size: .72rem; color: var(--green);
+    text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
+  }
 
   /* Phrase tray: fixed, pre-reviewed things the system may say. */
   .tray { margin-top: .9rem; border-top: 1px solid var(--line); padding-top: .7rem; }
@@ -128,18 +137,39 @@
   }
   .tray .lock.done { color: var(--green); }
 
-  /* Speaking pill: transient, above everything, Stop always one tap. */
+  /* Speaking pill — HARD RULE 3: the doctor always wins, one tap.
+     
+     POSITION IS THE WHOLE POINT AND IS NOT COSMETIC. This used to sit in
+     normal flow at the top of .stack, so on any page taller than the
+     viewport it scrolled out of sight — and in consultation 447 the
+     doctor tapped a long question, wanted to cut it off, found nothing to
+     press, tapped the chip again (speaking it twice), and finally stopped
+     the whole consultation recording to silence the machine. Ending a
+     consultation is not an acceptable way to cancel an utterance.
+     
+     Fixed to the viewport, so it is on screen wherever the doctor is
+     looking. Do not return this to normal flow. */
   .speaking {
-    display: none; align-items: center; gap: .7rem;
-    border: 1px solid var(--accent); background: #F6F1F5; color: var(--accent);
-    border-radius: var(--radius); padding: .6rem .9rem; font-size: .9rem;
+    display: none; align-items: center; gap: .9rem;
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: 1.4rem; z-index: 60; width: min(680px, calc(100vw - 2rem));
+    border: 2px solid var(--accent); background: var(--accent); color: #fff;
+    border-radius: 999px; padding: .7rem 1.1rem; font-size: 1rem;
+    box-shadow: 0 8px 28px #29231F33;
   }
   .speaking.on { display: flex; }
-  .speaking .what { flex: 1; font-style: italic; }
-  .speaking button {
-    border: 1px solid var(--accent); background: var(--accent); color: #fff;
-    border-radius: 999px; padding: .3rem .9rem; font-size: .85rem; cursor: pointer;
+  .speaking .what {
+    flex: 1; font-style: italic; white-space: nowrap;
+    overflow: hidden; text-overflow: ellipsis;
   }
+  .speaking button {
+    flex: none; border: 2px solid #fff; background: #fff; color: var(--accent);
+    border-radius: 999px; padding: .45rem 1.5rem; font-size: 1rem;
+    font-weight: 700; cursor: pointer; letter-spacing: .01em;
+  }
+  .speaking button:hover { background: #F6F1F5; }
+  .speaking .esc { font-size: .74rem; opacity: .85; white-space: nowrap; }
+  .speakwave i { background: #fff; }
   .speakwave { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
   .speakwave i { width: 3px; background: var(--accent); border-radius: 2px;
                  height: 13px; transform-origin: bottom; animation: sp 900ms infinite; }
@@ -277,13 +307,6 @@
     <button id="scResultDismiss" type="button">Dismiss</button>
   </div>
 
-  <!-- 0. SPEAKING STATE — transient; sits above everything while the
-       system has the floor, so Stop is always one tap (hard rule 3). -->
-  <div class="speaking" id="speakingBar">
-    <span class="speakwave"><i></i><i></i><i></i></span>
-    <span class="what" id="speakingWhat"></span>
-    <button id="speakStop" type="button">Stop</button>
-  </div>
   <div class="speakerr" id="speakError">
     <span class="what" id="speakErrorWhat"></span>
     <button id="speakErrorDismiss" type="button">Dismiss</button>
@@ -346,6 +369,17 @@
     <div id="transcript" style="margin-top:.5rem"><span id="partial" class="partial"></span></div>
   </div>
 
+</div>
+
+<!-- SPEAKING STATE — hard rule 3, the doctor always wins.
+     Deliberately OUTSIDE .stack and fixed to the viewport: in normal flow
+     it scrolled out of sight exactly when it was needed (consultation
+     447). role=alert so it is announced, not merely drawn. -->
+<div class="speaking" id="speakingBar" role="alert" aria-live="assertive">
+  <span class="speakwave"><i></i><i></i><i></i></span>
+  <span class="what" id="speakingWhat"></span>
+  <span class="esc">or press Esc</span>
+  <button id="speakStop" type="button">Stop</button>
 </div>
 
 <script src="/static/nav.js"></script>
@@ -685,6 +719,7 @@ function renderCDS(a) {
     li.appendChild(el('span', 'qtext', q));
     return li;
   });
+  markAskedQuestions();
   fillList(document.getElementById('sList'), document.getElementById('sIdle'),
            a.signs_to_check || [], s => el('li', null, s));
   fillList(document.getElementById('dxList'), document.getElementById('dxIdle'),
@@ -759,6 +794,12 @@ const discLock = document.getElementById('discLock');
 
 let agendaVersion = 0;
 let disclosed = false;
+// Questions already spoken this session, by their text (stable across
+// agenda revisions, unlike the index). Re-asking stays ALLOWED and logged
+// — the panel can lag and repetition is sometimes right — but in 447 the
+// same question went out three times because nothing showed it had
+// already been asked.
+const askedQuestions = new Set();
 let speaking = null;        // {utterance_id, audio, text}
 let pendingSpeakText = '';  // what we asked for, to label the pill
 
@@ -779,6 +820,16 @@ function setSpeakingUI(on, label) {
   speakingBar.classList.toggle('on', on);
   speakingWhat.textContent = on ? ('Speaking: \u201c' + label + '\u201d') : '';
   refreshSpeechControls();
+}
+
+function markAskedQuestions() {
+  document.querySelectorAll('#qList li.qrow').forEach(li => {
+    const text = li.querySelector('.qtext').textContent;
+    const asked = askedQuestions.has(text);
+    li.classList.toggle('asked', asked);
+    const say = li.querySelector('.say');
+    if (say) say.textContent = asked ? '↻' : '🔊';
+  });
 }
 
 function refreshSpeechControls() {
@@ -856,6 +907,8 @@ async function onSpeakReady(msg) {
   // speak_started goes AFTER playback actually begins, carrying the seq of
   // the next frame we will send. WebSocket order means the server sees it
   // before any audio recorded during playback.
+  if (msg.text) askedQuestions.add(msg.text);
+  markAskedQuestions();
   speaking = {utterance_id: msg.utterance_id, audio: audio, text: msg.text || label};
   ws.send(JSON.stringify({type: 'speak_started', utterance_id: msg.utterance_id,
                           seq: seq + 1}));
@@ -1057,8 +1110,13 @@ document.getElementById('scResultDismiss').addEventListener('click',
   () => scResult.classList.remove('on'));
 soundCheckBtn.addEventListener('click', runSoundCheck);
 
+// Hard rule 3, two independent one-tap paths. A false stop costs a
+// re-tap; not being able to stop cost a whole consultation in 447.
 document.getElementById('speakStop').addEventListener('click',
   () => stopSpeaking('doctor_stop'));
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && speaking) { e.preventDefault(); stopSpeaking('doctor_stop'); }
+});
 document.getElementById('speakErrorDismiss').addEventListener('click',
   () => speakError.classList.remove('on'));
 

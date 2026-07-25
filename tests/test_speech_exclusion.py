@@ -808,3 +808,104 @@ def test_say_to_patient_buttons_explain_themselves_when_not_connected():
     html = Path("app/static/live.html").read_text()
     assert "b.disabled = busy || !live || gated;" in html
     assert "Start the consultation first — the system can only speak" in html
+
+
+# ===========================================================================
+# HARD RULE 3 — the doctor always wins (consultations 446/447, 2026-07-25)
+#
+# In 447 the doctor tapped a long question, wanted to cut it off, and found
+# nothing to press. He tapped the chip again — speaking it a second time —
+# and finally STOPPED THE WHOLE CONSULTATION RECORDING to silence the
+# machine. Ending a consultation is not an acceptable way to cancel an
+# utterance.
+#
+# The control was never absent. `#speakStop` was in the DOM the whole time.
+# It was in NORMAL FLOW at the top of `.stack`, so on any page taller than
+# the viewport it scrolled out of sight exactly when it was needed. That is
+# why these assertions are mostly about POSITION: the failure was never
+# "does it exist" but "can it be seen".
+#
+# Scope, stated plainly: no browser is driven anywhere in this suite, so
+# these check the page's source, not its rendering. What they would have
+# caught is the actual regression — a Stop control that scrolls away.
+
+def _live_html() -> str:
+    from pathlib import Path
+
+    return Path("app/static/live.html").read_text()
+
+
+def test_a_stop_control_exists_inside_the_speaking_bar():
+    html = _live_html()
+    bar = html[html.index('id="speakingBar"'):]
+    bar = bar[:bar.index("</div>")]
+    assert 'id="speakStop"' in bar, "Stop must live on the speaking bar itself"
+    assert ">Stop<" in bar
+
+
+def test_the_speaking_bar_is_fixed_to_the_viewport():
+    """THE regression. In normal flow it scrolled out of view — which is
+    how a doctor came to have no way of stopping the machine talking."""
+    html = _live_html()
+    css = html[html.index("  .speaking {"):html.index("  .speaking.on {")]
+    assert "position: fixed" in css, (
+        "the speaking bar must not return to normal flow — consultation 447")
+    assert "z-index" in css
+
+
+def test_the_speaking_bar_is_outside_the_scrolling_stack():
+    """Belt and braces on the CSS: it must not be a child of .stack, so a
+    future layout change cannot quietly re-parent it into the scroll."""
+    html = _live_html()
+    # The stack's last child is the live-transcript pane; the bar must come
+    # after the stack closes, at document level, not inside it.
+    stack_start = html.index('<div class="stack">')
+    last_pane = html.index('<!-- 4. LIVE TRANSCRIPT')
+    bar = html.index('id="speakingBar"')
+    assert 'id="speakingBar"' not in html[stack_start:last_pane]
+    assert bar > last_pane
+    closing = html.index("\n</div>\n", last_pane)   # closes .stack
+    assert bar > closing, "the speaking bar must not be a child of .stack"
+
+
+def test_the_bar_is_shown_exactly_while_a_speaking_window_is_open():
+    """Rendered during the window, hidden outside it: setSpeakingUI(true)
+    on playback start, and every path that ends an utterance calls
+    setSpeakingUI(false)."""
+    html = _live_html()
+    assert "speakingBar.classList.toggle('on', on);" in html
+    assert ".speaking.on { display: flex; }" in html
+    assert "setSpeakingUI(true, label);" in html
+    # Every termination path clears it.
+    assert html.count("setSpeakingUI(false, '');") >= 2
+
+
+def test_stop_cancels_immediately_and_is_recorded_as_doctor_stop():
+    html = _live_html()
+    assert "() => stopSpeaking('doctor_stop'));" in html
+    stop = html[html.index("function stopSpeaking"):]
+    stop = stop[:stop.index("\n}")]
+    assert "audio.pause()" in stop, "Stop must halt playback, not merely tell the server"
+    assert "speak_ended" in stop and "reason: reason" in stop
+
+
+def test_escape_is_a_second_one_tap_path():
+    """A false stop costs a re-tap; not being able to stop cost a whole
+    consultation."""
+    html = _live_html()
+    assert "e.key === 'Escape' && speaking" in html
+    assert "stopSpeaking('doctor_stop')" in html
+
+
+def test_an_already_asked_question_shows_that_it_was_asked():
+    """447 spoke the same question three times because nothing showed it
+    had gone out. Re-asking stays allowed — the panel lags and repetition
+    is sometimes right — but it must be visible."""
+    html = _live_html()
+    assert "askedQuestions" in html
+    assert "li.classList.toggle('asked', asked);" in html
+    assert "content: ' ✓ asked'" in html
+    # Tracked by TEXT, not index: the index moves when the agenda revises.
+    assert "askedQuestions.add(msg.text)" in html
+    # And it must not disable the chip.
+    assert "asked ? '↻' : '🔊'" in html
