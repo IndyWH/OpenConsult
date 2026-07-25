@@ -127,6 +127,12 @@ def test_monitor_pulse_is_deliberately_public_and_aggregate_only(clients):
         "live_slot_rejections_last_hour",
         "registrations_pending_activation_today",
         "registrations_pending_activation_last_hour",
+        # Phase 7a invariant counter: segments transcribed from audio the
+        # pipeline zero-filled itself. Should always be zero; surfaced so
+        # "should never happen" is visible to the sentry rather than
+        # buried in a log line. A count, so the aggregate-only obligation
+        # asserted below still holds.
+        "silence_hallucinations_today", "silence_hallucinations_last_hour",
         "errors_last_hour", "audio_disk_used_mb",
     }
     assert isinstance(body["live_consultation_active"], bool)

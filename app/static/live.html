@@ -91,6 +91,84 @@
   .walkin-box { display: flex; gap: .5rem; flex-wrap: wrap; align-items: center; }
   .walkin-box a { font-size: .85rem; color: var(--ink-soft); }
   #status { font-size: .82rem; color: var(--ink-faint); width: 100%; }
+
+  /* ---- Phase 7a: tap-to-ask ---- */
+  /* Question rows gain a speaker affordance. The chip speaks; the text
+     stays plain text so the panel still reads as a list of questions. */
+  .cds li.qrow { display: flex; align-items: flex-start; gap: .5rem; }
+  .cds li.qrow .qtext { flex: 1; }
+  .say {
+    flex: none; border: 1px solid var(--line); background: var(--panel);
+    border-radius: 999px; width: 1.6rem; height: 1.6rem; line-height: 1;
+    display: inline-flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--ink-soft); padding: 0; font-size: .8rem;
+  }
+  .say:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .say:disabled { opacity: .35; cursor: default; }
+
+  /* Phrase tray: fixed, pre-reviewed things the system may say. */
+  .tray { margin-top: .9rem; border-top: 1px solid var(--line); padding-top: .7rem; }
+  .tray h3 {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--ink-faint); font-weight: 600; margin: 0 0 .5rem;
+  }
+  .tray .row { display: flex; gap: .4rem; flex-wrap: wrap; align-items: center; }
+  .phrase {
+    border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
+    padding: .3rem .7rem; font-size: .82rem; color: var(--ink); cursor: pointer;
+  }
+  .phrase:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .phrase:disabled { opacity: .35; cursor: default; }
+  .phrase.disclose { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .tray .lock {
+    font-size: .8rem; color: var(--ink-faint); margin: .5rem 0 0;
+    display: flex; align-items: center; gap: .4rem;
+  }
+  .tray .lock.done { color: var(--green); }
+
+  /* Speaking pill: transient, above everything, Stop always one tap. */
+  .speaking {
+    display: none; align-items: center; gap: .7rem;
+    border: 1px solid var(--accent); background: #F6F1F5; color: var(--accent);
+    border-radius: var(--radius); padding: .6rem .9rem; font-size: .9rem;
+  }
+  .speaking.on { display: flex; }
+  .speaking .what { flex: 1; font-style: italic; }
+  .speaking button {
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    border-radius: 999px; padding: .3rem .9rem; font-size: .85rem; cursor: pointer;
+  }
+  .speakwave { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
+  .speakwave i { width: 3px; background: var(--accent); border-radius: 2px;
+                 height: 13px; transform-origin: bottom; animation: sp 900ms infinite; }
+  .speakwave i:nth-child(2) { animation-delay: 150ms; }
+  .speakwave i:nth-child(3) { animation-delay: 300ms; }
+  @keyframes sp { 0%,100% { transform: scaleY(.3); } 50% { transform: scaleY(1); } }
+
+  /* A failure must LOOK like a failure — never like a system that chose
+     not to speak. Amber, persistent, dismissible. */
+  .speakerr {
+    display: none; border: 1px solid #EBC7C0; background: #FBF1EF; color: var(--red);
+    border-radius: var(--radius); padding: .6rem .9rem; font-size: .88rem;
+    align-items: center; gap: .7rem;
+  }
+  .speakerr.on { display: flex; }
+  .speakerr .what { flex: 1; }
+  .speakerr button {
+    border: 1px solid #EBC7C0; background: transparent; color: var(--red);
+    border-radius: 999px; padding: .2rem .7rem; font-size: .8rem; cursor: pointer;
+  }
+
+  /* System utterances in the live transcript: a distinct grey channel.
+     They are NOT turns — no turn number, not citable. */
+  #transcript p.said {
+    color: var(--ink-faint); font-style: italic;
+    border-left: 2px solid var(--line); padding-left: .6rem;
+  }
+  #transcript p.said .who {
+    font-style: normal; font-size: .72rem; text-transform: uppercase;
+    letter-spacing: .08em; margin-right: .45rem;
+  }
 </style>
 </head>
 <body>
@@ -133,6 +211,18 @@
     </form>
   </div>
 
+  <!-- 0. SPEAKING STATE — transient; sits above everything while the
+       system has the floor, so Stop is always one tap (hard rule 3). -->
+  <div class="speaking" id="speakingBar">
+    <span class="speakwave"><i></i><i></i><i></i></span>
+    <span class="what" id="speakingWhat"></span>
+    <button id="speakStop" type="button">Stop</button>
+  </div>
+  <div class="speakerr" id="speakError">
+    <span class="what" id="speakErrorWhat"></span>
+    <button id="speakErrorDismiss" type="button">Dismiss</button>
+  </div>
+
   <!-- 1. URGENT ACTIONS — always first -->
   <div class="urgent" id="urgentBox" style="display:none">
     <h2 class="pane-label">⚠ Urgent actions</h2>
@@ -145,6 +235,24 @@
       <h2>Questions to ask</h2>
       <ul id="qList"></ul>
       <p class="idle" id="qIdle">Suggestions appear once the conversation gets going.</p>
+
+      <!-- Phrase tray (spec Part 5). Everything the system may say that is
+           not a CDS question. Fixed wording, reviewed in advance; the
+           client sends an id, never text. -->
+      <div class="tray">
+        <h3>Say to patient</h3>
+        <div class="row">
+          <button class="phrase disclose" data-phrase="disclosure" type="button">Disclosure</button>
+          <button class="phrase" data-phrase="invitation" type="button">Invitation</button>
+          <button class="phrase" data-phrase="mm-hm" type="button">Mm-hm</button>
+          <button class="phrase" data-phrase="i_see" type="button">I see</button>
+          <button class="phrase" data-phrase="go_on" type="button">Go on</button>
+          <button class="phrase" data-phrase="examination_handover" type="button">Hand over to examine</button>
+        </div>
+        <p class="lock" id="discLock">
+          <label><input type="checkbox" id="discCheck"> Disclosure given in my own words</label>
+        </p>
+      </div>
     </div>
     <div class="pane cds">
       <h2>Signs to check</h2>
@@ -480,7 +588,7 @@ function el(tag, className, text) {
 function fillList(listEl, idleEl, items, build) {
   listEl.innerHTML = '';
   idleEl.style.display = items.length ? 'none' : '';
-  for (const item of items) listEl.appendChild(build(item));
+  items.forEach((item, i) => listEl.appendChild(build(item, i)));
 }
 
 function renderCDS(a) {
@@ -494,8 +602,23 @@ function renderCDS(a) {
     li.appendChild(el('span', 'why', u.reason));
     uList.appendChild(li);
   }
+  // Tap-to-ask: each agenda question gains a speaker affordance. The
+  // button carries only the assessment version and the index — never the
+  // text. The server resolves that reference against its own copy of the
+  // agenda and authors the words itself (hard rule 1, PHASE_7A_SPEC §2.1).
+  agendaVersion = a.assessment_version || agendaVersion;
   fillList(document.getElementById('qList'), document.getElementById('qIdle'),
-           a.questions_to_ask || [], q => el('li', null, q));
+           a.questions_to_ask || [], (q, i) => {
+    const li = el('li', 'qrow');
+    const say = el('button', 'say', '🔊');
+    say.type = 'button';
+    say.title = 'Ask the patient this, in the system\'s voice';
+    say.dataset.version = agendaVersion;
+    say.dataset.index = i;
+    li.appendChild(say);
+    li.appendChild(el('span', 'qtext', q));
+    return li;
+  });
   fillList(document.getElementById('sList'), document.getElementById('sIdle'),
            a.signs_to_check || [], s => el('li', null, s));
   fillList(document.getElementById('dxList'), document.getElementById('dxIdle'),
@@ -544,6 +667,148 @@ function addFinal(msg) {
   p.appendChild(document.createTextNode(msg.text));
   transcriptEl.insertBefore(p, partialEl);
 }
+
+// Grey channel: what the machine said, inline and in time order. These
+// are NOT transcript turns — no turn number, never citable — and they
+// reach here from the speak protocol, not from the transcriber, because
+// the transcriber never hears them (that is the whole guarantee).
+function addSpoken(text) {
+  const p = document.createElement('p');
+  p.className = 'said';
+  const ts = el('span', 'ts',
+                formatTime(recStartMs ? (Date.now() - recStartMs) / 1000 : 0));
+  p.appendChild(ts);
+  p.appendChild(el('span', 'who', 'Assistant'));
+  p.appendChild(document.createTextNode(text));
+  transcriptEl.insertBefore(p, partialEl);
+}
+
+// ================================================== Phase 7a: tap-to-ask
+const speakingBar = document.getElementById('speakingBar');
+const speakingWhat = document.getElementById('speakingWhat');
+const speakError = document.getElementById('speakError');
+const speakErrorWhat = document.getElementById('speakErrorWhat');
+const discCheck = document.getElementById('discCheck');
+const discLock = document.getElementById('discLock');
+
+let agendaVersion = 0;
+let disclosed = false;
+let speaking = null;        // {utterance_id, audio, text}
+let pendingSpeakText = '';  // what we asked for, to label the pill
+
+// Phrases the patient must have heard the disclosure before. Mirrors the
+// server's DISCLOSURE_GATED_PHRASES — the server is the authority and
+// refuses regardless; this only keeps the doctor from tapping a dead
+// button. Encouragers are deliberately not gated.
+const GATED_PHRASES = ['invitation', 'examination_handover'];
+
+function showSpeakError(detail) {
+  // A dead speaker must LOOK like a fault, never like a system that chose
+  // not to speak.
+  speakErrorWhat.textContent = detail;
+  speakError.classList.add('on');
+}
+
+function setSpeakingUI(on, label) {
+  speakingBar.classList.toggle('on', on);
+  speakingWhat.textContent = on ? ('Speaking: \u201c' + label + '\u201d') : '';
+  refreshSpeechControls();
+}
+
+function refreshSpeechControls() {
+  const busy = speaking !== null || pendingSpeakText !== '';
+  const live = ws && ws.readyState === WebSocket.OPEN && recording;
+  document.querySelectorAll('#qList .say').forEach(b => {
+    b.disabled = busy || !live || !disclosed;
+    b.title = !live ? 'Start the consultation first'
+            : !disclosed ? 'Play the disclosure first (hard rule: the patient is told they are talking to a machine)'
+            : busy ? 'One utterance at a time'
+            : 'Ask the patient this, in the system\'s voice';
+  });
+  document.querySelectorAll('.phrase').forEach(b => {
+    const gated = GATED_PHRASES.includes(b.dataset.phrase) && !disclosed;
+    b.disabled = busy || !live || gated;
+  });
+  discCheck.disabled = disclosed || !live;
+}
+
+function requestSpeak(ref, label) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    showSpeakError('Not connected — cannot speak.');
+    return;
+  }
+  speakError.classList.remove('on');
+  pendingSpeakText = label;
+  refreshSpeechControls();
+  // A REFERENCE, never text. There is no field here for words.
+  ws.send(JSON.stringify({type: 'speak', ref: ref}));
+}
+
+function stopSpeaking(reason) {
+  if (!speaking) return;
+  const {utterance_id, audio} = speaking;
+  try { audio.pause(); } catch (e) { /* already ended */ }
+  ws.send(JSON.stringify({type: 'speak_ended', utterance_id: utterance_id,
+                          seq: seq + 1, reason: reason}));
+  speaking = null;
+  setSpeakingUI(false, '');
+}
+
+async function onSpeakReady(msg) {
+  const label = pendingSpeakText;
+  pendingSpeakText = '';
+  const audio = new Audio(msg.url);
+  audio.onended = () => { if (speaking) stopSpeaking('complete'); };
+  audio.onerror = () => {
+    // Playback failed even though synthesis succeeded — still a fault.
+    ws.send(JSON.stringify({type: 'speak_ended', utterance_id: msg.utterance_id,
+                            seq: seq + 1, reason: 'cancelled'}));
+    speaking = null;
+    setSpeakingUI(false, '');
+    showSpeakError('The audio could not be played — check the speaker/output device.');
+  };
+  try {
+    await audio.play();
+  } catch (err) {
+    audio.onerror();
+    return;
+  }
+  // speak_started goes AFTER playback actually begins, carrying the seq of
+  // the next frame we will send. WebSocket order means the server sees it
+  // before any audio recorded during playback.
+  speaking = {utterance_id: msg.utterance_id, audio: audio, text: label};
+  ws.send(JSON.stringify({type: 'speak_started', utterance_id: msg.utterance_id,
+                          seq: seq + 1}));
+  setSpeakingUI(true, label);
+  addSpoken(label);
+}
+
+document.getElementById('speakStop').addEventListener('click',
+  () => stopSpeaking('doctor_stop'));
+document.getElementById('speakErrorDismiss').addEventListener('click',
+  () => speakError.classList.remove('on'));
+
+document.getElementById('qList').addEventListener('click', (e) => {
+  const button = e.target.closest('.say');
+  if (!button || button.disabled) return;
+  const text = button.parentElement.querySelector('.qtext').textContent;
+  requestSpeak({kind: 'cds_question',
+                assessment_version: Number(button.dataset.version),
+                index: Number(button.dataset.index)}, text);
+});
+
+document.querySelectorAll('.phrase').forEach(button => {
+  button.addEventListener('click', () => {
+    if (button.disabled) return;
+    requestSpeak({kind: 'phrase', id: button.dataset.phrase},
+                 button.textContent.trim());
+  });
+});
+
+discCheck.addEventListener('change', () => {
+  if (!discCheck.checked) return;
+  ws.send(JSON.stringify({type: 'disclosure_given'}));
+});
 
 // ============================================================= start / stop
 function standDown(statusText) {
@@ -596,6 +861,19 @@ function onWsMessage(event) {
     // can arrive after start() already flipped into recording state,
     // so stand down completely: worklet, timer, flags, button.
     standDown(msg.detail);
+  }
+  else if (msg.type === 'speak_ready') { onSpeakReady(msg); }
+  else if (msg.type === 'speak_refused') {
+    pendingSpeakText = '';
+    refreshSpeechControls();
+    showSpeakError(msg.detail);
+  }
+  else if (msg.type === 'disclosure') {
+    disclosed = msg.given;
+    discCheck.checked = true;
+    discLock.classList.add('done');
+    discLock.title = 'Recorded and audited (' + msg.how + ')';
+    refreshSpeechControls();
   }
   else if (msg.type === 'cds_unavailable') {
     document.getElementById('dxIdle').style.display = '';
@@ -685,6 +963,14 @@ async function start() {
   }
 
   // Attach the transcription worklet to the SAME source the meter reads.
+  //
+  // THE MIC-STATUS CLUSTER'S INVARIANT — one capture, so the level meter
+  // cannot disagree with what the server hears. Phase 7a did not touch
+  // it, and the barge-in detector arriving in session 3 must NOT touch
+  // it either: that detector opens a SECOND, echo-cancelled stream, and
+  // wiring the meter to it would make the red pill describe audio the
+  // transcriber never receives. The detector stream is for one boolean
+  // and nothing else — never the meter, never the transcript.
   await audioCtx.audioWorklet.addModule('/static/recorder-worklet.js');
   workletNode = new AudioWorkletNode(audioCtx, 'pcm-forwarder');
   workletNode.port.onmessage = (e) => enqueue(resample(e.data, audioCtx.sampleRate));
@@ -694,11 +980,14 @@ async function start() {
   btn.textContent = 'Stop';
   btn.disabled = false;
   startTimer();
+  refreshSpeechControls();   // tap-to-ask becomes available
   setStatus('listening — speak normally');
 }
 
 async function stop() {
   recording = false;
+  stopSpeaking('doctor_stop');   // never leave a window open across Stop
+  refreshSpeechControls();
   btn.disabled = true;
   btn.textContent = 'Please wait…';
   stopTimer();

@@ -49,6 +49,13 @@ _DAY_COUNTERS = {
     "consultation.created": "consultations_started_today",
     "finalisation.failed": "finalisations_failed_today",
     "live.slot_rejected": "live_slot_rejections_today",
+    # Phase 7a invariant: a segment transcribed from a region we
+    # zero-filled ourselves. Should always be zero. Counted here so that
+    # "should never happen" is something the sentry can see rather than
+    # something buried in a log line — a non-zero value means Whisper
+    # hallucinated on digital silence and the fill needs revisiting
+    # (finalize.drop_segments_in_excluded_spans).
+    "transcript.silence_hallucination": "silence_hallucinations_today",
 }
 
 

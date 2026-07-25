@@ -383,11 +383,28 @@ def _frame(seq: int, samples: int, amplitude: int) -> bytes:
 
 
 def _drain_until(ws, wanted, limit=60):
+    """Read until one of `wanted` arrives.
+
+    `speak_refused` is ALWAYS accepted, whether asked for or not: without
+    that, a test whose speak is unexpectedly refused blocks forever on the
+    next receive instead of failing with a useful message.
+    """
     for _ in range(limit):
         message = ws.receive_json()
         if message.get("type") in wanted:
             return message
+        if message.get("type") == "speak_refused":
+            raise AssertionError(
+                f"speak refused while waiting for {wanted}: {message['detail']}")
     raise AssertionError(f"none of {wanted} arrived")
+
+
+def _disclose(ws):
+    """Satisfy the hard-rule-4 lock the way a doctor would with the
+    checkbox. Question chips and clinical phrases are refused until this
+    has happened — that is the point, and it is server-side."""
+    ws.send_text(json.dumps({"type": "disclosure_given"}))
+    return _drain_until(ws, {"disclosure"})
 
 
 @needs_db
@@ -421,6 +438,7 @@ def test_phrase_reference_produces_the_servers_own_words(speech_state):
     client = _client_for(_make_user("doctor"))
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": secrets.token_hex(8)})
+        _disclose(ws)
         ws.send_text(json.dumps({"type": "speak",
                                  "ref": {"kind": "phrase", "id": "invitation"}}))
         ready = _drain_until(ws, {"speak_ready", "speak_refused"})
@@ -449,6 +467,7 @@ def test_a_second_speak_while_a_window_is_open_is_rejected(speech_state):
     client = _client_for(_make_user("doctor"))
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": secrets.token_hex(8)})
+        _disclose(ws)
         ws.send_text(json.dumps({"type": "speak",
                                  "ref": {"kind": "phrase", "id": "invitation"}}))
         first = _drain_until(ws, {"speak_ready"})
@@ -487,8 +506,12 @@ def test_a_foreign_doctor_resuming_the_session_may_not_speak(speech_state):
         _drain_until(ws, {"resume"})
         ws.send_text(json.dumps({"type": "speak",
                                  "ref": {"kind": "phrase", "id": "invitation"}}))
-        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        message = ws.receive_json()
+        while message.get("type") not in ("speak_refused", "speak_ready"):
+            message = ws.receive_json()
     assert message["type"] == "speak_refused"
+    # Ownership is checked BEFORE the disclosure lock, so this is the
+    # reason returned even though the intruder also has not disclosed.
     assert "only the doctor running this consultation" in message["detail"]
 
 
@@ -500,6 +523,7 @@ def test_spans_are_persisted_as_bytes_and_milliseconds(speech_state):
     client = _client_for(_make_user("doctor"))
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": secrets.token_hex(8)})
+        _disclose(ws)
         ws.send_bytes(_frame(1, 4000, PATIENT_AMPLITUDE))       # 0.25 s
         _drain_until(ws, {"ack"})
         ws.send_text(json.dumps({"type": "speak",
@@ -561,6 +585,7 @@ def test_reconnect_cancels_playback_and_never_resumes_it(speech_state):
 
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": session_id})
+        _disclose(ws)
         ws.send_bytes(_frame(1, 4000, PATIENT_AMPLITUDE))
         _drain_until(ws, {"ack"})
         ws.send_text(json.dumps({"type": "speak",
@@ -593,6 +618,7 @@ def test_speech_events_are_audited(speech_state):
     client = _client_for(_make_user("doctor"))
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": secrets.token_hex(8)})
+        _disclose(ws)
         ws.send_text(json.dumps({"type": "speak",
                                  "ref": {"kind": "phrase", "id": "invitation"}}))
         ready = _drain_until(ws, {"speak_ready"})
@@ -613,3 +639,131 @@ def test_speech_events_are_audited(speech_state):
             " ORDER BY id DESC LIMIT 5")]
     assert "speech.requested" in actions
     assert "speech.barge_in" in actions
+
+
+# --- the disclosure lock (hard rule 4) -------------------------------------
+#
+# Enforced SERVER-SIDE, not by a disabled button. A disabled button can be
+# re-enabled from the browser console in ten seconds; a server refusal
+# cannot. The UI's disabling is a courtesy on top of this.
+
+@needs_db
+def test_a_cds_question_is_refused_before_the_disclosure(speech_state):
+    client = _client_for(_make_user("doctor"))
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": 1, "index": 0}}))
+        message = ws.receive_json()
+        while message.get("type") not in ("speak_refused", "speak_ready"):
+            message = ws.receive_json()
+    assert message["type"] == "speak_refused"
+    assert "talking to a machine" in message["detail"]
+
+
+@needs_db
+def test_clinical_phrases_are_refused_before_the_disclosure(speech_state):
+    client = _client_for(_make_user("doctor"))
+    for phrase_id in speech.DISCLOSURE_GATED_PHRASES:
+        with client.websocket_connect("/ws/transcribe") as ws:
+            ws.send_json({"session_id": secrets.token_hex(8)})
+            ws.send_text(json.dumps({"type": "speak",
+                                     "ref": {"kind": "phrase", "id": phrase_id}}))
+            message = ws.receive_json()
+            while message.get("type") not in ("speak_refused", "speak_ready"):
+                message = ws.receive_json()
+        assert message["type"] == "speak_refused", phrase_id
+
+
+@needs_db
+def test_the_disclosure_itself_is_never_gated(speech_state):
+    """It cannot require itself."""
+    client = _client_for(_make_user("doctor"))
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "disclosure"}}))
+        assert _drain_until(ws, {"speak_ready"})["type"] == "speak_ready"
+
+
+@needs_db
+def test_encouragers_are_not_gated(speech_state):
+    """"mm-hm" is not a clinical interaction; gating it would make the
+    lock feel like a nuisance rather than a rule."""
+    client = _client_for(_make_user("doctor"))
+    for phrase_id in speech.ENCOURAGER_IDS:
+        with client.websocket_connect("/ws/transcribe") as ws:
+            ws.send_json({"session_id": secrets.token_hex(8)})
+            ws.send_text(json.dumps({"type": "speak",
+                                     "ref": {"kind": "phrase", "id": phrase_id}}))
+            assert _drain_until(ws, {"speak_ready"})["type"] == "speak_ready", phrase_id
+
+
+@needs_db
+def test_speaking_the_disclosure_through_unlocks_the_agenda(speech_state):
+    """And only when it played THROUGH: a cut-off disclosure has not been
+    given."""
+    client = _client_for(_make_user("doctor"))
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "disclosure"}}))
+        ready = _drain_until(ws, {"speak_ready"})
+        ws.send_text(json.dumps({"type": "speak_started",
+                                 "utterance_id": ready["utterance_id"], "seq": 1}))
+        ws.send_bytes(_frame(1, 4000, TTS_AMPLITUDE))
+        _drain_until(ws, {"ack"})
+        ws.send_text(json.dumps({"type": "speak_ended",
+                                 "utterance_id": ready["utterance_id"],
+                                 "seq": 2, "reason": "complete"}))
+        assert _drain_until(ws, {"disclosure"})["given"] is True
+        # Now a gated phrase goes through.
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "invitation"}}))
+        assert _drain_until(ws, {"speak_ready"})["type"] == "speak_ready"
+
+
+@needs_db
+def test_a_cut_off_disclosure_does_not_count(speech_state):
+    client = _client_for(_make_user("doctor"))
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "disclosure"}}))
+        ready = _drain_until(ws, {"speak_ready"})
+        ws.send_text(json.dumps({"type": "speak_started",
+                                 "utterance_id": ready["utterance_id"], "seq": 1}))
+        ws.send_bytes(_frame(1, 4000, TTS_AMPLITUDE))
+        _drain_until(ws, {"ack"})
+        ws.send_text(json.dumps({"type": "speak_ended",
+                                 "utterance_id": ready["utterance_id"],
+                                 "seq": 2, "reason": "doctor_stop"}))
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "invitation"}}))
+        message = ws.receive_json()
+        while message.get("type") not in ("speak_refused", "speak_ready"):
+            message = ws.receive_json()
+    assert message["type"] == "speak_refused"
+
+
+@needs_db
+def test_the_doctors_attestation_unlocks_and_is_audited(speech_state):
+    """The doctor may give the disclosure in their own words instead."""
+    doctor = _make_user("doctor")
+    with _client_for(doctor).websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "disclosure_given"}))
+        assert _drain_until(ws, {"disclosure"})["how"] == "doctor_attested"
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "invitation"}}))
+        assert _drain_until(ws, {"speak_ready"})["type"] == "speak_ready"
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        row = conn.execute(
+            "SELECT user_id, at, detail FROM audit_event"
+            " WHERE action = 'speech.disclosure_given'"
+            " ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert row[0] == doctor["id"], "the audit row must carry the attesting user"
+    assert row[1] is not None, "and its timestamp"
+    assert row[2]["how"] == "doctor_attested"

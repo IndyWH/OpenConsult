@@ -318,3 +318,122 @@ def test_utterances_cascade_when_the_consultation_is_deleted():
             "SELECT count(*) FROM system_utterance WHERE consultation_id = %s",
             (cid,)).fetchone()[0]
     assert left == 0
+
+
+# --- what the review page is given ----------------------------------------
+#
+# Scope note: these test the PAYLOAD and the served markup. They do not
+# test the DOM — no browser is driven anywhere in this suite. Whether the
+# chips actually disable, the pill actually appears and the audio actually
+# plays is what the real-room check in HANDOVER is for.
+
+@needs_db
+def test_the_review_payload_carries_utterances_under_a_separate_key():
+    """A separate key, matching the separate table. `turns` is what the
+    note and its citations read; `system_utterances` is what the grey
+    channel reads, and nothing joins them."""
+    import secrets as _secrets
+
+    from app import auth
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    cid, spoken = _build_consultation()
+    doctor = asyncio.run(auth.create_user(
+        f"doctor_{_secrets.token_hex(4)}", "test-password-123", "Doctor", "doctor"))
+    client = TestClient(app)
+    client.cookies.set(auth.COOKIE_NAME, auth.sign_session(doctor["id"]))
+
+    payload = client.get(f"/api/consultations/{cid}").json()
+    assert [u["text"] for u in payload["system_utterances"]] == [spoken]
+    assert all(spoken not in t["text"] for t in payload["turns"])
+    # No turn number on an utterance: it can never be a citation target.
+    assert "idx" not in payload["system_utterances"][0]
+
+
+def test_the_live_page_ships_the_tap_to_ask_controls():
+    """Markup presence only — that the affordances exist and the phrase
+    tray offers exactly the six approved phrase ids."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    for element in ("speakingBar", "speakStop", "speakError", "discCheck"):
+        assert f'id="{element}"' in html, element
+    for phrase_id in ("disclosure", "invitation", "mm-hm", "i_see", "go_on",
+                      "examination_handover"):
+        assert f'data-phrase="{phrase_id}"' in html, phrase_id
+
+
+def test_the_live_page_sends_references_and_never_text():
+    """The client half of hard rule 1: there is no code path in the page
+    that puts words into a speak message."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "type: 'speak', ref: ref" in html
+    assert "'speak', text" not in html and '"speak", text' not in html
+
+
+def test_the_mic_cluster_invariant_is_documented_for_session_three():
+    """The detector stream arriving with barge-in must never be wired to
+    the meter — the meter must keep describing what the server hears."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "never the meter" in html
+
+
+# --- the hallucination invariant on excluded spans -------------------------
+#
+# NOT detection of our own voice, and it must never become that. It never
+# looks at what a segment SAYS. It asserts a property of a region that is
+# provably digital silence, because we zero-filled it ourselves.
+
+def test_a_segment_inside_an_excluded_span_is_dropped():
+    recording = turns((0, 5), (6, 9), (12, 20))
+    kept, dropped = finalize.drop_segments_in_excluded_spans(
+        recording, [(5.5, 10.0)])
+    assert [t["start"] for t in kept] == [0, 12]
+    assert [t["start"] for t in dropped] == [6]
+
+
+def test_a_segment_straddling_the_boundary_is_dropped():
+    """Part of it came from silence, and the rest cannot be trusted to be
+    cleanly separable."""
+    recording = turns((0, 6))
+    kept, dropped = finalize.drop_segments_in_excluded_spans(
+        recording, [(5.0, 8.0)])
+    assert kept == [] and len(dropped) == 1
+
+
+def test_segments_merely_touching_the_boundary_are_kept():
+    """Half-open intervals: a segment ending exactly where a span starts
+    contains no muted audio."""
+    recording = turns((0, 5), (8, 12))
+    kept, dropped = finalize.drop_segments_in_excluded_spans(
+        recording, [(5.0, 8.0)])
+    assert len(kept) == 2 and dropped == []
+
+
+def test_the_invariant_is_a_no_op_without_spans():
+    recording = turns((0, 5))
+    kept, dropped = finalize.drop_segments_in_excluded_spans(recording, [])
+    assert kept is recording and dropped == []
+
+
+def test_the_invariant_never_inspects_segment_text():
+    """The guard against it silently becoming string matching: a segment
+    whose text is exactly what we spoke, OUTSIDE any span, is kept."""
+    spoken = "Does the pain go anywhere else?"
+    recording = [{"start": 30.0, "end": 33.0, "text": spoken, "confidence": 0.9}]
+    kept, dropped = finalize.drop_segments_in_excluded_spans(
+        recording, [(5.0, 8.0)])
+    assert kept == recording and dropped == []
+
+
+def test_the_invariant_has_a_pulse_counter():
+    """"Should never happen" must be something the sentry can see."""
+    from app import monitor
+
+    assert (monitor._DAY_COUNTERS["transcript.silence_hallucination"]
+            == "silence_hallucinations_today")

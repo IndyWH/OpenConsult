@@ -101,6 +101,46 @@ def spans_to_seconds(spans: list[tuple[int, int]]) -> list[tuple[float, float]]:
     return [(start / divisor, end / divisor) for start, end in spans]
 
 
+def drop_segments_in_excluded_spans(
+    turns: list[dict], excluded_spans_s: list[tuple[float, float]]
+) -> tuple[list[dict], list[dict]]:
+    """Invariant check: nothing may be transcribed from a muted span.
+
+    **This is NOT detection of our own voice, and must never become that.**
+    It does not look at what a segment says and never compares it to
+    anything the system spoke. It asserts a property of a region that is
+    *provably digital silence* — we zero-filled it ourselves a few lines
+    above, in `mute_spans`. A segment there is not "probably our voice"; it
+    is output with no input, which is a Whisper hallucination on silence.
+
+    Why an invariant rather than a hope: zero-filled digital silence is a
+    known hallucination trigger for Whisper. WhisperX runs silero VAD
+    first, which should emit no speech regions on pure zeros, so this
+    should never fire. "Should never fire" is exactly the kind of claim
+    that deserves a check rather than a comment — and one that is visible
+    when it is wrong, hence the anomaly count and audit event at the call
+    site rather than a silent drop.
+
+    If it ever does fire in practice, the fix under consideration is
+    filling with very low-level noise instead of pure zeros. Do not change
+    the fill pre-emptively: a real firing is the evidence that would
+    justify it, and pure zeros are the stronger guarantee until then.
+
+    Returns (kept, dropped). Overlap is any intersection at all — a
+    segment straddling the boundary is dropped, because part of it came
+    from silence and the rest cannot be trusted to be cleanly separable.
+    """
+    if not excluded_spans_s:
+        return turns, []
+    kept, dropped = [], []
+    for turn in turns:
+        start, end = float(turn.get("start", 0)), float(turn.get("end", 0))
+        overlaps = any(start < span_end and end > span_start
+                       for span_start, span_end in excluded_spans_s)
+        (dropped if overlaps else kept).append(turn)
+    return kept, dropped
+
+
 def transcribe_and_diarise(wav_path: str,
                            exclusion_spans: list[tuple[int, int]] | None = None
                            ) -> list[dict]:
@@ -267,6 +307,30 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         spans = await system_utterances.exclusion_spans(cid)
         transcription = await asyncio.to_thread(
             transcribe_and_diarise, wav_path, spans)
+
+        # Invariant, not detection: nothing may be transcribed from a
+        # region we zero-filled ourselves. Should never fire (silero VAD
+        # emits no speech on pure zeros); visible rather than silent if it
+        # does, because a hallucination on silence is exactly the class of
+        # failure this phase exists to prevent.
+        excluded_s = transcription.get("excluded_spans_s") or []
+        kept, hallucinated = drop_segments_in_excluded_spans(
+            transcription["turns"], excluded_s)
+        if hallucinated:
+            transcription["turns"] = kept
+            logger.error(
+                "Consultation %d: %d segment(s) transcribed from muted "
+                "silence — dropped. This should not happen; see "
+                "drop_segments_in_excluded_spans.", cid, len(hallucinated))
+            await audit.log(None, "transcript.silence_hallucination",
+                            "consultation", cid,
+                            {"dropped": len(hallucinated),
+                             "spans": len(excluded_s),
+                             "segments": [{"start": t.get("start"),
+                                           "end": t.get("end"),
+                                           "text": (t.get("text") or "")[:200]}
+                                          for t in hallucinated[:10]]})
+
         turns = attribute_roles(transcription["turns"])
         for i, turn in enumerate(turns):
             turn["idx"] = i

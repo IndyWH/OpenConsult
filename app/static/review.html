@@ -36,6 +36,22 @@
   }
   .note-foot .grounding { margin-right: auto; }
 
+  /* System utterances: a distinct grey channel. Deliberately NOT styled
+     like a turn — no number column, no role colour, not clickable. The
+     doctor sees exactly what the machine said and when; the note cannot
+     touch it. */
+  #transcript .turn.said {
+    display: block; color: var(--ink-faint); font-style: italic;
+    border-left: 2px solid var(--line); background: transparent;
+    padding: .35rem 0 .35rem .7rem; margin: .3rem 0;
+  }
+  #transcript .turn.said .role {
+    font-style: normal; font-size: .68rem; text-transform: uppercase;
+    letter-spacing: .08em; margin-right: .5rem; color: var(--ink-faint);
+  }
+  #transcript .turn.said .ts { margin-right: .5rem; }
+  #transcript .turn.said .endreason { font-size: .78rem; }
+
   /* transcript turns: theme classes + editing affordance */
   #transcript { max-height: 75vh; overflow-y: auto; }
   .turn .ttext[contenteditable="true"]:focus { background: #F3EDE6; outline: none; }
@@ -182,9 +198,55 @@ function renderHead() {
   }
 }
 
+// System utterances render inline, in time order, in a distinct grey
+// channel: the doctor can see exactly what the machine said and when.
+// They are NOT Doctor or Patient turns — no turn number, not clickable as
+// citations, and they arrive under a separate `system_utterances` key
+// because they live in a separate table that the note path cannot reach.
+function spokenNode(u) {
+  const div = document.createElement('div');
+  div.className = 'turn said';
+  const meta = document.createElement('span');
+  meta.className = 'role';
+  meta.textContent = 'Assistant \u00b7 spoken aloud';
+  div.appendChild(meta);
+  const ts = document.createElement('span');
+  ts.className = 'ts';
+  ts.textContent = u.started_offset_ms == null
+    ? '(not played)' : fmt(u.started_offset_ms / 1000);
+  div.appendChild(ts);
+  div.appendChild(document.createTextNode(u.text));
+  if (u.end_reason && u.end_reason !== 'complete') {
+    const why = document.createElement('span');
+    why.className = 'endreason';
+    why.textContent = ' (' + u.end_reason.replace(/_/g, ' ') + ')';
+    div.appendChild(why);
+  }
+  return div;
+}
+
+function interleaved() {
+  // Merge by time so the consultation reads correctly. Utterances with no
+  // recorded start (failed_to_play) sort last rather than at zero.
+  const items = state.turns.map(t => ({at: t.start_s ?? t.start ?? 0, turn: t}));
+  for (const u of (state.system_utterances || [])) {
+    items.push({at: u.started_offset_ms == null ? Infinity
+                                                : u.started_offset_ms / 1000,
+                spoken: u});
+  }
+  return items.sort((a, b) => a.at - b.at);
+}
+
 function renderTranscript() {
   transcriptEl.innerHTML = '';
-  for (const t of state.turns) {
+  for (const item of interleaved()) {
+    if (item.spoken) { transcriptEl.appendChild(spokenNode(item.spoken)); continue; }
+    renderTurn(item.turn);
+  }
+}
+
+function renderTurn(t) {
+  {
     const div = el('div', 'turn ' + (t.role === 'Doctor' ? 'doctor' : 'patient') +
                           (t.confidence < 0.6 ? ' lowconf' : ''));
     div.id = 'turn-' + t.idx;

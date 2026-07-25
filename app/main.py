@@ -709,10 +709,14 @@ async def consultation_state(
     note = await consultations.latest_note(cid)
     plain = note_as_plain_text(note["content"]) if note else None
     letter_rows = await letters.list_letters(cid)
+    # Phase 7a: what the machine said, for the review page's grey channel.
+    # A SEPARATE key from `turns`, matching the separate table — the note
+    # and its citations read `turns` and can never reach these.
+    spoken = await system_utterances.for_consultation(cid)
     await audit.log(user["id"], "consultation.viewed", "consultation", cid)
     return JSONResponse(
         content={**consultation, "turns": turns, "note": note, "plain_text": plain,
-                 "letters": letter_rows}
+                 "letters": letter_rows, "system_utterances": spoken}
     )
 
 
@@ -1012,6 +1016,21 @@ async def _grace_finalise(app_state, session_id: str) -> None:
     await _complete_session(app_state, entry, connection_lost=True)
 
 
+def _needs_disclosure(ref: dict) -> bool:
+    """Which utterances the disclosure lock covers (hard rule 4).
+
+    Every CDS question, plus the clinical phrases. NOT the disclosure
+    itself — it cannot require itself — and not the encouragers: "mm-hm"
+    is not a clinical interaction, and gating it would make the lock feel
+    like a nuisance rather than a rule.
+    """
+    if ref.get("kind") == "cds_question":
+        return True
+    if ref.get("kind") == "phrase":
+        return ref.get("id") in speech.DISCLOSURE_GATED_PHRASES
+    return False
+
+
 def _cancel_playback(entry: dict, reason: str) -> None:
     """End any in-flight utterance without a client `speak_ended`.
 
@@ -1168,6 +1187,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "agenda": speech.AgendaLog(),
             "utterances": [],          # dicts, persisted at session end
             "pending_utterance": None,  # prepared, not yet started
+            # Hard rule 4: the patient must be told they are talking to a
+            # machine. Held server-side because the rule is code-enforced,
+            # not a UI courtesy — a disabled button can be re-enabled from
+            # the console, a server refusal cannot.
+            "disclosed": False,
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -1274,6 +1298,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # overlapping windows would make the exclusion span ambiguous.
             await refuse_speech("an utterance is already in flight")
             return
+        if not entry["disclosed"] and _needs_disclosure(payload.get("ref") or {}):
+            # Hard rule 4, enforced here rather than only in the UI: the
+            # patient is told they are talking to a machine BEFORE the
+            # machine starts asking them things.
+            await refuse_speech(
+                "the patient has not been told they are talking to a machine — "
+                "play the disclosure, or tick 'disclosure given'")
+            return
         try:
             utterance = await asyncio.to_thread(
                 functools.partial(
@@ -1322,6 +1354,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 ended_offset_ms=bytes_to_ms(span["end_byte"]))
         entry["utterances"].append(row)
 
+    async def mark_disclosed(how: str) -> None:
+        """Record that the patient has been told. Audited with user and
+        timestamp (the audit row carries `at` and `user_id`)."""
+        entry["disclosed"] = True
+        await audit.log(user["id"], "speech.disclosure_given", None, None,
+                        {"how": how})
+        await websocket.send_json({"type": "disclosure", "given": True, "how": how})
+        logger.info("Live session %s: disclosure recorded (%s) by %s",
+                    session_id, how, user["username"])
+
     async def handle_speak_started(payload: dict) -> None:
         """Open the exclusion window at actual playback start (§2.2 step 2)."""
         utterance = entry["pending_utterance"]
@@ -1354,6 +1396,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         cut_latency = payload.get("cut_latency_ms")
         record_utterance(utterance, span, reason,
                          int(cut_latency) if cut_latency is not None else None)
+        # The disclosure counts once the patient has actually heard it —
+        # a cut-off disclosure has not been given.
+        if (utterance.ref_detail.get("id") == "disclosure"
+                and reason == "complete" and not entry["disclosed"]):
+            await mark_disclosed("spoken")
         entry["pending_utterance"] = None
         await audit.log(
             user["id"], "speech.barge_in" if reason == "barge_in" else "speech.spoken",
@@ -1395,6 +1442,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         await handle_speak_started(payload)
                     elif kind == "speak_ended":
                         await handle_speak_ended(payload)
+                    elif kind == "disclosure_given":
+                        # The doctor's own words instead of ours. Only the
+                        # doctor running the consultation may attest it.
+                        if user["id"] != entry["user"]["id"]:
+                            await refuse_speech(
+                                "only the doctor running this consultation "
+                                "may record the disclosure")
+                        elif not entry["disclosed"]:
+                            await mark_disclosed("doctor_attested")
 
             if session.new_audio_seconds >= PROCESS_INTERVAL_S:
                 committed, partial = await session.process()
