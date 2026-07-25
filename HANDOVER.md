@@ -32,7 +32,7 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 289 tests; heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 313 tests; heavy ones self-skip if Ollama/Postgres/
   corpus are absent. Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
@@ -51,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 built the same day — tap-to-ask works end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -288,10 +288,10 @@ Five commits, "Design pass 1/5 … 5/5":
 
 `PHASE_7A_SPEC.md` (in the repo since this session) is the *how*;
 `PHASE_7_SPEC.md` § Stage 7a stays the statement of what 7a is *for*.
-Build order items 0–4 are done: schema module, `app/speech.py`, live-path
-exclusion, finalisation exclusion, and (session 2, 2026-07-25) real
-speech through Piper plus the doctor-facing UI. **Not built, and
-deliberately session 3: the barge-in detector (build item 5) and
+Build order items 0–4 and 7 are done: schema module, `app/speech.py`,
+live-path exclusion, finalisation exclusion, real speech through Piper,
+the doctor-facing UI, and the sound check. **Not built, and deliberately
+session 3: the barge-in detector (build item 5) and
 `scripts/calibrate_barge_in.py`** — held back on purpose until the owner
 has used tap-to-ask in the real room. `BARGE_IN_ENABLED` ships false;
 hard mute is this design with the detector off.
@@ -521,6 +521,84 @@ ever fires, the fix under consideration is low-level noise instead of
 pure zeros — the fill is deliberately **not** changed pre-emptively,
 because a real firing is the evidence that would justify it.
 
+### The sound check — a dead speaker eats transcript, silently
+
+Spec Part 10 / D6, owner's addition 2026-07-25. **This is a safety
+feature, not a convenience**, and the reasoning is the whole point:
+
+A dead speaker fails **silently**. If the volume is down or the output
+device is wrong, playback still succeeds — nothing errors, because
+nothing failed — and the patient simply hears nothing. The doctor reads
+that silence as a patient who is not answering. **Worse, the exclusion
+window opens anyway**, so for the length of that inaudible utterance the
+microphone feeds nothing to the transcript, and whatever the patient says
+during it is dropped **by construction**. A dead speaker therefore
+converts quietly into missing transcript, with nothing on screen to say
+so — the same shape as every other failure this project has designed
+against: not visibly broken, just wrong.
+
+The mic cluster answers *"is the room being heard"*. This answers the
+other half: *"is the room hearing us"*.
+
+- A **labelled** control beside Start — speaker icon plus the words
+  *Sound check*. **Not a cogwheel**: settings iconography reads as
+  configuration rather than as test, and icon-only controls cost a beat
+  on every use.
+- Plays the fixed phrase `sound_check` ("Sound check. If you can hear
+  this clearly, press yes.") through the same audio **output** path a
+  spoken question uses. Deliberately **not** over the `/ws/transcribe`
+  speak protocol — that protocol belongs to a live consultation, and this
+  runs before one starts. Two small endpoints instead:
+  `POST /api/speech/sound-check` and `.../result`.
+- Measures from the **existing** analyser on the capture stream. The
+  mic-cluster invariant stands — no second stream for this.
+- Reports a **level, not a boolean**, then asks a one-tap question. **The
+  human answer is authoritative**; the measurement corroborates it and is
+  the part that produces a number.
+- Four classes: heard well / heard faint / not heard / unverified. *Faint
+  reads differently from silent on purpose* — it predicts both a patient
+  who strains and an unreliable barge-in detector later. Declining is
+  recorded as **unverified, never as a pass**.
+- **Headphones are a known confound and not a warning**: they defeat the
+  acoustic path, so energy absent plus a "yes" is expected. The answer is
+  accepted and the discrepancy recorded. The same courtesy runs the other
+  way — energy present plus a "no" is still `not_heard`.
+- **Disabled while recording**, in the UI and again server-side (409). A
+  test phrase inside a live consultation would be a system utterance
+  needing the whole exclusion machinery for no clinical benefit. A
+  disabled button is a courtesy; a refusal is a rule.
+- **Offered, never blocking.** The first question tap of a session with
+  no check offers one — one tap to run, one to skip — and skipping
+  proceeds immediately. Asked once per session, not once per tap.
+
+**On the thresholds, plainly: two of the three are guesses.**
+
+| | value | provenance |
+|---|---|---|
+| Silence floor | `1e-4` RMS | **Not new.** The same value the mic cluster's dead-mic pill already uses, reused so the two surfaces cannot disagree about what silence is. |
+| "Good" boundary | `4.0×` floor (≈ +12 dB) | **Uncalibrated guess.** |
+| "Faint" boundary | `1.8×` floor (≈ +5 dB) | **Uncalibrated guess.** |
+
+Nobody has measured this room, this speaker or this microphone. Both
+ratios are env-tunable (`SOUND_CHECK_GOOD_RATIO`,
+`SOUND_CHECK_FAINT_RATIO`) precisely so the owner can set them from his
+own room, and **every raw measurement is stored** in the
+`speech.sound_check` audit row — noise floor, peak, mean, ratio, ratio in
+dB, plus the thresholds that were in force — so they can be set from real
+data rather than re-guessed.
+
+The noise floor is sampled over 400 ms of the quiet room immediately
+before playback, and the "peak" is the loudest 50 ms window during it.
+Using the floor's own peak (not its mean) as the denominator is
+deliberately conservative: it makes the ratio harder to pass, so a noisy
+room under-reports rather than over-reports.
+
+**For session 3:** the measured loopback level is exactly the input the
+barge-in detector's envelope-proportional threshold needs.
+`scripts/calibrate_barge_in.py` should **read these audit rows rather
+than re-measure from scratch** — that is why the numbers are stored flat
+and raw.
+
 ### The real-room check — this, not the suite, is what proves it
 
 The suite is evidence about the code. Nothing in it drives a browser, and
@@ -538,7 +616,11 @@ yet (see "Shared schema module"). Re-run
 running app — the pulse fetched at 12:30 on 2026-07-25 still had no
 `silence_hallucinations_today` field, which is the tell.
 
-1. Log in as a doctor and start a consultation from Today (or a walk-in).
+1. Log in as a doctor. **Before starting**, tap **Sound check** beside
+   Start. Confirm you hear "Sound check. If you can hear this clearly,
+   press yes.", answer Yes, and note the level it reports. Then start a
+   consultation from Today (or a walk-in). (Confirm the Sound check
+   button greys out once recording begins.)
 2. **Before disclosure:** confirm the question chips and the Invitation /
    Hand-over buttons are greyed. Tap one anyway — nothing should be
    spoken. (The server refuses regardless of the button state; to see
@@ -969,7 +1051,12 @@ lost while Phase 7 takes attention:**
    the detector off — and flips only if calibration meets both sides of
    the target. Two standing constraints for whoever builds it: the
    detector stream must never be wired to the mic meter, and the approved
-   disclosure must not gain an interruption line.
+   disclosure must not gain an interruption line. **Read the sound-check
+   levels from the `speech.sound_check` audit rows rather than
+   re-measuring** — that loopback level is exactly what the
+   envelope-proportional threshold needs, and it is already being
+   recorded. The good/faint ratios there are uncalibrated guesses and
+   should be set from the same run.
 7. **The Phase 7a real-room check has not been run** (see its section
    below). Nothing in the suite drives a browser or plays audio into a
    microphone, so the guarantee is proven in code and not yet in the
@@ -1313,8 +1400,8 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   repo as `PHASE_7A_SPEC.md`. Built: the shared schema module,
   `app/speech.py` (Piper as an isolated subprocess), the live-path
   exclusion with the `system_utterance` table, the finalisation
-  exclusion, and the doctor-facing UI with the disclosure lock.
-  **Tap-to-ask works end to end.** Session 3 is the barge-in detector and
+  exclusion, the doctor-facing UI with the disclosure lock, and the sound
+  check (spec Part 10). **Tap-to-ask works end to end.** Session 3 is the barge-in detector and
   its calibration script, deliberately held until the owner has used this
   in the real room — and **the real-room check in "Phase 7a — the
   transcript guarantee" has not been run yet**, so the guarantee is
