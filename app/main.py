@@ -25,6 +25,7 @@ from app import audit, auth, consultations, frontdesk, letters, monitor, ratelim
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import finalize_consultation, regenerate_note
+from app import transcript_quality
 from app.live import PROCESS_INTERVAL_S, LiveSession
 from app.notes import note_as_plain_text
 from app.rag import RAGService
@@ -697,6 +698,16 @@ async def approve(
         return JSONResponse(
             status_code=409,
             content={"error": "Unresolved urgent actions must be acknowledged first."},
+        )
+    # Transcript-quality gate refusal: there is no draft to approve, and
+    # there must not be one — the transcript is not trustworthy. Guarded
+    # on status as well as on the missing note, so a later regenerate
+    # cannot open a path to approving a refused transcript.
+    if consultation and consultation["status"] == transcript_quality.STATUS_UNRELIABLE:
+        return JSONResponse(
+            status_code=409,
+            content={"error": "This transcript was refused by the quality gate and"
+                     " cannot be approved. No note was drafted from it."},
         )
     note = await consultations.latest_note(cid)
     if note is None or note["content"].get("refusal"):

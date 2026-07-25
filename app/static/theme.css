@@ -58,7 +58,7 @@ h1.page { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margi
 .chip.linked { border-color: #CDE3D5; background: #F0F7F2; color: var(--green); }
 .chip.status { border-color: #E3D9C8; background: #F7F1E6; color: var(--amber); font-weight: 600; }
 .chip.status.approved, .chip.status.done { border-color: #CDE3D5; background: #F0F7F2; color: var(--green); }
-.chip.status.failed, .chip.status.live { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
+.chip.status.failed, .chip.status.live, .chip.status.unreliable_transcript { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
 .chip.status.neutral, .chip.status.waiting, .chip.status.cancelled, .chip.status.voided {
   border-color: var(--line); background: var(--panel); color: var(--ink-soft);
 }

@@ -58,6 +58,13 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS audio_deleted_at timestamptz;
 -- never reconnected — the audio tail may be missing; review shows a
 -- warning banner so the doctor knows what they are signing.
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS connection_lost boolean NOT NULL DEFAULT false;
+-- Transcript-quality gate (2026-07-25, TRANSCRIPT_QUALITY_GATE_SPEC.md §7).
+-- quality_signals holds all four measured signals on EVERY consultation,
+-- whether or not anything fired — that is how calibration data for the
+-- S1/S3 redesign accumulates for free. quality_outcome is 'pass' or
+-- 'refused' ('flagged' is reserved for the follow-up flag tier).
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_signals jsonb;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_outcome text;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -216,13 +223,26 @@ async def set_status(cid: int, status: str, *, audio_path: str | None = None,
         )
 
 
+async def save_quality(cid: int, signals: dict, outcome: str) -> None:
+    """Store the transcript-quality signals and verdict. Called on EVERY
+    finalisation, refused or not — the stored signals are the calibration
+    data for the S1/S3 redesign (spec §7)."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET quality_signals = %s, quality_outcome = %s"
+            " WHERE id = %s",
+            (json.dumps(signals), outcome, cid),
+        )
+
+
 async def get_consultation(cid: int) -> dict | None:
     async with await _conn() as conn:
         row = await (
             await conn.execute(
                 "SELECT c.id, c.started_at, c.status, c.audio_path, c.error,"
                 " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name,"
-                " c.voided_at, c.void_reason, c.doctor_id, c.connection_lost"
+                " c.voided_at, c.void_reason, c.doctor_id, c.connection_lost,"
+                " c.quality_signals, c.quality_outcome"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -243,6 +263,8 @@ async def get_consultation(cid: int) -> dict | None:
         "void_reason": row[10],
         "doctor_id": row[11],
         "connection_lost": row[12],
+        "quality_signals": row[13],
+        "quality_outcome": row[14],
     }
 
 

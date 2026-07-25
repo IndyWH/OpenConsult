@@ -106,6 +106,9 @@
       missing from the transcript and audio. Review with particular care
       before approving.</span>
     </div>
+    <!-- Transcript-quality gate refusal. Red = the system is stopping you,
+         the same semantics as the urgency banner; no new colour meaning. -->
+    <div class="urgency" id="qualityBanner" style="display:none"></div>
     <div class="urgency" id="urgentBanner" style="display:none"></div>
 
     <!-- 1. DRAFT NOTE — the document the doctor is here to sign -->
@@ -312,6 +315,7 @@ async function refresh() {
   contentEl.style.display = '';
   document.getElementById('connLost').style.display =
     state.connection_lost ? '' : 'none';
+  renderQualityBanner();
   renderUrgentBanner();
   renderTranscript();
   renderNote();
@@ -464,13 +468,18 @@ function applyReadOnly() {
   // Voided (admin inspection) is read-only too. A refusal has no approvable
   // draft: Approve stays hidden (renderNote).
   const locked = state.status === 'approved' || !!state.voided_at;
-  const refused = state.note && state.note.content.refusal;
+  // Two different refusals: the note grounding gate (a note exists, marked
+  // refusal) and the transcript-quality gate (no note at all, status
+  // unreliable_transcript). Neither has an approvable draft.
+  const refused = (state.note && state.note.content.refusal)
+    || state.quality_outcome === 'refused';
   document.getElementById('approve').style.display = (locked || refused) ? 'none' : '';
   // "+" (add letter) exists ONLY on approved, non-voided consultations —
   // a letter must never cite content the doctor hasn't signed.
   plusBtn.style.display =
     (state.status === 'approved' && !state.voided_at) ? 'inline-flex' : 'none';
-  document.getElementById('regen').style.display = locked ? 'none' : '';
+  document.getElementById('regen').style.display =
+    (locked || state.quality_outcome === 'refused') ? 'none' : '';
   document.getElementById('swap').style.display = locked ? 'none' : '';
   document.getElementById('noteTools').textContent = locked
     ? 'approved — read-only' : 'draft — nothing is final until approved';
@@ -478,6 +487,36 @@ function applyReadOnly() {
     for (const t of noteEl.querySelectorAll('.text')) t.contentEditable = 'false';
     for (const t of transcriptEl.querySelectorAll('.ttext')) t.contentEditable = 'false';
   }
+}
+
+function renderQualityBanner() {
+  const banner = document.getElementById('qualityBanner');
+  if (state.quality_outcome !== 'refused') { banner.style.display = 'none'; return; }
+  banner.style.display = '';
+  banner.className = 'urgency';
+  banner.innerHTML = '';
+  banner.appendChild(el('span', 'icon', '⚠'));
+  const box = document.createElement('div');
+  box.appendChild(el('h3', null, 'This transcript is not reliable — no note was drafted'));
+  const signals = (state.quality_signals || {});
+  const reasons = [];
+  const conf = (signals.s2_confidence || {});
+  if (conf.weighted_mean != null && conf.weighted_mean < conf.refuse_below)
+    reasons.push(`average speech-recognition confidence ${conf.weighted_mean.toFixed(3)}` +
+                 ` (below ${conf.refuse_below})`);
+  const trunc = (signals.s4_truncation || {});
+  if (trunc.gap_s != null && trunc.gap_s > trunc.refuse_above_s)
+    reasons.push(`${trunc.gap_s.toFixed(1)}s of audio after the last transcribed` +
+                 ` segment (tolerance ${trunc.refuse_above_s}s)`);
+  const ul = document.createElement('ul');
+  for (const r of reasons) ul.appendChild(el('li', null, r));
+  box.appendChild(ul);
+  box.appendChild(el('p', 'meta',
+    'The transcript below is shown for inspection only. It may not correspond ' +
+    'to what was said. No note was generated from it and none can be approved. ' +
+    'The recording and transcript are kept as evidence; an administrator can void ' +
+    'this consultation.'));
+  banner.appendChild(box);
 }
 
 function renderUrgentBanner() {

@@ -14,7 +14,11 @@ Triggered by the Stop button. Steps, in order:
 5. Attribute roles: first-speaker-is-Doctor heuristic (the doctor opens
    the consultation in every mock script and typical practice); the
    review UI has a swap-roles override for when it guesses wrong.
-6. Draft the SOAP note with MedGemma — which reloads onto the now-free
+6. Run the transcript-quality gate (app/transcript_quality.py) — BEFORE
+   the note call, so a refusal costs no MedGemma time. Signals are stored
+   on every consultation; S2 (low confidence) and S4 (truncation) refuse
+   independently. See TRANSCRIPT_QUALITY_GATE_SPEC.md §11.
+7. Draft the SOAP note with MedGemma — which reloads onto the now-free
    GPU on its first call.
 """
 
@@ -28,7 +32,7 @@ import time
 
 import httpx
 
-from app import audit, consultations
+from app import audit, consultations, transcript_quality
 from app.notes import draft_note
 
 logger = logging.getLogger(__name__)
@@ -74,6 +78,7 @@ def transcribe_and_diarise(wav_path: str) -> list[dict]:
     compute = "float16" if device == "cuda" else "int8"
 
     audio = whisperx.load_audio(wav_path)
+    audio_duration_s = len(audio) / 16000
 
     started = time.perf_counter()
     # Silero VAD: whisperx's default pyannote VAD checkpoint is incompatible
@@ -89,6 +94,17 @@ def transcribe_and_diarise(wav_path: str) -> list[dict]:
         WHISPERX_MODEL, device, compute_type=compute, vad_method="silero",
         asr_options={"initial_prompt": CLINICAL_INITIAL_PROMPT},
     )
+    # S1 for the transcript-quality gate, taken here because the model is
+    # already loaded — one window, no extra load, and it must happen
+    # BEFORE the forced-English transcribe below. Measured only: it does
+    # not act (spec §11 — it returns English at p=0.90 for #70).
+    detected_language, language_probability = None, None
+    try:
+        detected_language, language_probability, _ = model.model.detect_language(
+            audio=audio, language_detection_segments=1)
+    except Exception:  # pragma: no cover - never block finalisation on a measurement
+        logger.warning("Language detection unavailable; S1 recorded as unknown")
+
     result = model.transcribe(audio, batch_size=8, language="en")
 
     align_model, metadata = whisperx.load_align_model(language_code="en", device=device)
@@ -166,7 +182,9 @@ def transcribe_and_diarise(wav_path: str) -> list[dict]:
     for turn in turns:
         turn.pop("weight", None)
         turn["confidence"] = round(turn["confidence"], 3)
-    return turns
+    return {"turns": turns, "audio_duration_s": audio_duration_s,
+            "detected_language": detected_language,
+            "language_probability": language_probability}
 
 
 def attribute_roles(turns: list[dict]) -> list[dict]:
@@ -186,11 +204,37 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
     await consultations.set_status(cid, "processing", audio_path=wav_path)
     try:
         await unload_medgemma()
-        turns = await asyncio.to_thread(transcribe_and_diarise, wav_path)
-        turns = attribute_roles(turns)
+        transcription = await asyncio.to_thread(transcribe_and_diarise, wav_path)
+        turns = attribute_roles(transcription["turns"])
         for i, turn in enumerate(turns):
             turn["idx"] = i
         await consultations.save_turns(cid, turns)
+
+        # Transcript-quality gate, BEFORE the note call — a refusal must
+        # cost no MedGemma time, and must never produce a draft from a
+        # transcript that is not faithful to the audio (spec §1, #70).
+        signals = transcript_quality.compute_signals(
+            turns,
+            audio_duration_s=transcription.get("audio_duration_s"),
+            detected_language=transcription.get("detected_language"),
+            language_probability=transcription.get("language_probability"),
+        )
+        verdict = transcript_quality.evaluate(signals)
+        await consultations.save_quality(cid, signals, verdict["outcome"])
+
+        if verdict["outcome"] == transcript_quality.OUTCOME_REFUSED:
+            # No note is drafted. Transcript and audio are retained — this
+            # is evidence, not rubbish. NOT 'failed': the pipeline worked,
+            # the audio did not.
+            await consultations.set_status(cid, transcript_quality.STATUS_UNRELIABLE)
+            await audit.log(None, "consultation.quality_refused", "consultation",
+                            cid, {"fired": verdict["fired"],
+                                  "summary": transcript_quality.refusal_summary(
+                                      verdict["fired"])})
+            logger.warning("Consultation %d refused by the transcript-quality "
+                           "gate: %s", cid,
+                           transcript_quality.refusal_summary(verdict["fired"]))
+            return
 
         note = await draft_note(await consultations.get_turns(cid))
         await consultations.save_note(cid, note)
