@@ -65,4 +65,8 @@ Sinhala voice interaction; AI examination of any kind; AI communication of findi
 
 ## Sequencing note
 
-Phase 7 starts only after the current docket obligations are stable (Phase 5 adjudication/decision, Phase 0 recordings, Docker/demo packaging). 7a+7b make a strong demo milestone on their own and are the recommended first commitment; 7c is committed separately after 7a/7b review.
+Phase 7 starts only after the current docket obligations are stable (Phase 5 adjudication/decision, Phase 0 recordings, Docker/demo packaging).
+
+**Gate update 2026-07-25.** The **Phase 5 precondition is satisfied**: the step 6 adjudication completed 2026-07-25 and the fine-tune was deferred to v2 by owner decision the same day (`evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6; decision header in `evals/2026-07-17_finetune_plan.md`). The **recordings precondition now means `05_epigastric_pain_en` only** — `01_chest_pain_si` is deferred alongside Phase 5, since it needs a Sinhala-speaking second reader and only feeds the paused Sinhala arm. **The remaining gate is therefore: `05_epigastric_pain_en`, Docker Compose packaging, and the two-role demo script.**
+
+7a+7b make a strong demo milestone on their own and are the recommended first commitment; 7c is committed separately after 7a/7b review.
