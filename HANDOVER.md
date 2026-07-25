@@ -32,8 +32,7 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 253 tests (1 skipped: Piper is not installed, see the
-  Phase 7a section); heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 289 tests; heavy ones self-skip if Ollama/Postgres/
   corpus are absent. Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
@@ -52,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a build started the same day — items 0–3 of four built, UI and barge-in are session 2** (see "Phase 7a — the transcript guarantee" below). Two gate items deliberately carried — see "Phase 7 opened". | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 built the same day — tap-to-ask works end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -72,7 +71,7 @@ app/notes.py           cited SOAP note generation + plain-text serialiser
 app/consultations.py   Postgres persistence (consultation/turns/notes/urgency)
 app/letters.py         referral letters: suggest/draft calls + grounding gate
 app/schema.py          one entry point + ordering for the whole DB schema
-app/speech.py          Phase 7a: Piper TTS, phrase table, reference resolution
+app/speech.py          Phase 7a: TTS subprocess adapter, phrases, ref resolution
 app/system_utterances.py  what the system said, and its exclusion spans
 app/monitor.py         public monitoring pulse: aggregate counts, 10 s cache
 app/ratelimit.py       per-IP auth rate limits + proxy-aware client_ip
@@ -289,11 +288,13 @@ Five commits, "Design pass 1/5 … 5/5":
 
 `PHASE_7A_SPEC.md` (in the repo since this session) is the *how*;
 `PHASE_7_SPEC.md` § Stage 7a stays the statement of what 7a is *for*.
-Build order items 0–3 are done: schema module, `app/speech.py`, live-path
-exclusion, finalisation exclusion. **Not built, and deliberately session
-2: the UI (spec Part 5) and the barge-in detector (build item 5).** There
-is no way to tap a question from the browser yet — the protocol exists,
-its client does not.
+Build order items 0–4 are done: schema module, `app/speech.py`, live-path
+exclusion, finalisation exclusion, and (session 2, 2026-07-25) real
+speech through Piper plus the doctor-facing UI. **Not built, and
+deliberately session 3: the barge-in detector (build item 5) and
+`scripts/calibrate_barge_in.py`** — held back on purpose until the owner
+has used tap-to-ask in the real room. `BARGE_IN_ENABLED` ships false;
+hard mute is this design with the detector off.
 
 ### The guarantee, and why it is structural
 
@@ -402,37 +403,172 @@ S4's arithmetic in one of two implementations would have made the
 calibration stop describing what the pipeline does. **S1 is still two code
 paths**; that one needs the multi-window redesign and was not touched.
 
-### Piper is NOT installed, and that is a decision waiting on the owner
+### Piper runs as a subprocess, at arm's length — do not "simplify" it
 
-`piper-tts` is deliberately absent from `pyproject.toml`. Two reasons,
-both the owner's call:
+Owner's decision 2026-07-25, settled. **There is no `import piper`
+anywhere in `app/`, and there must not be one.** Synthesis goes through a
+configurable command (`TTS_COMMAND`) run as a separate process which
+writes a WAV and exits. Two reasons, both recorded in `app/speech.py` and
+`NOTICE` so the indirection is not removed as pointless:
 
-- It is **GPL-3.0-or-later** (the current `piper-tts` links espeak-ng; the
-  old MIT rhasspy releases are a different, older package). For a locally
-  run prototype that is never distributed this imposes no obligation, but
-  it interacts with the external-collaboration ambition and this repo's
-  `NOTICE` conventions.
-- Adding it **re-resolves the uv lockfile** on a machine where resolution
-  churn has corrupted the CUDA wheels before (see Troubleshooting).
+- `piper-tts` is **GPL-3.0-or-later** and links espeak-ng. Invoking a
+  separate program at arm's length is a different relationship from
+  linking it into our process, and this project is intended for external
+  collaboration.
+- Adding it to `pyproject.toml` would **re-resolve the app's lockfile** —
+  the churn that corrupted this machine's CUDA wheels before.
 
-Sizes if it goes ahead: `piper-tts` wheel 34.1 MB, `onnxruntime` already
-present (1.27.0), `en_GB-alba-medium` voice 63.2 MB. Its only runtime
-dependencies are onnxruntime and pathvalidate — `torch` is in the `train`
-extra only, so nothing competes for the GPU. `PiperVoice.load` is called
-with an explicit `use_cuda=False`.
+Installed with `uv tool install piper-tts` into its own environment
+(`~/.local/share/uv/tools/piper-tts`). Verified after installing:
+`uv.lock` and `pyproject.toml` unchanged, and the app's venv still cannot
+`import piper`.
 
-**Consequence for the test suite, stated plainly: the synthesis path is
-unverified against the real library.** Reference resolution, the cache and
-duration arithmetic, the hard cap, the exclusion windows and the protocol
-are all genuinely tested; the one test that needs real audio self-skips,
-as the Ollama- and corpus-dependent tests already do. A green run is not
-evidence that the system can speak.
+Voice `en_GB-alba-medium` lives **outside the repo** at
+`~/.local/share/piper-voices/` (63 MB, never committed), path via
+`TTS_MODEL_PATH`. **Its licence position is recorded in `NOTICE` as the
+model card states it, not as assumed:** the card gives the *training
+dataset's* licence (CC BY 4.0, the Edinburgh CSTR corpus) and states **no
+licence for the weights**. That gap is deliberately left visible.
 
-Also awaiting the owner: the **`disclosure` phrase wording** in
-`app/speech.py::PHRASES` is a draft by the implementer. Hard rule 4
-requires disclosure but the spec does not quote the sentence, and the
-wording is a clinical-communication decision. The other five phrases are
-verbatim from spec Part 5.
+**CPU only, structurally.** `--cuda` is not passed, but the stronger
+guarantee is that the tool environment's onnxruntime is a CPU-only build
+whose available providers are `['AzureExecutionProvider',
+'CPUExecutionProvider']` — there is no CUDA provider to select even if
+someone added the flag. Nothing was resident on the card during
+synthesis.
+
+**Absolute paths in `.env`, deliberately:** `consultation-ai.service`
+inherits systemd's default `PATH`, which does **not** include
+`~/.local/bin`. A bare `piper` resolves in an interactive shell and fails
+under the service — the kind of difference that only shows up in the
+room. `TTS_COMMAND` is also quoted, so `set -a && . ./.env` still works
+(unquoted, bash ran `--model` as a command).
+
+**Measured latency**, en_GB-alba-medium, this machine, five typical CDS
+questions plus the fixed phrases:
+
+| | |
+|---|---|
+| Cold (cache miss: process start + model load + synthesis) | median **749 ms**, range 735–843 ms |
+| Warm (cache hit, no subprocess at all) | median **0.04 ms** |
+
+Cold cost is dominated by process start and is near-independent of text
+length (a 650 ms utterance and a 3.4 s one both cost ~0.75 s to make).
+Every invocation is a fresh process, so there is no "warm process" — the
+warm path is the on-disk cache. That is fine for 7a, where the doctor
+taps and waits once per distinct question; it is the number 7c's
+pre-synthesis plan has to hide.
+
+Failure never degrades to silence. A missing command or model is
+`SpeechUnavailable` (a configuration state); a non-zero exit, a timeout,
+or an empty output file is `SpeechFailed` (a fault). Both reach the
+doctor as a visible red panel — **a dead speaker must look like a fault,
+not like a system that chose not to speak.**
+
+### The disclosure, and the doctor's name
+
+The disclosure wording was **approved by the owner 2026-07-25** and is in
+`PHRASES` verbatim, asserted word for word in the tests because it is the
+sentence a patient hears:
+
+> Hello. I'm a computer, not a person. I'll ask you some questions about
+> what's brought you in. Dr {doctor} is here with you and you can speak
+> to him at any time.
+
+It deliberately says **nothing about interrupting** the system, so it
+stays true whether or not barge-in is enabled and stays constant across
+the face study's arms. A test asserts the absence; **do not add an
+interruption line when the detector lands.**
+
+`{doctor}` is interpolated **server-side from the session's doctor
+account** — code, never a model, the same convention as `letters.py`.
+Fallback is display name, then username. **No title is ever invented**:
+the "Dr" lives in the phrase template, not in a transform on the name.
+
+Three things about the live data are the owner's to decide, not to fix
+here: no account carries a title; the display names are inconsistent in
+form (`herath` → "Herath", `vicky` → "Victoria", `JoydeepSinha1988` →
+"Joydeep Sinha"); and the admin account `doctor` has display name
+"Doctor", so it would speak as **"Dr Doctor"**. Also flagged rather than
+changed: the approved wording's *"you can speak to him"* assumes the
+doctor is male, which is a wording change and therefore the owner's.
+
+**The disclosure lock is server-side** (hard rule 4). Every CDS question
+and the two clinical phrases are refused until the session has recorded a
+disclosure — the phrase played *through* (a cut-off one does not count),
+or the doctor ticking "disclosure given in my own words". Both audit
+`speech.disclosure_given` with user and timestamp. The disclosure cannot
+gate itself; the encouragers are exempt, because "mm-hm" is not a
+clinical interaction and gating it would make the lock feel like a
+nuisance rather than a rule. A disabled button can be re-enabled from the
+console in ten seconds; a server refusal cannot.
+
+### The silence invariant — not detection, and it must not become that
+
+Zero-filled digital silence is a classic Whisper hallucination trigger.
+Silero VAD should emit no speech regions on pure zeros, so this should
+never fire — which is exactly the sort of claim that deserves a check.
+`finalize.drop_segments_in_excluded_spans` drops any segment overlapping
+an excluded span, audits `transcript.silence_hallucination`, and feeds
+`silence_hallucinations_today` on the monitoring pulse, so "should never
+happen" is visible to the sentry rather than buried in a log line.
+
+It **never looks at what a segment says**, and a test asserts that: a
+segment whose text is exactly what the system spoke, but *outside* any
+span, is kept. It asserts a property of a region that is provably digital
+silence, because the pipeline zero-filled it a few lines earlier. If it
+ever fires, the fix under consideration is low-level noise instead of
+pure zeros — the fill is deliberately **not** changed pre-emptively,
+because a real firing is the evidence that would justify it.
+
+### The real-room check — this, not the suite, is what proves it
+
+The suite is evidence about the code. Nothing in it drives a browser, and
+no test plays audio into a microphone. **This walkthrough is what tells
+us the guarantee holds in the room**, and it should be run before Phase
+7a is called done.
+
+The app must be restarted first to pick up this code
+(`sudo systemctl restart consultation-ai`) — it runs without `--reload`.
+
+1. Log in as a doctor and start a consultation from Today (or a walk-in).
+2. **Before disclosure:** confirm the question chips and the Invitation /
+   Hand-over buttons are greyed. Tap one anyway — nothing should be
+   spoken. (The server refuses regardless of the button state; to see
+   that, re-enable a chip in the browser console and tap it — a red
+   panel should say the patient has not been told.)
+3. Tap **Disclosure**. Confirm you hear it through the room speaker, that
+   the name spoken is *your* account's, and that the speaking pill
+   appears with a Stop button while it plays.
+4. Confirm the chips and phrase buttons become live once it finishes, and
+   that the disclosure line appears in the live transcript in grey,
+   marked *Assistant*.
+5. Let the patient-actor talk for a minute. Tap a **question chip**.
+   Confirm: it speaks, the pill shows it, all other chips grey out while
+   it does, and **the spoken question does not appear as patient or
+   doctor text in the live transcript** — only in the grey channel.
+6. Tap a chip and press **Stop** mid-sentence. Playback must cut
+   immediately.
+7. Speak normally straight after an utterance ends and confirm your
+   speech still reaches the transcript (the 200 ms tail should cost you
+   nothing at conversational pace).
+8. Press **Stop** to finish, wait for finalisation, open the review page.
+9. **The check that matters:** read the diarised transcript end to end.
+   Every question the machine asked must appear **only** in the grey
+   *Assistant · spoken aloud* channel — never as a Doctor or Patient
+   turn, never with a turn number, and never citable from the note. Click
+   through the note's citation chips and confirm none lands on a grey
+   line.
+10. Confirm the draft note contains nothing the machine said.
+
+**If any machine utterance appears as a patient or doctor turn, stop and
+report it — that is the guarantee failing, and it is the one failure this
+phase exists to prevent.**
+
+Worth also checking, since they are cheap: pull the speaker cable and tap
+a chip (a red error panel, not silence); and confirm
+`/api/monitor/pulse` reports `silence_hallucinations_today: 0` after the
+consultation finalises.
 
 ## Shared schema module (2026-07-25)
 
@@ -767,13 +903,19 @@ lost while Phase 7 takes attention:**
    — the same recording as gate item 1, so the two unblock together.
 5. **Consultations #78 and #162 await the owner's review** (both
    `awaiting_review` in the live database, verified 2026-07-25).
-6. **Phase 7a session 2**, from the same spec's build order: the UI
-   (tappable question chips, phrase tray, speaking pill with Stop,
-   disclosure lock, the review page's grey transcript channel) and the
-   barge-in detector plus `scripts/calibrate_barge_in.py`. Two owner
-   decisions gate the work: whether to install Piper (GPL, lockfile
-   re-resolve) and the `disclosure` wording. `BARGE_IN_ENABLED` ships
-   false — hard mute is this design with the detector off.
+6. **Phase 7a session 3**: the barge-in detector (second echo-cancelled
+   stream, envelope-proportional threshold) and
+   `scripts/calibrate_barge_in.py` reporting both sides of the D5 target.
+   Deliberately held until the owner has used tap-to-ask in the real
+   room. `BARGE_IN_ENABLED` ships false — hard mute is this design with
+   the detector off — and flips only if calibration meets both sides of
+   the target. Two standing constraints for whoever builds it: the
+   detector stream must never be wired to the mic meter, and the approved
+   disclosure must not gain an interruption line.
+7. **The Phase 7a real-room check has not been run** (see its section
+   below). Nothing in the suite drives a browser or plays audio into a
+   microphone, so the guarantee is proven in code and not yet in the
+   room.
 
 ## Pre-Phase-7 build item: finalisation transcript-quality gate
 
@@ -1108,15 +1250,17 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   Cowork 2026-07-24. Next: Docker Compose packaging and the two-role
   demo script.
 - **Whole-project:** the end-of-project review docket above.
-- **Phase 7 (OPEN; 7a items 0–3 built 2026-07-25):** supervised auto
-  history-taking is spec'd in `PHASE_7_SPEC.md`, and 7a's *how* is now in
-  the repo as `PHASE_7A_SPEC.md`. Built: the shared schema module,
-  `app/speech.py`, the live-path exclusion with the `system_utterance`
-  table, and the finalisation exclusion. **Session 2 is the UI and the
-  barge-in detector** — until then there is no way to tap a question from
-  the browser; the protocol exists, its client does not. Two owner
-  decisions gate it: installing Piper, and the disclosure wording. See
-  "Phase 7a — the transcript guarantee". **OPENED 2026-07-25 by owner
+- **Phase 7 (OPEN; 7a items 0–4 built 2026-07-25):** supervised auto
+  history-taking is spec'd in `PHASE_7_SPEC.md`, and 7a's *how* is in the
+  repo as `PHASE_7A_SPEC.md`. Built: the shared schema module,
+  `app/speech.py` (Piper as an isolated subprocess), the live-path
+  exclusion with the `system_utterance` table, the finalisation
+  exclusion, and the doctor-facing UI with the disclosure lock.
+  **Tap-to-ask works end to end.** Session 3 is the barge-in detector and
+  its calibration script, deliberately held until the owner has used this
+  in the real room — and **the real-room check in "Phase 7a — the
+  transcript guarantee" has not been run yet**, so the guarantee is
+  proven in code and not in the room. **OPENED 2026-07-25 by owner
   decision**,
   with `05_epigastric_pain_en` and the Docker/demo work **deliberately
   carried** rather than met; the transcript-quality gate item is **met
