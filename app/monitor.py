@@ -56,6 +56,11 @@ _DAY_COUNTERS = {
     # hallucinated on digital silence and the fill needs revisiting
     # (finalize.drop_segments_in_excluded_spans).
     "transcript.silence_hallucination": "silence_hallucinations_today",
+    # Consultation 445: one utterance silenced six minutes and nothing
+    # objected. A span longer than the synthesiser can produce, or a union
+    # covering an absurd share of the recording, is counted here so an
+    # over-reach announces itself rather than being invisible.
+    "transcript.exclusion_anomaly": "exclusion_anomalies_today",
 }
 
 

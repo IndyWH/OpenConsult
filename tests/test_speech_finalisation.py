@@ -569,3 +569,61 @@ def test_the_invariant_runs_before_the_speaker_merge():
     invariant = source.index("raw_segments, hallucinated = drop_segments_in_excluded_spans")
     merge = source.index("# Merge word-assigned segments into speaker turns.")
     assert invariant < merge, "the invariant must run before the merge"
+
+
+# --- the backstops item 4 argues for ---------------------------------------
+#
+# Whatever the cause, ONE utterance silenced six minutes of a consultation
+# and nothing objected — no limit existed that the damage could exceed.
+
+def test_a_span_longer_than_the_synthesiser_can_produce_is_clamped():
+    """By definition wrong: there is no utterance it could correspond to."""
+    result = finalize.check_exclusion_limits([(10.0, 400.0)], 669.0)
+    (start, end), = result["spans"]
+    assert end - start == pytest.approx(finalize.MAX_SPAN_S)
+    assert result["anomalies"][0]["kind"] == "span_too_long"
+    assert result["anomalies"][0]["was_s"] == pytest.approx(390.0)
+
+
+def test_the_clamp_is_the_synthesis_cap_plus_the_tail():
+    from app import speech as sp
+
+    assert finalize.MAX_SPAN_S == pytest.approx(
+        sp.SPEECH_MAX_UTTERANCE_S + sp.SPEECH_EXCLUSION_TAIL_MS / 1000)
+
+
+def test_an_absurd_excluded_fraction_is_reported():
+    spans = [(float(i * 20), float(i * 20 + 15)) for i in range(20)]   # 300s
+    result = finalize.check_exclusion_limits(spans, 400.0)
+    kinds = [a["kind"] for a in result["anomalies"]]
+    assert "excluded_fraction_too_high" in kinds
+    assert result["fraction"] == pytest.approx(0.75, abs=0.01)
+
+
+def test_c445_would_not_have_tripped_the_fraction_limit():
+    """Recorded deliberately. 445 sat at 10.1% while being a serious
+    incident, so this backstop would NOT have caught it — it is a ceiling
+    on absurdity, not a tight bound, and must not be mistaken for one."""
+    result = finalize.check_exclusion_limits(C445_SPANS_S, C445_DURATION_S)
+    assert result["anomalies"] == []
+    assert result["fraction"] == pytest.approx(0.101, abs=0.002)
+    assert result["fraction"] < finalize.MAX_EXCLUDED_FRACTION
+
+
+def test_the_union_is_a_true_union_not_a_sum():
+    merged = finalize.merge_spans([(0.0, 5.0), (3.0, 8.0), (20.0, 21.0)])
+    assert merged == [(0.0, 8.0), (20.0, 21.0)]
+    result = finalize.check_exclusion_limits([(0.0, 5.0), (3.0, 8.0)], 100.0)
+    assert result["excluded_s"] == pytest.approx(8.0)   # not 10.0
+
+
+def test_normal_exclusion_produces_no_anomalies():
+    result = finalize.check_exclusion_limits([(10.0, 13.0), (50.0, 58.0)], 600.0)
+    assert result["anomalies"] == [] and result["excluded_s"] == pytest.approx(11.0)
+
+
+def test_the_anomaly_has_a_pulse_counter():
+    from app import monitor
+
+    assert (monitor._DAY_COUNTERS["transcript.exclusion_anomaly"]
+            == "exclusion_anomalies_today")

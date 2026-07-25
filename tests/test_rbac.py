@@ -133,6 +133,8 @@ def test_monitor_pulse_is_deliberately_public_and_aggregate_only(clients):
         # buried in a log line. A count, so the aggregate-only obligation
         # asserted below still holds.
         "silence_hallucinations_today", "silence_hallucinations_last_hour",
+        # Consultation 445: exclusion over-reach must announce itself.
+        "exclusion_anomalies_today", "exclusion_anomalies_last_hour",
         "errors_last_hour", "audio_disk_used_mb",
     }
     assert isinstance(body["live_consultation_active"], bool)

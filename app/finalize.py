@@ -32,7 +32,7 @@ import time
 
 import httpx
 
-from app import audit, consultations, system_utterances, transcript_quality
+from app import audit, consultations, speech, system_utterances, transcript_quality
 from app.notes import draft_note
 
 logger = logging.getLogger(__name__)
@@ -99,6 +99,77 @@ def spans_to_seconds(spans: list[tuple[int, int]]) -> list[tuple[float, float]]:
     """Byte spans → second spans, for the transcript-quality gate."""
     divisor = float(SAMPLE_RATE * BYTES_PER_SAMPLE)
     return [(start / divisor, end / divisor) for start, end in spans]
+
+
+# --- backstops on exclusion (consultation 445) -----------------------------
+#
+# The lesson of 445 is not only its specific cause. ONE utterance silenced
+# six minutes of a consultation and nothing objected — no limit existed
+# that the damage could exceed. These two convert an invisible over-reach
+# into something that announces itself, whatever the next cause turns out
+# to be.
+
+# No single span may be longer than the longest utterance the synthesiser
+# will ever produce, plus the tail. A span longer than that is by
+# definition wrong: there is no utterance it could correspond to.
+MAX_SPAN_S = (speech.SPEECH_MAX_UTTERANCE_S
+              + speech.SPEECH_EXCLUSION_TAIL_MS / 1000.0)
+
+# The union of excluded spans as a fraction of the recording. 445 sat at
+# 10.1% while being a serious incident, so this is a ceiling on absurdity
+# rather than a tight bound — owner-tunable.
+MAX_EXCLUDED_FRACTION = float(os.getenv("MAX_EXCLUDED_FRACTION", "0.25"))
+
+
+def merge_spans(spans: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """Overlapping/adjacent spans merged, so a union is a true union.
+
+    Windows cannot overlap by construction (one utterance at a time), but
+    the union is what the fraction check measures and it must not be
+    inflated by double-counting if that ever changes.
+    """
+    merged: list[list[float]] = []
+    for start, end in sorted((float(a), float(b)) for a, b in spans):
+        if merged and start <= merged[-1][1]:
+            merged[-1][1] = max(merged[-1][1], end)
+        else:
+            merged.append([start, end])
+    return [(a, b) for a, b in merged]
+
+
+def check_exclusion_limits(spans_s: list[tuple[float, float]],
+                           audio_duration_s: float | None) -> dict:
+    """Clamp over-long spans and report on the total excluded fraction.
+
+    Returns {"spans": clamped, "anomalies": [...], "excluded_s", "fraction"}.
+    An anomaly is a fact for the audit log, not a refusal: the transcript
+    gate already decides whether a damaged transcript may be drafted from,
+    and a second refusal path would be a second thing to get wrong.
+    """
+    anomalies: list[dict] = []
+    clamped: list[tuple[float, float]] = []
+    for start, end in spans_s:
+        if end - start > MAX_SPAN_S:
+            anomalies.append({
+                "kind": "span_too_long", "start_s": round(start, 3),
+                "was_s": round(end - start, 3), "clamped_to_s": MAX_SPAN_S,
+            })
+            end = start + MAX_SPAN_S
+        clamped.append((start, end))
+
+    union = merge_spans(clamped)
+    excluded = sum(b - a for a, b in union)
+    fraction = (excluded / audio_duration_s) if audio_duration_s else 0.0
+    if fraction > MAX_EXCLUDED_FRACTION:
+        anomalies.append({
+            "kind": "excluded_fraction_too_high",
+            "excluded_s": round(excluded, 2),
+            "audio_duration_s": round(float(audio_duration_s or 0), 2),
+            "fraction": round(fraction, 4),
+            "limit": MAX_EXCLUDED_FRACTION,
+        })
+    return {"spans": clamped, "anomalies": anomalies,
+            "excluded_s": round(excluded, 2), "fraction": round(fraction, 4)}
 
 
 # A segment is discarded only when MOST of it lies inside muted audio.
@@ -196,6 +267,18 @@ def transcribe_and_diarise(wav_path: str,
 
     audio = whisperx.load_audio(wav_path)
     audio_duration_s = len(audio) / SAMPLE_RATE
+
+    # Backstops before anything is muted (consultation 445): clamp any
+    # span longer than the synthesiser could possibly produce, and notice
+    # when the union covers an absurd share of the recording.
+    limits = check_exclusion_limits(
+        spans_to_seconds(exclusion_spans or []), audio_duration_s)
+    for anomaly in limits["anomalies"]:
+        logger.error("Exclusion anomaly (%s): %s", anomaly["kind"], anomaly)
+    exclusion_spans = [(int(a * SAMPLE_RATE * BYTES_PER_SAMPLE),
+                        int(b * SAMPLE_RATE * BYTES_PER_SAMPLE))
+                       for a, b in limits["spans"]]
+
     # From here on every model sees the derived copy only. The original
     # array is untouched, and the file was never opened for writing.
     audio = mute_spans(audio, exclusion_spans or [])
@@ -322,7 +405,9 @@ def transcribe_and_diarise(wav_path: str,
             "detected_language": detected_language,
             "language_probability": language_probability,
             "excluded_spans_s": excluded_s,
-            "hallucinated_segments": hallucinated}
+            "hallucinated_segments": hallucinated,
+            "exclusion_anomalies": limits["anomalies"],
+            "excluded_fraction": limits["fraction"]}
 
 
 def attribute_roles(turns: list[dict]) -> list[dict]:
@@ -353,6 +438,18 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         # RAW segments before the speaker merge (see consultation 445).
         # What is left here is the reporting of it.
         excluded_s = transcription.get("excluded_spans_s") or []
+
+        # Exclusion backstops (consultation 445). Audited and counted, not
+        # refused: the transcript-quality gate below already decides
+        # whether a damaged transcript may be drafted from, and a second
+        # refusal path would be a second thing to get wrong. The point is
+        # that an over-reach announces itself instead of being invisible.
+        for anomaly in (transcription.get("exclusion_anomalies") or []):
+            await audit.log(None, "transcript.exclusion_anomaly",
+                            "consultation", cid,
+                            {**anomaly,
+                             "excluded_fraction": transcription.get("excluded_fraction")})
+
         hallucinated = transcription.get("hallucinated_segments") or []
         if hallucinated:
             logger.error(
