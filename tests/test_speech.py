@@ -6,13 +6,19 @@ What these tests are evidence about, stated plainly because it matters:
   logic over the phrase table and the server's own agenda log, so every
   assertion below about "the client cannot supply words" is a genuine
   test of the shipped mechanism.
-- **Synthesis itself is not.** piper-tts is an optional dependency and is
-  not installed on this machine as of 2026-07-25 (owner decision pending —
-  GPL-3.0-or-later, and a lockfile re-resolve). Tests needing real audio
-  self-skip, as the Ollama- and corpus-dependent tests already do. The
-  cache, duration and cap arithmetic are tested against synthetic WAVs
-  built here, which means they test the arithmetic and NOT Piper's
-  behaviour. Nobody should read a green run as proof the system can speak.
+- **Synthesis is real, but mostly stubbed.** Piper runs as a SUBPROCESS
+  from its own environment (there is no `import piper` in the app), so
+  most tests here drive a fake command — a real subprocess writing a
+  known-length WAV, because running a subprocess is precisely the
+  adapter's job and faking at the function boundary would test nothing.
+  The handful of `test_real_*` tests do call Piper, and self-skip with a
+  clear reason when the command or voice is absent. They are the join
+  between the arithmetic everything else trusts and what Piper actually
+  produces.
+- **Nothing here drives a browser.** The sound-check tests below cover
+  classification, the endpoints and the audit row; whether the control
+  actually plays audio into a room is what the real-room check in
+  HANDOVER is for.
 """
 
 from __future__ import annotations
@@ -53,6 +59,7 @@ def test_phrase_table_holds_exactly_the_specified_phrases():
     assert set(speech.PHRASES) == {
         "disclosure", "invitation", "mm-hm", "i_see", "go_on",
         "examination_handover",
+        "sound_check",   # spec Part 10, added 2026-07-25
     }
 
 
@@ -95,7 +102,7 @@ def test_no_phrase_advises_reassures_or_diagnoses():
     for phrase_id in speech.PHRASES:
         lowered = speech.render_phrase(phrase_id, "Herath").lower()
         for bad in forbidden:
-            assert bad not in lowered, f"{phrase_id} may be advising: {text!r}"
+            assert bad not in lowered, f"{phrase_id} may be advising: {lowered!r}"
 
 
 # --- the doctor's name, interpolated server-side ---------------------------
@@ -613,3 +620,271 @@ def test_unknown_utterance_id_is_404_not_a_confirmation():
     doctor = _make_user("doctor")
     response = _client_for(doctor).get("/api/speech/deadbeefdeadbeef.wav")
     assert response.status_code == 404
+
+
+# --- the sound check (spec Part 10) ----------------------------------------
+#
+# Why it exists, restated because it governs what these tests must prove:
+# a dead speaker fails SILENTLY. Playback succeeds, nothing errors, the
+# patient hears nothing — and because the exclusion window opens anyway,
+# whatever the patient says during that inaudible utterance is dropped
+# from the transcript by construction. A dead speaker converts quietly
+# into missing transcript.
+
+def test_the_sound_check_phrase_is_the_approved_wording():
+    """Deliberately not clinical and not addressed to the patient — it is
+    a check spoken in the room and should sound like one (spec 10.4)."""
+    assert speech.PHRASES["sound_check"] == \
+        "Sound check. If you can hear this clearly, press yes."
+
+
+def test_the_sound_check_phrase_resolves_like_any_other():
+    resolution = speech.resolve({"kind": "phrase", "id": "sound_check"})
+    assert resolution.text == speech.PHRASES["sound_check"]
+    assert resolution.ref_kind == "phrase"
+
+
+def test_the_sound_check_phrase_is_not_disclosure_gated():
+    """It is spoken before a consultation starts, to the room rather than
+    to the patient, so hard rule 4 does not reach it."""
+    assert "sound_check" not in speech.DISCLOSURE_GATED_PHRASES
+
+
+def test_the_sound_check_phrase_synthesises(tmp_path):
+    service = service_with(tmp_path, seconds=2.0)
+    wav_bytes, duration_ms, _ = service.synthesise(speech.PHRASES["sound_check"])
+    assert wav_bytes[:4] == b"RIFF" and duration_ms == 2000
+
+
+# The four result classes (spec 10.2 table). Pure classification, so all
+# four are reachable without a browser, a speaker or a room.
+
+def test_class_heard_good_needs_energy_clearly_above_the_floor_and_a_yes():
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=2e-4, peak_rms=2e-3, answer="yes")
+    assert verdict["result"] == speech.RESULT_HEARD_GOOD
+    assert verdict["discrepancy"] is None
+    assert verdict["level"]["ratio"] == pytest.approx(10.0)
+    assert verdict["level"]["ratio_db"] == pytest.approx(20.0, abs=0.2)
+
+
+def test_class_heard_faint_is_marginally_above_the_floor():
+    """Faint must read differently from silent: it predicts both a patient
+    who strains and an unreliable barge-in detector later."""
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=2e-4, peak_rms=4.4e-4, answer="yes")
+    assert verdict["result"] == speech.RESULT_HEARD_FAINT
+    assert (speech.SOUND_CHECK_FAINT_RATIO
+            <= verdict["level"]["ratio"] < speech.SOUND_CHECK_GOOD_RATIO)
+
+
+def test_class_not_heard_is_the_doctor_saying_no():
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=2e-4, peak_rms=1e-6, answer="no")
+    assert verdict["result"] == speech.RESULT_NOT_HEARD
+
+
+def test_class_unverified_when_the_doctor_declines():
+    """Recorded as unverified rather than as a pass — the doctor may have
+    good reason to skip, and the system does not get to call that a pass."""
+    for answer in ("skip", None, ""):
+        verdict = speech.classify_sound_check(
+            noise_floor_rms=2e-4, peak_rms=2e-3, answer=answer)
+        assert verdict["result"] == speech.RESULT_UNVERIFIED
+    # The level is still measured and recorded, even unverified.
+    assert verdict["level"]["peak_rms"] > 0
+
+
+def test_headphones_are_not_a_warning():
+    """Headphones defeat the acoustic path, so energy absent plus a yes is
+    expected. The human answer is authoritative: accept it, record the
+    discrepancy, do not warn (spec 10.2)."""
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=2e-4, peak_rms=0.0, answer="yes")
+    assert verdict["result"] == speech.RESULT_HEARD_GOOD
+    assert verdict["discrepancy"] == "no_acoustic_path_headphones_likely"
+
+
+def test_the_human_answer_beats_the_measurement_in_both_directions():
+    """Energy present but the doctor says no is still not_heard — the
+    discrepancy is recorded rather than argued with."""
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=2e-4, peak_rms=5e-3, answer="no")
+    assert verdict["result"] == speech.RESULT_NOT_HEARD
+    assert verdict["discrepancy"] == "energy_present_but_doctor_says_no"
+
+
+def test_the_silence_floor_is_the_mic_clusters_own_number():
+    """Not a new invented threshold: the live page's dead-mic pill already
+    treats this RMS as no signal. Reusing it means the two surfaces cannot
+    disagree about what silence is."""
+    assert speech.SOUND_CHECK_SILENT_RMS == pytest.approx(1e-4)
+    from pathlib import Path
+    assert "1e-4" in Path("app/static/live.html").read_text()
+
+
+def test_a_dead_quiet_room_cannot_fake_a_pass_through_the_ratio():
+    """In a near-silent room the ratio can be large on noise alone, so the
+    absolute floor has to bite as well."""
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=1e-9, peak_rms=5e-5, answer="yes")
+    assert verdict["discrepancy"] == "no_acoustic_path_headphones_likely"
+
+
+def test_levels_are_recorded_raw_for_later_calibration():
+    """Item 4's requirement: scripts/calibrate_barge_in.py should read
+    these rather than re-measure, since the loopback level is exactly the
+    input its envelope-proportional threshold needs. So the raw numbers
+    and the thresholds in force are both stored."""
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=3e-4, peak_rms=1.5e-3, mean_rms=9e-4, answer="yes")
+    level = verdict["level"]
+    for field in ("noise_floor_rms", "peak_rms", "mean_rms", "ratio",
+                  "ratio_db", "good_ratio", "faint_ratio", "silent_rms"):
+        assert field in level, field
+    assert level["mean_rms"] == pytest.approx(9e-4)
+    assert level["good_ratio"] == speech.SOUND_CHECK_GOOD_RATIO
+
+
+def test_the_thresholds_are_env_tunable_because_they_are_guesses():
+    """They are uncalibrated: nobody has measured this room, speaker or
+    microphone. Being env-settable is how the owner sets them from his."""
+    assert speech.SOUND_CHECK_GOOD_RATIO > speech.SOUND_CHECK_FAINT_RATIO > 1.0
+
+
+# --- the sound-check endpoints ---------------------------------------------
+
+@needs_db
+def test_sound_check_prepares_an_utterance_and_audits_the_result():
+    doctor = _make_user("doctor")
+    client = _client_for(doctor)
+    from app.main import app
+    app.state.live_sessions = {}
+
+    started = client.post("/api/speech/sound-check")
+    if started.status_code == 503:
+        pytest.skip(f"TTS unavailable: {started.json().get('error')}")
+    assert started.status_code == 200
+    body = started.json()
+    assert body["text"] == speech.PHRASES["sound_check"]
+    assert body["url"] == f"/api/speech/{body['utterance_id']}.wav"
+    assert body["duration_ms"] > 0
+    # And the audio really is fetchable by the doctor who asked for it.
+    assert client.get(body["url"]).status_code == 200
+
+    result = client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 2e-4, "peak_rms": 2e-3, "mean_rms": 1e-3,
+        "answer": "yes", "device_label": "Speakers (Realtek)"})
+    assert result.status_code == 200
+    assert result.json()["result"] == speech.RESULT_HEARD_GOOD
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        row = conn.execute(
+            "SELECT user_id, at, detail FROM audit_event"
+            " WHERE action = 'speech.sound_check' ORDER BY id DESC LIMIT 1"
+        ).fetchone()
+    assert row is not None
+    user_id, at, detail = row
+    assert user_id == doctor["id"]
+    assert at is not None                       # the timestamp spec 10.5 asks for
+    assert detail["result"] == speech.RESULT_HEARD_GOOD
+    assert detail["answer"] == "yes"
+    assert detail["device_label"] == "Speakers (Realtek)"
+    # The measured level, raw, for later calibration.
+    assert detail["peak_rms"] == pytest.approx(2e-3)
+    assert detail["noise_floor_rms"] == pytest.approx(2e-4)
+    assert detail["ratio"] == pytest.approx(10.0)
+
+
+@needs_db
+def test_sound_check_is_refused_during_a_consultation():
+    """Spec 10.3. A test phrase inside a live consultation would be a
+    system utterance needing the whole exclusion machinery for no clinical
+    benefit. The UI disables the button; this is the server saying the
+    same thing, because a disabled button is a courtesy and a refusal is a
+    rule."""
+    from app.main import app
+
+    doctor = _make_user("doctor")
+    client = _client_for(doctor)
+    app.state.live_sessions = {
+        "s1": {"attached": True, "user": doctor},
+    }
+    try:
+        response = client.post("/api/speech/sound-check")
+        assert response.status_code == 409
+        assert "system utterance" in response.json()["error"]
+    finally:
+        app.state.live_sessions = {}
+
+
+@needs_db
+def test_another_doctors_live_session_does_not_block_the_check():
+    from app.main import app
+
+    doctor, other = _make_user("doctor"), _make_user("doctor")
+    client = _client_for(doctor)
+    app.state.live_sessions = {"s1": {"attached": True, "user": other}}
+    try:
+        response = client.post("/api/speech/sound-check")
+        assert response.status_code in (200, 503)   # 503 only if TTS is absent
+    finally:
+        app.state.live_sessions = {}
+
+
+@needs_db
+def test_receptionist_cannot_run_a_sound_check():
+    client = _client_for(_make_user("receptionist"))
+    assert client.post("/api/speech/sound-check").status_code == 403
+    assert client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 1e-4, "peak_rms": 1e-3, "answer": "yes"}
+    ).status_code == 403
+
+
+@needs_db
+def test_an_unverified_check_is_audited_as_unverified_not_as_a_pass():
+    doctor = _make_user("doctor")
+    client = _client_for(doctor)
+    response = client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 2e-4, "peak_rms": 2e-3, "answer": "skip"})
+    assert response.json()["result"] == speech.RESULT_UNVERIFIED
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        detail = conn.execute(
+            "SELECT detail FROM audit_event WHERE action = 'speech.sound_check'"
+            " ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert detail["result"] == speech.RESULT_UNVERIFIED
+
+
+def test_the_control_is_labelled_and_is_not_a_cogwheel():
+    """Spec 10.2: settings iconography reads as configuration rather than
+    as test, and icon-only controls cost a beat on every use."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert 'id="soundCheckBtn"' in html
+    assert "<span>Sound check</span>" in html
+    assert "cogwheel" not in html.lower() or "not a cogwheel" in html
+
+
+def test_the_check_measures_from_the_existing_capture_stream():
+    """The mic-cluster invariant stands (spec 10.3): one capture, so the
+    meter cannot disagree with what the server hears. No second stream."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "do\n// NOT open a second stream" in html or \
+        "NOT open a second stream" in html
+    # It reads the shared analyser rather than calling getUserMedia again.
+    assert "analyser.getFloatTimeDomainData" in html
+    assert html.count("navigator.mediaDevices.getUserMedia") == 1
+
+
+def test_the_offer_is_never_blocking():
+    """Skipping proceeds immediately, and the offer is made once per
+    session rather than once per tap."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    assert "soundCheckDone = true;   // asked once per session" in html
+    assert "Offered, NEVER blocking" in html

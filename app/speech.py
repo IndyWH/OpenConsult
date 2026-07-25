@@ -57,6 +57,7 @@ from __future__ import annotations
 import hashlib
 import io
 import logging
+import math
 import os
 import secrets
 import shlex
@@ -157,6 +158,10 @@ PHRASES: dict[str, str] = {
     "go_on": "Go on.",
     # Examination handover: the system never pretends to examine.
     "examination_handover": "Thank you — Dr {doctor} will examine you now.",
+    # Sound check (spec Part 10 / D6). Deliberately not clinical and not
+    # addressed to the patient — it is a check spoken in the room, and it
+    # should sound like one.
+    "sound_check": "Sound check. If you can hear this clearly, press yes.",
 }
 
 ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
@@ -165,6 +170,103 @@ ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
 # The encouragers are exempt: "mm-hm" is not a clinical interaction, and
 # gating them would make the lock feel like a nuisance rather than a rule.
 DISCLOSURE_GATED_PHRASES = ("invitation", "examination_handover")
+
+
+# --- sound check (spec Part 10) --------------------------------------------
+#
+# WHY THIS EXISTS, and it is not a convenience: a dead speaker fails
+# SILENTLY. Playback succeeds, nothing errors, and the patient simply
+# hears nothing — the doctor reads the silence as a patient who is not
+# answering. Worse, the exclusion window opens anyway, so for the length
+# of that inaudible utterance the microphone feeds nothing to the
+# transcript and whatever the patient says is dropped BY CONSTRUCTION.
+#
+# A dead speaker therefore converts quietly into missing transcript, with
+# nothing on screen to say so. That is the same shape as every other
+# failure this project has had to design against: not visibly broken,
+# just wrong. The mic cluster answers "is the room being heard"; this
+# answers the other half — "is the room hearing us".
+
+RESULT_HEARD_GOOD = "heard_good"
+RESULT_HEARD_FAINT = "heard_faint"
+RESULT_NOT_HEARD = "not_heard"
+RESULT_UNVERIFIED = "unverified"
+
+# Absolute silence floor. NOT a new number: this is the same RMS the live
+# page's mic cluster already treats as "no signal" for its dead-mic pill
+# (`app/static/live.html`). Reusing it means the two surfaces cannot
+# disagree about what silence is.
+SOUND_CHECK_SILENT_RMS = float(os.getenv("SOUND_CHECK_SILENT_RMS", "1e-4"))
+
+# ---------------------------------------------------------------------------
+# THESE TWO ARE UNCALIBRATED GUESSES. They are stated as such rather than
+# dressed up: nobody has measured this room, this speaker or this
+# microphone. 4.0x is roughly +12 dB over the noise floor and 1.8x roughly
+# +5 dB, chosen so that "faint" covers the band where a patient would
+# strain and the barge-in detector would be unreliable. Every measurement
+# is stored raw in the `speech.sound_check` audit row precisely so these
+# can be set from real data later — see `scripts/calibrate_barge_in.py`
+# when it is built (build order item 5).
+# ---------------------------------------------------------------------------
+SOUND_CHECK_GOOD_RATIO = float(os.getenv("SOUND_CHECK_GOOD_RATIO", "4.0"))
+SOUND_CHECK_FAINT_RATIO = float(os.getenv("SOUND_CHECK_FAINT_RATIO", "1.8"))
+
+
+def classify_sound_check(*, noise_floor_rms: float, peak_rms: float,
+                         mean_rms: float | None = None,
+                         answer: str | None) -> dict:
+    """Turn a loopback measurement plus the doctor's answer into a result.
+
+    **The human answer is authoritative.** The only true test of whether
+    the room heard it is a person in the room saying so; the acoustic
+    measurement corroborates that and is the part that produces a number.
+
+    Headphones are a known confound: they defeat the acoustic path
+    entirely, so energy reads as absent while the doctor says yes. That is
+    NOT a warning — the answer is accepted, the discrepancy is recorded,
+    and nothing is flagged. The same courtesy runs the other way: energy
+    present but the doctor says no is still `not_heard`.
+
+    Pure and side-effect free, so the four classes are testable without a
+    browser, a speaker or a room.
+    """
+    floor = max(float(noise_floor_rms or 0.0), SOUND_CHECK_SILENT_RMS)
+    peak = max(float(peak_rms or 0.0), 0.0)
+    ratio = peak / floor if floor > 0 else 0.0
+    audible = peak >= SOUND_CHECK_SILENT_RMS and ratio >= SOUND_CHECK_FAINT_RATIO
+
+    level = {
+        "noise_floor_rms": round(float(noise_floor_rms or 0.0), 8),
+        "peak_rms": round(peak, 8),
+        "mean_rms": round(float(mean_rms), 8) if mean_rms is not None else None,
+        "ratio": round(ratio, 3),
+        "ratio_db": round(20 * math.log10(ratio), 1) if ratio > 0 else None,
+        "good_ratio": SOUND_CHECK_GOOD_RATIO,
+        "faint_ratio": SOUND_CHECK_FAINT_RATIO,
+        "silent_rms": SOUND_CHECK_SILENT_RMS,
+    }
+
+    if answer not in ("yes", "no"):
+        # Declined to answer. Recorded as unverified rather than as a pass —
+        # the doctor may have good reason to skip and the system does not
+        # get to overrule that, but it also does not get to call it a pass.
+        return {"result": RESULT_UNVERIFIED, "level": level, "discrepancy": None,
+                "answer": answer or "skip"}
+
+    if answer == "no":
+        return {"result": RESULT_NOT_HEARD, "level": level,
+                "discrepancy": "energy_present_but_doctor_says_no" if audible else None,
+                "answer": answer}
+
+    if not audible:
+        # Doctor heard it, the microphone did not. Almost always headphones.
+        return {"result": RESULT_HEARD_GOOD, "level": level,
+                "discrepancy": "no_acoustic_path_headphones_likely",
+                "answer": answer}
+
+    return {"result": RESULT_HEARD_GOOD if ratio >= SOUND_CHECK_GOOD_RATIO
+                      else RESULT_HEARD_FAINT,
+            "level": level, "discrepancy": None, "answer": answer}
 
 
 def doctor_name_for(user: dict | None) -> str:

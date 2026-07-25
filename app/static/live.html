@@ -159,6 +159,47 @@
     border-radius: 999px; padding: .2rem .7rem; font-size: .8rem; cursor: pointer;
   }
 
+  /* Sound check: a labelled control, deliberately not a cogwheel. */
+  .soundcheck {
+    display: inline-flex; align-items: center; gap: .4rem;
+    border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
+    border-radius: 999px; padding: .32rem .8rem; font-size: .85rem; cursor: pointer;
+  }
+  .soundcheck:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .soundcheck:disabled { opacity: .4; cursor: default; }
+  .soundcheck.done { border-color: var(--green); color: var(--green); }
+
+  .scresult {
+    display: none; align-items: center; gap: .7rem;
+    border-radius: var(--radius); padding: .6rem .9rem; font-size: .9rem;
+    border: 1px solid var(--line); background: var(--panel);
+  }
+  .scresult.on { display: flex; }
+  .scresult .what { flex: 1; }
+  .scresult button {
+    border: 1px solid currentColor; background: transparent; color: inherit;
+    border-radius: 999px; padding: .2rem .7rem; font-size: .8rem; cursor: pointer;
+  }
+  .scresult.good  { border-color: #BFD9C4; background: #F1F7F2; color: var(--green); }
+  .scresult.faint { border-color: #E9DCC0; background: #F7F1E6; color: var(--amber); }
+  .scresult.bad   { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
+  .scresult .lvl { font-variant-numeric: tabular-nums; opacity: .8; font-size: .82rem; }
+
+  /* The offer, shown once per session when a question is tapped before
+     any check has run. Offered, NEVER blocking — one tap to run, one to
+     skip, and skipping proceeds immediately. */
+  .scoffer {
+    display: none; align-items: center; gap: .7rem;
+    border: 1px solid var(--line); background: var(--panel);
+    border-radius: var(--radius); padding: .6rem .9rem; font-size: .9rem;
+  }
+  .scoffer.on { display: flex; }
+  .scoffer .what { flex: 1; }
+  .scoffer button { border-radius: 999px; padding: .25rem .8rem; font-size: .83rem;
+                    cursor: pointer; border: 1px solid var(--line);
+                    background: var(--panel); color: var(--ink); }
+  .scoffer button.go { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+
   /* System utterances in the live transcript: a distinct grey channel.
      They are NOT turns — no turn number, not citable. */
   #transcript p.said {
@@ -191,6 +232,14 @@
       <span class="chev">▾</span>
     </span>
     <div class="mic-menu" id="micMenu"></div>
+    <!-- Sound check (spec Part 10). LABELLED, not a cogwheel: settings
+         iconography reads as configuration rather than as test, and
+         icon-only controls cost a beat on every use. -->
+    <button class="soundcheck" id="soundCheckBtn" type="button"
+            title="Play a test phrase and check the room can hear it">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
+      <span>Sound check</span>
+    </button>
     <button class="primary" id="btn" disabled title="Recording needs a linked patient">Start</button>
   </div>
   <div id="status" class="hint"></div>
@@ -209,6 +258,21 @@
       <button type="submit" class="primary">Start walk-in consultation</button>
       <a href="/today">Go to Today queue</a>
     </form>
+  </div>
+
+  <div class="scoffer" id="scOffer">
+    <span class="what">No sound check yet this session — has the room heard the machine?</span>
+    <button class="go" id="scOfferRun" type="button">Run check</button>
+    <button id="scOfferSkip" type="button">Skip</button>
+  </div>
+
+  <!-- Sound-check result. Four classes (spec 10.2): heard well, heard
+       faint, not heard, unverified. Faint reads differently from silent
+       on purpose — it predicts both a patient who strains and an
+       unreliable barge-in detector later. -->
+  <div class="scresult" id="scResult">
+    <span class="what" id="scResultWhat"></span>
+    <button id="scResultDismiss" type="button">Dismiss</button>
   </div>
 
   <!-- 0. SPEAKING STATE — transient; sits above everything while the
@@ -729,6 +793,13 @@ function refreshSpeechControls() {
     const gated = GATED_PHRASES.includes(b.dataset.phrase) && !disclosed;
     b.disabled = busy || !live || gated;
   });
+  // Disabled while recording (spec 10.3): a test phrase inside a live
+  // consultation would be a system utterance and would need the whole
+  // exclusion machinery for no clinical benefit.
+  soundCheckBtn.disabled = recording || soundCheckBusy;
+  soundCheckBtn.title = recording
+    ? 'Not during a consultation — run it before you start'
+    : 'Play a test phrase and check the room can hear it';
   discCheck.disabled = disclosed || !live;
 }
 
@@ -783,6 +854,196 @@ async function onSpeakReady(msg) {
   addSpoken(label);
 }
 
+// ================================================ Phase 7a: the sound check
+//
+// WHY THIS EXISTS, and it is not a convenience (spec Part 10.1): a dead
+// speaker fails SILENTLY. Playback succeeds, nothing errors, and the
+// patient simply hears nothing — the doctor reads that silence as a
+// patient who is not answering. Worse, the exclusion window opens anyway,
+// so for the length of that inaudible utterance whatever the patient says
+// is dropped from the transcript BY CONSTRUCTION. A dead speaker converts
+// quietly into missing transcript with nothing on screen to say so.
+//
+// The mic cluster answers "is the room being heard". This answers the
+// other half: "is the room hearing us".
+
+const soundCheckBtn = document.getElementById('soundCheckBtn');
+const scResult = document.getElementById('scResult');
+const scResultWhat = document.getElementById('scResultWhat');
+const scOffer = document.getElementById('scOffer');
+
+let soundCheckDone = false;   // per page session; drives the one-time offer
+let soundCheckBusy = false;
+let pendingQuestionTap = null;
+
+// Measure from the EXISTING analyser — the same capture stream the
+// transcriber consumes. The mic-cluster invariant stands (spec 10.3): do
+// NOT open a second stream for this. (The barge-in detector in session 3
+// does open its own stream, and that one must never reach the meter.)
+function currentRms() {
+  if (!analyser || audioCtx.state !== 'running') return null;
+  const buf = new Float32Array(analyser.fftSize);
+  analyser.getFloatTimeDomainData(buf);
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+  return Math.sqrt(sum / buf.length);
+}
+
+function sampleRms(ms) {
+  // Returns {peak, mean} over a window, sampled at the meter's own rate.
+  return new Promise(resolve => {
+    const samples = [];
+    const id = setInterval(() => {
+      const rms = currentRms();
+      if (rms !== null) samples.push(rms);
+    }, 50);
+    setTimeout(() => {
+      clearInterval(id);
+      if (!samples.length) return resolve({peak: 0, mean: 0, samples: 0});
+      const peak = Math.max(...samples);
+      const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+      resolve({peak: peak, mean: mean, samples: samples.length});
+    }, ms);
+  });
+}
+
+function askHeard() {
+  // One tap. The human answer is authoritative (spec 10.2) — the acoustic
+  // measurement corroborates it and produces the number.
+  return new Promise(resolve => {
+    scResult.className = 'scresult on';
+    scResultWhat.innerHTML = '';
+    scResultWhat.appendChild(document.createTextNode('Did you hear that clearly? '));
+    const mk = (label, value, cls) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      if (cls) b.className = cls;
+      b.style.marginLeft = '.35rem';
+      b.addEventListener('click', () => resolve(value), {once: true});
+      return b;
+    };
+    scResultWhat.appendChild(mk('Yes', 'yes', 'go'));
+    scResultWhat.appendChild(mk('No', 'no'));
+    scResultWhat.appendChild(mk('Skip', 'skip'));
+  });
+}
+
+function showSoundCheckResult(verdict) {
+  const level = verdict.level || {};
+  const db = level.ratio_db == null ? '—' : level.ratio_db.toFixed(0) + ' dB';
+  const texts = {
+    heard_good: ['good', 'Heard clearly. The room can hear the machine.'],
+    heard_faint: ['faint', 'Heard, but faint — the patient may struggle, and barge-in will be unreliable at this volume.'],
+    not_heard: ['bad', 'Not heard. Check the speaker is on, unmuted, and the right output device.'],
+    unverified: ['', 'Unverified — recorded as not checked rather than as a pass.'],
+  };
+  const [cls, message] = texts[verdict.result] || ['', verdict.result];
+  scResult.className = 'scresult on ' + cls;
+  scResultWhat.textContent = message;
+  const lvl = el('span', 'lvl', ' (' + db + ' over the noise floor)');
+  if (verdict.result !== 'unverified') scResultWhat.appendChild(lvl);
+  if (verdict.discrepancy === 'no_acoustic_path_headphones_likely') {
+    // NOT a warning (spec 10.2): headphones defeat the acoustic path, so
+    // absent energy plus "yes" is expected. Record it, accept the answer.
+    scResultWhat.appendChild(
+      el('span', 'lvl', ' — no sound reached the microphone, which is normal on headphones.'));
+  }
+  soundCheckBtn.classList.toggle('done', verdict.result !== 'not_heard');
+}
+
+async function runSoundCheck() {
+  if (soundCheckBusy || recording) return;
+  soundCheckBusy = true;
+  soundCheckBtn.disabled = true;
+  scOffer.classList.remove('on');
+  scResult.className = 'scresult on';
+  scResultWhat.textContent = 'Measuring the room…';
+  try {
+    // Noise floor first: the room as it is, before we make any sound.
+    const floor = await sampleRms(400);
+
+    const response = await fetch('/api/speech/sound-check', {method: 'POST'});
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}));
+      scResult.className = 'scresult on bad';
+      scResultWhat.textContent = 'Sound check unavailable: ' +
+        (body.error || response.status);
+      return;
+    }
+    const utterance = await response.json();
+
+    scResultWhat.textContent = 'Playing: \u201c' + utterance.text + '\u201d';
+    const audio = new Audio(utterance.url);
+    const playing = sampleRms(utterance.duration_ms + 250);
+    try {
+      await audio.play();
+    } catch (err) {
+      scResult.className = 'scresult on bad';
+      scResultWhat.textContent =
+        'The browser refused to play audio. Click the page, then try again.';
+      return;
+    }
+    const heard = await playing;
+
+    const answer = await askHeard();
+    const result = await fetch('/api/speech/sound-check/result', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        noise_floor_rms: floor.peak,     // the loudest the quiet room got
+        peak_rms: heard.peak,
+        mean_rms: heard.mean,
+        answer: answer,
+        device_label: outputDeviceLabel(),
+      })
+    });
+    const verdict = await result.json();
+    soundCheckDone = true;
+    showSoundCheckResult(verdict);
+  } catch (err) {
+    scResult.className = 'scresult on bad';
+    scResultWhat.textContent = 'Sound check failed: ' + err.message;
+  } finally {
+    soundCheckBusy = false;
+    soundCheckBtn.disabled = recording;
+    // Whatever happened, a pending question tap proceeds — the check is
+    // offered, never blocking.
+    if (pendingQuestionTap) { const go = pendingQuestionTap; pendingQuestionTap = null; go(); }
+  }
+}
+
+function outputDeviceLabel() {
+  // Browsers only expose this when the page has device permission and the
+  // API exists; null is a legitimate answer and is recorded as such.
+  try {
+    if (typeof audioCtx?.sinkId === 'string' && audioCtx.sinkId) return audioCtx.sinkId;
+  } catch (e) { /* not supported */ }
+  return null;
+}
+
+// Offered, never blocking (spec 10.3). The first question tap of a
+// session with no check yet offers one; skipping proceeds immediately.
+function offerSoundCheckThen(proceed) {
+  if (soundCheckDone) { proceed(); return; }
+  pendingQuestionTap = proceed;
+  scOffer.classList.add('on');
+}
+
+document.getElementById('scOfferRun').addEventListener('click', () => {
+  scOffer.classList.remove('on');
+  // Cannot actually play during recording, so honour the skip path.
+  if (recording) { const go = pendingQuestionTap; pendingQuestionTap = null; scResult.className = 'scresult on'; scResultWhat.textContent = 'A sound check cannot run during a consultation — it would become a system utterance in the transcript.'; if (go) go(); return; }
+  runSoundCheck();
+});
+document.getElementById('scOfferSkip').addEventListener('click', () => {
+  scOffer.classList.remove('on');
+  soundCheckDone = true;   // asked once per session, not once per tap
+  const go = pendingQuestionTap; pendingQuestionTap = null;
+  if (go) go();
+});
+document.getElementById('scResultDismiss').addEventListener('click',
+  () => scResult.classList.remove('on'));
+soundCheckBtn.addEventListener('click', runSoundCheck);
+
 document.getElementById('speakStop').addEventListener('click',
   () => stopSpeaking('doctor_stop'));
 document.getElementById('speakErrorDismiss').addEventListener('click',
@@ -792,9 +1053,10 @@ document.getElementById('qList').addEventListener('click', (e) => {
   const button = e.target.closest('.say');
   if (!button || button.disabled) return;
   const text = button.parentElement.querySelector('.qtext').textContent;
-  requestSpeak({kind: 'cds_question',
-                assessment_version: Number(button.dataset.version),
-                index: Number(button.dataset.index)}, text);
+  const ref = {kind: 'cds_question',
+               assessment_version: Number(button.dataset.version),
+               index: Number(button.dataset.index)};
+  offerSoundCheckThen(() => requestSpeak(ref, text));
 });
 
 document.querySelectorAll('.phrase').forEach(button => {

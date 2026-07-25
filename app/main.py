@@ -259,6 +259,85 @@ async def speech_audio(utterance_id: str, user: dict = Depends(api_user(*CLINICA
                     headers={"Cache-Control": "no-store"})
 
 
+class SoundCheckResultBody(BaseModel):
+    noise_floor_rms: float
+    peak_rms: float
+    mean_rms: float | None = None
+    answer: str | None = None          # 'yes' | 'no' | anything else = skipped
+    device_label: str | None = None    # output device, when the browser exposes it
+
+
+def _user_is_recording(user_id: int) -> bool:
+    """True when this doctor has a live session attached right now.
+
+    The sound check is refused during recording (spec §10.3): a test
+    phrase inside a live consultation would be a system utterance and
+    would have to go through the whole exclusion machinery for no clinical
+    benefit. The UI disables the button; this is the server saying the
+    same thing, because a disabled button is a courtesy and a refusal is
+    a rule.
+    """
+    sessions = getattr(app.state, "live_sessions", None) or {}
+    return any(entry.get("attached") and entry["user"]["id"] == user_id
+               for entry in sessions.values())
+
+
+@app.post("/api/speech/sound-check")
+async def sound_check_start(user: dict = Depends(api_user(*CLINICAL_ROLES))) -> JSONResponse:
+    """Prepare the sound-check utterance (spec Part 10).
+
+    Deliberately NOT over the `/ws/transcribe` speak protocol: that
+    protocol belongs to a live consultation, and this runs before one
+    starts. It uses the same audio OUTPUT path a spoken question uses —
+    synthesis, cache, and `/api/speech/{id}.wav`.
+    """
+    if _user_is_recording(user["id"]):
+        return JSONResponse(status_code=409, content={
+            "error": "a sound check cannot run during a consultation — "
+                     "it would be a system utterance in the transcript"})
+    try:
+        utterance = await asyncio.to_thread(
+            functools.partial(app.state.speech.prepare,
+                              {"kind": "phrase", "id": "sound_check"},
+                              None, user_id=user["id"]))
+    except (speech.SpeechUnavailable, speech.SpeechFailed) as exc:
+        await audit.log(user["id"], "speech.failed", None, None,
+                        {"reason": str(exc), "via": "sound_check"})
+        return JSONResponse(status_code=503, content={"error": str(exc)})
+    return JSONResponse(content={
+        "utterance_id": utterance.utterance_id,
+        "duration_ms": utterance.duration_ms,
+        "url": f"/api/speech/{utterance.utterance_id}.wav",
+        "text": utterance.text})
+
+
+@app.post("/api/speech/sound-check/result")
+async def sound_check_result(
+    body: SoundCheckResultBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """Classify the loopback measurement against the doctor's answer.
+
+    Classification is server-side and pure (`speech.classify_sound_check`)
+    so the four result classes are testable without a browser, a speaker
+    or a room. The raw RMS numbers are audited exactly as measured —
+    `scripts/calibrate_barge_in.py` (build order item 5) is meant to read
+    these rather than re-measure from scratch, since the loopback level is
+    precisely the input its envelope-proportional threshold needs.
+    """
+    verdict = speech.classify_sound_check(
+        noise_floor_rms=body.noise_floor_rms, peak_rms=body.peak_rms,
+        mean_rms=body.mean_rms, answer=body.answer)
+    await audit.log(user["id"], "speech.sound_check", None, None,
+                    {"result": verdict["result"], "answer": verdict["answer"],
+                     "discrepancy": verdict["discrepancy"],
+                     "device_label": body.device_label,
+                     **verdict["level"]})
+    logger.info("Sound check by %s: %s (ratio %.2f, answer %s)",
+                user["username"], verdict["result"],
+                verdict["level"]["ratio"], verdict["answer"])
+    return JSONResponse(content=verdict)
+
+
 class ChangePasswordBody(BaseModel):
     current_password: str
     new_password: str
