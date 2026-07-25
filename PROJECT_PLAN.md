@@ -248,8 +248,8 @@ Live (streaming) diarisation · more than two speakers · prescription generatio
 
 ## 10. Roadmap ideas beyond v1
 
-- Fine-tuned Sinhala medical ASR model published to Hugging Face
-- Evaluation paper: code-switched Sinhala clinical ASR benchmark
+- **Evaluation paper: code-switched Sinhala clinical ASR benchmark** — *promoted; this one has a finished result rather than a planned one.* The pre-registered protocol is complete through adjudication (benchmark → recordings eval → step 6), and it returned a clean negative: no off-the-shelf model handles code-switched clinical Sinhala, with four of twelve curated clinical terms — two of them drug names — unrecoverable in every model. The negative result strengthens the paper rather than weakening it.
+- Fine-tuned Sinhala medical ASR model published to Hugging Face — **conditional**, on the same restart trigger recorded in the fine-tune plan header: a materially better Sinhala or multilingual model, or a code-switched clinical dataset, appearing. Not proceeding as of 2026-07-25.
 - Tamil support (Sri Lanka's second consultation language)
 - Sri Lankan national guideline corpus for the RAG layer
 - Proper appointment scheduling (calendar slots, patient self-booking, SMS reminders)

@@ -9,6 +9,13 @@ the way it is, what's known to be fragile, and what to do next.
 
 ## Orientation in five minutes
 
+**Read first:** PROJECT_PLAN.md § *What v1 is, and is not* — what v1
+does, what it does not (no Sinhala or other non-English transcription),
+and the one consequence that is specified but **not yet built** (the
+finalisation transcript-quality gate). Read it before the phase table
+below, or the Sinhala rows will read as work in progress rather than as
+a closed question.
+
 One machine (RTX 4090, 24 GB VRAM, WSL2 Ubuntu 26.04), everything local.
 
 ```bash
