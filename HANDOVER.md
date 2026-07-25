@@ -565,6 +565,26 @@ must not open transcripts or notes.
    note generator left Assessment and Plan **empty rather than
    fabricating** when the consultation never reached them. Both behaviours
    worth preserving; re-check them during real-audio validation.
+8. **ASR specimen — code-switched near-homophone collapse** (from the
+   2026-07-25 adjudication, `03_diabetes_review_si`):
+   rrashmini-large-v2 renders *ulcer* as පල්සර් and the immediately
+   following reference word *pulses* as පල්සර්ස්. Two clinically
+   opposite findings collapse onto near-identical output **in adjacent
+   words**, in a sentence whose meaning is *no ulcer, pulses present*.
+   (Not a single-model quirk: seniruk-small does the same thing one
+   glyph over — අල්සර් නෑ අල්සර්ස්.) This is the code-switched analogue
+   of the existing noun-substitution specimens (the *wheelbarrow* /
+   three-wheeler substitution, specimen 3) — same failure class,
+   reached by transliteration collision rather than acoustic confusion.
+   For the claim-by-claim fidelity audit (item 2).
+9. **Safety note carried forward from the adjudication:** any future
+   Sinhala transcription path must be evaluated **specifically on
+   drug-name and numeric-marker recovery**, not on CER or WER alone.
+   The four terms lost by every model were two drug names (`losartan`,
+   `atorvastatin`), the three-month control marker (`HbA1c`), and the
+   diagnosis (`neuropathy`) — while the aggregate metrics rated the
+   models as merely mediocre. Aggregate error rates do not see this
+   class of loss; the step 6 method (curated terms, adjudicated) does.
 
 ## Phase 5 — investigation complete, fine-tune deferred to v2
 
