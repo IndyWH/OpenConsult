@@ -74,14 +74,14 @@ si/en schema seam stays.)
 
 **After the consultation (a background job, takes a minute or two):**
 4. The full recording is re-transcribed at higher quality and **diarised** (labelled *Doctor:* / *Patient:*).
-5. The Sinhala transcript is translated into English; both versions are kept.
+5. ~~The Sinhala transcript is translated into English; both versions are kept.~~ — **not implemented in v1.** This step is conditional on Sinhala restarting; v1 has no Sinhala transcript to translate. See *What v1 is, and is not*.
 6. A concise SOAP-style note is drafted, plus a suggested investigations list (bloods, imaging) and a guideline summary grounded in retrieved guideline text (not the model's memory).
 7. The doctor reviews, edits, and signs off the note. Only then is it saved as final.
 
 **Around the edges:**
 - User accounts with roles (doctor, receptionist, admin) — role provides context, shapes the interface, and controls access.
 - **Two role-specific views mirroring a real Sri Lankan GP surgery:** a **front-desk view** for the receptionist (register patients, manage today's queue) and a **consulting view** for the doctor (open the queue, start a session). The receptionist can manage patients and the queue but cannot open transcripts or clinical notes.
-- A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
+- A patient database holding consultations, transcripts (~~both languages~~ — **English only in v1**; the second language is conditional on Sinhala restarting), notes, and an audit trail of who did what and what the AI suggested when.
 
 ## 3. Architecture overview
 
@@ -180,7 +180,7 @@ Two retentions, both deliberate:
 - **QueueEntry** — patient added to today's queue by the receptionist; ordered list, status: `waiting → in consultation → done` (matches the walk-in, take-a-number flow of a typical SL surgery rather than calendar slots)
 - **Consultation** — belongs to a patient and a doctor; status: `live → processing → finalised`
 - **TranscriptSegment** — rough live segments (timestamped, no speaker)
-- **FinalTranscript** — diarised, role-attributed; Sinhala and English versions
+- **FinalTranscript** — diarised, role-attributed; Sinhala and English versions. *The Sinhala side is a **retained schema seam**, deliberately unpopulated in v1: removing it and later restoring it would be a migration against a database holding approved clinical notes. See §4, Scope decision.*
 - **Note** — SOAP draft → doctor-edited → approved (versioned)
 - **CDSSnapshot** — what the CDS engine suggested and when (valuable for research and audit)
 - **Investigation / GuidelineSummary** — suggested tests and retrieved guideline excerpts with sources
