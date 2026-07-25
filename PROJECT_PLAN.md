@@ -106,6 +106,7 @@ Browser (mic + UI)
 [4] Finalisation Pipeline (async, post-consultation)
     WhisperX re-transcription → pyannote diarisation
     → role attribution → Sinhala→English translation
+                         (designed; NOT BUILT in v1)
     → SOAP note draft → investigations → guideline summary
                                            │
 [5] RAG Service ◄──────────────────────────┘
@@ -117,7 +118,7 @@ Browser (mic + UI)
 
 **Key design decisions (locked in):**
 - **Live path is rough, final path is accurate.** No diarisation during the consultation; a slower, higher-quality pass runs afterwards.
-- **Transcribe then translate** (not Whisper's direct translate mode) — preserves the Sinhala transcript as a first-class artifact.
+- **Transcribe then translate** (not Whisper's direct translate mode) — preserves the Sinhala transcript as a first-class artifact. **Not exercised in v1** (no Sinhala transcription), but retained as the design of record if Sinhala restarts — and the adjudication supports it: the failure is in *transcription*, not in translation, so the shape of this decision was never what broke.
 - **Guidelines via retrieval (RAG), not model memory** — recommendations must be traceable to a source document.
 - **Raw audio is retained until finalisation succeeds**, then handled per the data-retention policy.
 - **Draft-until-approved:** all AI outputs require explicit doctor sign-off.
