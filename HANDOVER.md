@@ -42,7 +42,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 2 — Post-consultation note | **Done, real-audio validation begun** | Full pipeline + review UI + eval. The 2026-07-12 recordings ran through the full live→Stop→review pipeline as they were made (five consultations; three approved, two awaiting review as of that date) — diarisation and notes held up in use; the formal check against marking schemes + a real-audio section in the note-quality eval are still to do. |
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
-| 5 — Sinhala | **Benchmark and recordings eval done; adjudicated 2026-07-25; fine-tune deferred to v2** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune deferred to v2 by owner decision 2026-07-25** (eight sign-offs deliberately not sought) — see the decision header in `evals/2026-07-17_finetune_plan.md`. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
+| 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
 | 7 — Supervised auto history-taking | **Spec'd 2026-07-24; nothing started** | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied** (step 6 adjudication + fine-tune deferral), and the recordings precondition now means `05_epigastric_pain_en` only (`01_chest_pain_si` deferred with Phase 5). **Remaining gate: `05_epigastric_pain_en` + Docker Compose packaging + the two-role demo script.** 7a+7b are the recommended first commitment, 7c committed separately. |
 
@@ -586,7 +586,7 @@ must not open transcripts or notes.
    models as merely mediocre. Aggregate error rates do not see this
    class of loss; the step 6 method (curated terms, adjudicated) does.
 
-## Phase 5 — investigation complete, fine-tune deferred to v2
+## Phase 5 — CLOSED with a negative result (2026-07-25)
 
 Benchmark stage (plan §7 "benchmark FIRST, train later") completed
 2026-07-10 — `evals/2026-07-10_sinhala_asr_benchmark.md`, harness
@@ -640,22 +640,24 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   What did NOT change: no off-the-shelf model is usable for
   code-switched clinical Sinhala. Full table and limitations (unblinded,
   single adjudicator) in the eval record's § Step 6.
-- **Decision (step 7), 2026-07-25: the fine-tune is DEFERRED to v2** —
-  owner's call, with the eight sign-offs in the groundwork plan
-  deliberately not sought. The pre-registered investigation is complete
-  and its conclusion stands; the remaining pre-Phase-7 obligations take
-  priority. The plan is preserved unchanged as the restart point — see
-  its decision header (`evals/2026-07-17_finetune_plan.md`), which also
+- **Decision (step 7), 2026-07-25: Phase 5 is CLOSED with a negative
+  result, and the fine-tune is NOT PROCEEDING** — owner's call, with the
+  eight sign-offs in the groundwork plan deliberately not sought.
+  **Consultation AI is English-only for v1: Sinhala is out of scope, not
+  postponed.** The pre-registered investigation ran to completion and
+  its conclusion stands; the negative result *is* the Phase 5 finding.
+  The plan is preserved unchanged as the restart point — see its
+  decision header (`evals/2026-07-17_finetune_plan.md`), which also
   carries the one substantive amendment: lead with
-  `seniruk/whisper-small-si`, not xlsr. **Restart conditions:** a Sinhala
-  arm is needed for a demo or study commitment, or a new candidate model
-  or code-switched dataset appears. Whoever restarts reads § Step 6
-  first.
-- **Deferred with it:** recording `01_chest_pain_si` (needs a
-  Sinhala-speaking second reader and only feeds the paused Sinhala arm),
-  the translation layer (Gemma/NMT benchmark, plan §4), and
-  dual-language transcript storage — the `FinalTranscript` model in the
-  plan already anticipates si/en pairs.
+  `seniruk/whisper-small-si`, not xlsr. **Restart trigger (narrow):**
+  only a materially better Sinhala or multilingual model, or a
+  code-switched clinical dataset, appearing — a demo or study commitment
+  is not a trigger. Whoever restarts reads § Step 6 first.
+- **Out of scope for v1 with it:** the translation layer (Gemma/NMT
+  benchmark, plan §4) and dual-language transcript generation. The
+  project-wide English-only decision and its two deliberate retentions
+  (research artifacts; the si/en seam in `FinalTranscript`) are recorded
+  in PROJECT_PLAN.md §§4, 7 and in the English-only section below.
 
 ## CDS restraint dimension — built and evaluated (2026-07-17)
 
