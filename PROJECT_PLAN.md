@@ -8,6 +8,57 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 
 ---
 
+## What v1 is, and is not
+
+*(Scope block, added 2026-07-25. Deliberately unnumbered so the section
+numbering below — and the cross-references to it from HANDOVER.md and
+PHASE_7_SPEC.md — stay stable.)*
+
+The project asks whether a single consumer GPU in a spare room can
+support a general practice consultation end to end: listen, reason
+alongside the doctor, and produce a cited note the doctor signs. The
+low-resource language question — *listen in Sinhala, document in
+English* — is why the project exists, and it was the first question the
+project answered.
+
+**The answer, as of 2026-07-25, is no with current off-the-shelf
+models.** That answer is a result, not a gap: it was reached through a
+pre-registered protocol run to completion —
+`evals/2026-07-10_sinhala_asr_benchmark.md` (benchmark),
+`evals/2026-07-12_sinhala_asr_recordings_eval.md` (recordings eval,
+including its § Step 6 adjudication), and the not-proceeding header of
+`evals/2026-07-17_finetune_plan.md`.
+
+**What v1 does.** English consultations, end to end: live streaming
+transcription; live CDS with urgency escalation; corpus-grounded
+guideline retrieval that refuses when the corpus doesn't cover the
+topic; a cited draft SOAP note the doctor edits and approves; referral
+letters generated from the approved note; users, roles, the walk-in
+queue, and an audit log. All of it local — no cloud inference.
+
+**What v1 does not do.** Transcribe or translate Sinhala, or any other
+non-English language.
+
+**The consequence, stated precisely.** Once the finalisation
+transcript-quality gate ships, non-English audio will be **refused at
+finalisation** rather than drafted from — because an English-forced
+pipeline does not fail loudly on Sinhala speech; it produces a fluent
+hallucinated translation and a normal-looking draft note from it. That
+is consultation #70, and it was approved before anyone noticed. **That
+gate is approved and specified as a pre-Phase-7 build item, but it is
+NOT YET BUILT.** Until it ships, the #70 path remains open — which is
+precisely why the gate sits on the Phase 7 entry gate rather than in the
+deferred review docket.
+
+**The Sinhala research artifacts are retained deliberately** — both
+`_si` scripts, the `03_diabetes_review_si` recording and its frozen
+reference, `scripts/evaluate_sinhala_asr.py`, the benchmark, the
+recordings eval, the adjudication worksheet, and the fine-tune plan.
+They are a pre-registered negative result on code-switched clinical ASR
+and are intended for external collaboration. (§4's Scope decision block
+records the same retention, plus the separate reason the `FinalTranscript`
+si/en schema seam stays.)
+
 ## 1. Why this project
 
 - **Low-resource language clinical NLP.** Sinhala medical speech recognition is almost untouched territory. Sri Lankan consultations are conducted in Sinhala (heavily code-switched with English medical terms) while notes and prescriptions are written in English. This project models that exact workflow: *listen in Sinhala, document in English*.
