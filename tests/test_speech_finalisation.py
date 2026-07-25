@@ -397,13 +397,15 @@ def test_a_segment_inside_an_excluded_span_is_dropped():
     assert [t["start"] for t in dropped] == [6]
 
 
-def test_a_segment_straddling_the_boundary_is_dropped():
-    """Part of it came from silence, and the rest cannot be trusted to be
-    cleanly separable."""
+def test_a_segment_mostly_outside_a_span_is_kept():
+    """This assertion used to read the other way, and that is exactly how
+    consultation 445 happened: it encoded "any overlap drops the segment"
+    as if it were the requirement. A segment 1 s of whose 6 s is muted got
+    its words from the other 5 s — it is transcript, not hallucination."""
     recording = turns((0, 6))
     kept, dropped = finalize.drop_segments_in_excluded_spans(
         recording, [(5.0, 8.0)])
-    assert kept == [] and len(dropped) == 1
+    assert dropped == [] and len(kept) == 1
 
 
 def test_segments_merely_touching_the_boundary_are_kept():
@@ -437,3 +439,133 @@ def test_the_invariant_has_a_pulse_counter():
 
     assert (monitor._DAY_COUNTERS["transcript.silence_hallucination"]
             == "silence_hallucinations_today")
+
+
+# ===========================================================================
+# REGRESSION: consultation 445, 2026-07-25 — "the missing six minutes"
+#
+# The first real-room test of 7a. The doctor tapped 16 utterances over an
+# 11-minute consultation. Finalisation produced FOUR turns ending at
+# 4:36, the transcript-quality gate correctly refused on a 360.7 s
+# trailing gap, and roughly six minutes of real patient speech — including
+# "I have type 2 diabetes and I take metformin" — was gone.
+#
+# WHAT IT WAS NOT, established by measurement before anything was changed:
+#   * Not capture. The original WAV has that speech at full level.
+#   * Not the exclusion windows. All 16 spans were well-formed, every
+#     end_reason was `complete`, the longest was 8.9 s, none ran to EOF,
+#     and the union was 67.36 s — 10.1% of a 669 s recording.
+#   * Not the derived copy. Measured directly: it is bit-identical to the
+#     original outside those 16 spans, and NOT zero after 4:40.
+#   * Not the quality gate. Its arithmetic was exactly right, including
+#     the excluded-span discount, and refusing was the correct response to
+#     a transcript that had genuinely lost six minutes.
+#
+# WHAT IT WAS: this invariant. WhisperX's speaker merge joins consecutive
+# same-speaker segments into one turn, and it produced a single turn
+# spanning 284.874-488.829 s. That 204-second turn CONTAINED four of our
+# own short utterances totalling 12.69 s. The original rule dropped a
+# segment on ANY overlap, so it discarded all 204 seconds to remove
+# 12.69 — sixteen times more transcript than was ever muted.
+#
+# The numbers below are the real ones, read from `system_utterance` and
+# the `transcript.silence_hallucination` audit row. Do not replace them
+# with round figures: the point is that this exact case cannot come back.
+
+C445_SPANS_S = [
+    (3.50, 4.768), (7.50, 16.361), (95.25, 104.111), (160.75, 169.45),
+    (242.75, 245.376), (253.75, 255.691), (271.25, 274.45), (280.50, 284.16),
+    (424.75, 425.565), (454.50, 455.45), (469.50, 478.20), (480.50, 482.72),
+    (492.75, 495.109), (499.00, 500.20), (511.25, 519.95), (600.50, 603.80),
+]
+C445_DURATION_S = 669.0
+C445_LOST_TURN = {
+    "start": 284.874, "end": 488.829, "confidence": 0.8,
+    "text": ("I'm not taking any blood thinners, but I have type 2 diabetes "
+             "and I take metformin and another medication which has a "
+             "difficult name to pronounce. I'm a bit worried because I feel "
+             "like having a temperature."),
+}
+
+
+def test_c445_the_lost_turn_is_kept():
+    """THE regression. A 204 s turn containing 12.7 s of our own speech is
+    transcript, not hallucination, and must survive."""
+    kept, dropped = finalize.drop_segments_in_excluded_spans(
+        [C445_LOST_TURN], C445_SPANS_S)
+    assert dropped == [], (
+        "consultation 445 has come back: a turn was discarded for containing "
+        "our own utterances")
+    assert kept == [C445_LOST_TURN]
+    assert "metformin" in kept[0]["text"]
+
+
+def test_c445_the_overlap_was_a_small_fraction_of_the_turn():
+    """6.2% muted. The any-overlap rule could not tell that apart from a
+    segment lying wholly inside a span, which is why it had to go."""
+    overlap = finalize._overlap_seconds(
+        C445_LOST_TURN["start"], C445_LOST_TURN["end"], C445_SPANS_S)
+    duration = C445_LOST_TURN["end"] - C445_LOST_TURN["start"]
+    assert overlap == pytest.approx(12.69, abs=0.05)
+    assert duration == pytest.approx(203.955, abs=0.01)
+    assert overlap / duration < 0.07
+    assert overlap / duration < finalize.SEGMENT_MUTED_FRACTION
+
+
+def test_c445_spans_were_all_well_formed():
+    """Recorded so the disproved hypothesis stays disproved: the windows
+    were never the fault. Every span ends after it starts, none is longer
+    than the synthesis cap, and the union is a tenth of the recording."""
+    for start, end in C445_SPANS_S:
+        assert end > start
+        assert end - start <= 20.0        # SPEECH_MAX_UTTERANCE_S
+    union = sum(e - s for s, e in C445_SPANS_S)
+    assert union == pytest.approx(67.36, abs=0.05)
+    assert union / C445_DURATION_S == pytest.approx(0.101, abs=0.002)
+    assert max(e for _, e in C445_SPANS_S) < C445_DURATION_S, "no span ran to EOF"
+
+
+def test_c445_gate_arithmetic_was_correct_and_the_refusal_was_right():
+    """The gate is not on trial here. Given the four turns that survived,
+    360.7 s was the true discounted gap and refusing was correct."""
+    surviving = [{"start": 177.63, "end": 224.52, "text": "x", "confidence": 0.786},
+                 {"start": 245.61, "end": 246.57, "text": "x", "confidence": 0.775},
+                 {"start": 256.67, "end": 264.94, "text": "x", "confidence": 0.786},
+                 {"start": 275.15, "end": 276.43, "text": "x", "confidence": 0.826}]
+    gap = transcript_quality.s4_truncation_gap(
+        surviving, C445_DURATION_S, C445_SPANS_S)
+    assert gap == pytest.approx(360.66, abs=0.05)
+    assert gap > transcript_quality.TRUNCATION_REFUSE_S
+
+
+def test_a_segment_wholly_inside_a_span_is_still_dropped():
+    """The invariant must keep working: a real hallucination on muted
+    silence lies inside the span, so its fraction is ~1.0."""
+    inside = {"start": 470.0, "end": 477.0, "text": "Thank you.", "confidence": 0.3}
+    kept, dropped = finalize.drop_segments_in_excluded_spans([inside], C445_SPANS_S)
+    assert kept == [] and dropped == [inside]
+
+
+def test_a_segment_half_muted_is_dropped_at_the_boundary():
+    """Majority rule: at or above the fraction, it goes."""
+    half = {"start": 465.0, "end": 475.0, "text": "?", "confidence": 0.4}
+    _, dropped = finalize.drop_segments_in_excluded_spans([half], C445_SPANS_S)
+    assert dropped == [half]      # 5.5s of 10s muted
+
+
+def test_a_zero_length_segment_is_kept_rather_than_dividing_by_zero():
+    odd = {"start": 300.0, "end": 300.0, "text": "", "confidence": 0.5}
+    kept, dropped = finalize.drop_segments_in_excluded_spans([odd], C445_SPANS_S)
+    assert kept == [odd] and dropped == []
+
+
+def test_the_invariant_runs_before_the_speaker_merge():
+    """Ordering is half the fix. After the merge, a hallucinated fragment
+    can be inside a turn spanning minutes; before it, the fragment is
+    removed on its own."""
+    from pathlib import Path
+
+    source = Path("app/finalize.py").read_text()
+    invariant = source.index("raw_segments, hallucinated = drop_segments_in_excluded_spans")
+    merge = source.index("# Merge word-assigned segments into speaker turns.")
+    assert invariant < merge, "the invariant must run before the merge"

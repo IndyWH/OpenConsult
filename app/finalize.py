@@ -101,6 +101,30 @@ def spans_to_seconds(spans: list[tuple[int, int]]) -> list[tuple[float, float]]:
     return [(start / divisor, end / divisor) for start, end in spans]
 
 
+# A segment is discarded only when MOST of it lies inside muted audio.
+#
+# This threshold is the whole lesson of consultation 445 (2026-07-25). The
+# first version of this invariant dropped a segment on ANY overlap, which
+# is correct reasoning for a segment straddling a boundary and
+# catastrophic for one that CONTAINS a span. In 445 a 204-second turn
+# contained four short utterances totalling 12.7 s; the any-overlap rule
+# threw away all 204 seconds to remove 12.7 — sixteen times more
+# transcript than was ever muted — and six minutes of a real consultation
+# with it.
+#
+# The invariant's actual purpose is "nothing may be transcribed FROM a
+# muted region". A hallucination on silence lies wholly inside a span, so
+# its overlap fraction is ~1.0. A genuine turn that merely contains a
+# span got its words from the real audio around it, so its fraction is
+# small — 6.2% in 445's case.
+SEGMENT_MUTED_FRACTION = float(os.getenv("SEGMENT_MUTED_FRACTION", "0.5"))
+
+
+def _overlap_seconds(start: float, end: float,
+                     spans: list[tuple[float, float]]) -> float:
+    return sum(max(0.0, min(end, b) - max(start, a)) for a, b in spans)
+
+
 def drop_segments_in_excluded_spans(
     turns: list[dict], excluded_spans_s: list[tuple[float, float]]
 ) -> tuple[list[dict], list[dict]]:
@@ -110,34 +134,39 @@ def drop_segments_in_excluded_spans(
     It does not look at what a segment says and never compares it to
     anything the system spoke. It asserts a property of a region that is
     *provably digital silence* — we zero-filled it ourselves a few lines
-    above, in `mute_spans`. A segment there is not "probably our voice"; it
-    is output with no input, which is a Whisper hallucination on silence.
+    above, in `mute_spans`. A segment lying inside one is not "probably our
+    voice"; it is output with no input, which is a Whisper hallucination
+    on silence.
 
     Why an invariant rather than a hope: zero-filled digital silence is a
     known hallucination trigger for Whisper. WhisperX runs silero VAD
     first, which should emit no speech regions on pure zeros, so this
-    should never fire. "Should never fire" is exactly the kind of claim
-    that deserves a check rather than a comment — and one that is visible
-    when it is wrong, hence the anomaly count and audit event at the call
-    site rather than a silent drop.
+    should rarely fire. That is exactly the kind of claim that deserves a
+    check rather than a comment — and one that is visible when it is
+    wrong, hence the anomaly count and audit event at the call site.
 
-    If it ever does fire in practice, the fix under consideration is
-    filling with very low-level noise instead of pure zeros. Do not change
-    the fill pre-emptively: a real firing is the evidence that would
-    justify it, and pure zeros are the stronger guarantee until then.
+    If it ever fires on a segment that is genuinely inside a span, the fix
+    under consideration is filling with very low-level noise instead of
+    pure zeros. Do not change the fill pre-emptively.
 
-    Returns (kept, dropped). Overlap is any intersection at all — a
-    segment straddling the boundary is dropped, because part of it came
-    from silence and the rest cannot be trusted to be cleanly separable.
+    **Discards only segments that are MOSTLY muted** (see
+    `SEGMENT_MUTED_FRACTION` above, and consultation 445). Applied to raw
+    segments before the speaker merge, so a hallucinated fragment is
+    removed on its own rather than taking a legitimate turn with it.
+
+    Returns (kept, dropped).
     """
     if not excluded_spans_s:
         return turns, []
     kept, dropped = [], []
     for turn in turns:
         start, end = float(turn.get("start", 0)), float(turn.get("end", 0))
-        overlaps = any(start < span_end and end > span_start
-                       for span_start, span_end in excluded_spans_s)
-        (dropped if overlaps else kept).append(turn)
+        duration = end - start
+        if duration <= 0:
+            kept.append(turn)
+            continue
+        fraction = _overlap_seconds(start, end, excluded_spans_s) / duration
+        (dropped if fraction >= SEGMENT_MUTED_FRACTION else kept).append(turn)
     return kept, dropped
 
 
@@ -241,9 +270,20 @@ def transcribe_and_diarise(wav_path: str,
         time.perf_counter() - started, len(audio) / 16000,
     )
 
+    # The silence invariant runs HERE, on raw segments, BEFORE the speaker
+    # merge below. That ordering is the fix for consultation 445: the merge
+    # joins consecutive same-speaker segments into one turn, and a merged
+    # turn can legitimately span minutes and contain several of our own
+    # utterances. Checking after the merge meant a hallucinated fragment
+    # could take 204 seconds of real consultation with it. Checking before
+    # removes the fragment on its own.
+    excluded_s = spans_to_seconds(exclusion_spans or [])
+    raw_segments, hallucinated = drop_segments_in_excluded_spans(
+        result["segments"], excluded_s)
+
     # Merge word-assigned segments into speaker turns.
     turns: list[dict] = []
-    for seg in result["segments"]:
+    for seg in raw_segments:
         words = seg.get("words", [])
         speakers = [w.get("speaker") for w in words if w.get("speaker")]
         speaker = max(set(speakers), key=speakers.count) if speakers else "SPEAKER_00"
@@ -281,7 +321,8 @@ def transcribe_and_diarise(wav_path: str,
     return {"turns": turns, "audio_duration_s": audio_duration_s,
             "detected_language": detected_language,
             "language_probability": language_probability,
-            "excluded_spans_s": spans_to_seconds(exclusion_spans or [])}
+            "excluded_spans_s": excluded_s,
+            "hallucinated_segments": hallucinated}
 
 
 def attribute_roles(turns: list[dict]) -> list[dict]:
@@ -308,16 +349,12 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         transcription = await asyncio.to_thread(
             transcribe_and_diarise, wav_path, spans)
 
-        # Invariant, not detection: nothing may be transcribed from a
-        # region we zero-filled ourselves. Should never fire (silero VAD
-        # emits no speech on pure zeros); visible rather than silent if it
-        # does, because a hallucination on silence is exactly the class of
-        # failure this phase exists to prevent.
+        # The invariant itself now runs inside transcribe_and_diarise, on
+        # RAW segments before the speaker merge (see consultation 445).
+        # What is left here is the reporting of it.
         excluded_s = transcription.get("excluded_spans_s") or []
-        kept, hallucinated = drop_segments_in_excluded_spans(
-            transcription["turns"], excluded_s)
+        hallucinated = transcription.get("hallucinated_segments") or []
         if hallucinated:
-            transcription["turns"] = kept
             logger.error(
                 "Consultation %d: %d segment(s) transcribed from muted "
                 "silence — dropped. This should not happen; see "
