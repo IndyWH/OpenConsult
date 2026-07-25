@@ -96,22 +96,24 @@ def tokenise(text: str) -> list[str]:
 
 
 def weighted_mean_confidence(turns: list[dict]) -> float | None:
-    """Duration-weighted mean per-segment confidence.
+    """Duration-weighted mean per-segment confidence — S2.
 
     Weighting by segment duration is the point: an unweighted mean lets a
     short clean segment cancel a long garbled one, which is exactly the
     failure #70 presented.  Returns None when there is no measurable
     duration.
+
+    **Delegates to the pipeline's own implementation** rather than keeping
+    a second copy.  This harness and `app/transcript_quality.py` used to
+    compute S2 and S4 independently; the moment their arithmetic diverges,
+    the calibration stops describing what the pipeline actually does.
+    HANDOVER carried work item 2 asks for exactly this collapse (it names
+    S1, which is still two paths — that one needs the multi-window
+    redesign and is not touched here).
     """
-    total_weight = 0.0
-    total = 0.0
-    for turn in turns:
-        duration = max(0.0, float(turn["end"]) - float(turn["start"]))
-        total += float(turn["confidence"]) * duration
-        total_weight += duration
-    if total_weight <= 0:
-        return None
-    return total / total_weight
+    from app.transcript_quality import s2_weighted_confidence
+
+    return s2_weighted_confidence(turns)
 
 
 def unweighted_mean_confidence(turns: list[dict]) -> float | None:
@@ -161,15 +163,22 @@ def max_consecutive_repeats(turns: list[dict]) -> int:
     return best
 
 
-def truncation_gap(turns: list[dict], audio_duration: float | None) -> float | None:
-    """Seconds of audio after the last stored segment ends.
+def truncation_gap(turns: list[dict], audio_duration: float | None,
+                   excluded_spans_s: list[tuple[float, float]] | None = None
+                   ) -> float | None:
+    """Seconds of audio after the last stored segment ends — S4.
 
     #70 dropped its final 33 s.  Returns None when the audio duration is
     unknown (audio purged), never a fabricated zero.
+
+    Delegates to the pipeline's implementation, for the reason given on
+    `weighted_mean_confidence` above.  Since 2026-07-25 that implementation
+    also discounts Phase 7a speaking windows, so a consultation where the
+    system spoke last is not mistaken for a truncated recording.
     """
-    if audio_duration is None or not turns:
-        return None
-    return max(0.0, float(audio_duration) - max(float(t["end"]) for t in turns))
+    from app.transcript_quality import s4_truncation_gap
+
+    return s4_truncation_gap(turns, audio_duration, excluded_spans_s)
 
 
 def truncate_turns_at(turns: list[dict], boundary_s: float) -> list[dict]:

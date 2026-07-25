@@ -32,7 +32,7 @@ import time
 
 import httpx
 
-from app import audit, consultations, transcript_quality
+from app import audit, consultations, system_utterances, transcript_quality
 from app.notes import draft_note
 
 logger = logging.getLogger(__name__)
@@ -61,11 +61,59 @@ async def unload_medgemma() -> None:
     logger.warning("MedGemma still resident after 30s — proceeding anyway")
 
 
-def transcribe_and_diarise(wav_path: str) -> list[dict]:
+SAMPLE_RATE = 16_000
+BYTES_PER_SAMPLE = 2
+
+
+def mute_spans(audio, spans: list[tuple[int, int]]):
+    """A DERIVED COPY of the audio with the given byte spans zero-filled.
+
+    Phase 7a, PHASE_7A_SPEC.md §1.3. The live path is not the only place
+    the system's own voice could enter the transcript: this function
+    re-transcribes the whole recording, so gating the live path alone
+    would leave our voice in the FINAL transcript — the one the note is
+    grounded in, and the one the grounding gate would then faithfully cite.
+
+    Spans are byte offsets into the WAV's PCM data, straight from
+    `system_utterance`. `whisperx.load_audio` returns mono 16 kHz float32,
+    the same layout the recording was written in, so a byte offset is a
+    sample index doubled — no resampling, no drift.
+
+    **The original array is copied, and the file on disk is never touched.**
+    The WAV stays byte-intact as the faithful record of the room, and is
+    what the retention sweep and the FLAC-on-approval step operate on.
+    """
+    if not spans:
+        return audio
+    derived = audio.copy()
+    total = len(derived)
+    for start_byte, end_byte in spans:
+        lo = max(0, int(start_byte) // BYTES_PER_SAMPLE)
+        hi = min(total, int(end_byte) // BYTES_PER_SAMPLE)
+        if hi > lo:
+            derived[lo:hi] = 0.0
+    return derived
+
+
+def spans_to_seconds(spans: list[tuple[int, int]]) -> list[tuple[float, float]]:
+    """Byte spans → second spans, for the transcript-quality gate."""
+    divisor = float(SAMPLE_RATE * BYTES_PER_SAMPLE)
+    return [(start / divisor, end / divisor) for start, end in spans]
+
+
+def transcribe_and_diarise(wav_path: str,
+                           exclusion_spans: list[tuple[int, int]] | None = None
+                           ) -> list[dict]:
     """WhisperX + pyannote, returning speaker turns with confidence.
 
     Blocking and GPU-heavy — run via asyncio.to_thread. Loads its models,
     uses them, and frees them before returning.
+
+    `exclusion_spans` are Phase 7a speaking windows as byte offsets. The
+    models are handed a muted derived copy; WhisperX and pyannote cannot
+    hear what is not there. `audio_duration_s` is deliberately taken from
+    the FULL recording — muting does not shorten the audio, and S4's
+    trailing-gap arithmetic depends on the real duration.
     """
     from app.transcription import _preload_cuda_libraries
 
@@ -78,7 +126,15 @@ def transcribe_and_diarise(wav_path: str) -> list[dict]:
     compute = "float16" if device == "cuda" else "int8"
 
     audio = whisperx.load_audio(wav_path)
-    audio_duration_s = len(audio) / 16000
+    audio_duration_s = len(audio) / SAMPLE_RATE
+    # From here on every model sees the derived copy only. The original
+    # array is untouched, and the file was never opened for writing.
+    audio = mute_spans(audio, exclusion_spans or [])
+    if exclusion_spans:
+        logger.info("Excluding %d system-speech span(s) from the final "
+                    "transcript (%.1fs of %.1fs)", len(exclusion_spans),
+                    sum(e - s for s, e in exclusion_spans)
+                    / (SAMPLE_RATE * BYTES_PER_SAMPLE), audio_duration_s)
 
     started = time.perf_counter()
     # Silero VAD: whisperx's default pyannote VAD checkpoint is incompatible
@@ -184,7 +240,8 @@ def transcribe_and_diarise(wav_path: str) -> list[dict]:
         turn["confidence"] = round(turn["confidence"], 3)
     return {"turns": turns, "audio_duration_s": audio_duration_s,
             "detected_language": detected_language,
-            "language_probability": language_probability}
+            "language_probability": language_probability,
+            "excluded_spans_s": spans_to_seconds(exclusion_spans or [])}
 
 
 def attribute_roles(turns: list[dict]) -> list[dict]:
@@ -204,7 +261,12 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
     await consultations.set_status(cid, "processing", audio_path=wav_path)
     try:
         await unload_medgemma()
-        transcription = await asyncio.to_thread(transcribe_and_diarise, wav_path)
+        # Phase 7a: the speaking windows are read from the database, not
+        # from a live session object — which is how a connection_lost or
+        # post-restart finalisation still excludes our voice (spec §2.3).
+        spans = await system_utterances.exclusion_spans(cid)
+        transcription = await asyncio.to_thread(
+            transcribe_and_diarise, wav_path, spans)
         turns = attribute_roles(transcription["turns"])
         for i, turn in enumerate(turns):
             turn["idx"] = i
@@ -218,6 +280,10 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
             audio_duration_s=transcription.get("audio_duration_s"),
             detected_language=transcription.get("detected_language"),
             language_probability=transcription.get("language_probability"),
+            # Spec §2.4: the gate must be TOLD about the exclusions. A
+            # system utterance at the end of a recording would otherwise
+            # look like dropped audio to S4.
+            excluded_spans_s=transcription.get("excluded_spans_s"),
         )
         verdict = transcript_quality.evaluate(signals)
         await consultations.save_quality(cid, signals, verdict["outcome"])

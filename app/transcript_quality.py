@@ -115,18 +115,48 @@ def s3_repetition(turns: list[dict]) -> dict:
             "max_consecutive_identical": best}
 
 
-def s4_truncation_gap(turns: list[dict], audio_duration_s: float | None) -> float | None:
+def s4_truncation_gap(turns: list[dict], audio_duration_s: float | None,
+                      excluded_spans_s: list[tuple[float, float]] | None = None
+                      ) -> float | None:
     """Seconds of audio after the last stored segment ends. None when the
-    audio duration is unknown — never a fabricated zero."""
+    audio duration is unknown — never a fabricated zero.
+
+    Note what this measures, because it is narrower than "silence": the
+    **trailing** gap only. Muted spans in the middle of a recording do not
+    touch it, because the last segment still ends where it ended.
+
+    `excluded_spans_s` (Phase 7a) discounts audio the system was speaking
+    over. Only the trailing region matters, and it matters in exactly one
+    case: the system speaks last — the examination handover, say — and the
+    recording ends. Zero-filling that span means the last transcribed
+    segment now ends before it, so the gap would grow by the length of our
+    own utterance and could manufacture an `unreliable_transcript` refusal
+    on a perfectly good consultation. Discounting it is spec §2.4's
+    requirement that the measurement be told about the exclusions.
+    """
     if audio_duration_s is None or not turns:
         return None
-    return max(0.0, float(audio_duration_s) - max(float(t.get("end", 0)) for t in turns))
+    last_end = max(float(t.get("end", 0)) for t in turns)
+    gap = max(0.0, float(audio_duration_s) - last_end)
+    for start, end in (excluded_spans_s or []):
+        overlap = min(float(end), float(audio_duration_s)) - max(float(start), last_end)
+        if overlap > 0:
+            gap -= overlap
+    return max(0.0, gap)
 
 
 def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
                     detected_language: str | None = None,
-                    language_probability: float | None = None) -> dict:
-    """All four signals. Always computed, always stored (spec §3, §7)."""
+                    language_probability: float | None = None,
+                    excluded_spans_s: list[tuple[float, float]] | None = None) -> dict:
+    """All four signals. Always computed, always stored (spec §3, §7).
+
+    `excluded_spans_s` are the Phase 7a speaking windows in seconds. Only
+    S4 consults them (see its docstring). S2 needs no adjustment: an
+    excluded span produces no segments, so it contributes no confidence
+    and no duration weight — it is absent from the mean rather than
+    dragging it down.
+    """
     return {
         "s1_language": {
             "detected": detected_language,
@@ -141,8 +171,9 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
         },
         "s3_repetition": {**s3_repetition(turns), "acts": False},
         "s4_truncation": {
-            "gap_s": s4_truncation_gap(turns, audio_duration_s),
+            "gap_s": s4_truncation_gap(turns, audio_duration_s, excluded_spans_s),
             "audio_duration_s": audio_duration_s,
+            "excluded_s": round(sum(e - s for s, e in (excluded_spans_s or [])), 2),
             "refuse_above_s": TRUNCATION_REFUSE_S,
             "acts": True,
         },
