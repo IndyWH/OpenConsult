@@ -32,7 +32,8 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 103 tests; heavy ones self-skip if Ollama/Postgres/
+- `uv run pytest` — 253 tests (1 skipped: Piper is not installed, see the
+  Phase 7a section); heavy ones self-skip if Ollama/Postgres/
   corpus are absent. Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
@@ -51,7 +52,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25** (owner decision; two gate items deliberately carried — see "Phase 7 opened" below). Spec'd 2026-07-24; build not started. | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a build started the same day — items 0–3 of four built, UI and barge-in are session 2** (see "Phase 7a — the transcript guarantee" below). Two gate items deliberately carried — see "Phase 7 opened". | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -70,6 +71,9 @@ app/finalize.py        Stop-triggered pipeline: WhisperX + pyannote + roles + no
 app/notes.py           cited SOAP note generation + plain-text serialiser
 app/consultations.py   Postgres persistence (consultation/turns/notes/urgency)
 app/letters.py         referral letters: suggest/draft calls + grounding gate
+app/schema.py          one entry point + ordering for the whole DB schema
+app/speech.py          Phase 7a: Piper TTS, phrase table, reference resolution
+app/system_utterances.py  what the system said, and its exclusion spans
 app/monitor.py         public monitoring pulse: aggregate counts, 10 s cache
 app/ratelimit.py       per-IP auth rate limits + proxy-aware client_ip
 app/mock_scripts.py    mock-script parser (turns)
@@ -78,7 +82,8 @@ app/static/live.html   live page; review.html  review page; nav.js app chrome
 corpus/manifest.yaml   committed provenance for the gitignored corpus
 scripts/               ingest_guidelines, simulate_cds, make_tts_sample,
                        evaluate_{urgency,rag,notes,sinhala_asr},
-                       manage_users (break-glass CLI, see toolbox below)
+                       manage_users (break-glass CLI, see toolbox below),
+                       migrate.py [--check] (schema apply / drift report)
 ```
 
 Models: MedGemma 27B Q4_K_M GGUF via Ollama (clinical reasoning, notes,
@@ -279,6 +284,155 @@ Five commits, "Design pass 1/5 … 5/5":
   Verification: #66 regenerated under the new prompt and diffed against
   approved v1 for the owner (13/16 sentences grounded; the one
   under-cited sentence and the dropped invention placeholdered).
+
+## Phase 7a — the transcript guarantee (2026-07-25, session 1 of 2)
+
+`PHASE_7A_SPEC.md` (in the repo since this session) is the *how*;
+`PHASE_7_SPEC.md` § Stage 7a stays the statement of what 7a is *for*.
+Build order items 0–3 are done: schema module, `app/speech.py`, live-path
+exclusion, finalisation exclusion. **Not built, and deliberately session
+2: the UI (spec Part 5) and the barge-in detector (build item 5).** There
+is no way to tap a question from the browser yet — the protocol exists,
+its client does not.
+
+### The guarantee, and why it is structural
+
+7a introduces audio output into a system whose entire safety guarantee is
+that *the transcript is faithful to the room*. If the system's own voice
+can enter the transcript, the system can put words in the patient's
+mouth — and every downstream defence inherits the corruption, because the
+note grounding gate would faithfully cite a fabricated turn. That is
+consultation #70's failure shape exactly (a note faithful to a transcript
+that was not faithful to the audio), reached by a new route.
+
+So the mechanism is **server-held knowledge of when we were speaking**,
+never signal quality and never text comparison. Echo cancellation that
+works 98% of the time is *detection*, and a rare fabrication is worse
+than a frequent one because nobody builds the habit of checking for it.
+
+> String comparison against the spoken text is legitimate **as a test
+> assertion** and forbidden **as a runtime mechanism**. Both test files
+> say so in their docstrings, because it is exactly the thing a future
+> contributor will promote into the pipeline as a helpful safeguard.
+
+### Exclusion happens twice, from one persisted source
+
+1. **Live path** (`app/live.py::append_pcm16`): the recording gets the
+   real audio, the transcriber's buffer gets **silence** for any part of
+   it we were speaking over. Silence rather than nothing, deliberately —
+   dropping the samples would shift every later timestamp relative to the
+   recording, and the urgency alarm's first-fired times read that clock.
+2. **Final path** (`app/finalize.py::mute_spans`): finalisation
+   re-transcribes the *whole* recording, so gating the live path alone
+   would leave our voice in the final transcript. The models are handed a
+   **derived copy** with the spans zero-filled.
+
+**The original WAV is never modified.** It stays byte-intact as the
+faithful record of the room and is what the retention sweep and
+FLAC-on-approval operate on; a test sha256s it before and after.
+
+A window is a **byte range on the recording**, not a sequence range.
+Verified against the client: frames are a fixed 4000 samples (0.25 s),
+but the server appends whatever arrives and only *warns* on a seq gap, so
+`seq × frame_size` is not a safe offset — the server's own byte count is.
+That choice also removes the need for a timer: a window carries a ceiling
+of `start + synthesised duration + tail` from the moment it opens, so a
+`speak_ended` that never arrives closes it exactly right, and a late one
+is clamped.
+
+**Ordering, checked rather than assumed:** the client sends
+`speak_started` at playback start carrying the seq of the next frame, and
+WebSocket messages are ordered — so the server knows the window is open
+before the first in-window byte arrives. It is a message-ordering
+guarantee, not a timing one, and it does **not** depend on the ~2 s commit
+margin. The client's declared seq is logged as a cross-check and never
+used as the offset; trusting it would put the guarantee in the client's
+hands.
+
+### Reference-only speech (`app/speech.py`)
+
+Hard rule 1 — questions and acknowledgements only, never advice — is
+enforced in code, not prompt. The client sends a **reference**
+(`{"kind":"phrase","id":…}` or
+`{"kind":"cds_question","assessment_version":N,"index":i}`) and the
+server resolves it against its own phrase table or its own versioned copy
+of the CDS agenda, authoring the words itself. A `speak` carrying `text`
+is **rejected outright and audited**, not sanitised: sanitising would make
+it a filter, and a filter is detection. An unresolvable agenda version is
+refused rather than guessed — substituting another version's wording
+would be the server authoring a question nobody tapped. A question since
+revised off the agenda is allowed and logged (the panel lags a turn;
+re-asking is redundant, not unsafe).
+
+`cds_rationale` records the assessment's `reasoning` field, because the
+CDS schema gives questions as bare strings with no rationale of their own.
+That is the honest reading of hard rule 5's "the rationale, not just the
+question".
+
+### `system_utterance` — a separate table, on purpose
+
+**Not** a `system` role in `transcript_turn`. The note generator receives
+turns, and system utterances are not turns: there is no enum value to
+forget to filter and no query that includes us by omitting a WHERE clause.
+It is also what carries the spans across a restart, which is why a
+`connection_lost` finalisation still excludes correctly. Byte offsets are
+authoritative; the `*_offset_ms` columns are derived and rounded.
+
+### Transcript-quality gate interaction — what S4 actually measures
+
+The spec recorded this as unverified and inferred it might be a silence
+measure. **It is not.** `s4_truncation_gap` is
+`audio_duration − max(turn.end)`: the **trailing** gap only. So muted
+spans in the *middle* of a recording cannot move it and cannot manufacture
+a spurious `unreliable_transcript` refusal. There is exactly one exception
+— the system speaks **last** (the examination handover) and the recording
+ends, so the last transcribed segment now ends before our utterance and
+the gap grows by its length. S4 is therefore now told about the excluded
+spans and discounts them from the trailing region. A test builds that
+scenario, asserts it genuinely trips the gate undiscounted, and asserts
+the discount clears it; another asserts a real 33 s truncation with no
+windows still refuses, so the discount cannot become a way to silence the
+gate. **S2 needed no adjustment** and is asserted unchanged: a muted span
+produces no segments, so it contributes no confidence and no duration
+weight.
+
+`scripts/calibrate_transcript_quality.py` now **delegates S2 and S4** to
+`app/transcript_quality.py` instead of keeping its own copies — changing
+S4's arithmetic in one of two implementations would have made the
+calibration stop describing what the pipeline does. **S1 is still two code
+paths**; that one needs the multi-window redesign and was not touched.
+
+### Piper is NOT installed, and that is a decision waiting on the owner
+
+`piper-tts` is deliberately absent from `pyproject.toml`. Two reasons,
+both the owner's call:
+
+- It is **GPL-3.0-or-later** (the current `piper-tts` links espeak-ng; the
+  old MIT rhasspy releases are a different, older package). For a locally
+  run prototype that is never distributed this imposes no obligation, but
+  it interacts with the external-collaboration ambition and this repo's
+  `NOTICE` conventions.
+- Adding it **re-resolves the uv lockfile** on a machine where resolution
+  churn has corrupted the CUDA wheels before (see Troubleshooting).
+
+Sizes if it goes ahead: `piper-tts` wheel 34.1 MB, `onnxruntime` already
+present (1.27.0), `en_GB-alba-medium` voice 63.2 MB. Its only runtime
+dependencies are onnxruntime and pathvalidate — `torch` is in the `train`
+extra only, so nothing competes for the GPU. `PiperVoice.load` is called
+with an explicit `use_cuda=False`.
+
+**Consequence for the test suite, stated plainly: the synthesis path is
+unverified against the real library.** Reference resolution, the cache and
+duration arithmetic, the hard cap, the exclusion windows and the protocol
+are all genuinely tested; the one test that needs real audio self-skips,
+as the Ollama- and corpus-dependent tests already do. A green run is not
+evidence that the system can speak.
+
+Also awaiting the owner: the **`disclosure` phrase wording** in
+`app/speech.py::PHRASES` is a draft by the implementer. Hard rule 4
+requires disclosure but the spec does not quote the sentence, and the
+wording is a clinical-communication decision. The other five phrases are
+verbatim from spec Part 5.
 
 ## Shared schema module (2026-07-25)
 
@@ -596,13 +750,16 @@ lost while Phase 7 takes attention:**
    (single-window detection returns English at p=0.90 for #70); S3 must
    measure *within* segments (cross-segment run length is 1 everywhere).
    Neither may act until re-calibrated against 66–70. **Shared-measurement
-   requirement:** S1 is currently measured inside
+   requirement — partly discharged 2026-07-25:** S2 and S4 are now single
+   implementations in `app/transcript_quality.py`, with
+   `scripts/calibrate_transcript_quality.py` delegating to them (Phase 7a
+   had to change S4's arithmetic, and two copies would have diverged).
+   **S1 is still two code paths**: measured inside
    `app/finalize.py::transcribe_and_diarise` (reusing the already-loaded
-   WhisperX model) while `scripts/calibrate_transcript_quality.py`
-   measures it independently — two code paths for one signal. The
-   redesign must collapse them into **one shared measurement function**
-   used by both, or the calibration will stop describing what the
-   pipeline actually does.
+   WhisperX model) while the calibration harness measures it
+   independently. The redesign must collapse those into one shared
+   function, or the calibration will stop describing what the pipeline
+   actually does.
 3. **Schema-drift protection: BUILT 2026-07-25** as commit 0 of Phase 7a
    (`PHASE_7A_SPEC.md` §3.4 — 7a adds a table, which made this the
    cheapest moment to pay for it). See "Shared schema module" below.
@@ -610,6 +767,13 @@ lost while Phase 7 takes attention:**
    — the same recording as gate item 1, so the two unblock together.
 5. **Consultations #78 and #162 await the owner's review** (both
    `awaiting_review` in the live database, verified 2026-07-25).
+6. **Phase 7a session 2**, from the same spec's build order: the UI
+   (tappable question chips, phrase tray, speaking pill with Stop,
+   disclosure lock, the review page's grey transcript channel) and the
+   barge-in detector plus `scripts/calibrate_barge_in.py`. Two owner
+   decisions gate the work: whether to install Piper (GPL, lockfile
+   re-resolve) and the `disclosure` wording. `BARGE_IN_ENABLED` ships
+   false — hard mute is this design with the detector off.
 
 ## Pre-Phase-7 build item: finalisation transcript-quality gate
 
@@ -728,14 +892,19 @@ docket item 5.
    unvoid friction, `consultation.unvoid_refused`) and not a third note
    telling people to be careful.
 
-   **⚠ #70's state is still wrong as of 2026-07-25 10:29.** The row
-   reads `status = approved`, `voided_at IS NULL`. The audit trail shows
-   no void after 2026-07-24 10:49:20 — the only `consultation.*` events
-   dated 2026-07-25 are the five `keep_for_research` flags at 03:06. So
-   the row has been approved-and-visible since 2026-07-24 and **re-voiding
-   it is still outstanding, and is the owner's action to take.** When it
-   is done it must be voided with reason class `clinical_safety`, which
-   the guard below makes irreversible over HTTP.
+   **#70 was re-voided 2026-07-25 10:59:07 — this is now CLOSED.**
+   Verified against the audit trail and the row itself: `voided_at` is
+   set, `keep_for_research` is true, and the void carries reason class
+   **`clinical_safety`**, which the guard below makes irreversible over
+   HTTP (reversal is break-glass only). It was done `via break-glass CLI`
+   with a reason naming it as the transcript-quality gate's regression
+   fixture and saying never purge. `status` still reads `approved`, which
+   is correct and not a leftover: voiding stamps `voided_at` rather than
+   rewriting status.
+
+   The earlier ⚠ in this item said the state was still wrong and the
+   re-void outstanding. That was true when written at 10:29 and was
+   superseded half an hour later.
 
    **#70 must never be purged.** It now carries `keep_for_research`
    (set 2026-07-25 03:06), protecting its audio from the retention
@@ -939,8 +1108,16 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   Cowork 2026-07-24. Next: Docker Compose packaging and the two-role
   demo script.
 - **Whole-project:** the end-of-project review docket above.
-- **Phase 7 (queued, not started):** supervised auto history-taking is
-  spec'd in `PHASE_7_SPEC.md`. **OPENED 2026-07-25 by owner decision**,
+- **Phase 7 (OPEN; 7a items 0–3 built 2026-07-25):** supervised auto
+  history-taking is spec'd in `PHASE_7_SPEC.md`, and 7a's *how* is now in
+  the repo as `PHASE_7A_SPEC.md`. Built: the shared schema module,
+  `app/speech.py`, the live-path exclusion with the `system_utterance`
+  table, and the finalisation exclusion. **Session 2 is the UI and the
+  barge-in detector** — until then there is no way to tap a question from
+  the browser; the protocol exists, its client does not. Two owner
+  decisions gate it: installing Piper, and the disclosure wording. See
+  "Phase 7a — the transcript guarantee". **OPENED 2026-07-25 by owner
+  decision**,
   with `05_epigastric_pain_en` and the Docker/demo work **deliberately
   carried** rather than met; the transcript-quality gate item is **met
   for its refuse path**, which is live. Full amendment, plus the five
