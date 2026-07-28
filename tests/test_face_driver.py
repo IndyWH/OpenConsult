@@ -12,6 +12,8 @@ a stopped driver's tick loop emits nothing.
 
 import asyncio
 
+import pytest
+
 from vendor.kindalive.engine.chemicals import Chemical
 from vendor.kindalive.engine.clock import ManualClock
 from vendor.kindalive.engine.impulse import ChemicalImpulse
@@ -38,8 +40,10 @@ def test_classification_covers_all_twelve_muscles_exactly_once():
 
 
 def test_pinned_muscles_stay_at_neutral_under_maximum_anger_and_disgust():
+    # Keyed to clinical mode: since 2026-07-28 the caps are one arm of the
+    # owner's evaluation-first comparison, not the default behaviour.
     clock = ManualClock()
-    driver = FaceDriver(clock=clock)
+    driver = FaceDriver(clock=clock, mode="clinical")
     neutral = dict(driver._neutral)
 
     for _ in range(30):  # repeated max-delta spikes, then a tick's advance
@@ -65,10 +69,11 @@ def test_pinned_muscles_stay_at_neutral_under_maximum_anger_and_disgust():
     assert state.get(Chemical.CORTISOL) > state.baseline(Chemical.CORTISOL) + 0.2
 
 
-def test_same_event_sequence_produces_identical_states():
+@pytest.mark.parametrize("mode", ["full", "clinical"])
+def test_same_event_sequence_produces_identical_states(mode):
     def run() -> list[dict]:
         clock = ManualClock()
-        driver = FaceDriver(clock=clock)
+        driver = FaceDriver(clock=clock, mode=mode)
         states = []
         driver.on_consultation_started()
         for i in range(20):
@@ -111,6 +116,39 @@ def test_tick_loop_emits_face_state_payloads_then_stops():
     for msg in sent:
         assert msg["type"] == "face_state"
         assert set(msg["muscles"]) == ALL_MUSCLES
+
+
+def test_full_mode_does_not_clamp():
+    """Mirror of the clinical adversarial test: in full mode the same
+    anger/disgust drive REACHES the payload un-neutralised — the owner's
+    evaluation-first decision, superseding the caps for this phase."""
+    clock = ManualClock()
+    driver = FaceDriver(clock=clock, mode="full")
+    for _ in range(30):
+        for chemical, delta in ANGER_DISGUST_ATTACK:
+            driver.engine.apply_impulse(ChemicalImpulse(chemical, delta))
+        clock.advance(seconds=0.2)
+        driver.advance(0.2)
+    muscles = driver.payload()["muscles"]
+    # brow_lower is the anger brow; nose_wrinkle is disgust. Both pinned
+    # in clinical mode; both must move freely here.
+    assert muscles["brow_lower"] > 0.5
+    assert muscles["nose_wrinkle"] > 0.5
+
+
+def test_full_mode_runs_the_upstream_default_not_clinical():
+    full = FaceDriver(clock=ManualClock(), mode="full")
+    clinical = FaceDriver(clock=ManualClock(), mode="clinical")
+    # Species-default adrenaline baseline is 0.1; [clinical] lowers it to
+    # 0.02. Full mode must show the upstream default.
+    assert full.engine.state.baseline(Chemical.ADRENALINE) == pytest.approx(0.1)
+    assert clinical.engine.state.baseline(Chemical.ADRENALINE) == pytest.approx(0.02)
+
+
+def test_default_mode_is_full_and_unknown_falls_back_loudly():
+    assert FaceDriver(clock=ManualClock()).mode == face_mod.FACE_EXPRESSION_MODE
+    assert face_mod.FACE_EXPRESSION_MODE in face_mod.EXPRESSION_MODES
+    assert FaceDriver(clock=ManualClock(), mode="typo").mode == "full"
 
 
 def test_urgency_is_deliberately_not_an_event():

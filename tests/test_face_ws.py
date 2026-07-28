@@ -165,13 +165,16 @@ def test_face_on_ticks_then_off_goes_silent_and_both_are_audited(face_state_env)
                 break
         assert "face_state" not in after_off, "face_state after toggling off"
 
-    toggles = [(detail["on"], detail["session_id"])
+    toggles = [(detail["on"], detail.get("mode"))
                for _, _, detail in _audit_rows("face.toggled")
                if detail["session_id"] == session_id]
-    assert toggles == [(True, session_id), (False, session_id)]
+    # The expression mode rides every ON toggle so feedback sessions can
+    # be correlated with what the face was running; off has no mode.
+    assert toggles == [(True, face_mod.FACE_EXPRESSION_MODE), (False, None)]
 
     arms = [(sid, detail) for _, sid, detail in _audit_rows("face.arms")
             if sid == cid]
     assert len(arms) == 1
     assert arms[0][1]["face_ever_on"] is True
     assert [t["on"] for t in arms[0][1]["toggles"]] == [True, False]
+    assert arms[0][1]["modes"] == [face_mod.FACE_EXPRESSION_MODE]

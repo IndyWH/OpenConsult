@@ -1,13 +1,25 @@
 """Phase 7b: the impulse-mapping layer between consultation events and the
-vendored kindalive engine — deterministic, hard-capped, GPU-free.
+vendored kindalive engine — deterministic, GPU-free.
 
 This module owns EVERYTHING between what happens in the room and what the
 face renderer is sent. The vendored engine (vendor/kindalive/) is used
-as-is; the [clinical] preset in its personalities.toml expresses the
-intent, and the per-muscle policy below enforces it — belt and braces,
-PHASE_7B_KINDALIVE.md decision 3. Nothing here calls a model, loads a
-model, or draws randomness: the same event sequence always produces the
-same face states (the clock is injectable; tests use ManualClock).
+as-is. Two expression modes (FACE_EXPRESSION_MODE, read at driver
+creation and recorded in the audit trail so feedback sessions can be
+correlated with what the face was running):
+
+- "full" (default since 2026-07-28, owner decision): kindalive's
+  upstream default personality, per-muscle policy bypassed — the
+  engine's face state is emitted as produced. This SUPERSEDES
+  PHASE_7B_KINDALIVE.md decision 3 (limited range / hard caps) for the
+  evaluation phase: the owner will gather feedback from human mock
+  patients playing difficult patients BEFORE deciding any caps.
+- "clinical": the session-1 behaviour — the [clinical] preset plus the
+  per-muscle policy below. Deliberately retained, built and tested: it
+  is one arm of the later comparison, not dead code.
+
+Nothing here calls a model, loads a model, or draws randomness: the same
+event sequence always produces the same face states (the clock is
+injectable; tests use ManualClock).
 
 THE URGENCY ALARM IS DELIBERATELY NOT WIRED TO THE FACE. The face is a
 listening presence for the patient; it must not signal clinical state to
@@ -31,13 +43,20 @@ from vendor.kindalive.engine.impulse import ChemicalImpulse
 from vendor.kindalive.engine.neurochemical_engine import NeurochemicalEngine
 from vendor.kindalive.engine.seed_chemistry import SeedChemistry
 from vendor.kindalive.expression.face import project_face
-from vendor.kindalive.expression.face_3d import DEFAULT_MOOD_COLOR
+from vendor.kindalive.expression.face_3d import DEFAULT_MOOD_COLOR, face_payload
 
 logger = logging.getLogger("consultation-ai.face")
 
 CONFIG_DIR = Path(__file__).resolve().parents[1] / "vendor" / "kindalive" / "config"
 
 PRESET = "clinical"
+
+# "full" | "clinical" — see the module docstring. Read at driver creation.
+# An unknown value falls back to "full" WITH a warning, and the audit rows
+# record the mode actually run, so a typo cannot silently change a study
+# arm's recorded identity.
+FACE_EXPRESSION_MODE = os.environ.get("FACE_EXPRESSION_MODE", "full")
+EXPRESSION_MODES = ("full", "clinical")
 
 # Small positive range above neutral allowed for the banded muscles.
 # Conservative default; env-tunable so the calibration pass can widen it
@@ -150,16 +169,27 @@ class FaceDriver:
 
     def __init__(self, clock: Clock | None = None,
                  band: float | None = None,
-                 tick_hz: float | None = None) -> None:
+                 tick_hz: float | None = None,
+                 mode: str | None = None) -> None:
         self._clock = clock or RealClock()
-        seed, self._affinity = load_preset()
+        mode = mode or FACE_EXPRESSION_MODE
+        if mode not in EXPRESSION_MODES:
+            logger.warning("Unknown FACE_EXPRESSION_MODE %r — running 'full'",
+                           mode)
+            mode = "full"
+        self.mode = mode
+        # full: kindalive's upstream default personality, caps bypassed —
+        # original behaviour, unchanged. clinical: the session-1 arm.
+        seed, self._affinity = load_preset(
+            PRESET if mode == "clinical" else "default")
         self.engine = NeurochemicalEngine(clock=self._clock, seed=seed)
         self.band = FACE_BAND if band is None else band
         self.tick_hz = FACE_TICK_HZ if tick_hz is None else tick_hz
-        # Neutral is the [clinical] preset's resting face: the muscle
-        # values projected from baseline chemistry before any impulse.
-        # Pinned muscles are held at exactly these values, so at rest the
-        # policy changes nothing and under provocation they cannot move.
+        # Neutral (clinical mode only) is the preset's resting face: the
+        # muscle values projected from baseline chemistry before any
+        # impulse. Pinned muscles are held at exactly these values, so at
+        # rest the policy changes nothing and under provocation they
+        # cannot move.
         self._neutral = project_face(self.engine.state).as_dict()
         self._last_advance = self._clock.now()
         self._last_audio_inject = float("-inf")
@@ -221,9 +251,13 @@ class FaceDriver:
             self.engine.advance(dt)
 
     def payload(self) -> dict:
-        """The setTargets payload with the per-muscle policy applied to the
-        engine's output BEFORE anything is emitted. This is the only exit;
-        there is no uncapped path to the client."""
+        """The setTargets payload. In full mode the engine's face state is
+        emitted as produced (the vendored payload builder, original
+        kindalive behaviour). In clinical mode the per-muscle policy is
+        applied BEFORE anything is emitted, and that path has no uncapped
+        exit to the client."""
+        if self.mode == "full":
+            return face_payload(project_face(self.engine.state))
         raw = project_face(self.engine.state).as_dict()
         muscles: dict[str, float] = {}
         for muscle, value in raw.items():

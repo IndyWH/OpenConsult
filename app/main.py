@@ -1249,9 +1249,11 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
     # history, so a study arm is one query — the live face.toggled rows
     # carry only the session id, because no consultation row existed yet.
     if entry.get("face_toggles"):
+        modes = sorted({t["mode"] for t in entry["face_toggles"] if "mode" in t})
         await audit.log(user["id"], "face.arms", "consultation", cid,
                         {"toggles": entry["face_toggles"],
-                         "face_ever_on": any(t["on"] for t in entry["face_toggles"])})
+                         "face_ever_on": any(t["on"] for t in entry["face_toggles"]),
+                         "modes": modes})
 
     # Persist urgent actions still unresolved at session end (the CDS
     # engine clears an action once the transcript shows it arranged, so
@@ -1749,15 +1751,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if face_task is not None:
                 face_task.cancel()
                 face_task = None
-        entry["face_toggles"].append(
-            {"on": on, "at_audio_s": round(session.audio_seconds, 1)})
+        # The expression mode rides every on-toggle (an off-toggle has no
+        # running mode), so feedback sessions can be correlated with what
+        # the face was actually running — full range vs the clinical arm.
+        toggle = {"on": on, "at_audio_s": round(session.audio_seconds, 1)}
+        if driver is not None:
+            toggle["mode"] = driver.mode
+        entry["face_toggles"].append(toggle)
         # The consultation row does not exist until Stop, so this row
         # carries the session; _complete_session writes the
         # consultation-linked `face.arms` summary the study reads.
         await audit.log(user["id"], "face.toggled", None, None,
-                        {"on": on, "session_id": session_id,
-                         "patient_id": entry["patient_id"],
-                         "at_audio_s": round(session.audio_seconds, 1)})
+                        {"session_id": session_id,
+                         "patient_id": entry["patient_id"], **toggle})
         await websocket.send_json({"type": "face_toggled", "on": on})
         if driver is not None:
             face_task = asyncio.create_task(driver.run(websocket.send_json))
