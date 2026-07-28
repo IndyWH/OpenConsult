@@ -1,0 +1,44 @@
+# Personality presets — named bundles of SeedChemistry + affinity.
+# Each personality overrides species defaults for specific chemicals.
+
+[default]
+default_affinity = 1.0
+interaction_scale = 1.0
+
+[cheerful]
+default_affinity = 1.2
+interaction_scale = 1.0
+
+[cheerful.baselines]
+serotonin = 0.6
+dopamine = 0.4
+endorphins = 0.3
+gaba = 0.45
+
+[stoic]
+default_affinity = 0.6
+interaction_scale = 0.7
+
+[stoic.baselines]
+gaba = 0.6
+serotonin = 0.5
+adrenaline = 0.08
+cortisol = 0.15
+
+[stoic.half_life_multipliers]
+adrenaline = 0.7
+cortisol = 0.8
+
+[anxious]
+default_affinity = 1.5
+interaction_scale = 1.3
+
+[anxious.baselines]
+cortisol = 0.35
+gaba = 0.25
+adrenaline = 0.15
+serotonin = 0.4
+
+[anxious.half_life_multipliers]
+cortisol = 1.5
+gaba = 1.3

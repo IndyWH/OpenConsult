@@ -67,16 +67,34 @@ and if this project is ever published the position should be confirmed
 with the voice's publisher rather than inferred.
 
 
-kindalive (Phase 7b — not yet integrated)
------------------------------------------
+kindalive (Phase 7b — vendored 2026-07-28)
+------------------------------------------
 
   Upstream  : https://github.com/smithandrewjohn/kindalive
-  Licence   : MIT
+  Licence   : MIT (upstream LICENSE kept at vendor/kindalive/LICENSE)
+  Pinned    : commit a29bcf73e2c44cbf2fa6549ae28d1a9d1f6f37b6
 
-Planned to be vendored at a pinned commit per `PHASE_7B_KINDALIVE.md`
-build decision 1. **Not vendored yet** — this entry is a placeholder so
-the attribution requirement is not discovered late; the pinned commit
-hash goes here when the work starts.
+Vendored by copying files (no dependency added, no lockfile change — the
+same arms-length pattern as Piper) per `PHASE_7B_KINDALIVE.md` build
+decision 1. What was vendored, all from the pinned commit:
+
+  vendor/kindalive/engine/       chemicals, clock, impulse, interactions,
+                                 neurochemical_engine, seed_chemistry
+  vendor/kindalive/emotions/     emotion_vector, projection
+  vendor/kindalive/expression/   face.py, face_3d.py (setTargets payload
+                                 construction lives here, so it was kept),
+                                 base.py, __init__.py
+  vendor/kindalive/config/       chemicals.toml, emotions.toml, face.toml,
+                                 personalities.toml
+  app/static/face3d.js           the canvas renderer, copied unchanged
+                                 from expression/web_assets/face3d.js
+
+The only modifications to the vendored .py files are import rewrites
+(`kindalive.` → `vendor.kindalive.`); `personalities.toml` additionally
+carries this project's `[clinical]` preset. The upstream LLM interpreter
+(`interpreter/` package) was deliberately NOT vendored — the owner's
+decision is to inject impulses deterministically from consultation
+events instead (build decision 2).
 
 
 Clinical guideline corpus

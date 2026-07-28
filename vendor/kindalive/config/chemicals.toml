@@ -1,0 +1,34 @@
+# Chemical parameters — species-level defaults.
+# These define the "generic robot" before personality is applied.
+
+[dopamine]
+baseline = 0.3
+half_life = 1200.0   # 20 minutes
+
+[serotonin]
+baseline = 0.5
+half_life = 14400.0  # 4 hours
+
+[oxytocin]
+baseline = 0.2
+half_life = 1800.0   # 30 minutes
+
+[testosterone]
+baseline = 0.3
+half_life = 7200.0   # 2 hours
+
+[cortisol]
+baseline = 0.2
+half_life = 3600.0   # 1 hour
+
+[adrenaline]
+baseline = 0.1
+half_life = 180.0    # 3 minutes
+
+[endorphins]
+baseline = 0.2
+half_life = 1800.0   # 30 minutes
+
+[gaba]
+baseline = 0.4
+half_life = 3600.0   # 1 hour

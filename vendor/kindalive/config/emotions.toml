@@ -1,0 +1,55 @@
+# Emotion projection weights.
+# Each emotion is a weighted linear combination of chemicals, clamped to [0, 1].
+
+[happiness]
+dopamine = 0.35
+serotonin = 0.35
+endorphins = 0.15
+oxytocin = 0.15
+cortisol = -0.20
+
+[excitement]
+adrenaline = 0.45
+dopamine = 0.35
+testosterone = 0.20
+
+[anger]
+testosterone = 0.35
+cortisol = 0.35
+adrenaline = 0.30
+gaba = -0.30
+
+[calm]
+gaba = 0.45
+serotonin = 0.35
+oxytocin = 0.20
+adrenaline = -0.25
+cortisol = -0.15
+
+[bonding]
+oxytocin = 0.50
+serotonin = 0.30
+endorphins = 0.20
+
+[anxiety]
+cortisol = 0.40
+adrenaline = 0.35
+testosterone = 0.25
+gaba = -0.35
+serotonin = -0.15
+
+[sadness]
+# Inverse terms use max(0, baseline - level) — the deficit of a positive
+# chemical below its own baseline. Sadness only rises when dopamine,
+# serotonin, or oxytocin fall below their normal resting level, not
+# just because they are less than 1.0.
+cortisol = 0.60
+dopamine_inverse = 0.50   # max(0, baseline_dopamine - dopamine)
+serotonin_inverse = 0.40  # max(0, baseline_serotonin - serotonin)
+oxytocin_inverse = 0.40   # max(0, baseline_oxytocin - oxytocin)
+
+[euphoria]
+dopamine = 0.30
+endorphins = 0.30
+adrenaline = 0.20
+oxytocin = 0.20

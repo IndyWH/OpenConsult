@@ -1,0 +1,83 @@
+# Facial muscle projection weights.
+#
+# Each muscle is a weighted linear combination of chemicals, clamped to [0, 1].
+# Names roughly correspond to FACS Action Units. Inverted terms (suffix
+# `_inverse`) compute `max(0, baseline_chemical - level)` — the deficit of a
+# positive chemical below its own resting level.
+#
+# This file is documentation. The authoritative weights live in
+# `kindalive/expression/face.py` (`FACE_WEIGHTS`), mirroring the convention
+# used for `emotions.toml` and `EMOTION_WEIGHTS`.
+
+[brow_inner_raise]            # AU1 — sadness, concern
+cortisol = 0.40
+dopamine_inverse = 0.35
+serotonin_inverse = 0.25
+gaba = -0.10
+
+[brow_outer_raise]            # AU2 — surprise, fear
+adrenaline = 0.50
+dopamine = 0.20
+gaba = -0.10
+
+[brow_lower]                  # AU4 — anger, focus
+testosterone = 0.35
+cortisol = 0.30
+adrenaline = 0.20
+gaba = -0.20
+serotonin = -0.10
+
+[eyelid_upper_raise]          # AU5 — alertness, surprise
+adrenaline = 0.55
+cortisol = 0.25
+dopamine = 0.15
+gaba = -0.20
+
+[eyelid_lower_tighten]        # AU7 — anger, anxiety
+cortisol = 0.35
+testosterone = 0.25
+adrenaline = 0.20
+gaba = -0.15
+
+[cheek_raise]                 # AU6 — Duchenne joy
+dopamine = 0.45
+endorphins = 0.30
+oxytocin = 0.20
+cortisol = -0.20
+
+[nose_wrinkle]                # AU9 — disgust, anger
+testosterone = 0.30
+cortisol = 0.30
+adrenaline = 0.15
+gaba = -0.20
+
+[lip_corner_pull]             # AU12 — smile
+dopamine = 0.40
+endorphins = 0.30
+serotonin = 0.20
+oxytocin = 0.15
+cortisol = -0.25
+
+[lip_corner_depress]          # AU15 — frown
+cortisol = 0.45
+dopamine_inverse = 0.35
+serotonin_inverse = 0.25
+endorphins = -0.15
+
+[jaw_open]                    # AU26 — surprise, laughter
+adrenaline = 0.40
+dopamine = 0.25
+endorphins = 0.15
+gaba = -0.15
+cortisol = -0.10
+
+[lip_pucker]                  # AU18 — affection, concern
+oxytocin = 0.50
+endorphins = 0.20
+cortisol = -0.10
+
+[lip_press]                   # AU24 — restraint, anger
+testosterone = 0.35
+cortisol = 0.25
+gaba = 0.15
+endorphins = -0.10
