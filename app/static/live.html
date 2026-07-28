@@ -104,7 +104,7 @@
     display: inline-flex; align-items: center; justify-content: center;
     cursor: pointer; color: var(--ink-soft); padding: 0; font-size: .8rem;
   }
-  .say:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .say:hover:not(:disabled) { border-color: var(--plum); color: var(--plum); }
   .say:disabled { opacity: .35; cursor: default; }
   /* Already spoken. Re-asking stays allowed — the panel lags, and
      repetition is sometimes right — but it must be visible that it has
@@ -125,9 +125,9 @@
      which is what this control still is. */
   .say.again {
     width: auto; gap: .25rem; padding: 0 .5rem; font-size: .72rem;
-    border-color: var(--accent); color: var(--accent); font-weight: 600;
+    border-color: var(--plum); color: var(--plum); font-weight: 600;
   }
-  .say.again:hover:not(:disabled) { background: var(--accent); color: #fff; }
+  .say.again:hover:not(:disabled) { background: var(--plum); color: #fff; }
 
   /* Phrase tray: fixed, pre-reviewed things the system may say. */
   .tray { margin-top: .9rem; border-top: 1px solid var(--line); padding-top: .7rem; }
@@ -140,9 +140,9 @@
     border: 1px solid var(--line); background: var(--panel); border-radius: 999px;
     padding: .3rem .7rem; font-size: .82rem; color: var(--ink); cursor: pointer;
   }
-  .phrase:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .phrase:hover:not(:disabled) { border-color: var(--plum); color: var(--plum); }
   .phrase:disabled { opacity: .35; cursor: default; }
-  .phrase.disclose { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .phrase.disclose { border-color: var(--plum); color: var(--plum); font-weight: 600; }
   /* Given: done, not outstanding — but still available (someone may join). */
   .phrase.given { border-color: var(--green); color: var(--green); font-weight: 400; }
   .tray .lock {
@@ -162,30 +162,53 @@
      consultation is not an acceptable way to cancel an utterance.
      
      Fixed to the viewport, so it is on screen wherever the doctor is
-     looking. Do not return this to normal flow. */
+     looking. Do not return this to normal flow.
+
+     AND IT MUST BE VISIBLE, which is a separate requirement that this
+     failed for three consultations while `position: fixed` was correct all
+     along (449). Every colour here referenced `var(--accent)`, and no such
+     custom property has ever existed — the design system's accent is
+     `--plum`. An undefined custom property is INVALID AT COMPUTED-VALUE
+     TIME, so `background: var(--accent)` did not fall back to the accent,
+     it computed to `transparent`; the border shorthand fell back to
+     `currentColor`, i.e. white on cream; and `.speaking button`'s
+     `color: var(--accent)` INHERITED the bar's `#fff`, giving white text on
+     a white button. A transparent pill with a white border and an invisible
+     label — which is exactly "a pale translucent wash with no readable
+     button", and why the doctor scrolled hunting for a control that was
+     already on screen.
+
+     So: named colours only from theme.css, opacity pinned to 1, and the
+     background set as its own longhand so a future bad value cannot silently
+     zero it inside a shorthand. */
   .speaking {
     display: none; align-items: center; gap: .9rem;
     position: fixed; left: 50%; transform: translateX(-50%);
-    bottom: 1.4rem; z-index: 60; width: min(680px, calc(100vw - 2rem));
-    border: 2px solid var(--accent); background: var(--accent); color: #fff;
-    border-radius: 999px; padding: .7rem 1.1rem; font-size: 1rem;
-    box-shadow: 0 8px 28px #29231F33;
+    bottom: 1.4rem; z-index: 60; width: min(760px, calc(100vw - 2rem));
+    border: 2px solid var(--plum);
+    background-color: var(--plum);
+    color: #fff; opacity: 1;
+    border-radius: var(--radius); padding: .85rem 1.1rem; font-size: 1.05rem;
+    box-shadow: 0 10px 34px #29231F55;
   }
   .speaking.on { display: flex; }
   .speaking .what {
     flex: 1; font-style: italic; white-space: nowrap;
     overflow: hidden; text-overflow: ellipsis;
   }
+  /* High contrast and large: white on plum, and big enough to hit without
+     aiming. It is the one control that has to work while a patient waits. */
   .speaking button {
-    flex: none; border: 2px solid #fff; background: #fff; color: var(--accent);
-    border-radius: 999px; padding: .45rem 1.5rem; font-size: 1rem;
-    font-weight: 700; cursor: pointer; letter-spacing: .01em;
+    flex: none; border: 2px solid #fff; background-color: #fff;
+    color: var(--plum); opacity: 1;
+    border-radius: 999px; padding: .5rem 1.9rem; font-size: 1.05rem;
+    font-weight: 700; cursor: pointer; letter-spacing: .02em;
+    text-transform: uppercase;
   }
-  .speaking button:hover { background: #F6F1F5; }
-  .speaking .esc { font-size: .74rem; opacity: .85; white-space: nowrap; }
-  .speakwave i { background: #fff; }
+  .speaking button:hover { background-color: #F6F1F5; }
+  .speaking .esc { font-size: .78rem; opacity: .95; white-space: nowrap; }
   .speakwave { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
-  .speakwave i { width: 3px; background: var(--accent); border-radius: 2px;
+  .speakwave i { width: 3px; background-color: #fff; border-radius: 2px;
                  height: 13px; transform-origin: bottom; animation: sp 900ms infinite; }
   .speakwave i:nth-child(2) { animation-delay: 150ms; }
   .speakwave i:nth-child(3) { animation-delay: 300ms; }
@@ -211,7 +234,7 @@
     border: 1px solid var(--line); background: var(--panel); color: var(--ink-soft);
     border-radius: 999px; padding: .32rem .8rem; font-size: .85rem; cursor: pointer;
   }
-  .soundcheck:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+  .soundcheck:hover:not(:disabled) { border-color: var(--plum); color: var(--plum); }
   .soundcheck:disabled { opacity: .4; cursor: default; }
   .soundcheck.done { border-color: var(--green); color: var(--green); }
 
@@ -244,7 +267,7 @@
   .scoffer button { border-radius: 999px; padding: .25rem .8rem; font-size: .83rem;
                     cursor: pointer; border: 1px solid var(--line);
                     background: var(--panel); color: var(--ink); }
-  .scoffer button.go { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+  .scoffer button.go { border-color: var(--plum); color: var(--plum); font-weight: 600; }
 
   /* System utterances in the live transcript: a distinct grey channel.
      They are NOT turns — no turn number, not citable. */

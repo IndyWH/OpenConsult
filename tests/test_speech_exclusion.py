@@ -878,29 +878,137 @@ def test_a_stop_control_exists_inside_the_speaking_bar():
     assert ">Stop<" in bar
 
 
-def test_the_speaking_bar_is_fixed_to_the_viewport():
-    """THE regression. In normal flow it scrolled out of view — which is
-    how a doctor came to have no way of stopping the machine talking."""
+# WHY THE ASSERTIONS BELOW CHANGED SHAPE (2026-07-28, consultation 449).
+#
+# The two tests that used to live here asserted `position: fixed` and
+# non-membership of `.stack`. BOTH PASSED THROUGHOUT 449, and the control was
+# still unusable: it rendered as a transparent pill with a white border and a
+# white-on-white Stop button, so the doctor scrolled hunting for a control that
+# was already on screen.
+#
+# A test that asserts a CSS property cannot see that. It cannot see opacity, it
+# cannot see a colour that failed to resolve, and it cannot see a broken
+# containing block. It asserts the MECHANISM of a past fix rather than the
+# PURPOSE of the control, and this is the third time in a week that shape of
+# test has let something through — after the any-overlap invariant (445) and the
+# refresh-after-disconnect test that could not see a pre-connection state (448).
+#
+# So these assert the two things that actually decide whether the doctor can use
+# it: nothing in its ancestor chain silently degrades `fixed` into `absolute`,
+# and its colours are solid rather than translucent-or-unresolved.
+#
+# Scope, stated plainly rather than implied: no browser is driven anywhere in
+# this suite, so these read the page source and cannot compute real styles. They
+# are the strongest available proxy for the two failure modes, not a rendering
+# check — and they WOULD have failed on 449, which the old pair did not.
+
+_CONTAINING_BLOCK_PROPS = ("transform", "filter", "backdrop-filter",
+                           "perspective", "will-change", "contain")
+
+
+def test_no_ancestor_of_the_speaking_bar_establishes_a_containing_block():
+    """`position: fixed` is relative to the viewport UNLESS an ancestor carries
+    transform / filter / backdrop-filter / perspective / will-change / contain —
+    any of which silently makes it behave like `position: absolute`, i.e. a bar
+    that scrolls away with the page. That is indistinguishable, from the
+    doctor's side, from the 447 defect.
+
+    The bar is a direct child of <body>, so the chain is html → body. This
+    asserts the chain stays that short AND that no rule targeting html or body
+    introduces one of those properties.
+    """
+    html = _live_html()
+    body = html[html.index("<body>"):html.index('id="speakingBar"')]
+    # Every <div> opened before the bar must also have been closed, or the bar
+    # has acquired an ancestor that could carry a containing block.
+    opened = body.count("<div")
+    closed = body.count("</div>")
+    assert opened - closed == 1, (
+        "the speaking bar must stay a direct child of <body>; it has gained "
+        f"{opened - closed - 1} ancestor element(s), any of which could carry a "
+        "transform and silently degrade position: fixed into absolute")
+
+    from pathlib import Path
+    theme = Path("app/static/theme.css").read_text()
+    for sheet in (theme, html):
+        for selector in ("html {", "body {", "* {"):
+            if selector not in sheet:
+                continue
+            rule = sheet[sheet.index(selector):]
+            rule = rule[:rule.index("}")]
+            for prop in _CONTAINING_BLOCK_PROPS:
+                assert f"{prop}:" not in rule, (
+                    f"{selector} sets {prop}, which makes the speaking bar's "
+                    "position: fixed behave like position: absolute")
+
+
+def test_the_speaking_bar_is_solid_and_not_translucent():
+    """449: it rendered as "a pale translucent wash with no readable button".
+
+    The cause was `var(--accent)`, a custom property that has NEVER been
+    defined — the design system's accent is `--plum`. An undefined custom
+    property is invalid at computed-value time, so `background: var(--accent)`
+    computed to `transparent` rather than to any colour, and the button's
+    `color: var(--accent)` inherited the bar's own `#fff`.
+
+    So this checks the bar resolves to a real, opaque colour, and that nothing
+    thins it out.
+    """
     html = _live_html()
     css = html[html.index("  .speaking {"):html.index("  .speaking.on {")]
-    assert "position: fixed" in css, (
-        "the speaking bar must not return to normal flow — consultation 447")
-    assert "z-index" in css
+    # Still pinned — the 447 property, kept.
+    assert "position: fixed" in css and "z-index" in css
+    # Opaque: a named colour, explicitly opacity 1, and no alpha anywhere.
+    assert "background-color: var(--plum)" in css, (
+        "the bar needs a background that actually resolves")
+    assert "opacity: 1" in css
+    assert "transparent" not in css
+    assert "rgba(" not in css and "hsla(" not in css
+
+    button = html[html.index("  .speaking button {"):]
+    button = button[:button.index("}")]
+    assert "background-color: #fff" in button
+    assert "color: var(--plum)" in button, (
+        "white-on-white is what made Stop unreadable in 449")
 
 
-def test_the_speaking_bar_is_outside_the_scrolling_stack():
-    """Belt and braces on the CSS: it must not be a child of .stack, so a
-    future layout change cannot quietly re-parent it into the scroll."""
-    html = _live_html()
-    # The stack's last child is the live-transcript pane; the bar must come
-    # after the stack closes, at document level, not inside it.
-    stack_start = html.index('<div class="stack">')
-    last_pane = html.index('<!-- 4. LIVE TRANSCRIPT')
-    bar = html.index('id="speakingBar"')
-    assert 'id="speakingBar"' not in html[stack_start:last_pane]
-    assert bar > last_pane
-    closing = html.index("\n</div>\n", last_pane)   # closes .stack
-    assert bar > closing, "the speaking bar must not be a child of .stack"
+def test_no_stylesheet_references_an_undefined_custom_property():
+    """The generalisable form of 449's defect, and the test that would have
+    caught it years earlier than a room would.
+
+    Ten declarations in live.html referenced `var(--accent)`, which is defined
+    nowhere. CSS fails these SILENTLY — no console error, no fallback to
+    anything sensible, just a declaration that computes to its initial value.
+    A colour becomes transparent and nobody notices until a doctor cannot find
+    a Stop button.
+    """
+    import re
+    from pathlib import Path
+
+    static = Path("app/static")
+    theme = (static / "theme.css").read_text()
+    root = theme[theme.index(":root {"):]
+    root = root[:root.index("}")]
+    defined = set(re.findall(r"(--[\w-]+)\s*:", root))
+
+    for path in sorted(static.glob("*.html")) + sorted(static.glob("*.css")):
+        text = path.read_text()
+        # Comments are stripped first. The comment above `.speaking` quotes the
+        # broken `var(--accent)` on purpose, and that explanation is the reason
+        # nobody reintroduces it — a test must not force prose to be deleted to
+        # stay green.
+        text = re.sub(r"/\*.*?\*/", "", text, flags=re.S)
+        text = re.sub(r"<!--.*?-->", "", text, flags=re.S)
+        for name in set(re.findall(r"var\((--[\w-]+)", text)):
+            # A var() with a comma has its own fallback and is safe.
+            if re.search(rf"var\(\s*{re.escape(name)}\s*,", text):
+                continue
+            # Locally-scoped properties are defined in the same file.
+            if re.search(rf"{re.escape(name)}\s*:", text.replace(f"var({name}", "")):
+                continue
+            assert name in defined, (
+                f"{path.name} uses {name}, which no :root defines — it will "
+                "compute to the initial value and fail silently (449)")
 
 
 def test_the_bar_is_shown_exactly_while_a_speaking_window_is_open():
