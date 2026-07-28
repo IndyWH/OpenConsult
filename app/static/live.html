@@ -907,6 +907,26 @@ function formatTime(s) {
   return `${m}:${String(sec).padStart(2, '0')}`;
 }
 
+// STRICTLY TIME-ORDERED, because ARRIVAL order is not time order and cannot be.
+//
+// The live path re-transcribes a rolling buffer and only commits a segment once
+// it ends more than ~2 s before the newest audio (app/live.py), so a transcript
+// line always arrives a couple of seconds after the words were said. A spoken
+// utterance, by contrast, is logged the instant playback starts. Appending in
+// arrival order therefore puts the machine ahead of the patient — consultation
+// 450: the Assistant line at 2:25 rendered above the patient line at 2:24, so
+// the consultation read as though the machine had spoken first.
+//
+// Insertion is stable: strict `>` means equal timestamps keep arrival order.
+function insertByTime(node, seconds) {
+  node.dataset.t = String(seconds);
+  let before = partialEl;
+  for (const line of transcriptEl.querySelectorAll('p[data-t]')) {
+    if (Number(line.dataset.t) > seconds) { before = line; break; }
+  }
+  transcriptEl.insertBefore(node, before);
+}
+
 function addFinal(msg) {
   const p = document.createElement('p');
   const ts = document.createElement('span');
@@ -914,7 +934,7 @@ function addFinal(msg) {
   ts.textContent = formatTime(msg.start);
   p.appendChild(ts);
   p.appendChild(document.createTextNode(msg.text));
-  transcriptEl.insertBefore(p, partialEl);
+  insertByTime(p, Number(msg.start) || 0);
 }
 
 // Grey channel: what the machine said, inline and in time order. These
@@ -924,12 +944,11 @@ function addFinal(msg) {
 function addSpoken(text) {
   const p = document.createElement('p');
   p.className = 'said';
-  const ts = el('span', 'ts',
-                formatTime(recStartMs ? (Date.now() - recStartMs) / 1000 : 0));
-  p.appendChild(ts);
+  const seconds = recStartMs ? (Date.now() - recStartMs) / 1000 : 0;
+  p.appendChild(el('span', 'ts', formatTime(seconds)));
   p.appendChild(el('span', 'who', 'Assistant'));
   p.appendChild(document.createTextNode(text));
-  transcriptEl.insertBefore(p, partialEl);
+  insertByTime(p, seconds);
 }
 
 // ================================================== Phase 7a: tap-to-ask
