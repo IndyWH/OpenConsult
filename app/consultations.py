@@ -297,7 +297,29 @@ async def get_consultation(cid: int) -> dict | None:
         # and 2 because nobody answered are the same number and different
         # statements.
         "speakers_declared": row[17] is not None,
+        # A declaration the pipeline never used. 450: the doctor answered "one",
+        # diarisation had already run with two, and NOTHING on any screen said
+        # so — the answer was accepted and discarded in silence. This is what
+        # carries it, and it feeds the same acknowledge gate as single_voice.
+        "declaration_ignored": (row[17] is not None and row[18] is not None
+                                and row[17] != row[18]),
     }
+
+
+def speaker_labels_unverified(consultation: dict) -> bool:
+    """Do the Doctor/Patient labels need a human eye before approval?
+
+    ONE answer, read by the review page and by the approve guard, so the banner
+    and the button cannot disagree. Two reasons, both meaning "these labels are
+    not a measurement of who spoke":
+
+    * diarisation returned a single cluster, so every line was defaulted to
+      Patient; or
+    * the doctor declared a count that the pipeline did not use, so the labels
+      were produced under an assumption they rejected.
+    """
+    return bool(consultation.get("single_voice_detected")
+                or consultation.get("declaration_ignored"))
 
 
 async def save_urgent_actions(cid: int, actions: list[dict]) -> None:

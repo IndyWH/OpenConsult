@@ -454,9 +454,16 @@
      completed by the time this appears, so nothing here can hold the
      consultation open, and there is NO auto-dismiss timer. -->
 <div class="spkask" id="spkAsk" role="alert" aria-live="assertive">
-  <span class="what">How many people spoke in this consultation?</span>
-  <button class="go" id="spkOne" type="button">Just me</button>
-  <button class="go" id="spkTwo" type="button">Two of us</button>
+  <!-- WHO spoke, not how many (owner's call, 2026-07-28). "Just me" meant the
+       doctor, and one declared voice labels every turn PATIENT — so a doctor who
+       really was the only speaker would tap "just me" and have their own words
+       attributed to the patient. That is the exact failure this whole line of
+       work exists to prevent, arriving through the wording instead of the audio.
+       A doctor-only recording is therefore not supported by design; see
+       HANDOVER if that ever becomes a real case. -->
+  <span class="what">Who spoke in this consultation?</span>
+  <button class="go" id="spkOne" type="button">Only the patient</button>
+  <button class="go" id="spkTwo" type="button">Both of us</button>
   <button id="spkSkip" type="button">Skip</button>
 </div>
 <div class="spkask" id="spkResult">
@@ -1306,31 +1313,36 @@ async function declareSpeakers(cid, count) {
   spkAsk.classList.remove('on');
   speakersOutstanding = false;
   refreshResultButton();
-  if (count === null) {
-    showSpeakerResult('Skipped — assuming two people spoke. If that is wrong, '
-      + 'correct the speaker labels on the review page.', 'faint');
-    return;
-  }
+  // Skip POSTS too, rather than staying silent. It carries no count — the
+  // default still applies — but it releases the waiting pipeline at once, which
+  // is what keeps skipping free. An offer that costs time is not an offer.
+  const payload = count === null ? {skip: true} : {count: count};
   try {
     const response = await fetch(`/api/consultations/${cid}/declared-speakers`, {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({count: count})
+      body: JSON.stringify(payload)
     });
     const body = await response.json();
     if (!response.ok) {
       showSpeakerResult('Could not record that: ' + (body.error || response.status)
         + '. Check the speaker labels on the review page.', 'bad');
+    } else if (body.skipped) {
+      showSpeakerResult('Skipped — assuming both of you spoke. If that is wrong, '
+        + 'correct the speaker labels on the review page.', 'faint');
     } else if (body.applied) {
       showSpeakerResult(count === 1
-        ? 'Recorded: one voice. Every line will be labelled Patient — check them '
-          + 'on the review page.'
-        : 'Recorded: two voices.', 'good');
+        ? 'Recorded: only the patient. Every line will be labelled Patient — '
+          + 'check them on the review page.'
+        : 'Recorded: both of you.', 'good');
     } else {
-      // Honest about the race rather than silent: the answer is stored but it
-      // did not shape this transcript.
-      showSpeakerResult('Recorded, but speaker identification had already run '
-        + `with ${body.used} — this transcript was not affected. Correct the `
-        + 'speaker labels on the review page.', 'faint');
+      // 450: this branch fired and the doctor never saw it. An answer that did
+      // not shape the transcript is not a footnote — it means the labels below
+      // were produced under a count they rejected, so it is marked as a FAULT
+      // and the review page repeats it behind an acknowledgement.
+      showSpeakerResult('NOT APPLIED — speaker identification had already run '
+        + `with ${body.used}, not the ${count} you chose. This transcript's `
+        + 'Doctor/Patient labels may be wrong; the review page will ask you to '
+        + 'check them before approving.', 'bad');
     }
   } catch (err) {
     showSpeakerResult('Could not reach the server to record that. Check the '
@@ -1355,7 +1367,7 @@ function refreshResultButton() {
   if (!resultUrl) return;
   btn.disabled = speakersOutstanding;
   btn.title = speakersOutstanding
-    ? 'Answer "How many people spoke?" first — one tap, Skip is fine'
+    ? 'Answer "Who spoke?" first — one tap, Skip is fine'
     : '';
 }
 

@@ -26,7 +26,8 @@ from app import (audit, auth, consultations, frontdesk, letters, monitor, rateli
                  retention, schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
-from app.finalize import finalize_consultation, regenerate_note
+from app.finalize import (expect_declaration, finalize_consultation,
+                          regenerate_note, release_declaration)
 from app import transcript_quality
 from app.live import PROCESS_INTERVAL_S, LiveSession, bytes_to_ms
 from app.notes import note_as_plain_text
@@ -822,17 +823,24 @@ async def approve(
             status_code=409,
             content={"error": "Unresolved urgent actions must be acknowledged first."},
         )
-    # Diarisation found one voice, so the Doctor/Patient labels are a default
-    # rather than a measurement (2026-07-28). Blocked server-side as well as
-    # in the UI, the same as the urgency banner: a disabled button can be
-    # re-enabled from the console, a refusal cannot.
-    if (consultation and consultation["single_voice_detected"]
+    # The Doctor/Patient labels are not a measurement of who spoke — either
+    # diarisation returned one cluster, or the doctor declared a count the
+    # pipeline did not use (450). Blocked server-side as well as in the UI, the
+    # same as the urgency banner: a disabled button can be re-enabled from the
+    # console, a refusal cannot.
+    if (consultation and consultations.speaker_labels_unverified(consultation)
             and not consultation["single_voice_ack_at"]):
+        reason = ("you declared "
+                  f"{consultation['declared_speakers']} speaker(s) but speaker "
+                  f"identification had already run with "
+                  f"{consultation['speakers_used']}"
+                  if consultation["declaration_ignored"]
+                  else "only one voice was detected in the audio")
         return JSONResponse(
             status_code=409,
-            content={"error": "Only one voice was detected in the audio, so the"
-                     " speaker roles could not be determined from it. Check the"
-                     " transcript's Doctor/Patient labels and acknowledge first."},
+            content={"error": f"The speaker roles are unverified — {reason}."
+                     " Check the transcript's Doctor/Patient labels and"
+                     " acknowledge first."},
         )
     # A role change after the note was drafted leaves the note's claims
     # citing turns that now say something different. Acknowledge or
@@ -883,14 +891,15 @@ async def acknowledge_urgent(
 
 
 class SpeakersBody(BaseModel):
-    count: int
+    count: int | None = None
+    skip: bool = False
 
 
 @app.post("/api/consultations/{cid}/declared-speakers")
 async def declare_speakers(
     cid: int, body: SpeakersBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
 ) -> JSONResponse:
-    """The doctor's answer to "how many people spoke?", asked at Stop.
+    """The doctor's answer to "who spoke?", asked at Stop.
 
     Deliberately NOT gated on `_not_editable`: it is asked the moment the
     consultation is completed, and refusing it because finalisation has moved on
@@ -898,16 +907,39 @@ async def declare_speakers(
     answer reached diarisation in time, so the caller can tell the doctor the
     truth either way (standing rule: the tap always does something, and what it
     did is reported at the control).
+
+    Skip posts too, rather than staying silent. It carries no count — NULL still
+    means defaulted — but it RELEASES the waiting pipeline immediately, which is
+    what keeps the offer an offer: skipping must cost nothing, including time.
     """
     if (blocked := await _scoped(cid, user)) is not None:
         return blocked
+    if body.skip:
+        released = release_declaration(cid)
+        await audit.log(user["id"], "speakers.declared", "consultation", cid,
+                        {"skipped": True, "released_pipeline": released})
+        return JSONResponse(content={"ok": True, "skipped": True,
+                                     "applied": True, "used": None})
+    if body.count is None:
+        return JSONResponse(status_code=400,
+                            content={"error": "send a count, or skip: true"})
     try:
         result = await consultations.declare_speakers(cid, body.count)
     except ValueError as err:
         return JSONResponse(status_code=400, content={"error": str(err)})
+    released = release_declaration(cid)
     await audit.log(user["id"], "speakers.declared", "consultation", cid,
                     {"count": body.count, "applied": result["applied"],
-                     "already_used": result["used"]})
+                     "already_used": result["used"],
+                     "released_pipeline": released})
+    if not result["applied"]:
+        # An answer that did not shape the transcript must leave a trace the
+        # doctor will actually meet, not just an audit row and a JSON field.
+        # 450: the answer was accepted, discarded, and nothing on any screen
+        # said so. `speaker_labels_unverified` (below) is what carries it onto
+        # the review page and blocks approval until it is acknowledged.
+        logger.warning("Consultation %d: declared %d speaker(s) but diarisation "
+                       "had already run with %d", cid, body.count, result["used"])
     return JSONResponse(content={"ok": True, **result})
 
 
@@ -1188,6 +1220,12 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
     # GPU, pipelines run one at a time; the consultation waits as
     # 'queued' (worklist shows "processing (queued)").
     await consultations.set_status(cid, "queued", audio_path=wav_path)
+    # Register the waiter BEFORE queueing, so the pipeline cannot reach the
+    # count before the doctor's answer could possibly release it. Only the
+    # normal Stop path has a client to ask; a grace-period finalisation has
+    # nobody at the screen, so it never registers and never waits.
+    if not connection_lost:
+        expect_declaration(cid)
     app_state.finalize_queue.put_nowait((cid, wav_path))
     return cid
 

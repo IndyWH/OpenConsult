@@ -66,6 +66,61 @@ DIARIZATION_MODEL = os.getenv("DIARIZATION_MODEL", "pyannote/speaker-diarization
 # backstop, because a declaration can be mis-tapped.
 DEFAULT_SPEAKERS = 2
 
+# How long the FINALISATION PIPELINE may wait for the doctor's answer before
+# defaulting (owner decision 2026-07-28, after consultation 450).
+#
+# What must never wait is the RECORDING. Stop ends the consultation
+# immediately, the queue entry closes and the patient can leave — all of that
+# is already done before this wait begins, because the pipeline is a queued
+# background job. Letting the job pause a bounded moment is therefore not
+# holding the consultation open, and the offer stays an offer: both answers
+# AND Skip release it at once, and nobody is made to wait for a reply.
+#
+# 450 is why it exists. The count used to be read immediately before the audio
+# phase on the assumption that unloading MedGemma bought 10-30 s of slack. It
+# did not: the audit row shows the doctor's answer arriving 11 s after the
+# consultation row was created and finding speakers_used already set to 2.
+SPEAKER_DECLARATION_WAIT_S = float(os.getenv("SPEAKER_DECLARATION_WAIT_S", "25"))
+
+# Consultations whose doctor is being asked the speaker count right now.
+# Registered at Stop, released by the answer (or by Skip), and abandoned after
+# the bounded wait. Absent means nobody is being asked — a crash-recovery or
+# connection-lost finalisation has no client to answer and must not wait.
+_declaration_waiters: dict[int, asyncio.Event] = {}
+
+
+def expect_declaration(cid: int) -> None:
+    """Called at Stop, before the pipeline is queued, so the waiter exists
+    before anything could release it."""
+    _declaration_waiters[cid] = asyncio.Event()
+
+
+def release_declaration(cid: int) -> bool:
+    """The doctor answered or skipped. True if a pipeline was waiting."""
+    event = _declaration_waiters.get(cid)
+    if event is None:
+        return False
+    event.set()
+    return True
+
+
+async def await_declaration(cid: int, timeout: float = SPEAKER_DECLARATION_WAIT_S) -> str:
+    """Block the PIPELINE (never the recording) until the answer arrives.
+
+    Returns why the wait ended, for the log: 'answered', 'timeout', or
+    'not_expected' when no client was ever going to answer.
+    """
+    event = _declaration_waiters.get(cid)
+    if event is None:
+        return "not_expected"
+    try:
+        await asyncio.wait_for(event.wait(), timeout)
+        return "answered"
+    except asyncio.TimeoutError:
+        return "timeout"
+    finally:
+        _declaration_waiters.pop(cid, None)
+
 
 async def unload_medgemma() -> None:
     """Release MedGemma's ~17 GB (keep_alive=0 evicts it) and wait for it."""
@@ -545,13 +600,15 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         # from a live session object — which is how a connection_lost or
         # post-restart finalisation still excludes our voice (spec §2.3).
         spans = await system_utterances.exclusion_spans(cid)
-        # Read LAST, immediately before the audio phase: the doctor is asked
-        # how many people spoke as they press Stop, and this gives that answer
-        # the whole MedGemma-unload window to arrive. The same call records
-        # what was actually used, so a late answer cannot make the row claim it
-        # shaped this transcript.
+        # Wait for the doctor's answer, not for an incidental window. Relying on
+        # the MedGemma unload to buy time was measured wrong on 450: the answer
+        # arrived 11 s after Stop and found the count already read. The wait is
+        # bounded and released instantly by any of the three taps.
+        why = await await_declaration(cid)
         speakers = await consultations.speakers_for_diarisation(
             cid, DEFAULT_SPEAKERS)
+        logger.info("Consultation %d: diarising with %d speaker(s) "
+                    "(declaration %s)", cid, speakers, why)
         transcription = await asyncio.to_thread(
             transcribe_and_diarise, wav_path, spans, speakers)
 

@@ -677,7 +677,14 @@ function renderSingleVoiceBanner() {
   // What is always true is that the roles were not determined from the audio
   // and that every line was labelled Patient by default. Say that.
   const banner = document.getElementById('singleVoiceBanner');
-  if (!state.single_voice_detected) { banner.style.display = 'none'; return; }
+  // TWO reasons the labels are not a measurement of who spoke, and the second
+  // one is 450: the doctor answered "only the patient", diarisation had already
+  // run with two, the transcript came out with the two-cluster split, and
+  // NOTHING on any screen said so. An answer accepted and discarded in silence.
+  const ignored = !!state.declaration_ignored;
+  if (!state.single_voice_detected && !ignored) {
+    banner.style.display = 'none'; return;
+  }
   const acked = !!state.single_voice_ack_at;
   banner.style.display = '';
   banner.className = 'urgency' + (acked ? ' acked' : '');
@@ -686,19 +693,31 @@ function renderSingleVoiceBanner() {
   const box = el('div');
   box.appendChild(el('h3', null, acked
     ? 'Speaker labels checked'
-    : 'Speaker roles were NOT determined from the audio'));
-  box.appendChild(el('p', null,
-    'Speaker identification returned a single voice for this recording, so '
-    + 'every line has been labelled Patient by default — not by measurement. '
-    + 'Read the transcript below and correct any line whose speaker is wrong '
-    + '(click its label) before approving.'));
+    : ignored ? 'Your answer did NOT reach speaker identification'
+              : 'Speaker roles were NOT determined from the audio'));
+  box.appendChild(el('p', null, ignored
+    ? `You answered that ${state.declared_speakers === 1
+        ? 'only the patient spoke' : 'both of you spoke'}, but speaker `
+      + `identification had already run with ${state.speakers_used}. This `
+      + 'transcript was produced under the count you did not choose, so its '
+      + 'Doctor/Patient labels may be wrong. Read the transcript below and '
+      + 'correct any line whose speaker is wrong (click its label) before '
+      + 'approving.'
+    : 'Speaker identification returned a single voice for this recording, so '
+      + 'every line has been labelled Patient by default — not by measurement. '
+      + 'Read the transcript below and correct any line whose speaker is wrong '
+      + '(click its label) before approving.'));
   // Declared and defaulted are different statements, and the doctor should be
   // able to tell which one they are reading.
-  box.appendChild(el('p', null, state.speakers_declared
-    ? `You declared that ${state.speakers_used === 1 ? 'only you spoke' :
-        'two people spoke'}, and speaker identification was run for `
-      + `${state.speakers_used}.`
-    : 'Nobody declared how many people spoke, so the default of two was used.'));
+  box.appendChild(el('p', null, ignored
+    ? `Count used: ${state.speakers_used}. Count you declared: `
+      + `${state.declared_speakers}. The answer arrived after speaker `
+      + 'identification had started.'
+    : state.speakers_declared
+      ? `You declared ${state.declared_speakers === 1
+          ? 'that only the patient spoke' : 'that both of you spoke'}, and `
+        + `speaker identification was run for ${state.speakers_used}.`
+      : 'Nobody declared who spoke, so the default of two was used.'));
   box.appendChild(el('p', 'when',
     'The note was drafted from these labels. If they are wrong, correct them '
     + 'and Regenerate.'
@@ -753,8 +772,11 @@ function refreshApproveGate() {
   if ((state.urgent_actions || []).length && !state.urgent_ack_at) {
     reasons.push('acknowledge the urgent-action alert');
   }
-  if (state.single_voice_detected && !state.single_voice_ack_at) {
-    reasons.push('check the speaker labels — only one voice was detected');
+  if ((state.single_voice_detected || state.declaration_ignored)
+      && !state.single_voice_ack_at) {
+    reasons.push(state.declaration_ignored
+      ? 'check the speaker labels — your declared speaker count was not the one used'
+      : 'check the speaker labels — only one voice was detected');
   }
   if (labels.stale && !labels.acknowledged) {
     reasons.push('the labels changed after this note was drafted — regenerate or acknowledge');

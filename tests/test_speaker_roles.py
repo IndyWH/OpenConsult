@@ -357,6 +357,141 @@ def test_an_answer_arriving_after_diarisation_says_so_rather_than_claiming_succe
     assert state["speakers_used"] == 2
 
 
+def test_an_answer_is_never_accepted_and_then_discarded_without_a_trace():
+    """CONSULTATION 450, and the fourth instance in a week of the same fault.
+
+    The doctor answered "only the patient". Diarisation had already run with
+    two, the audit row recorded `applied: false`, the transcript came out with
+    the two-cluster split — and NOTHING on any screen said so. The feature built
+    to stop an action being swallowed swallowed one itself.
+
+    So a declaration that did not apply must be visible in three places at once:
+    the state the review page reads, the approve guard, and the page's own
+    banner. This test fails if any of them stops carrying it.
+    """
+    from app import finalize
+
+    cid = _make_consultation()
+    client = _doctor_client()
+    # Diarisation has already consumed a count...
+    asyncio.run(consultations.speakers_for_diarisation(cid, finalize.DEFAULT_SPEAKERS))
+    # ...and the answer arrives afterwards.
+    body = client.post(f"/api/consultations/{cid}/declared-speakers",
+                       json={"count": 1}).json()
+    assert body["applied"] is False
+
+    # 1. The state says so, explicitly — not left for the reader to compare.
+    state = client.get(f"/api/consultations/{cid}").json()
+    assert state["declaration_ignored"] is True
+    assert state["declared_speakers"] == 1 and state["speakers_used"] == 2
+
+    # 2. Approval is refused until it is acknowledged, and the refusal names
+    #    both counts rather than saying something vague.
+    response = client.post(f"/api/consultations/{cid}/approve", json={"text": "S:\n"})
+    assert response.status_code == 409
+    assert "declared 1" in response.json()["error"]
+    assert "already run with 2" in response.json()["error"]
+
+    # 3. The same answer drives the shared helper the page and the guard read.
+    consultation = asyncio.run(consultations.get_consultation(cid))
+    assert consultations.speaker_labels_unverified(consultation) is True
+
+    # And acknowledging it releases approval, as with the single-voice case.
+    assert client.post(f"/api/consultations/{cid}/acknowledge-single-voice"
+                       ).status_code == 200
+    assert client.post(f"/api/consultations/{cid}/approve",
+                       json={"text": "S:\n"}).status_code == 200
+
+
+def test_the_review_page_carries_a_discarded_declaration():
+    """The banner half of the same rule: the count used, that it was not the one
+    declared, and why."""
+    html = _review_html()
+    banner = html[html.index("function renderSingleVoiceBanner()"):]
+    banner = banner[:banner.index("\nfunction ")]
+    assert "state.declaration_ignored" in banner
+    assert "Your answer did NOT reach speaker identification" in banner
+    assert "Count used:" in banner and "Count you declared:" in banner
+    assert "arrived after speaker" in banner, "it must say WHY"
+    # ...and it must show even when diarisation did not report a single voice,
+    # which is exactly why 450 showed nothing at all.
+    assert "!state.single_voice_detected && !ignored" in banner
+
+
+def test_a_discarded_declaration_is_marked_as_a_fault_at_the_control():
+    """On the live page, at the moment of the tap. 'faint' read as a footnote in
+    450; this is a fault, because the labels below were produced under a count
+    the doctor rejected."""
+    html = _live_html()
+    declare = html[html.index("async function declareSpeakers("):]
+    declare = declare[:declare.index("\nfunction askSpeakers(")]
+    assert "NOT APPLIED" in declare
+    assert "'bad'" in declare.split("NOT APPLIED")[1][:400], (
+        "a discarded answer must be styled as a fault, not a footnote")
+
+
+def test_skip_releases_the_waiting_pipeline_rather_than_staying_silent():
+    """Skip used to send nothing at all, which was fine when nothing waited.
+    Now the pipeline waits for an answer, so silence would cost the full
+    timeout — and an offer that costs time is not an offer."""
+    cid = _make_consultation()
+    client = _doctor_client()
+    body = client.post(f"/api/consultations/{cid}/declared-speakers",
+                       json={"skip": True}).json()
+    assert body["skipped"] is True
+    # Skipping records no count: NULL still means defaulted.
+    state = asyncio.run(consultations.get_consultation(cid))
+    assert state["declared_speakers"] is None
+    assert state["declaration_ignored"] is False
+
+    html = _live_html()
+    assert "{skip: true}" in html
+    # An empty body is still a client bug, not a silent default.
+    assert client.post(f"/api/consultations/{cid}/declared-speakers",
+                       json={}).status_code == 400
+
+
+def test_the_pipeline_waits_for_the_answer_but_the_recording_never_does():
+    """450's cause: the count was read on the assumption that unloading MedGemma
+    bought 10-30 s of slack. The audit row shows the answer arriving 11 s after
+    Stop and finding the count already taken.
+
+    What may wait is the queued background job. What may never wait is the
+    recording — and a finalisation with nobody at the screen must not wait at
+    all, or a lost connection would stall the queue for the full timeout.
+    """
+    from app import finalize
+
+    assert asyncio.run(finalize.await_declaration(999_999)) == "not_expected"
+
+    async def answered() -> str:
+        finalize.expect_declaration(4242)
+        assert finalize.release_declaration(4242) is True
+        return await finalize.await_declaration(4242, timeout=5)
+
+    assert asyncio.run(answered()) == "answered"
+
+    async def timed_out() -> str:
+        finalize.expect_declaration(4243)
+        return await finalize.await_declaration(4243, timeout=0.05)
+
+    assert asyncio.run(timed_out()) == "timeout"
+    # The waiter is always cleaned up, whichever way the wait ended.
+    assert 4242 not in finalize._declaration_waiters
+    assert 4243 not in finalize._declaration_waiters
+
+    from pathlib import Path
+    main = Path("app/main.py").read_text()
+    stop = main[main.index("async def _complete_session("):]
+    stop = stop[:stop.index("\nasync def ")]
+    assert stop.index("set_status(cid, \"queued\"") < stop.index("expect_declaration(cid)"), \
+        "the consultation must be completed before anything waits on an answer"
+    assert stop.index("expect_declaration(cid)") < stop.index("finalize_queue.put_nowait"), \
+        "the waiter must exist before the pipeline could reach the count"
+    assert "if not connection_lost:" in stop, \
+        "a finalisation with nobody at the screen must not wait"
+
+
 def test_only_one_or_two_speakers_may_be_declared():
     cid = _make_consultation()
     client = _doctor_client()
@@ -419,9 +554,9 @@ def _live_html() -> str:
 
 def test_the_speaker_question_is_asked_at_stop_with_three_one_tap_answers():
     html = _live_html()
-    assert "How many people spoke in this consultation?" in html
-    assert 'id="spkOne"' in html and ">Just me<" in html
-    assert 'id="spkTwo"' in html and ">Two of us<" in html
+    assert "Who spoke in this consultation?" in html
+    assert 'id="spkOne"' in html and ">Only the patient<" in html
+    assert 'id="spkTwo"' in html and ">Both of us<" in html
     assert 'id="spkSkip"' in html and ">Skip<" in html
     # Asked from the `done` handler — after the server confirms the
     # consultation is complete, so it cannot hold it open.
@@ -440,9 +575,10 @@ def test_no_answer_can_hold_the_consultation_open_and_none_leaves_a_dead_tap():
     declare = declare[:declare.index("\nfunction askSpeakers(")]
     assert declare.index("spkAsk.classList.remove('on')") < declare.index("fetch("), (
         "the question must close before the request, not after it")
-    # Skip needs no request at all and still reports the default it applied.
-    assert "if (count === null)" in declare
-    assert "Skipped — assuming two people spoke" in declare
+    # Skip POSTS now — it has to release the waiting pipeline — and still
+    # reports the default it applied.
+    assert "count === null ? {skip: true}" in declare
+    assert "Skipped — assuming both of you spoke" in declare
     # Every failure path speaks.
     assert "Could not record that" in declare
     assert "Could not reach the server" in declare
@@ -497,7 +633,7 @@ def test_the_question_cannot_be_destroyed_by_navigation_before_it_is_answered():
     refresh = html[html.index("function refreshResultButton()"):]
     refresh = refresh[:refresh.index("\n}")]
     assert "btn.disabled = speakersOutstanding;" in refresh
-    assert "Answer \"How many people spoke?\" first" in refresh
+    assert "Answer \"Who spoke?\" first" in refresh
     # And the click handler cannot navigate past an outstanding question.
     handler = html[html.index("btn.addEventListener('click'"):]
     handler = handler[:handler.index("});")]
@@ -546,8 +682,8 @@ def test_the_notice_distinguishes_a_declared_count_from_a_defaulted_one():
     same number and different statements."""
     html = _review_html()
     assert "state.speakers_declared" in html
-    assert "You declared that" in html
-    assert "Nobody declared how many people spoke" in html
+    assert "You declared" in html
+    assert "Nobody declared who spoke" in html
 
 
 def test_the_labels_banner_does_not_claim_a_note_exists_when_none_does():
@@ -572,12 +708,24 @@ def test_the_labels_banner_does_not_claim_a_note_exists_when_none_does():
 
 def test_the_single_voice_gate_is_unchanged():
     """The rewording must not weaken the gate: the acknowledgement and the
-    server-side 409 stay exactly as built."""
+    server-side 409 stay exactly as built.
+
+    The guard now asks `speaker_labels_unverified()` rather than reading
+    `single_voice_detected` itself, because 450 added a SECOND reason the labels
+    need checking. One helper, read by both the page and the guard, so they
+    cannot drift apart — which is the property this test is really buying.
+    """
     html = _review_html()
     assert "ackButton('acknowledge-single-voice')" in html
     from pathlib import Path
     main = Path("app/main.py").read_text()
-    assert "single_voice_detected" in main and "single_voice_ack_at" in main
+    assert "consultations.speaker_labels_unverified(consultation)" in main
+    assert 'consultation["single_voice_ack_at"]' in main
+    # And the helper covers both reasons.
+    source = Path("app/consultations.py").read_text()
+    helper = source[source.index("def speaker_labels_unverified("):]
+    helper = helper[:helper.index("\n\n\n")] if "\n\n\n" in helper else helper
+    assert "single_voice_detected" in helper and "declaration_ignored" in helper
 
 
 def test_the_swap_control_survives():
