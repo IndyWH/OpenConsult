@@ -65,6 +65,20 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS connection_lost boolean NOT NU
 -- 'refused' ('flagged' is reserved for the follow-up flag tier).
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_signals jsonb;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_outcome text;
+-- Diarisation honesty (2026-07-28). single_voice_detected: the audio gave
+-- only ONE speaker cluster, so the Doctor/Patient labels are a default and
+-- not a measurement. Acknowledge-gated on review, like the urgency banner:
+-- the uncertainty has to be visible at the transcript it applies to.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS single_voice_detected boolean NOT NULL DEFAULT false;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS single_voice_ack_at timestamptz;
+-- Role changes vs the drafted note. labels_changed_at is stamped by BOTH
+-- swap-roles and per-turn role correction; a note is stale iff it was
+-- created before that stamp. Comparing timestamps rather than keeping a
+-- boolean means a regenerate clears staleness for free (the new note is
+-- newer), and a second role change after an acknowledgement re-arms the
+-- banner instead of staying quietly acknowledged.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS labels_changed_at timestamptz;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS labels_ack_at timestamptz;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -242,7 +256,8 @@ async def get_consultation(cid: int) -> dict | None:
                 "SELECT c.id, c.started_at, c.status, c.audio_path, c.error,"
                 " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name,"
                 " c.voided_at, c.void_reason, c.doctor_id, c.connection_lost,"
-                " c.quality_signals, c.quality_outcome"
+                " c.quality_signals, c.quality_outcome,"
+                " c.single_voice_detected, c.single_voice_ack_at"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -265,6 +280,8 @@ async def get_consultation(cid: int) -> dict | None:
         "connection_lost": row[12],
         "quality_signals": row[13],
         "quality_outcome": row[14],
+        "single_voice_detected": row[15],
+        "single_voice_ack_at": str(row[16]) if row[16] else None,
     }
 
 
@@ -335,13 +352,135 @@ async def update_turn_text(cid: int, idx: int, text: str) -> None:
         )
 
 
+ROLES = ("Doctor", "Patient")
+
+
 async def swap_roles(cid: int) -> None:
+    """Whole-transcript inversion. Still the right tool for a genuine
+    inversion — but NOT for a split speaker cluster, which is not an
+    inversion and which swapping makes worse (consultation 448: it would
+    correct two turns and break the third). Per-turn correction is
+    `update_turn_role`."""
     async with await _conn() as conn:
         await conn.execute(
             "UPDATE transcript_turn SET role ="
             " CASE role WHEN 'Doctor' THEN 'Patient' ELSE 'Doctor' END"
             " WHERE consultation_id = %s", (cid,),
         )
+        await _stamp_labels_changed(conn, cid)
+
+
+async def update_turn_role(cid: int, idx: int, role: str) -> str | None:
+    """Correct ONE turn's speaker label. Returns the previous role for the
+    audit trail, or None if there is no such turn.
+
+    The answer to a split cluster: the doctor fixes the turns that are
+    wrong, leaving the ones that are right alone."""
+    if role not in ROLES:
+        raise ValueError(f"invalid role {role!r}")
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "WITH before AS (SELECT role FROM transcript_turn"
+                "  WHERE consultation_id = %s AND idx = %s)"
+                " UPDATE transcript_turn SET role = %s FROM before"
+                " WHERE consultation_id = %s AND idx = %s"
+                " RETURNING before.role",
+                (cid, idx, role, cid, idx),
+            )
+        ).fetchone()
+        if row is None:
+            return None
+        await _stamp_labels_changed(conn, cid)
+    return row[0]
+
+
+async def _stamp_labels_changed(conn, cid: int) -> None:
+    """Record that the speaker labels moved. A note created before this
+    stamp was drafted against the old labels — see labels_state()."""
+    await conn.execute(
+        "UPDATE consultation SET labels_changed_at = now() WHERE id = %s", (cid,))
+
+
+async def acknowledge_labels(cid: int) -> str:
+    """The doctor confirms they have read a note drafted against older
+    labels. Always stamps now(), unlike acknowledge_urgent's
+    keep-the-first-timestamp rule: a LATER role change must be able to
+    re-arm the banner, so what matters is whether the ack is newer than the
+    change, not when the first ack happened."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET labels_ack_at = now()"
+                " WHERE id = %s RETURNING labels_ack_at", (cid,),
+            )
+        ).fetchone()
+    return str(row[0]) if row else ""
+
+
+async def set_single_voice(cid: int) -> None:
+    """Diarisation found only one speaker cluster, so the roles are a
+    default. Recorded on the row, surfaced on review."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET single_voice_detected = true WHERE id = %s",
+            (cid,))
+
+
+async def acknowledge_single_voice(cid: int) -> str:
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET single_voice_ack_at = now()"
+                " WHERE id = %s AND single_voice_ack_at IS NULL"
+                " RETURNING single_voice_ack_at", (cid,),
+            )
+        ).fetchone()
+        if row is None:   # already acknowledged: keep the original timestamp
+            row = await (
+                await conn.execute(
+                    "SELECT single_voice_ack_at FROM consultation WHERE id = %s",
+                    (cid,))
+            ).fetchone()
+    return str(row[0]) if row and row[0] else ""
+
+
+async def labels_state(cid: int) -> dict:
+    """Is the drafted note stale with respect to the speaker labels, and has
+    that been acknowledged?
+
+    ONE implementation, queried by both the approve guard and the review
+    payload, so the button and the banner cannot disagree about the answer.
+
+    Stale iff the labels moved AFTER the latest note was created — which is
+    why a regenerate needs no clearing step: the new note is newer than the
+    change. Acknowledged iff the ack is at least as new as the change, which
+    is what makes a SECOND role change re-arm the banner rather than inherit
+    the earlier acknowledgement.
+
+    The comparisons are done in SQL on timestamptz rather than on stringified
+    timestamps: lexicographic comparison of "…+01:00" against "…+00:00" would
+    be wrong across a DST boundary.
+    """
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "SELECT c.labels_changed_at IS NOT NULL AND n.created_at IS NOT NULL"
+                "         AND c.labels_changed_at > n.created_at AS stale,"
+                "       c.labels_ack_at IS NOT NULL AND c.labels_changed_at IS NOT NULL"
+                "         AND c.labels_ack_at >= c.labels_changed_at AS acked,"
+                "       c.labels_changed_at"
+                " FROM consultation c LEFT JOIN LATERAL ("
+                "   SELECT created_at FROM note WHERE consultation_id = c.id"
+                "   ORDER BY version DESC LIMIT 1) n ON true"
+                " WHERE c.id = %s", (cid,),
+            )
+        ).fetchone()
+    if row is None:
+        return {"stale": False, "acknowledged": False, "labels_changed_at": None}
+    return {"stale": bool(row[0]),
+            "acknowledged": bool(row[0]) and bool(row[1]),
+            "labels_changed_at": str(row[2]) if row[2] else None}
 
 
 async def save_note(cid: int, content: dict) -> int:

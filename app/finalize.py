@@ -9,11 +9,14 @@ Triggered by the Stop button. Steps, in order:
    VRAM to drop before loading the audio models.
 2. Re-transcribe the full recording with WhisperX large-v3 (word-level
    timestamps + confidence scores).
-3. Diarise with pyannote (num_speakers=2) and merge into speaker turns.
+3. Diarise with pyannote (min_speakers=1, max_speakers=2) and merge into
+   speaker turns.
 4. Free the audio models' VRAM.
-5. Attribute roles: first-speaker-is-Doctor heuristic (the doctor opens
-   the consultation in every mock script and typical practice); the
-   review UI has a swap-roles override for when it guesses wrong.
+5. Attribute roles. Two clusters: first-speaker-is-Doctor — a heuristic
+   whose premise 7a has falsified, see attribute_roles. One cluster: every
+   turn is Patient, and the consultation is flagged single_voice_detected
+   so review says the roles are unverified. The review UI has a
+   whole-transcript swap AND per-turn role correction.
 6. Run the transcript-quality gate (app/transcript_quality.py) — BEFORE
    the note call, so a refusal costs no MedGemma time. Signals are stored
    on every consultation; S2 (low confidence) and S4 (truncation) refuse
@@ -338,8 +341,16 @@ def transcribe_and_diarise(wav_path: str,
     finally:
         torch.load = _torch_load
     waveform = torch.from_numpy(audio[None, :])
+    # A RANGE, not an exact count (2026-07-28). This was `num_speakers=2`,
+    # which does not mean "expect about two" — it requires exactly two, so
+    # with one human in the room pyannote had no way to answer "one" and
+    # split that single voice into two clusters. Every 7a consultation so
+    # far (446, 447, 448) carries patient speech labelled Doctor because of
+    # this line. Two is still the ceiling: a consultation is a doctor and a
+    # patient, and letting a third cluster appear would invent a speaker.
     annotation = diarizer(
-        {"waveform": waveform, "sample_rate": 16000}, num_speakers=2
+        {"waveform": waveform, "sample_rate": 16000},
+        min_speakers=1, max_speakers=2,
     )
     diarization = pd.DataFrame(
         annotation.itertracks(yield_label=True),
@@ -410,16 +421,46 @@ def transcribe_and_diarise(wav_path: str,
             "excluded_fraction": limits["fraction"]}
 
 
-def attribute_roles(turns: list[dict]) -> list[dict]:
-    """First speaker is the Doctor (they open the consultation). The review
-    UI provides a swap-roles override for when this heuristic is wrong."""
+def attribute_roles(turns: list[dict]) -> tuple[list[dict], bool]:
+    """Assign Doctor/Patient roles to diarised turns.
+
+    Returns `(turns, single_voice)`. `single_voice` is True when the audio
+    yielded only ONE speaker cluster, which the caller records on the
+    consultation so the review page can say the roles are unverified.
+
+    TWO CLUSTERS: first speaker is the Doctor. **This premise is falsified
+    by Phase 7a and is knowingly left in place for now** — see HANDOVER.
+    The docstring used to justify it as "the doctor opens the consultation",
+    which was true when a human opened it. In tap-to-ask the MACHINE opens,
+    with the disclosure and the invitation, and those are excluded from the
+    transcript by construction — so the first *human* voice is frequently
+    the patient. Replacing this heuristic is an open design question and
+    deliberately not attempted here; the review UI's swap and the new
+    per-turn role correction are what stand in for it.
+
+    ONE CLUSTER: every turn is labelled **Patient**, not Doctor.
+
+    The reasoning, recorded because it is a default and not a truth: in
+    tap-to-ask the machine asks the questions, so a lone human voice is
+    answering them, and in every case observed so far (446, 447, 448) that
+    voice was the patient. Labelling them Doctor — which is what the old
+    code did, since the first cluster was always the Doctor — was wrong in
+    all three. Patient is the better default, and it is still a default:
+    **the owner may change it**, and a single-voice consultation always
+    raises the review-page notice telling the doctor to check.
+    """
     if not turns:
-        return turns
+        return turns, False
+    speakers = {t["speaker"] for t in turns}
+    single_voice = len(speakers) <= 1
     doctor_speaker = turns[0]["speaker"]
     for turn in turns:
-        turn["role"] = "Doctor" if turn["speaker"] == doctor_speaker else "Patient"
+        if single_voice:
+            turn["role"] = "Patient"
+        else:
+            turn["role"] = "Doctor" if turn["speaker"] == doctor_speaker else "Patient"
         turn.pop("speaker", None)
-    return turns
+    return turns, single_voice
 
 
 async def finalize_consultation(cid: int, wav_path: str) -> None:
@@ -465,10 +506,19 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
                                            "text": (t.get("text") or "")[:200]}
                                           for t in hallucinated[:10]]})
 
-        turns = attribute_roles(transcription["turns"])
+        turns, single_voice = attribute_roles(transcription["turns"])
         for i, turn in enumerate(turns):
             turn["idx"] = i
         await consultations.save_turns(cid, turns)
+        # Recorded on the consultation, not left in a log line: one voice
+        # means the roles are a default rather than a measurement, and the
+        # review page must say so before anything is signed.
+        if single_voice:
+            await consultations.set_single_voice(cid)
+            await audit.log(None, "transcript.single_voice", "consultation", cid,
+                            {"turns": len(turns)})
+            logger.warning("Consultation %d: only one speaker cluster — roles "
+                           "defaulted to Patient and flagged for review", cid)
 
         # Transcript-quality gate, BEFORE the note call — a refusal must
         # cost no MedGemma time, and must never produce a draft from a
