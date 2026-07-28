@@ -7,12 +7,16 @@ waiting → in_consultation → done, ordered by position, per day.
 
 from __future__ import annotations
 
+import logging
 import os
 
 import psycopg
 from dotenv import load_dotenv
 
+from app import audit
+
 load_dotenv()
+logger = logging.getLogger(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 
 SCHEMA_SQL = """
@@ -216,14 +220,26 @@ async def close_entry(entry_id: int, outcome: str) -> dict | None:
     """Administrative closure when no recording happened: waiting or
     in_consultation → done/cancelled. Distinct from finish_entry (which is
     the Stop-button path for real consultations). Returns the prior state
-    for the audit trail, or None if the entry isn't closable."""
+    for the audit trail, or None if the entry isn't closable.
+
+    DELIBERATELY NOT scoped to CURRENT_DATE, unlike every other query here
+    (2026-07-28). Queue entry 164 is the specimen: a walk-in abandoned before
+    Start on 2026-07-26 stayed `in_consultation`, and once the date rolled over
+    BOTH recovery paths — Resume and Close — refused it, because both were
+    day-scoped. Nothing was left that could close it, so it was permanent.
+
+    The close path is the one that must be able to reach into the past: it is
+    the escape hatch, and an escape hatch scoped to today cannot let anybody out
+    of yesterday. `_ENTRY_SELECT` and the display queries stay day-scoped —
+    today's queue is still today's queue.
+    """
     if outcome not in ("done", "cancelled"):
         raise ValueError(f"invalid outcome {outcome!r}")
     async with await _conn() as conn:
         old = await (
             await conn.execute(
-                "SELECT status, patient_id FROM queue_entry"
-                " WHERE id = %s AND queue_date = CURRENT_DATE", (entry_id,),
+                "SELECT status, patient_id FROM queue_entry WHERE id = %s",
+                (entry_id,),
             )
         ).fetchone()
         if old is None or old[0] not in ("waiting", "in_consultation"):
@@ -232,6 +248,60 @@ async def close_entry(entry_id: int, outcome: str) -> dict | None:
             "UPDATE queue_entry SET status = %s WHERE id = %s", (outcome, entry_id)
         )
     return {"from_status": old[0], "patient_id": old[1]}
+
+
+async def sweep_stale_entries() -> list[dict]:
+    """Close walk-ins abandoned before Start on an earlier day.
+
+    THE LOCKOUT THIS EXISTS TO PREVENT (entry 164, 2026-07-26): an
+    `in_consultation` entry holds the single system-wide live-consultation slot,
+    so while its date is current EVERY doctor is refused the slot — not just the
+    one who opened it. The guard is global by design (see the capacity
+    statement), which means one abandoned walk-in locks out the whole practice
+    until midnight.
+
+    Two conditions, both required, and the second is what keeps this safe:
+
+    * `queue_date < CURRENT_DATE` — today's entries are never touched. A live
+      consultation in progress right now looks exactly like a stale one, and the
+      only thing separating them is the date.
+    * no `consultation` row for that patient — if a consultation exists the
+      session really started, and closing the entry as `cancelled` would file a
+      real consultation under "no recording happened".
+
+    Audits each closure itself, the same convention as
+    `retention.sweep_expired_audio` — a sweep owns its own trail, so the record
+    cannot go missing because a caller forgot. `queue.cancelled` with no acting
+    user and a `via` saying what closed it and why: a future reader finding a
+    cancelled walk-in needs the reason in the row, not in someone's memory.
+
+    Returns what it closed. Called at startup beside the retention sweep; entry
+    164 is closed by its first run.
+    """
+    async with await _conn() as conn:
+        rows = await (
+            await conn.execute(
+                "UPDATE queue_entry q SET status = 'cancelled'"
+                " WHERE q.status = 'in_consultation'"
+                "   AND q.queue_date < CURRENT_DATE"
+                "   AND NOT EXISTS (SELECT 1 FROM consultation c"
+                "                   WHERE c.patient_id = q.patient_id)"
+                " RETURNING q.id, q.patient_id, q.queue_date"
+            )
+        ).fetchall()
+    closed = [{"entry_id": r[0], "patient_id": r[1], "queue_date": str(r[2])}
+              for r in rows]
+    for entry in closed:
+        await audit.log(None, "queue.cancelled", "queue_entry", entry["entry_id"],
+                        {"outcome": "cancelled", "from_status": "in_consultation",
+                         "patient_id": entry["patient_id"],
+                         "queue_date": entry["queue_date"],
+                         "via": "stale-entry sweep: abandoned before Start on an "
+                                "earlier day, holding the live-consultation slot"})
+        logger.warning("Stale-entry sweep closed queue entry %d (patient %d, %s)"
+                       " — it was holding the live-consultation slot",
+                       entry["entry_id"], entry["patient_id"], entry["queue_date"])
+    return closed
 
 
 async def finish_entry(entry_id: int) -> None:

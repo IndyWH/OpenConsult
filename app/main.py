@@ -80,6 +80,16 @@ async def lifespan(app: FastAPI):
     # one-active-entry guard is UI-level; this is the wall).
     app.state.live_sessions = {}
     app.state.retention_task = asyncio.create_task(retention.retention_loop())
+    # Stale-walk-in sweep, beside the retention sweep. An in_consultation entry
+    # abandoned before Start holds the single system-wide live slot, so it locks
+    # out EVERY doctor until its date rolls over — and once it has, both recovery
+    # paths used to refuse it (entry 164). Best-effort: a failure here must not
+    # stop the app, but it is logged loudly because the consequence of skipping
+    # it is a practice that cannot start a consultation.
+    try:
+        await frontdesk.sweep_stale_entries()   # audits each closure itself
+    except Exception:  # noqa: BLE001 - startup must survive a sweep failure
+        logger.exception("Stale-entry sweep failed at startup")
     yield
     app.state.retention_task.cancel()
     app.state.finalize_worker.cancel()
