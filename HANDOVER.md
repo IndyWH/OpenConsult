@@ -877,7 +877,44 @@ and **no exclusion anomaly and no silence hallucination** for either 446
 or 447. Stopping the recording mid-utterance closes the window correctly;
 that edge case is no longer only a unit test.
 
-### The standing rule: never swallow an action
+## THE THREE STANDING RULES (interface, non-negotiable)
+
+**All three in one place, each with the incident that produced it, so the
+next person meets them as a set rather than rediscovering the third one in
+a room — which is what happened twice.** Written into `live.html`,
+`review.html` and `worklist.html`, with a test per page asserting the
+reason survives.
+
+> **1. NEVER SWALLOW AN ACTION.** Either PERFORM the action, or VISIBLY
+> DISABLE the control with the reason attached to the control itself. Never
+> accept a tap, do nothing, and explain it somewhere else on the page.
+>
+> **2. A CONTROL THAT CAN ACT MUST NOT LOOK AS IF IT CANNOT.**
+>
+> **3. A CONTROL THE DOCTOR MUST REACH MUST BE WHERE THEY ARE LOOKING.**
+
+| Rule | The incident that produced it |
+|---|---|
+| **1** | **2026-07-25, three in one evening.** The "Not connected — cannot speak" panel, the finalisation page that never left "processing", and the sound-check offer that ate question-chip taps. The owner missed all three. Then a **fourth on 2026-07-28 (450)**: the declared speaker count was accepted, discarded, and nothing on any screen said so — in the feature built to fix the third. |
+| **2** | **2026-07-28, consultation 448.** An already-asked question chip turned green. Green means approved / linked / mic-live everywhere else in this app — all finished states — so the doctor read it as spent and did not re-tap, which cost the most important step of the walkthrough. Re-asking had worked the whole time. |
+| **3** | **2026-07-25, consultation 447**, then **2026-07-28, consultation 449 — the same defect in a NEW control three days after the first fix.** 447: the Stop control existed the whole time, in normal flow above the chips that trigger it, so it scrolled out of sight exactly when it was needed and the doctor stopped the whole recording to silence the machine. 449: the speaker-count question rendered two divs deep inside the scrolling stack, was never seen, and was never answered. |
+
+**Rule 1 and rule 2 are the same cost from opposite directions — a tap not
+taken.** Rule 3 is why "the control exists and is correct" is not enough:
+it also has to be in the doctor's field of view at the moment it is needed.
+**Rule 3 governs REASONS as well as controls** — a refusal explained where
+the doctor is not looking fails in exactly the way rule 1 describes, which
+is why refusals now land on the control that was pressed rather than in a
+banner elsewhere on the page.
+
+**Why rule 3 took two incidents to write down** is worth keeping: after 447
+the fix was recorded as a fact about *that* control ("the speaking bar is
+fixed to the viewport, do not return it to normal flow") rather than as a
+rule about controls in general. So when a new control was built days later,
+nothing in the codebase said where to put it. A lesson recorded as a
+property of one place does not generalise; a rule does.
+
+### The first of them, in full: never swallow an action
 
 **Adopted 2026-07-25 after the third instance in one evening.** Three
 separate controls did nothing while a small banner elsewhere explained
@@ -912,6 +949,68 @@ Auditing the page against the rule found two more violations, both fixed:
   already existed in the CSS and **nothing had ever applied it**. Now
   applied, chevron hidden so it stops inviting a click, reason in the
   control's own title.
+
+### The other two pages, audited 2026-07-28
+
+The 2026-07-25 audit covered `live.html` only. The review page and the
+Consultations worklist were audited before the collaborator's access.
+
+**Every violation on the review page was one shape**: a handler awaited a
+`fetch`, ignored the response, and refreshed — so a 409 produced no message
+anywhere at all. Approve, Regenerate, Swap Doctor/Patient, per-turn role
+correction, the acknowledge buttons, the transcript text edit and the letter
+body edit. **The two edits were the worst**: a refused correction stayed on
+screen looking saved until something else reloaded and silently reverted it,
+and the letter edit went further and recorded the refused text locally as
+though it had been accepted. Both now restore what the server holds. One
+`act()` helper per page owns refusals, and a test fails on any bare awaited
+fetch left in a handler.
+
+**The worklist's were a lesser class and are recorded as such**: they did
+explain, but in `#err` above a table whose rows can be a screen away — rule
+3 rather than rule 1. The reason now also goes on the control, outlined in
+red. **Two paths were deliberately left alone**: cancelling your own
+`prompt` is a choice, not a swallowed action.
+
+**Not a violation, checked and confirmed**: `refreshApproveGate()` is the
+only writer of Approve's disabled flag and carries all three
+acknowledgement reasons — urgency, speaker labels, stale labels — in the
+button's own title. The single-writer property has a test, asserted with
+comments stripped so the comment explaining *why* it is single-writer
+survives.
+
+### The abandoned-walk-in lockout (entry 164, fixed 2026-07-28)
+
+**The half that mattered was never the orphan row.** An `in_consultation`
+entry holds the **single system-wide** live-consultation slot, and that
+guard is global by design — so one walk-in abandoned before Start refuses
+**every doctor in the practice** until the date rolls over. Then, once it
+has, both recovery paths refused the entry too, because every queue query
+was scoped to `queue_date = CURRENT_DATE`: Resume answered 404 and Close
+answered 409. Nothing was left that could close it.
+
+Two changes. **The close path dropped its `CURRENT_DATE` filter, and only
+the close path** — an escape hatch scoped to today cannot let anybody out of
+yesterday. `_ENTRY_SELECT` and the display queries keep their day scoping
+and a test asserts it, so today's queue is still today's queue. And a
+**startup sweep** (`frontdesk.sweep_stale_entries`, beside the retention
+sweep) closes `in_consultation` entries dated before today **that have no
+consultation row**. Both conditions are load-bearing: a live consultation in
+progress right now looks exactly like a stale one and only the date
+separates them, and an entry *with* a consultation row means the session
+really started, so cancelling it would file a real consultation under "no
+recording happened". The sweep audits its own closures (`queue.cancelled`,
+no acting user, a `via` saying what closed it and why) and is idempotent, so
+a restart loop cannot re-audit the same closure.
+
+**The refusal itself is now legible**, which is the other half of the same
+story: all four sites that fire `live.slot_rejected` say what is holding the
+slot — patient name and the time the entry was opened for a queue entry,
+plus that it can be closed from Today; the user holding the stream for a
+WebSocket refusal. **The guard is unchanged and must stay so**: one live
+consultation at a time is a safety property, not a throughput limit, because
+two streams would share the transcriber and an urgency alarm arriving late
+under contention is a safety regression.
 
 ### Consultation 448 — THE GUARANTEE HOLDS IN A ROOM (2026-07-28)
 
@@ -2168,8 +2267,15 @@ docket item 5.
    class of loss; the step 6 method (curated terms, adjudicated) does.
 
 10. **A stale `in_consultation` queue entry, and what day-scoping does to
-   it** (observed 2026-07-27, deliberately NOT fixed — recorded for the
-   owner's decision). **Queue entry 164 exists and is stale**: patient 253
+   it** — **FIXED 2026-07-28** ahead of the collaborator's access, because the
+   lockout half of it would have met her with nothing but "busy". The close
+   path can now reach past today and a startup sweep closes entries abandoned
+   before Start on an earlier day; see "The abandoned-walk-in lockout" above
+   for the shape and the two conditions that keep the sweep safe. The
+   observation as originally recorded follows, unchanged, because the analysis
+   is what led to the fix. (Observed 2026-07-27, deliberately not fixed at the
+   time — recorded for the owner's decision.) **Queue entry 164 exists and is
+   stale**: patient 253
    ("Shivesh"), `queue_date` **2026-07-26**, position 1, created 14:53:24
    by user 182 (`herath`) via `queue.walk_in_started`. Verified against
    the database: it is still `in_consultation`, there is **no consultation
