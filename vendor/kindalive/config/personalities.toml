@@ -42,3 +42,33 @@ serotonin = 0.4
 [anxious.half_life_multipliers]
 cortisol = 1.5
 gaba = 1.3
+
+# [clinical] — Consultation AI's preset (NOT upstream; added 2026-07-28,
+# Phase 7b). Started from [stoic] per the owner's brief: high GABA and
+# serotonin baselines, near-zero adrenaline with shortened half-lives,
+# damped reactivity throughout. A limited emotional range — a clinical
+# presence, not an expressive companion. All numbers are conservative
+# first guesses; the calibration pass against real use sets them properly.
+# The hard per-muscle caps live in app/face.py, NOT here — the preset
+# expresses the intent, the caps enforce it (belt and braces, brief §3).
+[clinical]
+default_affinity = 0.4     # stoic 0.6 — every injected impulse lands weaker
+interaction_scale = 0.5    # stoic 0.7 — cross-chemical coupling damped
+
+[clinical.baselines]
+gaba = 0.7                 # stoic 0.6 — stronger calm brake on arousal
+serotonin = 0.55           # stoic 0.5 — stable mood floor
+adrenaline = 0.02          # stoic 0.08 — near-zero resting arousal
+cortisol = 0.1             # stoic 0.15 — low resting stress
+oxytocin = 0.25            # species 0.2 — slight resting warmth, so a
+                           # neutral face reads attentive rather than flat
+
+[clinical.half_life_multipliers]
+adrenaline = 0.4           # stoic 0.7 — 3 min species half-life becomes 72 s.
+                           # Deliberately the main damping mechanism: with
+                           # interaction_scale at 0.5 the GABA->adrenaline
+                           # interaction brake is also halved, so the decay
+                           # itself has to carry the "arousal dies quickly"
+                           # requirement rather than the cross-coupling.
+cortisol = 0.6             # stoic 0.8 — stress spikes wash out sooner
+testosterone = 0.7         # dominance-linked; decays faster toward baseline
