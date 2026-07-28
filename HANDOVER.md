@@ -493,6 +493,18 @@ form (`herath` → "Herath", `vicky` → "Victoria", `JoydeepSinha1988` →
 changed: the approved wording's *"you can speak to him"* assumes the
 doctor is male, which is a wording change and therefore the owner's.
 
+**Both of those were decided by the owner on 2026-07-28, and 448 is why.**
+The wording is now *"you can speak to **them** at any time"* — approved,
+asserted verbatim, and pinned by a second test so a revert reads as a
+named regression rather than a tweak. And 448 did speak as **"Dr
+Doctor"**, because the session ran on the admin account: the decision is
+to **fix the display names rather than guard against them in code**, so
+`scripts/manage_users.py set-display-name USERNAME "Name"` now exists
+(audited `user.display_name_changed`, old and new name both in the row).
+The no-invented-title convention is unchanged — the "Dr" stays in the
+phrase template. The names themselves are the owner's to choose and were
+deliberately not chosen here.
+
 **The disclosure lock is server-side** (hard rule 4). Every CDS question
 and the two clinical phrases are refused until the session has recorded a
 disclosure — the phrase played *through* (a cut-off one does not count),
@@ -826,6 +838,173 @@ Auditing the page against the rule found two more violations, both fixed:
   already existed in the CSS and **nothing had ever applied it**. Now
   applied, chevron hidden so it stops inviting a click, reason in the
   control's own title.
+
+### Consultation 448 — THE GUARANTEE HOLDS IN A ROOM (2026-07-28)
+
+**The fourth run of the real-room check, and the first one the transcript
+guarantee passed.** Three previous rooms each found a serious defect (445
+the missing six minutes, 446 the offer eating taps, 447 no way to stop an
+utterance). 448 found two interface defects and **no breach of the
+guarantee**.
+
+**448 must not be voided or purged.** It is the evidence that the
+guarantee holds, and it is the first artifact of that kind the project
+has. Patient "Step6 Patient", `awaiting_review`, `quality_outcome`
+**pass**.
+
+**The evidence, read from the database rather than from the screen:**
+
+| | |
+|---|---|
+| System utterances | **seven**, all in `system_utterance` |
+| Where they appear | the grey *Assistant · spoken aloud* channel **only** |
+| Turn numbers on them | **none** — they are not `transcript_turn` rows, so there is no number to give them |
+| Note claims | 6, all cited: **grounding 6/6** |
+| What those claims cite | `transcript_turn` rows only — **no citation resolves to a system utterance**, and none can, because the two live in different tables |
+
+That last row is the whole architectural point paying off: exclusion is
+structural, so "the note cited a machine utterance" is not a bug that was
+avoided, it is a sentence with nowhere to happen.
+
+**Two things the note did right and both are worth keeping:**
+
+- **Objective, Assessment and Plan are all empty**, not fabricated. The
+  consultation stopped early and never reached them. Same behaviour as the
+  2026-07-07 two-hats loop test (docket item 7); it has now held on real
+  room audio with a real early stop.
+- **Roughly 80 seconds of near-silence at the start produced no phantom
+  turns in the final transcript** — the first human turn begins at 94.4 s.
+  That is direct support for the 445 finding that the hallucinated-filler
+  problem is a **live-path** phenomenon (`distil-large-v3` re-transcribing
+  a short rolling buffer) and not a final-path one (WhisperX + silero VAD
+  over the whole file). It does not close docket item 8; it narrows it.
+
+**The two interface defects, both fixed the same day:**
+
+1. **Speak controls rendered enabled before the first connection.** The
+   doctor tapped a phrase button before pressing Start, got the red "Not
+   connected — cannot speak" panel, and only *then* did the controls grey
+   out. The standing rule broken from the one direction the 2026-07-25
+   audit could not see: before Start there has never *been* a socket, so
+   neither `onWsClose` nor `openSocket` had fired and the markup's default
+   enabled state was what rendered. `refreshSpeechControls()` is now called
+   at page load. **The old test passed throughout** — it asserts the
+   refresh inside `onWsClose`, and a test of the post-drop path cannot see
+   a pre-connection one; the new test asserts a **top-level** call.
+2. **An asked chip looked spent.** The doctor read the green chip as used
+   up and did not re-tap, which **cost the most important step of the
+   walkthrough** (hard rule 3's scroll-away Stop test). The briefed
+   suspicion was that the ↻ icon was not rendering. **It was rendering.**
+   What failed was legibility: three things said *done* (text greyed to
+   `--ink-faint`, a green ✓ ASKED label, and the button restyled to
+   `var(--green)` — this app's colour for approved / linked / mic-live,
+   every one a finished state) against one 12 px glyph saying *again*, and
+   the button's tooltip still read "Ask the patient this". The row now
+   keeps the receipt and the **button** says "↻ Again" in words at the
+   accent colour, tooltip "Already asked once — tap to ask it again".
+
+That second one produced a **companion to the standing rule**, recorded in
+`live.html` beside it: **a control that CAN act must not look as if it
+cannot.** Same cost — a tap not taken — from the opposite direction. Green
+is the specific trap in this app because the design system already spends
+it on finished states.
+
+One further defect found while establishing those facts and fixed with
+them: **`renderCDS` re-creates every question chip and did not call
+`refreshSpeechControls` afterwards**, so a CDS revision arriving before the
+disclosure rendered live-looking chips the server would have refused — the
+original rule, reached through a re-render.
+
+**Two open questions 448 raised, both investigated and neither acted on,
+because the fix is an owner decision. See the two sections below.**
+
+### 448's open question 1 — one human, two labels (diarisation)
+
+**Reported, not fixed.** Only one human was in the room. Turns 0 and 2 are
+labelled **Doctor** while being unmistakably the patient; turn 1 is
+labelled **Patient** and is correct. So a single speaker was **split across
+two labels** — the labels are not inverted.
+
+The cause is two lines, and neither is a bug in the ordinary sense:
+
+- `app/finalize.py` calls pyannote with **`num_speakers=2`** — a **fixed,
+  exact** count, not `min_speakers`/`max_speakers`. pyannote is therefore
+  *required* to return two clusters. With one voice in the room it has no
+  way to answer "one", so it splits that voice.
+- `attribute_roles` then takes **the first turn's cluster as Doctor** and
+  labels **every other cluster Patient**. Both halves of one human get a
+  label, and one of them is wrong by construction.
+
+**A single-human consultation cannot be labelled correctly by this code.**
+Both outcomes are wrong: if both clusters carry words, one human appears as
+both Doctor and Patient (448's shape); if all words land in one cluster,
+every turn is labelled **Doctor**, so a patient-only recording is
+attributed wholesale to the doctor.
+
+**And 7a has already broken the heuristic's stated premise.** "First
+speaker is the Doctor (they open the consultation)" was true when a human
+opened. In tap-to-ask the **machine** opens — disclosure, then invitation —
+and those are excluded, so the first *human* voice is now very often the
+patient. This is not a 7c problem waiting to arrive: it is live in 7a
+today. In 7c, where the machine asks and the doctor may barely speak, one
+human voice becomes the normal case rather than a testing artefact.
+(Recorded as context only — no action taken.)
+
+**The review page's Swap Doctor/Patient cannot fix 448**, and the reason
+is exactly as suspected: `consultations.swap_roles` is a whole-transcript
+`CASE role WHEN 'Doctor' THEN 'Patient' ELSE 'Doctor' END`, which assumes a
+uniform inversion. On 448 it would correct turns 0 and 2 and **break turn
+1**. Counted against the note: 5 of the 6 claims cite turns 0 or 2, so the
+swap takes the note from 1 claim agreeing with its cited turn's role to 5 —
+better, and still wrong, with the transcript itself now wrong on turn 1.
+**There is no per-turn role edit**: `PATCH /api/consultations/{cid}/turns/
+{idx}` takes `text` only.
+
+Options, for the owner to choose between — none of them started:
+
+1. **Stop forcing two speakers.** `min_speakers=1, max_speakers=2` lets
+   pyannote answer "one". Then a single-cluster consultation needs a role
+   rule that does not assume two voices, and 66–70 must be re-checked so a
+   fix for the one-human case does not degrade the two-human one.
+2. **Per-turn role correction** in the review UI, which is the honest
+   answer to a split cluster whatever the diarisation does, and is the only
+   option that can repair 448 itself.
+3. **Leave the heuristic and change what opens the consultation** — e.g.
+   have the doctor speak first deliberately. Cheapest, and it puts a
+   workflow constraint on the room to protect a code assumption.
+
+### 448's open question 2 — the grounding gate is speaker-blind
+
+**Reported, not fixed.** In 448 the claim *"Patient requests prostate
+cancer screening…"* cites turn 0, which the transcript labels **Doctor**,
+and the gate passed the note at **6/6**.
+
+`notes.validate_and_gate` checks exactly three things: that each cited
+index **exists** in the turn set, the cited **fraction** against
+`NOTE_MIN_CITED_FRACTION`, and the ⚠ flag (load-bearing regex AND cited
+turn confidence < 0.6). **It never reads `turn["role"]`.** Role appears in
+`app/notes.py` in one place only — `format_turns`, which builds the
+prompt text. So, plainly: **a claim beginning "Patient reports…" can cite a
+Doctor turn and pass the gate today.** 448 is the proof, five claims over.
+
+What closing it would cost, so the decision is informed:
+
+- **It inherits open question 1.** A speaker check keyed on `role` is only
+  as good as diarisation, and diarisation is currently *systematically*
+  wrong for one human — 7c's normal case. Built first, it would fire on
+  every single-human consultation and mostly report the other defect.
+  **Sequence matters: diarisation before the gate.**
+- **False positives are structural, not tunable.** Legitimate claims cite
+  doctor turns all the time — the doctor summarising the history back, or
+  one claim citing a question and its answer together. A rule reading
+  "'Patient' prefix ⇒ must cite a Patient turn" would reject good notes.
+- **The refusal tier is the wrong lever.** `validate_and_gate` has one
+  action, refuse the whole note. Speaker mismatch is per-claim, so it wants
+  a marker — but ⚠ currently means *low-confidence audio*, and overloading
+  it blurs two unrelated faults. It likely needs its own marker class.
+- **It goes stale on swap.** `swap-roles` runs *after* the note is drafted
+  and does not re-validate, so any stored verdict must be recomputed when
+  roles change or it silently describes the old labels.
 
 ### The real-room check — this, not the suite, is what proves it
 
@@ -1289,19 +1468,42 @@ lost while Phase 7 takes attention:**
    envelope-proportional threshold needs, and it is already being
    recorded. The good/faint ratios there are uncalibrated guesses and
    should be set from the same run.
-7. **The Phase 7a real-room check has been run THREE times on 2026-07-25
-   (consultations 445, 446, 447) and found a serious defect each time** —
-   the missing six minutes, then the offer eating taps, then no way to
-   stop an utterance. All are fixed and pinned by tests. **None has been
-   re-run since its fix**, so the guarantee is again proven in code and
-   not in the room. Re-run before calling 7a done — and note the pattern:
-   every round of room testing has found something no test would have.
+7. **The Phase 7a real-room check has now been run FOUR times, and the
+   fourth passed the guarantee** — 445, 446, 447 on 2026-07-25 (the missing
+   six minutes, the offer eating taps, no way to stop an utterance) and
+   **448 on 2026-07-28, where the transcript guarantee held**: seven system
+   utterances, all in the grey channel, none numbered, note grounding 6/6
+   citing human turns only. Full account in "Consultation 448" above; **448
+   must not be voided or purged.** The pattern held even so — 448 found two
+   interface defects (speak controls enabled before the first connection;
+   an asked chip that looked spent), both fixed and pinned, and it raised
+   **two open questions that are still open**: the diarisation
+   misattribution and the speaker-blind grounding gate. 448 **stopped
+   early**, so the parts of the walkthrough after the chip defect —
+   including hard rule 3's scroll-away Stop — have still not been done in a
+   room. Re-run before calling 7a done.
 8. **Hallucinated filler on ordinary silence: assessed, not built.** About
    fifteen phantom "Thank you." turns in 445's LIVE transcript. Confidence
    cannot catch it (there is none on the live path, and on the final path
    it does not separate); acoustic energy separates it by more than an
    order of magnitude. Findings and a sketch are in its own section; the
-   shape of any defence is the owner's call.
+   shape of any defence is the owner's call. **Narrowed by 448**: ~80 s of
+   near-silence at the start of that recording produced **no** phantom
+   turns in the final transcript, which is further support for this being a
+   live-path phenomenon only.
+9a. **448's two open questions, both REPORT-ONLY so far, in dependency
+   order.** (a) **Diarisation cannot label a single-human consultation**:
+   pyannote is called with a fixed `num_speakers=2`, so one voice is forced
+   into two clusters, and `attribute_roles` then labels one half Doctor and
+   the other Patient. 7a has already broken the "first speaker is the
+   Doctor" premise, because the machine now opens the consultation. Swap
+   Doctor/Patient assumes a uniform inversion and cannot repair it; there
+   is no per-turn role edit. (b) **The grounding gate is speaker-blind**:
+   `validate_and_gate` never reads `turn["role"]`, so "Patient reports…"
+   citing a Doctor turn passes — five claims over in 448. **(b) must not be
+   built before (a)**, or it will fire on every single-human consultation
+   and mostly report (a). Options and costs in the two "448's open
+   question" sections above.
 9. **The sound check is built but postponed** — untested in a room, and
    its good/faint thresholds are uncalibrated guesses.
 
@@ -1545,6 +1747,35 @@ docket item 5.
    should release the slot by itself. Not something to settle by quietly
    updating one row.
 
+11. **Fidelity specimen 5 — attribution drift (consultation 448,
+   2026-07-28).** For the claim-by-claim audit (item 2), and the same class
+   as the *wheelbarrow*/three-wheeler substitution in item 3 — the words
+   are close to the audio and the **attribution** is not.
+
+   | | |
+   |---|---|
+   | Transcript, turn 0 | "My friend was watching the farm, Clarkson's farm. And as you know, Jeremy Clarkson was diagnosed with …" |
+   | Note claim | "Patient requests prostate cancer screening due to worry **after seeing** Jeremy Clarkson's diagnosis **on TV** [0]." |
+
+   The transcript has the patient's *friend* watching, and the patient
+   hearing about it. The note has the patient seeing it on television. Both
+   sentences are about the same programme and only one of them is what was
+   said. It is cited, it is not flagged, and the citation chip resolves — so
+   **this is the specimen class that survives every gate the project
+   currently has**: grounding checks that a claim cites a real turn, never
+   that the claim is what the turn says. Nothing here proposes a defence;
+   it is recorded as evidence for the human-led audit.
+
+   **Recorded with it, from the same note: the ICE extraction returned
+   identical text for two different fields** — *"Patient's ideas: Worried
+   about prostate cancer [2]"* and *"Patient's concerns: Worried about
+   prostate cancer [2]"*, word for word. Ideas (what they think is going
+   on) and concerns (what they are worried about) are meant to be
+   different things, and duplicating one into both loses the distinction
+   the 2026-07-24 ICE prompt change exists to capture. The expectations
+   entry was distinct and correct ("Wants a PSA test as it is simple").
+   Prompt-level observation for the owner, not a code defect.
+
 ## Phase 5 — CLOSED with a negative result (2026-07-25)
 
 Benchmark stage (plan §7 "benchmark FIRST, train later") completed
@@ -1785,6 +2016,13 @@ defence layers, outermost first:
   (`gh repo view --json visibility`) — an earlier assumption that the
   fixed test password was world-readable was wrong; it is still a
   shared fixed string, hence the sweep below.
+- **`JoydeepSinha1988` (id 570) audits as `user.registered`, not
+  `user.registered_pending`, because it predates approve-to-activate** — it
+  was created 2026-07-24 19:29, before that landing, so it went active
+  without an approval step and its audit row carries no `ip`. It is a known
+  invited demo user who **has not yet logged in** and is **deliberately
+  being kept active**. Recorded so a future audit does not re-flag it as a
+  gate failure: it is not one, it is a pre-gate account.
 
 **Legacy junk-account sweep: DONE 2026-07-24** (owner-approved). All 489
 pre-isolation test accounts (`role_8hex` names, shared password
