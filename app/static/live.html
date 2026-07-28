@@ -72,6 +72,40 @@
   .stack .pane h2 { margin-bottom: .45rem; }
   .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
   @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
+
+  /* ---- STICKY TOP ROW (Phase 7b session 3 — revised variant A, owner-
+     approved 2026-07-28; docs/mockups/face_placement_mockup.html, body
+     class vA, is the approved mockup — B and C are rejected alternatives
+     kept for the record). Urgent actions LEFT, face RIGHT; the page
+     scrolls beneath it, so an unresolved red-flag alarm is on screen at
+     EVERY scroll position. The left half is the alarm's reserved home —
+     empty is the good state — and positions never swap. pointer-events
+     none on the wrapper so clicks pass through empty halves; the cards
+     re-enable it. z-index 4: above the panes, below the app header
+     (theme.css, z 5), and nowhere near the speaking bar (fixed, bottom
+     centre, z 60 — hard rule 3's control, untouched). top and card
+     heights are INTERIM sizing until the styling pass. */
+  .stickyrow {
+    position: sticky; top: 56px; z-index: 4;
+    max-width: 1080px; margin: .6rem auto 0; padding: 0 1.4rem;
+    display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem;
+    align-items: start; pointer-events: none;
+  }
+  .stickyrow .urgent, .stickyrow .facepane {
+    pointer-events: auto; box-shadow: 0 6px 24px #29231F14;
+  }
+  .facepane {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: .8rem 1rem;
+    display: flex; flex-direction: column; gap: .5rem;
+  }
+  .facepane .fhead { display: flex; align-items: center; }
+  .facepane .ftoggle {
+    margin-left: auto; font-size: .76rem; color: var(--green);
+    font-weight: 700; cursor: pointer; background: none; border: none;
+    padding: 0;
+  }
+  #faceMount { height: 190px; }  /* interim until the styling pass */
   .cds ul { margin: 0; padding-left: 1.15rem; }
   .cds li { margin-bottom: .4rem; font-size: .98rem; }
   .cds .why { display: block; color: var(--ink-faint); font-size: .8rem; font-weight: 400; }
@@ -337,6 +371,43 @@
   <div id="status" class="hint"></div>
 </div>
 
+<!-- STICKY TOP ROW — Phase 7b session 3, revised variant A (owner-approved
+     2026-07-28; supersedes session 2's top-of-stack placement). Urgent
+     actions LEFT, face RIGHT, the page scrolling beneath.
+     MEMBERSHIP, not visibility, is the state model (tested that way):
+     - alarm live + face on  → both cards;
+     - only one live         → that card in its own half, the other half
+                               EMPTY — positions never swap, the left half
+                               is the alarm's reserved home and empty is
+                               the good state;
+     - neither               → this whole row is absent from the DOM.
+     Face off still means its card absent and no face_state traffic (the
+     study's control arm). updateStickyRow() below is the only writer. -->
+<div class="stickyrow" id="stickyRow">
+  <div id="stickyLeft">
+    <div class="urgent" id="urgentBox">
+      <h2 class="pane-label">⚠ Urgent actions</h2>
+      <ul id="urgentList"></ul>
+    </div>
+  </div>
+  <div id="stickyRight">
+    <div class="facepane" id="facePane">
+      <div class="fhead">
+        <h2 class="pane-label">Assistant face</h2>
+        <!-- The on/off toggle lives on the face card. With the card
+             absent (face off) there is deliberately NO manual-on control:
+             the on-path is the disclosure auto-on (or the study's
+             face-off arm runs with that flag disabled and no face at
+             all). A manual off is final for the session — the doctor
+             always wins. -->
+        <button class="ftoggle" id="faceToggle" type="button" aria-pressed="true"
+                title="Turn the face off for the rest of this consultation">● on</button>
+      </div>
+      <div id="faceMount"></div>
+    </div>
+  </div>
+</div>
+
 <div class="stack">
 
   <!-- unlinked state: walk-in registration (recording stays gated) -->
@@ -374,27 +445,9 @@
     <button id="speakErrorDismiss" type="button">Dismiss</button>
   </div>
 
-  <!-- ROBOT FACE (Phase 7b) — DELIBERATELY UNSTYLED machinery, and this
-       placement is INTERIM until the styling pass (DESIGN_SPEC.md 7b
-       addendum; final placement is an owner decision). Top of the stack,
-       directly below the session header and above the urgent-actions
-       position, so it is visible without scrolling when a patient is in
-       front of the screen — the transient alert banners above keep
-       priority (rule 3). Default OFF, and OFF is a first-class state: it
-       is the control arm of the planned CARE study, so when the face is
-       off the renderer is ABSENT (no canvas in the DOM, no face_state
-       traffic from the server) — never merely blanked. -->
-  <div class="pane" id="facePane">
-    <h2 class="pane-label">Robot face</h2>
-    <button id="faceToggle" type="button" aria-pressed="false">Face: off</button>
-    <div id="faceMount" style="display:none; height:280px; max-width:420px"></div>
-  </div>
-
-  <!-- 1. URGENT ACTIONS — always first -->
-  <div class="urgent" id="urgentBox" style="display:none">
-    <h2 class="pane-label">⚠ Urgent actions</h2>
-    <ul id="urgentList"></ul>
-  </div>
+  <!-- (URGENT ACTIONS moved to the sticky row above the stack —
+       session 3, revised variant A: the alarm must be on screen at every
+       scroll position, so its home is the sticky row's LEFT half.) -->
 
   <!-- 2. QUESTIONS TO ASK · SIGNS TO CHECK -->
   <div class="duo">
@@ -872,15 +925,17 @@ function fillList(listEl, idleEl, items, build) {
 }
 
 function renderCDS(a) {
-  const urgentBox = document.getElementById('urgentBox');
+  // The urgent panel's home is the sticky row's LEFT half (session 3).
+  // Membership, not display, is the state: the captured references are
+  // used because getElementById cannot find a detached node.
   const urgent = a.urgent_actions || [];
-  urgentBox.style.display = urgent.length ? '' : 'none';
-  const uList = document.getElementById('urgentList');
-  uList.innerHTML = '';
+  alarmLive = urgent.length > 0;
+  updateStickyRow(alarmLive, faceOn);
+  urgentListEl.innerHTML = '';
   for (const u of urgent) {
     const li = el('li', null, u.action);
     li.appendChild(el('span', 'why', u.reason));
-    uList.appendChild(li);
+    urgentListEl.appendChild(li);
   }
   // Tap-to-ask: each agenda question gains a speaker affordance. The
   // button carries only the assessment version and the index — never the
@@ -1074,16 +1129,19 @@ function refreshSpeechControls() {
             : busy ? 'One utterance at a time'
             : 'Speak this to the patient';
   });
-  // Phase 7b: the face runs inside a live session only. Same standing
-  // rule as every control here — disabled with the reason on it, never a
-  // tap that does nothing. Looked up by id (not the const declared below)
-  // because this function runs once at page load before that declaration.
+  // Phase 7b: the face-off toggle exists only while its card is in the
+  // DOM (face on). Same standing rule as every control here — disabled
+  // with the reason on it, never a tap that does nothing. Looked up by id
+  // (not the const declared below) because this runs once at page load
+  // before that declaration, and a DETACHED card is not findable by id —
+  // the null guard is the detached case, which needs no refresh.
   const faceBtn = document.getElementById('faceToggle');
-  faceBtn.disabled = !live;
-  if (faceBtn.disabled) {
-    faceBtn.title = 'Start the consultation first — the face runs inside a live session';
-  } else {
-    faceBtn.title = 'Toggle the robot face (off is a first-class state — the study\'s control arm)';
+  if (faceBtn) {
+    const connected = ws && ws.readyState === WebSocket.OPEN;
+    faceBtn.disabled = !connected;
+    faceBtn.title = connected
+      ? 'Turn the face off for the rest of this consultation'
+      : 'Reconnecting — the face cannot be changed until the connection is back';
   }
   // Disabled while recording (spec 10.3): a test phrase inside a live
   // consultation would be a system utterance and would need the whole
@@ -1535,51 +1593,82 @@ discCheck.addEventListener('change', () => {
 // state, with the same reason on them, as they hold after a drop.
 refreshSpeechControls();
 
-// ============================================== Phase 7b: the robot face
+// ============================== Phase 7b: the robot face + the sticky row
 //
-// Machinery only — styling waits for DESIGN_SPEC.md. Default OFF, and OFF
-// is a first-class state (the control arm of the planned CARE study): the
-// server sends no face_state traffic and the renderer is ABSENT from the
-// DOM, not blanked. The client renders the panel only on the server's
-// face_toggled confirmation, so the panel can never claim a state the
+// Machinery only — styling waits for the styling pass. Default OFF, and
+// OFF is a first-class state (the control arm of the planned CARE study):
+// the server sends no face_state traffic and the face CARD is absent from
+// the DOM, not blanked. The client changes state only on the server's
+// face_toggled confirmation, so the card can never claim a state the
 // server is not in.
+//
+// Session 3 (revised variant A, owner-approved 2026-07-28): the face card
+// lives in the sticky row's RIGHT half; the urgent-actions panel lives in
+// its LEFT half, so an unresolved alarm is on screen at every scroll
+// position. MEMBERSHIP is the state model — updateStickyRow() is the ONLY
+// writer of what is in the row, and the row itself leaves the DOM when
+// both halves are empty.
 //
 // The vendored face3d.js (copied unchanged) starts one requestAnimation-
 // Frame loop per init and has no teardown, so it is initialised at most
-// ONCE per page; toggling detaches and re-attaches the same stage node.
-// Nothing loads until the first toggle-on — face-off costs zero.
+// ONCE per page; toggling detaches the whole card, stage included.
+// Nothing loads until the first face-on — face-off costs zero.
+const stickyRow = document.getElementById('stickyRow');
+const stickyLeft = document.getElementById('stickyLeft');
+const stickyRight = document.getElementById('stickyRight');
+const facePane = document.getElementById('facePane');
+const urgentBoxEl = document.getElementById('urgentBox');
+const urgentListEl = document.getElementById('urgentList');
+const stackEl = document.querySelector('.stack');
 const faceToggle = document.getElementById('faceToggle');
 const faceMount = document.getElementById('faceMount');
 let faceOn = false;      // server-confirmed state
+let alarmLive = false;   // maintained by renderCDS
 let faceStage = null;    // the once-initialised renderer node
 
+// Presence logic, all four combinations. Positions NEVER swap: the left
+// half is the alarm's reserved home (empty is the good state), the right
+// half is the face's. Detached nodes keep their identity — getElementById
+// cannot find them, which is why every reference above is captured once
+// at load.
+function updateStickyRow(alarm, face) {
+  if (alarm) { if (!urgentBoxEl.parentNode) stickyLeft.appendChild(urgentBoxEl); }
+  else if (urgentBoxEl.parentNode) urgentBoxEl.parentNode.removeChild(urgentBoxEl);
+  if (face) { if (!facePane.parentNode) stickyRight.appendChild(facePane); }
+  else if (facePane.parentNode) facePane.parentNode.removeChild(facePane);
+  if (alarm || face) {
+    if (!stickyRow.parentNode) stackEl.parentNode.insertBefore(stickyRow, stackEl);
+  } else if (stickyRow.parentNode) {
+    stickyRow.parentNode.removeChild(stickyRow);
+  }
+}
+
+// The toggle on the card turns the face OFF — and off is final for the
+// session: with the card gone there is deliberately no manual-on control
+// (the on-path is the disclosure auto-on), and the server never overrides
+// a manual off. The doctor always wins.
 faceToggle.addEventListener('click', () => {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
-  ws.send(JSON.stringify({type: 'face', on: !faceOn}));
+  ws.send(JSON.stringify({type: 'face', on: false}));
 });
 
 async function applyFaceToggle(on) {
   faceOn = on;
-  faceToggle.setAttribute('aria-pressed', String(on));
-  faceToggle.textContent = on ? 'Face: on' : 'Face: off';
+  updateStickyRow(alarmLive, on);
   refreshSpeechControls();
-  if (on) {
-    if (!faceStage) {
-      faceStage = document.createElement('div');
-      faceStage.id = 'face3dStage';
-      faceStage.style.height = '100%';
-      faceMount.appendChild(faceStage);
-      const mod = await import('/static/face3d.js');
-      mod.default('face3dStage');
-    } else if (!faceStage.parentNode) {
-      faceMount.appendChild(faceStage);
-    }
-    faceMount.style.display = '';
-  } else {
-    faceMount.style.display = 'none';
-    if (faceStage && faceStage.parentNode) faceStage.remove();  // absent, not blanked
+  if (on && !faceStage) {
+    faceStage = document.createElement('div');
+    faceStage.id = 'face3dStage';
+    faceStage.style.height = '100%';
+    faceMount.appendChild(faceStage);   // travels with the card thereafter
+    const mod = await import('/static/face3d.js');
+    mod.default('face3dStage');
   }
 }
+
+// Both cards start OUT of the DOM: no alarm and no face is the opening
+// state, and the sticky row itself must be absent then.
+updateStickyRow(false, false);
 
 // ============================================================= start / stop
 function standDown(statusText) {
