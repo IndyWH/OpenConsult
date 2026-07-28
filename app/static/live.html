@@ -374,6 +374,22 @@
     <button id="speakErrorDismiss" type="button">Dismiss</button>
   </div>
 
+  <!-- ROBOT FACE (Phase 7b) — DELIBERATELY UNSTYLED machinery, and this
+       placement is INTERIM until the styling pass (DESIGN_SPEC.md 7b
+       addendum; final placement is an owner decision). Top of the stack,
+       directly below the session header and above the urgent-actions
+       position, so it is visible without scrolling when a patient is in
+       front of the screen — the transient alert banners above keep
+       priority (rule 3). Default OFF, and OFF is a first-class state: it
+       is the control arm of the planned CARE study, so when the face is
+       off the renderer is ABSENT (no canvas in the DOM, no face_state
+       traffic from the server) — never merely blanked. -->
+  <div class="pane" id="facePane">
+    <h2 class="pane-label">Robot face</h2>
+    <button id="faceToggle" type="button" aria-pressed="false">Face: off</button>
+    <div id="faceMount" style="display:none; height:280px; max-width:420px"></div>
+  </div>
+
   <!-- 1. URGENT ACTIONS — always first -->
   <div class="urgent" id="urgentBox" style="display:none">
     <h2 class="pane-label">⚠ Urgent actions</h2>
@@ -429,19 +445,6 @@
   <div class="pane">
     <h2 class="pane-label">Live transcript</h2>
     <div id="transcript" style="margin-top:.5rem"><span id="partial" class="partial"></span></div>
-  </div>
-
-  <!-- 5. ROBOT FACE (Phase 7b) — DELIBERATELY UNSTYLED machinery.
-       DESIGN_SPEC.md and the mockups are not available yet; the bedside-
-       device styling is a later pass, not something to invent here.
-       Default OFF, and OFF is a first-class state: it is the control arm
-       of the planned CARE study, so when the face is off the renderer is
-       ABSENT (no canvas in the DOM, no face_state traffic from the
-       server) — never merely blanked. -->
-  <div class="pane" id="facePane">
-    <h2 class="pane-label">Robot face</h2>
-    <button id="faceToggle" type="button" aria-pressed="false">Face: off</button>
-    <div id="faceMount" style="display:none; height:280px; max-width:420px"></div>
   </div>
 
 </div>
