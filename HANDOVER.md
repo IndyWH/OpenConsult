@@ -51,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled (see "Phase 7b — session 1"). **Session 2 the same day**: full expression range by owner decision (evaluation-first; brief decision 3 superseded for this phase, clinical retained as the comparison arm), the CDS affect hint, interim top-of-stack placement, and the lost specs reconstructed and committed (see "Phase 7b — session 2"). **Session 3, also the same day**: sticky top row (urgent LEFT, face RIGHT — supersedes session 2's placement), auto-on at Disclosure, the auto-chained invitation, the caged silence nudge (the only autonomous utterance until 7c), and the sound-check wording fix (see "Phase 7b — session 3"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled (see "Phase 7b — session 1"). **Session 2 the same day**: full expression range by owner decision (evaluation-first; brief decision 3 superseded for this phase, clinical retained as the comparison arm), the CDS affect hint, interim top-of-stack placement, and the lost specs reconstructed and committed (see "Phase 7b — session 2"). **Session 3, also the same day**: sticky top row (urgent LEFT, face RIGHT — supersedes session 2's placement), auto-on at Disclosure, the auto-chained invitation, the caged silence nudge (the only autonomous utterance until 7c), and the sound-check wording fix (see "Phase 7b — session 3"); **room-checked the same evening (452, 454)**. **Session 4**: the Face pill (manual on-path; "manual off is final" amended by the owner), questions_to_ask ordered by clinical priority (harness re-run 9/10, the known script-02 boundary case the only FAIL), and the first-assessment latency report (see "Phase 7b — session 4"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -1838,7 +1838,9 @@ this session are the owner's, verbatim.
   **STUDY-ARM WARNING: face-off arm sessions must run with this flag
   DISABLED, or the arm silently breaks** — the disclosure will switch
   the face on mid-session. A manual face-off is never overridden again
-  in the same session; the doctor always wins.
+  in the same session; the doctor always wins. *(Amended session 4: the
+  Face pill can now turn it back on manually — what stays suppressed
+  after a manual off is the AUTO-on. See the session 4 section.)*
 - **The invitation auto-chains after a completed disclosure**
   (`AUTO_INVITATION_AFTER_DISCLOSURE`, default true): a disclosure that
   plays THROUGH (end_reason complete) is followed by the existing
@@ -1876,6 +1878,90 @@ this session are the owner's, verbatim.
   only when the device label itself indicates headphones; otherwise it
   is conditional. Same lesson as the single-voice notice: a notice that
   can assert something untrue teaches the doctor to discount it.
+
+## Phase 7b — session 4 (2026-07-28): the pill, agenda priority, latency report
+
+Session 3 passed its room check the same evening (consultations 452 and
+454: sticky row, auto-on, invitation chain, sound-check wording all
+verified in the room). Two follow-on items and one investigation.
+
+**1. The Face pill — and one session-3 rule amended, by the owner.**
+Room finding: after a manual face-off nothing could turn the face back
+on, and before the disclosure there was no on-path at all. A Face pill
+now sits beside Sound check: a full toggle showing its current state,
+same toggle path, `face.toggled` audit with via "manual", disabled with
+its reason until a live session exists. **"A manual off is final" is
+amended: the pill can turn the face back on.** That rule existed only
+because no control could reverse an off; the owner has now added one.
+What stays: the disclosure AUTO-on remains suppressed after a manual
+off — only the pill overrides one. The session-3 tests were amended
+rather than deleted, each with a comment naming this decision.
+
+**2. `questions_to_ask` is ordered by clinical priority** (CDS-side
+prompt change only; schema untouched; the page renders in the order
+received and has no client-side sort). The order is explicitly living —
+re-rank freely — while the differential's pinned-name revision rules
+stay as documented. **Harness re-run: 9/10 pass**, the one FAIL being
+script-02 dengue, the docket's documented boundary case, which also
+failed at baseline. Fire/silence and first-fire turns identical to the
+stored baseline on all nine common scripts; script 10 (testicular
+torsion) is in EXPECTATIONS but predated the stored JSON and passes.
+Differential stability moved slightly both ways (aggregate
+unchanged-update count 67/72 → 62/72; 09 improved) — a changed prompt
+shifts temperature-0 outputs, and this is reported rather than glossed.
+Spot check (01_chest_pain): radiation tops the agenda while
+undetermined, answered questions drop off, differential untouched 4/4.
+**REPORT, as asked: an explicit priority field is NOT materially more
+robust** — every consumer (the tap-to-ask panel, 7c's "top agenda
+question") needs only rank order, which the array already carries; a
+field would add schema churn and a second thing the model can get
+wrong. Revisit only if the UI ever needs to DISPLAY per-question
+urgency.
+
+**3. First-assessment latency (REPORT ONLY — nothing changed).** Room
+finding: some patients stop talking before the questions box first
+populates. Measured from code and the journals of 452 and 454:
+
+- **The trigger:** audio commits through the rolling live path
+  (re-transcribe every `PROCESS_INTERVAL_S` = 1.5 s; a segment commits
+  only when it ends > `COMMIT_MARGIN_S` = 2.0 s before the newest
+  audio); the first CDS call fires when committed transcript reaches
+  `CDS_MIN_NEW_CHARS` = **150 characters** (main.py) — roughly 15–40 s
+  of patient speech depending on pace and pauses. `engine.update` then
+  runs TWO sequential model calls (assessment, then the urgency
+  officer); the result is sent on the next ≤2 s loop pass; render is
+  immediate.
+- **452 (MedGemma warm):** first human speech ≈19:18:00 → assessment
+  call started 19:18:43 (43 s accumulating 150 chars) → assessment
+  8.7 s + urgency 3.2 s → questions on screen ≈19:18:55. **≈55 s
+  speech-to-questions.**
+- **454 (MedGemma cold):** first human speech ≈20:13:44 → first call
+  ≈20:14:14, which had to RELOAD MedGemma (453's finalisation had
+  unloaded it): 14.4 s including the llama-server start, + urgency
+  4.5 s → questions ≈20:14:33. **≈49 s speech-to-questions,** ~10 s of
+  it the reload — the num_ctx-mismatch reload cost already measured in
+  the VRAM section, now observed on the live path.
+- **Where the time goes:** the 150-char gate dominates (30–45 s); the
+  two sequential model calls add 12–19 s; commit margin and loop tick
+  add a ~3.5–5 s floor; render is negligible.
+- **Options, all the owner's to choose (none taken):** (a) a lower
+  FIRST-call threshold (e.g. ~50 chars, 150 thereafter) — pulls the
+  first population earlier by ~20–30 s at the cost of one extra
+  MedGemma round (~12 s GPU) and a thinner first differential; the
+  prompt already says "early, prefer a short list", and the revision
+  rules cope — the pinned-name rule just starts from a smaller list.
+  The urgency officer would also run earlier, which is a safety gain,
+  and it is stateless so an extra early round cannot anchor it. (b) A
+  first-call-specific trigger (first committed turn, or N seconds after
+  the invitation) — same effect, more code paths. (c) Send the
+  assessment to the client before the urgency call returns — saves
+  3–4.5 s every round but splits one message into two and reorders the
+  alarm relative to the panel; the alarm must never arrive later than
+  it does today. (d) Keep MedGemma resident across finalisation by
+  matching num_ctx (the reload was ~10 s of 454's 49) — already flagged
+  in the VRAM section as fixable and unfixed. (e) A lighter first
+  prompt — saves a few seconds of generation; another prompt variant to
+  keep coherent with the revision rules.
 
 ## Shared schema module (2026-07-25)
 
