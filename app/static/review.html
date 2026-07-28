@@ -668,6 +668,14 @@ function ackButton(endpoint) {
 }
 
 function renderSingleVoiceBanner() {
+  // WORDING (2026-07-28): this must describe what the SYSTEM DID, never assert
+  // what was in the room. It used to say "only one voice was detected in this
+  // recording" — and recording 66, two real people, arrived on this exact path,
+  // so that sentence can be flatly false. A safety notice that can state
+  // something untrue about the consultation teaches the doctor to discount it.
+  //
+  // What is always true is that the roles were not determined from the audio
+  // and that every line was labelled Patient by default. Say that.
   const banner = document.getElementById('singleVoiceBanner');
   if (!state.single_voice_detected) { banner.style.display = 'none'; return; }
   const acked = !!state.single_voice_ack_at;
@@ -680,10 +688,17 @@ function renderSingleVoiceBanner() {
     ? 'Speaker labels checked'
     : 'Speaker roles were NOT determined from the audio'));
   box.appendChild(el('p', null,
-    'Only one voice was detected in this recording, so every line has been '
-    + 'labelled Patient by default — not by measurement. Read the transcript '
-    + 'below and correct any line whose speaker is wrong (click its label) '
-    + 'before approving.'));
+    'Speaker identification returned a single voice for this recording, so '
+    + 'every line has been labelled Patient by default — not by measurement. '
+    + 'Read the transcript below and correct any line whose speaker is wrong '
+    + '(click its label) before approving.'));
+  // Declared and defaulted are different statements, and the doctor should be
+  // able to tell which one they are reading.
+  box.appendChild(el('p', null, state.speakers_declared
+    ? `You declared that ${state.speakers_used === 1 ? 'only you spoke' :
+        'two people spoke'}, and speaker identification was run for `
+      + `${state.speakers_used}.`
+    : 'Nobody declared how many people spoke, so the default of two was used.'));
   box.appendChild(el('p', 'when',
     'The note was drafted from these labels. If they are wrong, correct them '
     + 'and Regenerate.'

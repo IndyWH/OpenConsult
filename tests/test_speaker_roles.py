@@ -467,6 +467,43 @@ def test_the_label_itself_is_the_control():
     assert ".turn .who .rolebtn {" in html
 
 
+def test_the_single_voice_notice_never_asserts_what_was_in_the_room():
+    """Recording 66 — two real people — arrived on the single-voice path, so a
+    notice claiming only one voice was in the recording can be flatly false. A
+    safety notice that can state something untrue about the consultation teaches
+    the doctor to discount it.
+
+    What is always true is what the SYSTEM DID: identification returned one
+    voice, and every line was labelled Patient by default.
+    """
+    html = _review_html()
+    assert "Only one voice was detected in this recording" not in html, (
+        "that sentence was false for recording 66")
+    assert "Speaker identification returned a single voice" in html
+    assert "labelled Patient by default" in html
+    assert "correct any line whose speaker is wrong" in html
+    assert "before approving" in html
+
+
+def test_the_notice_distinguishes_a_declared_count_from_a_defaulted_one():
+    """Two because the doctor said so and two because nobody answered are the
+    same number and different statements."""
+    html = _review_html()
+    assert "state.speakers_declared" in html
+    assert "You declared that" in html
+    assert "Nobody declared how many people spoke" in html
+
+
+def test_the_single_voice_gate_is_unchanged():
+    """The rewording must not weaken the gate: the acknowledgement and the
+    server-side 409 stay exactly as built."""
+    html = _review_html()
+    assert "ackButton('acknowledge-single-voice')" in html
+    from pathlib import Path
+    main = Path("app/main.py").read_text()
+    assert "single_voice_detected" in main and "single_voice_ack_at" in main
+
+
 def test_the_swap_control_survives():
     """A genuine whole-consultation inversion is still a real case; per-turn
     correction is an addition, not a replacement."""
