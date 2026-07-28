@@ -51,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled until DESIGN_SPEC.md arrives (see "Phase 7b — session 1"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -73,6 +73,8 @@ app/letters.py         referral letters: suggest/draft calls + grounding gate
 app/schema.py          one entry point + ordering for the whole DB schema
 app/speech.py          Phase 7a: TTS subprocess adapter, phrases, ref resolution
 app/system_utterances.py  what the system said, and its exclusion spans
+app/face.py            Phase 7b: event→impulse layer + per-muscle hard caps
+vendor/kindalive/      vendored face engine, pinned commit (see NOTICE)
 app/monitor.py         public monitoring pulse: aggregate counts, 10 s cache
 app/ratelimit.py       per-IP auth rate limits + proxy-aware client_ip
 app/mock_scripts.py    mock-script parser (turns)
@@ -1593,6 +1595,136 @@ Worth also checking, since they are cheap: pull the speaker cable and tap
 a chip (a red error panel, not silence); and confirm
 `/api/monitor/pulse` reports `silence_hallucinations_today: 0` after the
 consultation finalises.
+
+## Phase 7b — session 1 (2026-07-28): the machinery, unstyled
+
+Built to `PHASE_7B_KINDALIVE.md` as written. Four commits ("Phase 7b
+1/4 … 4/4"), no new dependency anywhere — `pyproject.toml` and `uv.lock`
+are byte-identical; vendoring is file copying, the same arms-length
+pattern as Piper.
+
+- **Vendored kindalive at pinned commit
+  `a29bcf73e2c44cbf2fa6549ae28d1a9d1f6f37b6`** (MIT, upstream LICENSE kept
+  beside the code, attribution in NOTICE): `engine/`, `emotions/`,
+  `expression/face.py` **and `face_3d.py`** — kept because the
+  `setTargets` payload construction (`face_payload`) lives there, not in
+  `face.py` — plus `base.py` and the four config TOMLs, all under
+  `vendor/kindalive/`, imports rewritten to `vendor.kindalive`.
+  `face3d.js` copied **unchanged** into `app/static/`. The upstream LLM
+  interpreter was deliberately NOT vendored (owner decision 2: impulses
+  are injected deterministically). One structural note a future reader
+  needs: **at this commit the upstream TOMLs are documentation mirrors**
+  — upstream's presets actually live in a Python module that was not
+  vendored — so this project reads the vendored `personalities.toml` with
+  stdlib `tomllib` as its real config source (`app/face.py::load_preset`).
+- **`[clinical]` preset** in the vendored `personalities.toml`, from
+  stoic: GABA 0.7 / serotonin 0.55 baselines, adrenaline 0.02 with a 72 s
+  effective half-life, affinity 0.4, interaction coupling 0.5. Every
+  number is a commented first guess; the calibration pass sets them from
+  real use. Measured: the same 0.5 adrenaline spike peaks lower and
+  settles ~70 s vs ~85 s against [default]. One subtlety recorded in the
+  TOML: lowering `interaction_scale` also weakens the GABA→adrenaline
+  brake, so the shortened half-life is deliberately the main damping
+  mechanism.
+- **`app/face.py`** — everything between consultation events and the
+  engine, deterministic (no model calls, no randomness, injectable
+  clock, GPU-free). Events map to small commented impulses:
+  consultation started, patient audio arriving (rate-limited to one
+  injection per 2 s; frames inside a speaking window are skipped — that
+  audio is our own playback), system speech started/ended (fed from the
+  same server-held speak windows that drive transcript exclusion), stop.
+  **The urgency alarm is deliberately NOT wired to the face** — a
+  listening presence must not signal clinical state to the patient; the
+  reason is in the module docstring and a test fails if an urgency event
+  ever appears in the mapping.
+- **Hard caps as a per-muscle policy in our layer** (the preset expresses
+  intent, the caps enforce it): nine muscles **PINNED** at the preset's
+  resting neutral — anger, frustration, disgust, fear and distress are
+  unexpressible, not damped — including the inner-brow raise (empathic
+  concern sits next to sadness; allowing a little of it is the owner's
+  clinical call, so it starts pinned), `jaw_open` (laughter; the TTS
+  mouth flap is unaffected — face3d.js layers `setSpeaking`'s flap on top
+  client-side) and `lip_pucker` (ambiguous). Three **BANDED** —
+  `eyelid_upper_raise` (attention), `cheek_raise` and `lip_corner_pull`
+  (warmth) — clamped to neutral‥neutral+`FACE_BAND` (env, default 0.15).
+  The **FREE** class (blink, breathing, saccades, speech flap) is
+  client-side self-animation the server never sends. Full commented
+  table in `app/face.py`; loosening any row is the calibration pass.
+  Adversarial test: chemistry driven to anger/disgust maxima (brow_lower
+  reaches 0.85 uncapped) and every emitted payload holds pinned at
+  exactly neutral.
+- **Wired over the existing WebSocket, no new transport.** Client sends
+  `{"type":"face","on":bool}`; server confirms with `face_toggled`
+  BEFORE the first tick, then streams `face_state` payloads at
+  `FACE_TICK_HZ` (env, default 5). **Default OFF, and OFF is a
+  first-class state** — no driver, no `face_state` traffic at all, and
+  the renderer node is absent from the DOM, not blanked: it is the
+  control arm of the planned CARE study. The unstyled panel sits last in
+  the live page's stack; the toggle is disabled with its reason on the
+  control until a live session exists. `setSpeaking` follows the same
+  client transitions as the speaking pill. One client-side constraint
+  worth knowing: the vendored `face3d.js` starts one rAF loop per init
+  and has no teardown, so the page initialises it at most once and
+  detaches/re-attaches a single stage node on toggle.
+- **Audit (hard rule 5):** `face.toggled` per toggle (carries the
+  session id and audio offset — no consultation row exists until Stop),
+  plus one consultation-linked **`face.arms`** row written by
+  `_complete_session` with the whole toggle history, so reconstructing a
+  study arm is one query.
+- **Deliberately deferred:** styling (DESIGN_SPEC.md and the mockups are
+  in the owner's Downloads, not the repo — ask before styling anything);
+  the CDS affect hint (owner decision 2 allows it later; nothing model-
+  driven ships in this pass); the calibration pass (preset numbers, band
+  width, impulse sizes, mood accent recolour). Face chemistry does not
+  survive a reconnect (the driver is per-session but its tick task is
+  per-connection and the driver is reset with a fresh toggle) — accepted
+  for session 1, revisit only if it matters in a room.
+
+### Are pre-merge WhisperX segments persisted? (REPORT ONLY, 2026-07-28)
+
+Investigated for `RAW_TRANSCRIPT_VIEW_SPEC.md` (approved, not yet in the
+repo). **The decision on building it is the owner's; nothing was
+changed.**
+
+- **What finalisation persists today:** `transcript_turn` rows only —
+  post-merge, post-role (idx, role, start_s, end_s, text, confidence) —
+  plus `quality_signals`, the single-voice flag, `system_utterance`
+  rows and the note. **The raw ASR segments survive nowhere**: no table,
+  no JSON on disk, no log line. One partial exception: when the silence
+  invariant fires, up to 10 of the segments it DROPPED (start/end/first
+  200 chars) go into the `transcript.silence_hallucination` audit row —
+  dropped ones only, and only on that anomaly.
+- **Where they last exist:** `app/finalize.py::transcribe_and_diarise`,
+  local `raw_segments` — created by `drop_segments_in_excluded_spans(...)`
+  and last consumed by `merge_into_turns(raw_segments)` a few lines
+  later. They are not in the function's returned dict, so they die when
+  it returns. The function runs in `asyncio.to_thread` with no DB
+  access, so the minimal persistence point is: add them to the returned
+  dict (pure data change inside the thread), then write them in
+  `finalize_consultation` beside `save_turns` — which also covers
+  refused (`unreliable_transcript`) consultations, since `save_turns`
+  runs before the quality gate.
+- **Minimal shape:** one row per segment mirroring `transcript_turn` —
+  `(consultation_id, idx, cluster text, start_s, end_s, text,
+  confidence, dropped bool)` where `cluster` is pyannote's SPEAKER_xx
+  majority label and `dropped` marks silence-invariant removals if the
+  view should show them. Size is trivial: segments are roughly
+  sentence-sized (recording 66 → 99 segments over 300 s), so a 10-minute
+  consultation is ~200 rows / tens of KB — against a ~19 MB WAV. Keeping
+  full per-word JSON would multiply that by ~10 and is not needed for
+  the spec's view.
+- **Are `merge_into_turns()`'s inputs the segments the spec means?**
+  Yes — post-ASR (WhisperX transcribe → align → `assign_word_speakers`),
+  pre-merge, pre-role — with two nuances stated so the spec can decide:
+  (1) they already carry **cluster labels** (per-word SPEAKER_xx), just
+  not roles; (2) they are **post-silence-invariant** — segments mostly
+  inside excluded spans are already gone. If the view must show those
+  too, persist one line earlier (`result["segments"]`) or store both
+  with the `dropped` flag above.
+- The spec's read-from-storage-never-rebuild rule is confirmed
+  load-bearing: re-running the pipeline is not reproducible (WhisperX
+  turn counts moved ±2‥+5 on identical audio in the 2026-07-28 item-5
+  verification), so a rebuilt view would describe a different run.
 
 ## Shared schema module (2026-07-25)
 
