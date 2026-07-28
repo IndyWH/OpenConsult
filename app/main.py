@@ -1213,6 +1213,14 @@ async def edit_turn(
 # abandoned).
 LIVE_RECONNECT_GRACE_S = float(os.getenv("LIVE_RECONNECT_GRACE_S", "120"))
 
+# Phase 7b session 3 — owner decision, 2026-07-28. Auto-on at Disclosure:
+# the SPOKEN disclosure switches the face on ("the owner named the
+# button" — the 'in my own words' tick does not). The face-off study arm
+# must run with this DISABLED, or the arm silently breaks (recorded in
+# HANDOVER). A manual face-off is never overridden — the doctor always
+# wins.
+FACE_AUTO_ON_DISCLOSURE = os.getenv("FACE_AUTO_ON_DISCLOSURE", "true").lower() != "false"
+
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
     """Turn a live session's received audio into a queued consultation.
@@ -1494,6 +1502,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # and the toggle history for study-arm reconstruction.
             "face": None,
             "face_toggles": [],
+            # Session 3: a manual face-off is FINAL for the session — the
+            # disclosure auto-on never overrides it (the doctor always
+            # wins).
+            "face_manual_off": False,
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -1635,6 +1647,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await refuse_speech(f"synthesis failed: {exc}")
             return
         entry["pending_utterance"] = utterance
+        # Auto-on at Disclosure (owner decision 2026-07-28): the SPOKEN
+        # disclosure switches the face on — the "in my own words" tick
+        # does not (the owner named the button). Never after a manual
+        # off, and never when the flag is down (the face-off study arm).
+        if (FACE_AUTO_ON_DISCLOSURE
+                and utterance.ref_detail.get("id") == "disclosure"
+                and entry["face"] is None
+                and not entry["face_manual_off"]):
+            await handle_face({"on": True}, via="disclosure_auto")
         await audit.log(user["id"], "speech.requested", None, None,
                         {"utterance_id": utterance.utterance_id,
                          "ref_kind": utterance.ref_kind,
@@ -1731,12 +1752,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                  span["end_byte"] - span["start_byte"]),
              **({"cut_latency_ms": int(cut_latency)} if cut_latency is not None else {})})
 
-    async def handle_face(payload: dict) -> None:
+    async def handle_face(payload: dict, via: str = "manual") -> None:
         """Phase 7b: toggle the face. OFF is a first-class state — the
         control arm of the planned CARE study — so off means the driver is
         gone and the server sends no face_state messages at all, not a
-        blanked panel. Every toggle is audited (hard rule 5) and confirmed
-        back to the client, which renders the panel only on confirmation."""
+        blanked panel. Every toggle is audited (hard rule 5) with `via`
+        ("manual" | "disclosure_auto") and confirmed back to the client,
+        which renders the card only on confirmation. A MANUAL off is final
+        for the session: the disclosure auto-on checks the flag set here
+        and never overrides it — the doctor always wins."""
         nonlocal face_task
         on = bool(payload.get("on"))
         driver: face.FaceDriver | None = None
@@ -1751,6 +1775,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         else:
             if entry["face"] is None and face_task is None:
                 return  # already off
+            if via == "manual":
+                entry["face_manual_off"] = True
             if entry["face"] is not None:
                 entry["face"].stop()
                 entry["face"] = None
@@ -1760,7 +1786,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # The expression mode rides every on-toggle (an off-toggle has no
         # running mode), so feedback sessions can be correlated with what
         # the face was actually running — full range vs the clinical arm.
-        toggle = {"on": on, "at_audio_s": round(session.audio_seconds, 1)}
+        toggle = {"on": on, "at_audio_s": round(session.audio_seconds, 1),
+                  "via": via}
         if driver is not None:
             toggle["mode"] = driver.mode
         entry["face_toggles"].append(toggle)
