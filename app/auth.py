@@ -254,6 +254,44 @@ async def reset_password(username: str, new: str) -> bool:
     return row is not None
 
 
+async def set_display_name(username: str, display_name: str) -> dict | None:
+    """Break-glass display-name change — server-shell CLI only, never over
+    HTTP. Returns the id and the previous name so the caller can audit what
+    actually changed, or None if there is no such user.
+
+    Why this exists (2026-07-28): the display name is spoken aloud to a
+    patient. The disclosure interpolates it server-side, and consultation
+    448 ran on the admin account whose display name is "Doctor", so the room
+    heard "Dr Doctor". The owner's decision was to fix the names rather than
+    add a guard in code — no title is ever invented from a name, and that
+    convention stays (`app/speech.py`).
+
+    Trimmed, and refused if empty: a blank name would make the disclosure say
+    "Dr " and a name is not the place to discover that.
+    """
+    display_name = display_name.strip()
+    if not display_name:
+        raise ValueError("display name cannot be blank")
+    async with await _conn() as conn:
+        # The old name comes from a CTE rather than a sub-SELECT in
+        # RETURNING: a sub-SELECT there reads the statement's own snapshot
+        # and it is not obvious which side of the UPDATE it lands on. The CTE
+        # is unambiguous.
+        row = await (
+            await conn.execute(
+                "WITH before AS ("
+                "  SELECT id, display_name FROM app_user WHERE username = %s)"
+                " UPDATE app_user SET display_name = %s FROM before"
+                " WHERE app_user.id = before.id"
+                " RETURNING app_user.id, before.display_name",
+                (username, display_name),
+            )
+        ).fetchone()
+    if row is None:
+        return None
+    return {"id": row[0], "from": row[1], "to": display_name}
+
+
 async def set_role(username: str, role: str) -> bool:
     """Promote/demote — server-shell CLI only. Refuses to demote the last
     active admin, same invariant as deactivation."""

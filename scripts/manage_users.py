@@ -9,6 +9,7 @@ Usage:
     uv run python scripts/manage_users.py list
     uv run python scripts/manage_users.py reset-password USERNAME
     uv run python scripts/manage_users.py set-role USERNAME ROLE
+    uv run python scripts/manage_users.py set-display-name USERNAME "Display Name"
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app import auth, schema  # noqa: E402
+from app import audit, auth, schema  # noqa: E402
 
 
 async def cmd_list() -> int:
@@ -68,6 +69,33 @@ async def cmd_set_role(username: str, role: str) -> int:
     return 0
 
 
+async def cmd_set_display_name(username: str, display_name: str) -> int:
+    """The display name is SPOKEN ALOUD to a patient — the disclosure
+    interpolates it server-side (`app/speech.py`). Consultation 448 ran on
+    the admin account whose display name is "Doctor" and the room heard
+    "Dr Doctor". Owner's decision 2026-07-28: fix the names, not the code.
+    No title is invented from a name and that convention stands.
+
+    Audited like the consultation break-glass CLI, with the old name in the
+    row: a change to what a patient hears must be reconstructible afterwards.
+    """
+    try:
+        changed = await auth.set_display_name(username, display_name)
+    except ValueError as err:
+        print(f"Refused: {err}.", file=sys.stderr)
+        return 1
+    if changed is None:
+        print(f"No such user {username!r}.", file=sys.stderr)
+        return 1
+    await audit.log(None, "user.display_name_changed", "app_user", changed["id"],
+                    {"from": changed["from"], "to": changed["to"],
+                     "username": username, "via": "break-glass CLI"})
+    print(f"{username!r}: display name {changed['from']!r} → {changed['to']!r}.")
+    print("This is the name the disclosure speaks as \"Dr <name>\" —"
+          " say it aloud once before the next consultation.")
+    return 0
+
+
 def main() -> int:
     # Every entry point applies the whole schema, in one order (app/schema.py)
     # — a script must not be able to leave the database in a state no other
@@ -81,12 +109,19 @@ def main() -> int:
     setrole = sub.add_parser("set-role", help="promote/demote a user")
     setrole.add_argument("username")
     setrole.add_argument("role", choices=auth.ROLES)
+    setname = sub.add_parser(
+        "set-display-name",
+        help="set the name shown in the app AND spoken in the disclosure")
+    setname.add_argument("username")
+    setname.add_argument("display_name", metavar="DISPLAY_NAME")
     args = parser.parse_args()
 
     if args.command == "list":
         return asyncio.run(cmd_list())
     if args.command == "reset-password":
         return asyncio.run(cmd_reset_password(args.username))
+    if args.command == "set-display-name":
+        return asyncio.run(cmd_set_display_name(args.username, args.display_name))
     return asyncio.run(cmd_set_role(args.username, args.role))
 
 

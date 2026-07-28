@@ -304,3 +304,34 @@ def test_break_glass_reset_and_role_guard():
     assert asyncio.run(auth.set_role(user["username"], "doctor"))
     with pytest.raises(ValueError):
         asyncio.run(auth.set_role(user["username"], "superuser"))
+
+
+def test_break_glass_set_display_name():
+    """The display name is SPOKEN ALOUD: the disclosure interpolates it, and
+    448 ran on the account whose display name is "Doctor", so the room heard
+    "Dr Doctor". Owner's decision was to fix the names rather than guard in
+    code, which needs a way to set them from the console.
+
+    The old name is returned so the caller can audit what changed — a change
+    to what a patient hears must be reconstructible afterwards.
+    """
+    user = _make_user("doctor")
+    changed = asyncio.run(auth.set_display_name(user["username"], "Wajira Herath"))
+    assert changed is not None
+    assert changed["id"] == user["id"]
+    assert changed["from"] == "Doctor"      # _make_user sets role.title()
+    assert changed["to"] == "Wajira Herath"
+
+    # It is the value the disclosure will speak, so read it back from the row
+    # the app actually loads rather than trusting the return value.
+    reloaded = asyncio.run(auth.get_user(user["id"]))
+    assert reloaded["display_name"] == "Wajira Herath"
+
+    # Surrounding whitespace is trimmed, and a blank name is refused outright
+    # — it would make the disclosure say "Dr " to a patient.
+    assert asyncio.run(
+        auth.set_display_name(user["username"], "  Vicky  "))["to"] == "Vicky"
+    with pytest.raises(ValueError):
+        asyncio.run(auth.set_display_name(user["username"], "   "))
+
+    assert asyncio.run(auth.set_display_name("no-such-user-xyz", "Nobody")) is None
