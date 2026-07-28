@@ -915,10 +915,137 @@ them: **`renderCDS` re-creates every question chip and did not call
 disclosure rendered live-looking chips the server would have refused — the
 original rule, reached through a re-render.
 
-**Two open questions 448 raised, both investigated and neither acted on,
-because the fix is an owner decision. See the two sections below.**
+**Two open questions 448 raised. Both were investigated and reported before
+anything was changed, because the fix was the owner's decision to take — and
+on 2026-07-28 they took it: the diarisation one is addressed, the
+speaker-aware gate is deliberately held. See the sections below.**
+
+**448 is also part of the three-consultation evidence set for the speaker
+misattribution defect** (with 446 and 447), on top of being the evidence that
+the transcript guarantee holds. Neither role permits voiding, purging,
+re-finalising, or editing its stored transcript.
+
+### Speaker misattribution — ALL THREE 7a consultations (2026-07-28)
+
+**Superseding the "open question 1" section below, which is kept because its
+investigation is what led here.** The defect is not 448's alone. Checked
+directly on the review pages by the owner:
+
+| | Turns labelled **Doctor** that are the **patient** |
+|---|---|
+| **446** | turn 0 — *"Oh hi, I have tummy ache"* |
+| **447** | turns 0, 2 and 4 |
+| **448** | turns 0 and 2 |
+
+**The mechanism is the exact speaker count, and nothing to do with 7a's
+exclusion machinery.** `app/finalize.py` called pyannote with
+`num_speakers=2`, which does not mean "expect about two" — it *requires*
+two. One human in the room therefore had that voice split into two clusters,
+and `attribute_roles` labelled the first cluster Doctor.
+
+**What hid it for three consultations is the lesson worth keeping: the notes
+were correct.** 4/4, 12/12 and 6/6 claims cited. The model inferred the
+speakers from the *content* and wrote accurate notes over wrong labels — so
+every downstream check passed, the review page read well, and nothing
+objected. **A downstream component doing its job well concealed an upstream
+defect.** That is the same shape as consultation #70 (a note faithful to a
+transcript that was not faithful to the audio) reached from the opposite
+end: here the note was *better* than its input, which is not a mercy, it is
+camouflage. It is also why the speaker-aware grounding gate is worth
+building eventually — it is the one check that would have failed.
+
+**Owner decisions, 2026-07-28:**
+
+1. **Unpin the speaker count AND add per-turn role correction** — because
+   one fixes new consultations and only the other can repair existing ones.
+   Both are built (see the two subsections below).
+2. **The speaker-aware grounding gate is deliberately HELD** until the
+   labels are trustworthy. The sequencing argument was accepted: built
+   first, it would fire on every single-human consultation and mostly report
+   the diarisation defect. **Do not build it yet.**
+3. **446, 447 and 448 are retained UNREPAIRED as the evidence set** for this
+   defect, the way 445 is for the missing six minutes. Do not re-finalise
+   them and do not modify their stored transcripts.
+
+**Consultation 447 is sitting in `awaiting_review`. If it were approved as
+it stands, it would be signed with a transcript saying the DOCTOR complained
+of a sore throat.** That is what an unrepaired evidence-set row costs if
+someone treats it as ordinary work, and it is the reason the review page now
+refuses to let a single-voice consultation through unacknowledged.
+
+#### What the change actually fixed, measured (item 2, 2026-07-28)
+
+Re-diarised offline against the stored WAVs with the real pipeline
+functions, writing nothing to the database. **This is not a clean win and
+the numbers say so:**
+
+| | clusters before | clusters after | outcome |
+|---|---|---|---|
+| **448** | 2 (split) | **1** | fixed — all turns Patient, flagged |
+| **446** | 2 (split) | **1** | fixed — all turns Patient, flagged |
+| **447** | 2 (split) | **2** | **NOT fixed** — pyannote still splits one voice |
+| **67, 68, 69, 70** | 2 | 2 | unchanged, roles still alternate correctly |
+| **66** | 2 | **1** | **REGRESSED** — a genuine two-person consultation now reads as one voice |
+
+Two conclusions follow, and both are load-bearing:
+
+- **pyannote's speaker count is unreliable in both directions on this data.**
+  It over-splits one voice (447) and under-splits two (66). Unpinning is a
+  net improvement, not a fix, and it does not meet the owner's own bar on
+  its own — which is exactly why per-turn correction was decided alongside
+  it rather than after it.
+- **66's regression was made catastrophic by the speaker merge, so that is
+  where the rule went.** With one cluster the merge has nothing to join *on*
+  and joined the whole 300-second consultation into a SINGLE turn: 22 turns
+  down to 1, citations pointing at one blob, and one label to correct where
+  the doctor needs twenty-two. Same shape as consultation 445 — the merge is
+  what turns a small upstream error into a large downstream one. Segment
+  boundaries are now kept when there is one cluster. **The cost, stated:
+  single-cluster transcripts come out at ASR-segment granularity** (66 → 99
+  turns, 448 → 10, 446 → 9), so reading is choppier and there are more
+  labels to check. Grouping by pause length would need a threshold nobody
+  has calibrated on this room, so it is deliberately not done.
+
+**The first-speaker-is-Doctor premise is falsified and its replacement is an
+open design question.** The docstring justified itself with "the doctor opens
+the consultation", true when a human opened it; in tap-to-ask the **machine**
+opens with the disclosure and invitation, both excluded from the transcript,
+so the first *human* voice is frequently the patient. The heuristic is
+knowingly left in place for the two-cluster case and the docstring now says
+the premise is false instead of asserting it. Replacing it was deliberately
+not attempted in the same commit.
+
+**The single-cluster default is Patient, and it is a default.** In
+tap-to-ask the machine asks the questions, so a lone human voice is
+answering them, and in all three observed cases that voice was the patient.
+The owner may change it; the code comment says so, and every single-voice
+consultation raises the review notice regardless.
+
+#### What was built alongside it
+
+- **The single-voice notice** (review page, above the transcript, existing
+  acknowledge-gated banner pattern): the roles were not determined from the
+  audio and must be checked before approving. Refused server-side with a 409
+  as well — a disabled button can be re-enabled from the console.
+- **Per-turn role correction**: `PATCH /api/consultations/{cid}/turns/{idx}`
+  now takes `text`, `role`, or both, same RBAC and same voided/approved
+  refusals, audited as `turn.role_changed` with the **old and new** role. In
+  the page the speaker label **is** the control. Swap Doctor/Patient stays —
+  a genuine whole-consultation inversion is a real case — it just stops
+  being the only tool.
+- **The stale-note gate**: swap and per-turn correction both stamp
+  `labels_changed_at`, and a note created before that stamp cannot be
+  approved until it is regenerated or acknowledged. **Never silently
+  regenerated** — the note is the doctor's document. Staleness is two
+  timestamps compared in SQL, so a regenerate clears it for free and a
+  *second* role change re-arms the gate instead of inheriting the first
+  acknowledgement.
 
 ### 448's open question 1 — one human, two labels (diarisation)
+
+**The original investigation, kept as written. Superseded by the section
+above: the defect is in all three 7a consultations, and items 1-5 of the
+2026-07-28 work are the response.**
 
 **Reported, not fixed.** Only one human was in the room. Turns 0 and 2 are
 labelled **Doctor** while being unmistakably the patient; turn 1 is
@@ -973,7 +1100,20 @@ Options, for the owner to choose between — none of them started:
    have the doctor speak first deliberately. Cheapest, and it puts a
    workflow constraint on the room to protect a code assumption.
 
+**Outcome: the owner chose 1 AND 2, and both shipped 2026-07-28.** Option 3
+was not taken. Worth recording that the re-check option 1 demanded is the
+thing that earned its keep — it found the 66 regression, and without it
+unpinning would have shipped looking like a clean fix.
+
 ### 448's open question 2 — the grounding gate is speaker-blind
+
+**STILL OPEN, and deliberately HELD by owner decision 2026-07-28 until the
+speaker labels are trustworthy. Do not build it yet.** The sequencing
+argument below was accepted: built before diarisation is fixed, it would
+fire on every single-human consultation and mostly report the other defect.
+Note the irony worth keeping — this is the one check that *would* have caught
+the three-consultation misattribution, because the notes were correct and
+only the label/claim disagreement was visible.
 
 **Reported, not fixed.** In 448 the claim *"Patient requests prostate
 cancer screening…"* cites turn 0, which the transcript labels **Doctor**,
@@ -1491,19 +1631,39 @@ lost while Phase 7 takes attention:**
    near-silence at the start of that recording produced **no** phantom
    turns in the final transcript, which is further support for this being a
    live-path phenomenon only.
-9a. **448's two open questions, both REPORT-ONLY so far, in dependency
-   order.** (a) **Diarisation cannot label a single-human consultation**:
-   pyannote is called with a fixed `num_speakers=2`, so one voice is forced
-   into two clusters, and `attribute_roles` then labels one half Doctor and
-   the other Patient. 7a has already broken the "first speaker is the
-   Doctor" premise, because the machine now opens the consultation. Swap
-   Doctor/Patient assumes a uniform inversion and cannot repair it; there
-   is no per-turn role edit. (b) **The grounding gate is speaker-blind**:
-   `validate_and_gate` never reads `turn["role"]`, so "Patient reports…"
-   citing a Doctor turn passes — five claims over in 448. **(b) must not be
-   built before (a)**, or it will fire on every single-human consultation
-   and mostly report (a). Options and costs in the two "448's open
-   question" sections above.
+9a. **Speaker misattribution — (a) ADDRESSED 2026-07-28, (b) HELD.** The
+   defect was in ALL THREE 7a consultations (446 turn 0; 447 turns 0, 2, 4;
+   448 turns 0, 2), caused by the fixed `num_speakers=2`, and hidden for
+   three consultations because the notes were correct — the model inferred
+   speakers from content and wrote accurate notes over wrong labels.
+   **(a)** The count is unpinned (`min_speakers=1, max_speakers=2`), a
+   single cluster is labelled Patient and flagged, the review page raises an
+   acknowledge-gated notice, per-turn role correction exists, and a role
+   change marks the note as drafted against older labels. **Not a clean win,
+   and the numbers are in the section above:** 447 is still split, and
+   recording **66 regressed** from two clusters to one. **(b)** The
+   speaker-aware grounding gate is **deliberately not built** until the
+   labels are trustworthy — owner decision, the sequencing argument was
+   accepted. **446, 447 and 448 are retained unrepaired as the evidence
+   set**; 447 in particular would, if approved as it stands, be signed with
+   a transcript saying the doctor complained of a sore throat.
+9d. **The suite's green depended on alphabetical collection order** (found
+   and fixed 2026-07-28). `tests/test_speech_exclusion.py` installed a
+   `StubSpeech` on the process-global `app.state` and never removed it, so
+   four tests in `tests/test_speech.py` failed whenever they ran *after* it —
+   which they never did, because `test_speech.py` sorts first. **A suite that
+   can hide a failure by ordering is the same class of problem as a test that
+   encodes the bug as the requirement:** in both cases the tests agree with
+   something that is wrong. Fixed by restoring every installed attribute in a
+   `finally` and asserting the stub is gone. Running the suite in **reverse
+   collection order** then found a second dependency pointing the other way:
+   three sound-check tests never installed a speech service and only worked
+   because an earlier test in the same file had left one behind. **Depending
+   on another test having set up your state is the same fault as leaking
+   state into another test.** Both fixed; 375 pass in forward order and 375
+   in reverse. Worth repeating the reverse run after any new app.state
+   fixture — a throwaway `pytest_collection_modifyitems` plugin does it with
+   no new dependency, so the lockfile stays untouched.
 9. **The sound check is built but postponed** — untested in a room, and
    its good/faint thresholds are uncalibrated guesses.
 
