@@ -1379,19 +1379,32 @@ function showSoundCheckResult(verdict) {
   scResultWhat.textContent = message;
   const lvl = el('span', 'lvl', ' (' + db + ' over the noise floor)');
   if (verdict.result !== 'unverified') scResultWhat.appendChild(lvl);
-  if (headphones) {
-    // NOT a warning (spec 10.2): headphones defeat the acoustic path, so
-    // absent energy plus "yes" is expected. Record it, accept the answer — and
-    // do not dress an unmeasured room up as a measured one.
-    scResultWhat.appendChild(el('span', 'lvl',
-      ' — no sound reached the microphone, which is expected on headphones. '
-      + 'Whether the room can hear the machine was not tested.'));
-  }
   // The output device, with every reading. Three readings so far — 27 dB, 15 dB
   // and 4 dB — cannot be compared because the audio path differed each time,
   // which makes them useless for setting the thresholds they were collected to
   // set. A level without its path is not a measurement.
   const device = verdict.output_device || level.output_device;
+  if (headphones) {
+    // NOT a warning (spec 10.2): headphones defeat the acoustic path, so
+    // absent energy plus "yes" is expected. Record it, accept the answer — and
+    // do not dress an unmeasured room up as a measured one.
+    //
+    // WORDING (session 3): report what is KNOWN, never a guess. In the room
+    // on 2026-07-28 this said "expected on headphones" while the recorded
+    // output was the monitor's NVIDIA HD Audio — a notice asserting
+    // something untrue about the setup teaches the doctor to discount it
+    // (the single-voice notice lesson). The flat claim survives only when
+    // the device label itself says headphones; otherwise it is the
+    // conditional "expected if the output is headphones".
+    const labelSaysHeadphones =
+      !!device && /headphone|headset|earbud|earphone|airpod|buds/i.test(device);
+    scResultWhat.appendChild(el('span', 'lvl',
+      labelSaysHeadphones
+        ? ' — no sound reached the microphone, which is expected on headphones. '
+          + 'Whether the room can hear the machine was not tested.'
+        : ' — no sound reached the microphone, which is expected if the output '
+          + 'is headphones. Whether the room can hear the machine was not tested.'));
+  }
   if (device) {
     scResultWhat.appendChild(el('span', 'lvl', ' · output: ' + device));
   }

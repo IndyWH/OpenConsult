@@ -705,6 +705,36 @@ def test_the_sound_check_never_claims_the_room_heard_it_on_headphones():
     assert "expected on headphones" in show   # still not framed as a warning
 
 
+def test_the_headphones_explanation_is_conditional_unless_the_label_says_so():
+    """Session 3 wording fix. In the room on 2026-07-28 the panel said "no
+    sound reached the microphone, which is expected on headphones" while the
+    recorded output device was the monitor's NVIDIA HD Audio — a notice
+    asserting something untrue about the setup teaches the doctor to discount
+    it (the single-voice notice lesson, again).
+
+    The message must report what is KNOWN: the doctor's confirmation, the
+    measured level, and the output device by name. The flat headphones claim
+    survives only when the device label itself indicates headphones; otherwise
+    the explanation is the conditional "expected if the output is headphones"."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    show = html[html.index("function showSoundCheckResult("):]
+    show = show[:show.index("\n}")]
+    # The two variants, keyed on the device label — not on a guess.
+    assert "labelSaysHeadphones" in show
+    assert "/headphone|headset|earbud|earphone|airpod|buds/i.test(device)" in show
+    assert "expected if the output is headphones" in show
+    # The flat claim is inside the label-confirmed branch only: the string
+    # LITERAL (not the comment retelling the incident) appears exactly
+    # once, after the labelSaysHeadphones guard.
+    flat = "' — no sound reached the microphone, which is expected on headphones. '"
+    assert show.count(flat) == 1
+    assert show.index("labelSaysHeadphones") < show.index(flat)
+    # The device is still named with every reading.
+    assert "' · output: ' + device" in show
+
+
 def test_every_sound_check_reading_carries_its_output_device():
     """A level without its path is not a measurement. The three readings so far
     — 27 dB, 15 dB, 4 dB — cannot be compared because the audio path differed
