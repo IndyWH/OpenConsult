@@ -909,7 +909,59 @@ def test_an_already_asked_question_shows_that_it_was_asked():
     # Tracked by TEXT, not index: the index moves when the agenda revises.
     assert "askedQuestions.add(msg.text)" in html
     # And it must not disable the chip.
-    assert "asked ? '↻' : '🔊'" in html
+    assert "asked ? '↻ Again' : '🔊'" in html
+
+
+def test_an_already_asked_question_still_looks_tappable():
+    """The companion rule (448): a control that CAN act must not look as if
+    it cannot.
+
+    The ↻ glyph was rendering the whole time — that is not what failed. The
+    chip turned GREEN, which in this app means approved / linked / mic-live,
+    all finished states; the doctor read it as spent and did not re-tap,
+    which cost the most important step of the walkthrough. So the button
+    carries a word and the accent colour, and the row keeps the "✓ asked"
+    receipt: two different jobs, two different places.
+    """
+    html = _live_html()
+    # A word, not a lone glyph — the Sound-check finding about icon-only
+    # controls, applied to a 1.6rem circle.
+    assert "'↻ Again'" in html
+    assert "say.classList.toggle('again', asked);" in html
+    assert ".say.again {" in html
+    # The button must NOT be styled green, which is this app's colour for a
+    # finished state. The row's ✓ asked label may stay green; the control
+    # may not.
+    assert "li.qrow.asked .say { border-color: var(--green)" not in html, (
+        "green on the button is what read as spent in 448")
+    # And the reason lives on the control here too, not only for refusals.
+    assert "Already asked once — tap to ask it again" in html
+
+
+def test_freshly_rendered_question_chips_get_their_state():
+    """A CDS revision re-creates every chip from scratch, so they arrive in
+    the markup's default enabled state with no title. Without this, a
+    revision landing before the disclosure rendered live-looking chips the
+    server would have refused — the original standing rule, reached through
+    a re-render. markAskedQuestions must run first, because the titles are
+    asked-state dependent."""
+    html = _live_html()
+    render = html[html.index("function renderCDS("):]
+    render = render[:render.index("\nfunction ")]
+    assert "markAskedQuestions();" in render
+    assert "refreshSpeechControls();" in render
+    assert render.index("markAskedQuestions();") < render.index("refreshSpeechControls();")
+
+
+def test_the_companion_rule_is_written_down_in_the_page():
+    """Recorded beside the standing rule, with its reason attached — a rule
+    stripped of its why reads as a style opinion and gets traded away."""
+    html = _live_html()
+    assert "a control that CAN act must not" in html
+    assert "look as if it cannot" in html
+    assert "a tap not taken" in html
+    assert "approved, linked and mic-live" in html, (
+        "the reason green is the trap must survive, or the colour comes back")
 
 
 # ===========================================================================

@@ -108,13 +108,26 @@
   .say:disabled { opacity: .35; cursor: default; }
   /* Already spoken. Re-asking stays allowed — the panel lags, and
      repetition is sometimes right — but it must be visible that it has
-     gone out once (consultation 447: the same question three times). */
+     gone out once (consultation 447: the same question three times).
+     The ROW carries "it went out"; the BUTTON carries "you can do it
+     again". Splitting those two jobs is the point, and it is why the
+     button is deliberately NOT green (consultation 448: green read as
+     spent and the doctor did not re-tap). Green in this app means
+     approved / linked / mic-live — all finished states. */
   .cds li.qrow.asked .qtext { color: var(--ink-faint); }
-  .cds li.qrow.asked .say { border-color: var(--green); color: var(--green); }
   .cds li.qrow.asked .qtext::after {
     content: ' ✓ asked'; font-size: .72rem; color: var(--green);
     text-transform: uppercase; letter-spacing: .06em; white-space: nowrap;
   }
+  /* A word, not a lone glyph — the Sound-check finding: an icon-only
+     control costs a beat on every use, and 12 px of ↻ inside a 1.6 rem
+     circle is decoration rather than an affordance. Accent = tappable,
+     which is what this control still is. */
+  .say.again {
+    width: auto; gap: .25rem; padding: 0 .5rem; font-size: .72rem;
+    border-color: var(--accent); color: var(--accent); font-weight: 600;
+  }
+  .say.again:hover:not(:disabled) { background: var(--accent); color: #fff; }
 
   /* Phrase tray: fixed, pre-reviewed things the system may say. */
   .tray { margin-top: .9rem; border-top: 1px solid var(--line); padding-top: .7rem; }
@@ -406,6 +419,23 @@
 // thing. A banner may ACCOMPANY a refusal that arrives asynchronously
 // from the server — it may never SUBSTITUTE for a control that looks
 // live and is not.
+//
+// ---------------------------------------------------------------------
+// AND ITS COMPANION, adopted 2026-07-28 — a control that CAN act must not
+// look as if it cannot.
+//
+// The same cost as the rule above, a tap not taken, arriving from the
+// opposite direction. Consultation 448: an already-asked question chip
+// turned green, the doctor read green as spent and did not try again, and
+// that cost the most important step of the walkthrough. Re-asking had
+// worked the whole time.
+//
+// Green is the specific trap in this app, because the design system
+// already spends it on approved, linked and mic-live — every one a
+// finished state. So "it went out once" must be said without borrowing the
+// vocabulary of "it is done with". Words beat glyphs for this, the same
+// finding as the Sound check control: a 12 px ↻ inside a 1.6 rem circle is
+// not an affordance, it is a decoration.
 // =====================================================================
 
 // URL params are POINTERS only (which queue entry); patient identity is
@@ -756,6 +786,13 @@ function renderCDS(a) {
     return li;
   });
   markAskedQuestions();
+  // These chips were just re-created from scratch, so they carry the
+  // markup's default enabled state and no title — both rules apply to
+  // them. Found while establishing the facts for 448's green-chip defect:
+  // a CDS revision arriving before the disclosure rendered live-looking
+  // chips the server would have refused. markAskedQuestions must run
+  // first; the titles below are asked-state dependent.
+  refreshSpeechControls();
   fillList(document.getElementById('sList'), document.getElementById('sIdle'),
            a.signs_to_check || [], s => el('li', null, s));
   fillList(document.getElementById('dxList'), document.getElementById('dxIdle'),
@@ -864,7 +901,13 @@ function markAskedQuestions() {
     const asked = askedQuestions.has(text);
     li.classList.toggle('asked', asked);
     const say = li.querySelector('.say');
-    if (say) say.textContent = asked ? '↻' : '🔊';
+    if (!say) return;
+    // Companion rule: a control that CAN act must not look as if it
+    // cannot. The ↻ WAS rendering in 448 — the defect was that a 12 px
+    // glyph beside a green ✓ ASKED label reads as a receipt, not as a
+    // button. So it says the word too.
+    say.textContent = asked ? '↻ Again' : '🔊';
+    say.classList.toggle('again', asked);
   });
 }
 
@@ -873,9 +916,14 @@ function refreshSpeechControls() {
   const live = ws && ws.readyState === WebSocket.OPEN && recording;
   document.querySelectorAll('#qList .say').forEach(b => {
     b.disabled = busy || !live || !disclosed;
+    const row = b.closest('li.qrow');
+    const asked = !!row && row.classList.contains('asked');
     b.title = !live ? 'Start the consultation first'
             : !disclosed ? 'Play the disclosure first (hard rule: the patient is told they are talking to a machine)'
             : busy ? 'One utterance at a time'
+            // The reason lives on the control for the CAN-act case too, or
+            // the only thing saying "repeatable" is a glyph (448).
+            : asked ? 'Already asked once — tap to ask it again'
             : 'Ask the patient this, in the system\'s voice';
   });
   document.querySelectorAll('.phrase').forEach(b => {
