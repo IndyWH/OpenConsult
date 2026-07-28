@@ -1,7 +1,55 @@
 """Unit tests for the deterministic parts of the finalisation pipeline."""
 
-from app.finalize import attribute_roles
+from app.finalize import attribute_roles, merge_into_turns
 from app.notes import note_as_plain_text
+
+
+def _seg(start, end, speaker, text, score=0.8):
+    words = [{"speaker": speaker, "score": score} for _ in text.split()]
+    return {"start": start, "end": end, "text": text, "words": words}
+
+
+def test_two_clusters_merge_consecutive_same_speaker_segments():
+    segments = [
+        _seg(0, 2, "SPEAKER_00", "Good morning."),
+        _seg(2, 4, "SPEAKER_00", "What brings you in?"),
+        _seg(4, 7, "SPEAKER_01", "My chest hurts."),
+    ]
+    turns = merge_into_turns(segments)
+    assert [t["speaker"] for t in turns] == ["SPEAKER_00", "SPEAKER_01"]
+    assert turns[0]["text"] == "Good morning. What brings you in?"
+    assert turns[0]["end"] == 4
+
+
+def test_a_single_cluster_keeps_its_segment_boundaries():
+    """2026-07-28, measured on recording 66. Merging exists to join one
+    speaker's consecutive segments; with a single cluster it has nothing to
+    join ON, so it joined a whole 300-second consultation into ONE turn — 22
+    turns down to 1. That destroys citation granularity and leaves the doctor
+    one label to correct where they need twenty-two.
+
+    Same shape as consultation 445: the merge is what turns a small upstream
+    error into a large downstream one.
+    """
+    segments = [
+        _seg(0, 2, "SPEAKER_00", "Oh hi, I have tummy ache."),
+        _seg(2, 5, "SPEAKER_00", "It is in the lower tummy."),
+        _seg(5, 9, "SPEAKER_00", "Since yesterday it is constant."),
+    ]
+    turns = merge_into_turns(segments)
+    assert len(turns) == 3, "one cluster must not collapse the whole transcript"
+    assert [t["start"] for t in turns] == [0, 2, 5]
+
+
+def test_segments_with_no_speaker_at_all_are_one_cluster():
+    """No diarisation labels is not two speakers; it must take the
+    single-cluster path rather than merging everything into one turn."""
+    segments = [
+        {"start": 0, "end": 2, "text": "One.", "words": []},
+        {"start": 2, "end": 4, "text": "Two.", "words": []},
+    ]
+    turns = merge_into_turns(segments)
+    assert len(turns) == 2
 
 
 def test_first_speaker_is_doctor():

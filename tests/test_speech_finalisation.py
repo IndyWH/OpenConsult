@@ -562,12 +562,17 @@ def test_a_zero_length_segment_is_kept_rather_than_dividing_by_zero():
 def test_the_invariant_runs_before_the_speaker_merge():
     """Ordering is half the fix. After the merge, a hallucinated fragment
     can be inside a turn spanning minutes; before it, the fragment is
-    removed on its own."""
+    removed on its own.
+
+    Re-pointed 2026-07-28 when the merge was extracted into
+    merge_into_turns(); it now anchors on the CALL rather than on a comment,
+    which is the thing that actually establishes the ordering.
+    """
     from pathlib import Path
 
     source = Path("app/finalize.py").read_text()
     invariant = source.index("raw_segments, hallucinated = drop_segments_in_excluded_spans")
-    merge = source.index("# Merge word-assigned segments into speaker turns.")
+    merge = source.index("turns = merge_into_turns(raw_segments)")
     assert invariant < merge, "the invariant must run before the merge"
 
 

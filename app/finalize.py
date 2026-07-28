@@ -375,32 +375,7 @@ def transcribe_and_diarise(wav_path: str,
     raw_segments, hallucinated = drop_segments_in_excluded_spans(
         result["segments"], excluded_s)
 
-    # Merge word-assigned segments into speaker turns.
-    turns: list[dict] = []
-    for seg in raw_segments:
-        words = seg.get("words", [])
-        speakers = [w.get("speaker") for w in words if w.get("speaker")]
-        speaker = max(set(speakers), key=speakers.count) if speakers else "SPEAKER_00"
-        scores = [w["score"] for w in words if "score" in w]
-        confidence = sum(scores) / len(scores) if scores else 0.5
-        text = seg["text"].strip()
-        if not text:
-            continue
-        if turns and turns[-1]["speaker"] == speaker:
-            prev = turns[-1]
-            total = prev["weight"] + len(words)
-            prev["confidence"] = (
-                (prev["confidence"] * prev["weight"] + confidence * len(words)) / total
-                if total else prev["confidence"]
-            )
-            prev["weight"] = total
-            prev["text"] += " " + text
-            prev["end"] = seg["end"]
-        else:
-            turns.append(
-                {"speaker": speaker, "start": seg["start"], "end": seg["end"],
-                 "text": text, "confidence": round(confidence, 3), "weight": len(words)}
-            )
+    turns = merge_into_turns(raw_segments)
 
     # Free everything before MedGemma comes back.
     del model, align_model, diarizer, result
@@ -419,6 +394,66 @@ def transcribe_and_diarise(wav_path: str,
             "hallucinated_segments": hallucinated,
             "exclusion_anomalies": limits["anomalies"],
             "excluded_fraction": limits["fraction"]}
+
+
+def merge_into_turns(raw_segments: list[dict]) -> list[dict]:
+    """Group word-assigned ASR segments into speaker turns.
+
+    Consecutive segments from the same cluster become one turn — EXCEPT when
+    the whole recording came back as a SINGLE cluster (2026-07-28), in which
+    case segment boundaries are kept as they are.
+
+    Why the exception, measured rather than assumed: merging exists to join
+    one speaker's consecutive segments, so with one cluster it has nothing to
+    join *on* and joins the entire consultation into one turn. Re-checked
+    against recording 66 — a genuine two-person consultation that pyannote
+    now collapses to one cluster — merging produced a single 300-second turn
+    out of 22. That destroys the citation granularity the note depends on and
+    leaves the doctor one label to correct where they need twenty-two.
+
+    Same shape as the consultation-445 lesson: the merge is what turns a small
+    upstream error into a large downstream one, so the merge is where the
+    proportionality rule belongs. Keeping the boundaries asserts less — it
+    claims only what the ASR segmented, not a speaker structure nothing
+    measured.
+
+    The cost, stated because it is real: single-cluster transcripts come out
+    at ASR-segment granularity, which is roughly sentence-level (66 gives 99
+    turns, 448 gives 10). Reading is choppier and there are more labels to
+    correct. Grouping them by pause length instead would need a threshold
+    nobody has calibrated on this room, so it is deliberately not done here.
+    """
+    single_cluster = len({
+        w.get("speaker") for seg in raw_segments
+        for w in seg.get("words", []) if w.get("speaker")
+    }) <= 1
+
+    turns: list[dict] = []
+    for seg in raw_segments:
+        words = seg.get("words", [])
+        speakers = [w.get("speaker") for w in words if w.get("speaker")]
+        speaker = max(set(speakers), key=speakers.count) if speakers else "SPEAKER_00"
+        scores = [w["score"] for w in words if "score" in w]
+        confidence = sum(scores) / len(scores) if scores else 0.5
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+        if turns and not single_cluster and turns[-1]["speaker"] == speaker:
+            prev = turns[-1]
+            total = prev["weight"] + len(words)
+            prev["confidence"] = (
+                (prev["confidence"] * prev["weight"] + confidence * len(words)) / total
+                if total else prev["confidence"]
+            )
+            prev["weight"] = total
+            prev["text"] += " " + text
+            prev["end"] = seg["end"]
+        else:
+            turns.append(
+                {"speaker": speaker, "start": seg["start"], "end": seg["end"],
+                 "text": text, "confidence": round(confidence, 3), "weight": len(words)}
+            )
+    return turns
 
 
 def attribute_roles(turns: list[dict]) -> tuple[list[dict], bool]:
