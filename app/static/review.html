@@ -711,20 +711,32 @@ function renderLabelsBanner() {
   const banner = document.getElementById('labelsBanner');
   const labels = state.labels || {};
   if (!labels.stale) { banner.style.display = 'none'; return; }
+  // WORDING: conditional on a note actually existing. On 449 this said "The
+  // note was drafted from these labels ... correct them and Regenerate" on a
+  // consultation where NO note was drafted and Regenerate cannot produce one —
+  // the quality gate had refused. Same principle as the single-voice notice:
+  // say what is true, not what is usually true.
+  const hasNote = !!(state.note && !state.note.content.refusal);
   banner.style.display = '';
   banner.className = 'urgency' + (labels.acknowledged ? ' acked' : '');
   banner.innerHTML = '';
   banner.appendChild(el('span', 'icon', labels.acknowledged ? '✓' : '⚠'));
   const box = el('div');
   box.appendChild(el('h3', null, labels.acknowledged
-    ? 'Note checked against the corrected labels'
-    : 'This note was drafted against the OLD speaker labels'));
-  box.appendChild(el('p', null,
-    'A Doctor/Patient label changed after the note was drafted, so a claim '
-    + 'may now cite a line attributed to the other speaker. Regenerate the '
-    + 'note, or confirm you have re-read it against the corrected labels.'));
+    ? (hasNote ? 'Note checked against the corrected labels'
+               : 'Label change acknowledged')
+    : (hasNote ? 'This note was drafted against the OLD speaker labels'
+               : 'Speaker labels changed after this consultation was finalised')));
+  box.appendChild(el('p', null, hasNote
+    ? 'A Doctor/Patient label changed after the note was drafted, so a claim '
+      + 'may now cite a line attributed to the other speaker. Regenerate the '
+      + 'note, or confirm you have re-read it against the corrected labels.'
+    : 'A Doctor/Patient label changed after this consultation was finalised. '
+      + 'No note was drafted from it, so there is nothing to re-check — the '
+      + 'transcript itself is the record.'));
   box.appendChild(el('p', 'when',
-    'The note is not regenerated automatically — it is your document.'
+    (hasNote ? 'The note is not regenerated automatically — it is your document.'
+             : 'No note exists to regenerate.')
     + (labels.labels_changed_at
        ? ` · labels changed ${String(labels.labels_changed_at).slice(0,16)}` : '')));
   banner.appendChild(box);

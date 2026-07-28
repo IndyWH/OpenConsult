@@ -550,6 +550,26 @@ def test_the_notice_distinguishes_a_declared_count_from_a_defaulted_one():
     assert "Nobody declared how many people spoke" in html
 
 
+def test_the_labels_banner_does_not_claim_a_note_exists_when_none_does():
+    """449: it read "The note was drafted from these labels ... correct them and
+    Regenerate" on a consultation where NO note was drafted and Regenerate
+    cannot produce one — the quality gate had refused. Same principle as the
+    single-voice notice: say what is true, not what is usually true."""
+    html = _review_html()
+    banner = html[html.index("function renderLabelsBanner()"):]
+    banner = banner[:banner.index("\nfunction ")]
+    assert "const hasNote =" in banner, (
+        "the wording must be conditional on a note actually existing")
+    # The note-exists wording stays...
+    assert "drafted against the OLD speaker labels" in banner
+    assert "it is your document" in banner
+    # ...and the no-note wording says what is actually true.
+    assert "No note was drafted from it" in banner
+    assert "No note exists to regenerate." in banner
+    # A refused draft is not a note either.
+    assert "!state.note.content.refusal" in banner
+
+
 def test_the_single_voice_gate_is_unchanged():
     """The rewording must not weaken the gate: the acknowledgement and the
     server-side 409 stay exactly as built."""
