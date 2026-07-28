@@ -882,6 +882,35 @@ async def acknowledge_urgent(
     return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
 
 
+class SpeakersBody(BaseModel):
+    count: int
+
+
+@app.post("/api/consultations/{cid}/declared-speakers")
+async def declare_speakers(
+    cid: int, body: SpeakersBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """The doctor's answer to "how many people spoke?", asked at Stop.
+
+    Deliberately NOT gated on `_not_editable`: it is asked the moment the
+    consultation is completed, and refusing it because finalisation has moved on
+    would be a tap that does nothing. Instead the response says whether the
+    answer reached diarisation in time, so the caller can tell the doctor the
+    truth either way (standing rule: the tap always does something, and what it
+    did is reported at the control).
+    """
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
+    try:
+        result = await consultations.declare_speakers(cid, body.count)
+    except ValueError as err:
+        return JSONResponse(status_code=400, content={"error": str(err)})
+    await audit.log(user["id"], "speakers.declared", "consultation", cid,
+                    {"count": body.count, "applied": result["applied"],
+                     "already_used": result["used"]})
+    return JSONResponse(content={"ok": True, **result})
+
+
 @app.post("/api/consultations/{cid}/acknowledge-single-voice")
 async def acknowledge_single_voice(
     cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))

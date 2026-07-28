@@ -283,6 +283,128 @@ def test_a_consultation_with_no_note_is_never_stale():
     assert client.get(f"/api/consultations/{cid}").json()["labels"]["stale"] is False
 
 
+# ------------------------------------------------ the declared speaker count
+
+def test_the_default_is_two_and_reads_as_not_declared():
+    """Two is today's behaviour and is correct on four of the five real
+    two-person recordings, so a consultation nobody answered for behaves
+    exactly as it did before this work."""
+    from app import finalize
+
+    assert finalize.DEFAULT_SPEAKERS == 2
+    cid = _make_consultation()
+    used = asyncio.run(consultations.speakers_for_diarisation(
+        cid, finalize.DEFAULT_SPEAKERS))
+    assert used == 2
+    state = asyncio.run(consultations.get_consultation(cid))
+    assert state["declared_speakers"] is None
+    assert state["speakers_declared"] is False, (
+        "defaulted to two is a different statement from declared as two")
+    assert state["speakers_used"] == 2
+
+
+def test_a_declaration_of_one_is_what_diarisation_is_given():
+    """The whole point: 447 is fixed by construction when the count is forced
+    to exactly one, and no detection setting achieved that."""
+    from app import finalize
+
+    cid = _make_consultation()
+    client = _doctor_client()
+    response = client.post(f"/api/consultations/{cid}/declared-speakers",
+                           json={"count": 1})
+    assert response.status_code == 200
+    assert response.json()["applied"] is True
+
+    used = asyncio.run(consultations.speakers_for_diarisation(
+        cid, finalize.DEFAULT_SPEAKERS))
+    assert used == 1
+    state = asyncio.run(consultations.get_consultation(cid))
+    assert state["speakers_declared"] is True
+    assert state["speakers_used"] == 1
+
+
+def test_declaring_two_is_recorded_as_declared_not_defaulted():
+    from app import finalize
+
+    cid = _make_consultation()
+    client = _doctor_client()
+    client.post(f"/api/consultations/{cid}/declared-speakers", json={"count": 2})
+    asyncio.run(consultations.speakers_for_diarisation(cid, finalize.DEFAULT_SPEAKERS))
+    state = asyncio.run(consultations.get_consultation(cid))
+    assert state["speakers_used"] == 2
+    assert state["speakers_declared"] is True
+
+
+def test_an_answer_arriving_after_diarisation_says_so_rather_than_claiming_success():
+    """The race is made honest instead of silent. The answer is still stored —
+    it is a record of what the doctor said — but `applied` is False, so the UI
+    can tell them it did not shape this transcript. A tap that reports the
+    wrong outcome is worse than one that reports a late one."""
+    from app import finalize
+
+    cid = _make_consultation()
+    # Diarisation has already run and consumed a count.
+    asyncio.run(consultations.speakers_for_diarisation(cid, finalize.DEFAULT_SPEAKERS))
+
+    client = _doctor_client()
+    body = client.post(f"/api/consultations/{cid}/declared-speakers",
+                       json={"count": 1}).json()
+    assert body["applied"] is False
+    assert body["used"] == 2
+    # Stored anyway, and speakers_used is NOT rewritten.
+    state = asyncio.run(consultations.get_consultation(cid))
+    assert state["declared_speakers"] == 1
+    assert state["speakers_used"] == 2
+
+
+def test_only_one_or_two_speakers_may_be_declared():
+    cid = _make_consultation()
+    client = _doctor_client()
+    for bad in (0, 3, -1):
+        assert client.post(f"/api/consultations/{cid}/declared-speakers",
+                           json={"count": bad}).status_code == 400
+    with pytest.raises(ValueError):
+        asyncio.run(consultations.declare_speakers(cid, 5))
+
+
+def test_a_receptionist_cannot_declare_the_speaker_count():
+    auth.ensure_schema()
+    from app.main import app
+
+    cid = _make_consultation()
+    client = TestClient(app)
+    username = f"rec_{secrets.token_hex(4)}"
+    client.post("/api/register", json={
+        "username": username, "password": "test-password-123",
+        "display_name": "Rec", "role": "receptionist"})
+    approve_account(username)
+    client.post("/api/login", json={
+        "username": username, "password": "test-password-123"})
+    assert client.post(f"/api/consultations/{cid}/declared-speakers",
+                       json={"count": 1}).status_code == 403
+
+
+def test_the_count_is_exact_not_a_permitted_range():
+    """The range was tried, measured and replaced. It fixed 448 and 446, failed
+    to fix 447, and REGRESSED recording 66 from two clusters to one — detection
+    is unreliable in both directions on this data. A future contributor
+    reintroducing min_speakers/max_speakers should turn this red."""
+    from pathlib import Path
+
+    source = Path("app/finalize.py").read_text()
+    assert "num_speakers=num_speakers" in source
+    # Comments are stripped first: the comment ABOVE the call explains that the
+    # range was measured and abandoned, and that explanation must survive — it
+    # is the reason nobody should try the range again.
+    code = "\n".join(line for line in source.splitlines()
+                     if not line.lstrip().startswith("#"))
+    assert "min_speakers" not in code, (
+        "the permitted range was measured and abandoned; see DEFAULT_SPEAKERS")
+    assert "max_speakers" not in code
+    # And the reasoning itself is still on record.
+    assert "REGRESSED recording 66" in source
+
+
 # ------------------------------------------------------------------- the page
 
 def _review_html() -> str:

@@ -79,6 +79,14 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS single_voice_ack_at timestampt
 -- banner instead of staying quietly acknowledged.
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS labels_changed_at timestamptz;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS labels_ack_at timestamptz;
+-- Declared speaker count (2026-07-28). declared_speakers is what the DOCTOR
+-- said when asked at Stop, and NULL means they were not asked or skipped —
+-- so "declared" is exactly "declared_speakers IS NOT NULL". speakers_used is
+-- what the pipeline actually handed pyannote, stored separately and never
+-- inferred: a declaration that arrives after diarisation has already run must
+-- not make the record claim it was honoured.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS declared_speakers int;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS speakers_used int;
 CREATE TABLE IF NOT EXISTS transcript_turn (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     idx int NOT NULL,
@@ -257,7 +265,8 @@ async def get_consultation(cid: int) -> dict | None:
                 " c.urgent_actions, c.urgent_ack_at, c.patient_id, p.name,"
                 " c.voided_at, c.void_reason, c.doctor_id, c.connection_lost,"
                 " c.quality_signals, c.quality_outcome,"
-                " c.single_voice_detected, c.single_voice_ack_at"
+                " c.single_voice_detected, c.single_voice_ack_at,"
+                " c.declared_speakers, c.speakers_used"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -282,6 +291,12 @@ async def get_consultation(cid: int) -> dict | None:
         "quality_outcome": row[14],
         "single_voice_detected": row[15],
         "single_voice_ack_at": str(row[16]) if row[16] else None,
+        "declared_speakers": row[17],
+        "speakers_used": row[18],
+        # The distinction the review page needs: 2 because the doctor said so
+        # and 2 because nobody answered are the same number and different
+        # statements.
+        "speakers_declared": row[17] is not None,
     }
 
 
@@ -416,6 +431,52 @@ async def acknowledge_labels(cid: int) -> str:
             )
         ).fetchone()
     return str(row[0]) if row else ""
+
+
+SPEAKER_CHOICES = (1, 2)
+
+
+async def declare_speakers(cid: int, count: int) -> dict:
+    """Record the doctor's answer to "how many people spoke?".
+
+    Returns `{"applied": bool, "used": int | None}`. `applied` is False when
+    diarisation has ALREADY run with a count — the answer is still stored, but
+    it did not shape this transcript, and the caller must say so rather than
+    report a success. That is the honest form of a best-effort write: it never
+    blocks the doctor and it never claims more than happened.
+    """
+    if count not in SPEAKER_CHOICES:
+        raise ValueError(f"declared speakers must be one of {SPEAKER_CHOICES}")
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET declared_speakers = %s WHERE id = %s"
+                " RETURNING speakers_used", (count, cid),
+            )
+        ).fetchone()
+    if row is None:
+        return {"applied": False, "used": None}
+    return {"applied": row[0] is None, "used": row[0]}
+
+
+async def speakers_for_diarisation(cid: int, default: int) -> int:
+    """The count to hand pyannote, recorded as it is read.
+
+    Read as LATE as possible in the pipeline (immediately before the audio
+    phase) so an answer tapped at Stop has the whole MedGemma-unload window to
+    arrive. Storing `speakers_used` in the same statement is what makes the
+    race honest instead of silent: whatever happens, the row says which count
+    actually produced this transcript.
+    """
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET speakers_used ="
+                " COALESCE(declared_speakers, %s) WHERE id = %s"
+                " RETURNING speakers_used", (default, cid),
+            )
+        ).fetchone()
+    return row[0] if row else default
 
 
 async def set_single_voice(cid: int) -> None:

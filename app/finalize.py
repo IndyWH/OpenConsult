@@ -9,8 +9,9 @@ Triggered by the Stop button. Steps, in order:
    VRAM to drop before loading the audio models.
 2. Re-transcribe the full recording with WhisperX large-v3 (word-level
    timestamps + confidence scores).
-3. Diarise with pyannote (min_speakers=1, max_speakers=2) and merge into
-   speaker turns.
+3. Diarise with pyannote using an EXACT speaker count the doctor declared at
+   Stop (DEFAULT_SPEAKERS when they did not), and merge into speaker turns —
+   except on a single cluster, where segment boundaries are kept.
 4. Free the audio models' VRAM.
 5. Attribute roles. Two clusters: first-speaker-is-Doctor — a heuristic
    whose premise 7a has falsified, see attribute_roles. One cluster: every
@@ -46,6 +47,24 @@ WHISPERX_MODEL = os.getenv("WHISPERX_MODEL", "large-v3")
 # pyannote 4's default pipeline (community-1) is separately gated; 3.1 is
 # the one this machine's HF token has access to.
 DIARIZATION_MODEL = os.getenv("DIARIZATION_MODEL", "pyannote/speaker-diarization-3.1")
+
+# How many people spoke, when the doctor did not say (owner decision
+# 2026-07-28). Two is today's behaviour and is correct on four of the five real
+# two-person recordings, so a defaulted consultation behaves exactly as it did
+# before this work.
+#
+# The count is DECLARED, not detected, and the reasoning is measured rather
+# than assumed. `num_speakers=2` alone split a lone voice in two (446, 447,
+# 448). Replacing it with a permitted range let pyannote choose, and choosing
+# is what it cannot do reliably on this data: 447 stayed at two clusters when
+# allowed one, and recording 66 — two real people — collapsed to one. Every
+# row of that table resolves once the count is stated: 447 is right if forced
+# to one, 66 is right if forced to two.
+#
+# So the human in the room is authoritative and the machine corroborates,
+# which is the sound check's pattern. Per-turn role correction stays as the
+# backstop, because a declaration can be mis-tapped.
+DEFAULT_SPEAKERS = 2
 
 
 async def unload_medgemma() -> None:
@@ -245,12 +264,17 @@ def drop_segments_in_excluded_spans(
 
 
 def transcribe_and_diarise(wav_path: str,
-                           exclusion_spans: list[tuple[int, int]] | None = None
+                           exclusion_spans: list[tuple[int, int]] | None = None,
+                           num_speakers: int = DEFAULT_SPEAKERS,
                            ) -> list[dict]:
     """WhisperX + pyannote, returning speaker turns with confidence.
 
     Blocking and GPU-heavy — run via asyncio.to_thread. Loads its models,
     uses them, and frees them before returning.
+
+    `num_speakers` is an EXACT count, declared rather than detected — see
+    DEFAULT_SPEAKERS and the module docstring for why the detected range was
+    tried, measured and abandoned.
 
     `exclusion_spans` are Phase 7a speaking windows as byte offsets. The
     models are handed a muted derived copy; WhisperX and pyannote cannot
@@ -341,16 +365,14 @@ def transcribe_and_diarise(wav_path: str,
     finally:
         torch.load = _torch_load
     waveform = torch.from_numpy(audio[None, :])
-    # A RANGE, not an exact count (2026-07-28). This was `num_speakers=2`,
-    # which does not mean "expect about two" — it requires exactly two, so
-    # with one human in the room pyannote had no way to answer "one" and
-    # split that single voice into two clusters. Every 7a consultation so
-    # far (446, 447, 448) carries patient speech labelled Doctor because of
-    # this line. Two is still the ceiling: a consultation is a doctor and a
-    # patient, and letting a third cluster appear would invent a speaker.
+    # An EXACT count, DECLARED by the doctor rather than detected — see
+    # DEFAULT_SPEAKERS. The range (min_speakers=1, max_speakers=2) was tried
+    # on 2026-07-28 and measured: it fixed 448 and 446, failed to fix 447
+    # (pyannote still split one voice into two clusters when allowed one), and
+    # REGRESSED recording 66 from two clusters to one. Detection is unreliable
+    # in both directions on this data, so it is no longer asked to guess.
     annotation = diarizer(
-        {"waveform": waveform, "sample_rate": 16000},
-        min_speakers=1, max_speakers=2,
+        {"waveform": waveform, "sample_rate": 16000}, num_speakers=num_speakers,
     )
     diarization = pd.DataFrame(
         annotation.itertracks(yield_label=True),
@@ -507,8 +529,15 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         # from a live session object — which is how a connection_lost or
         # post-restart finalisation still excludes our voice (spec §2.3).
         spans = await system_utterances.exclusion_spans(cid)
+        # Read LAST, immediately before the audio phase: the doctor is asked
+        # how many people spoke as they press Stop, and this gives that answer
+        # the whole MedGemma-unload window to arrive. The same call records
+        # what was actually used, so a late answer cannot make the row claim it
+        # shaped this transcript.
+        speakers = await consultations.speakers_for_diarisation(
+            cid, DEFAULT_SPEAKERS)
         transcription = await asyncio.to_thread(
-            transcribe_and_diarise, wav_path, spans)
+            transcribe_and_diarise, wav_path, spans, speakers)
 
         # The invariant itself now runs inside transcribe_and_diarise, on
         # RAW segments before the speaker merge (see consultation 445).
