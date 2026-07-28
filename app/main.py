@@ -792,10 +792,15 @@ async def consultation_state(
     # A SEPARATE key from `turns`, matching the separate table — the note
     # and its citations read `turns` and can never reach these.
     spoken = await system_utterances.for_consultation(cid)
+    # Whether the drafted note predates a role change. Queried from the same
+    # function the approve guard uses, so the banner and the button cannot
+    # disagree about it.
+    labels = await consultations.labels_state(cid)
     await audit.log(user["id"], "consultation.viewed", "consultation", cid)
     return JSONResponse(
         content={**consultation, "turns": turns, "note": note, "plain_text": plain,
-                 "letters": letter_rows, "system_utterances": spoken}
+                 "letters": letter_rows, "system_utterances": spoken,
+                 "labels": labels}
     )
 
 
@@ -816,6 +821,29 @@ async def approve(
         return JSONResponse(
             status_code=409,
             content={"error": "Unresolved urgent actions must be acknowledged first."},
+        )
+    # Diarisation found one voice, so the Doctor/Patient labels are a default
+    # rather than a measurement (2026-07-28). Blocked server-side as well as
+    # in the UI, the same as the urgency banner: a disabled button can be
+    # re-enabled from the console, a refusal cannot.
+    if (consultation and consultation["single_voice_detected"]
+            and not consultation["single_voice_ack_at"]):
+        return JSONResponse(
+            status_code=409,
+            content={"error": "Only one voice was detected in the audio, so the"
+                     " speaker roles could not be determined from it. Check the"
+                     " transcript's Doctor/Patient labels and acknowledge first."},
+        )
+    # A role change after the note was drafted leaves the note's claims
+    # citing turns that now say something different. Acknowledge or
+    # regenerate — never a silent regeneration, the note is the doctor's.
+    labels = await consultations.labels_state(cid)
+    if labels["stale"] and not labels["acknowledged"]:
+        return JSONResponse(
+            status_code=409,
+            content={"error": "The speaker labels changed after this note was"
+                     " drafted. Regenerate the note, or acknowledge that you have"
+                     " checked it against the corrected labels."},
         )
     # Transcript-quality gate refusal: there is no draft to approve, and
     # there must not be one — the transcript is not trustworthy. Guarded
@@ -850,6 +878,34 @@ async def acknowledge_urgent(
         return blocked
     acked_at = await consultations.acknowledge_urgent(cid)
     await audit.log(user["id"], "urgent.acknowledged", "consultation", cid,
+                    {"acknowledged_at": acked_at})
+    return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
+
+
+@app.post("/api/consultations/{cid}/acknowledge-single-voice")
+async def acknowledge_single_voice(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """The doctor confirms they have checked the speaker labels on a
+    consultation where only one voice was detected."""
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
+    acked_at = await consultations.acknowledge_single_voice(cid)
+    await audit.log(user["id"], "single_voice.acknowledged", "consultation", cid,
+                    {"acknowledged_at": acked_at})
+    return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
+
+
+@app.post("/api/consultations/{cid}/acknowledge-labels")
+async def acknowledge_labels(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """The doctor confirms they have re-read a note drafted against the
+    speaker labels as they were BEFORE a role correction."""
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
+    acked_at = await consultations.acknowledge_labels(cid)
+    await audit.log(user["id"], "labels.acknowledged", "consultation", cid,
                     {"acknowledged_at": acked_at})
     return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
 
@@ -999,19 +1055,46 @@ async def letter_approve(
 
 
 class TurnBody(BaseModel):
-    text: str
+    # Both optional: a correction may be to the words, to the speaker label,
+    # or to both. Text stays a separate concern from role — correcting the
+    # words sets confidence to 1.0, and relabelling a speaker must not.
+    text: str | None = None
+    role: str | None = None
 
 
 @app.patch("/api/consultations/{cid}/turns/{idx}")
 async def edit_turn(
     cid: int, idx: int, body: TurnBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
 ) -> JSONResponse:
+    """Correct a turn's words and/or its speaker label.
+
+    Per-turn role correction (2026-07-28) is the answer to a SPLIT speaker
+    cluster, which Swap Doctor/Patient cannot fix: swapping a split makes it
+    worse, because some of the labels were already right (consultation 448 —
+    a swap would correct two turns and break the third).
+    """
     if (blocked := await _scoped(cid, user)) is not None:
         return blocked
     if (blocked := await _not_editable(cid)) is not None:
         return blocked
-    await consultations.update_turn_text(cid, idx, body.text)
-    await audit.log(user["id"], "turn.edited", "consultation", cid, {"turn": idx})
+    if body.text is None and body.role is None:
+        return JSONResponse(status_code=400,
+                            content={"error": "nothing to change: send text, role, or both"})
+    if body.role is not None and body.role not in consultations.ROLES:
+        return JSONResponse(
+            status_code=400,
+            content={"error": f"role must be one of {', '.join(consultations.ROLES)}"})
+    if body.text is not None:
+        await consultations.update_turn_text(cid, idx, body.text)
+        await audit.log(user["id"], "turn.edited", "consultation", cid, {"turn": idx})
+    if body.role is not None:
+        was = await consultations.update_turn_role(cid, idx, body.role)
+        if was is None:
+            return JSONResponse(status_code=404, content={"error": "no such turn"})
+        # Old AND new role in the row: a speaker relabel changes who the
+        # record says said something, and that must be reconstructible.
+        await audit.log(user["id"], "turn.role_changed", "consultation", cid,
+                        {"turn": idx, "from": was, "to": body.role})
     return JSONResponse(content={"ok": True})
 
 

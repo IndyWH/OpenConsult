@@ -55,6 +55,16 @@
   /* transcript turns: theme classes + editing affordance */
   #transcript { max-height: 75vh; overflow-y: auto; }
   .turn .ttext[contenteditable="true"]:focus { background: #F3EDE6; outline: none; }
+  /* The speaker label IS the control for correcting it (2026-07-28): the
+     place a person looks when they notice the label is wrong is the label.
+     Inherits its colour from .turn.doctor/.patient .who so the plum/green
+     role coding is untouched — this adds an affordance, not a new colour. */
+  .turn .who .rolebtn {
+    font: inherit; color: inherit; background: none; border: none; padding: 0;
+    cursor: pointer; text-align: left; border-bottom: 1px dashed currentColor;
+  }
+  .turn .who .rolebtn:hover:not(:disabled) { background: #F3EDE6; }
+  .turn .who .rolebtn:disabled { cursor: default; border-bottom: none; }
 
   .refusal { border: 1px solid var(--red); background: #FBF1EF; border-radius: var(--radius);
              padding: .75rem 1rem; }
@@ -142,12 +152,17 @@
     <!-- (letter panes will sit here, between note and transcript) -->
     <div id="letters"></div>
 
-    <!-- 2. DIARISED TRANSCRIPT — reference material, at the bottom -->
+    <!-- 2. DIARISED TRANSCRIPT — reference material, at the bottom.
+         The two role banners sit ABOVE it, because that is the thing they
+         are about: the uncertainty must be visible at what it applies to. -->
+    <div class="urgency" id="singleVoiceBanner" style="display:none"></div>
+    <div class="urgency" id="labelsBanner" style="display:none"></div>
     <div class="pane">
       <div class="pane-head"><h2>Diarised transcript</h2>
         <div class="tools">
           <span>click a citation chip in the note to highlight its source turn ·
-          double-click a line to correct it, then Regenerate</span>
+          double-click a line to correct it, then Regenerate ·
+          click a speaker label to change it for that line alone</span>
           <button id="swap" class="small">Swap Doctor/Patient</button>
         </div>
       </div>
@@ -252,7 +267,26 @@ function renderTurn(t) {
     div.id = 'turn-' + t.idx;
     if (t.confidence < 0.6) div.title = `ASR confidence ${t.confidence.toFixed(2)} on this turn`;
     div.appendChild(el('span', 'n', String(t.idx)));
-    const who = el('span', 'who', t.role);
+    // PER-TURN ROLE CORRECTION (2026-07-28). The answer to a split speaker
+    // cluster, which Swap Doctor/Patient cannot fix — swapping a split makes
+    // it worse, because some labels were already right. The label itself is
+    // the control: it is what the doctor is looking at when they notice it
+    // is wrong.
+    const who = el('span', 'who');
+    const roleBtn = el('button', 'rolebtn', t.role);
+    const locked = state.status === 'approved' || !!state.voided_at;
+    roleBtn.disabled = locked;
+    roleBtn.title = locked
+      ? 'This consultation is read-only'
+      : `Wrong speaker? Click to change this line to ${t.role === 'Doctor' ? 'Patient' : 'Doctor'}`;
+    roleBtn.addEventListener('click', async () => {
+      await fetch(`/api/consultations/${cid}/turns/${t.idx}`, {
+        method: 'PATCH', headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({role: t.role === 'Doctor' ? 'Patient' : 'Doctor'})
+      });
+      refresh();
+    });
+    who.appendChild(roleBtn);
     who.appendChild(document.createElement('br'));
     who.appendChild(el('span', 'ts', fmt(t.start)));
     div.appendChild(who);
@@ -379,10 +413,15 @@ async function refresh() {
     state.connection_lost ? '' : 'none';
   renderQualityBanner();
   renderUrgentBanner();
+  renderSingleVoiceBanner();
+  renderLabelsBanner();
   renderTranscript();
   renderNote();
   renderLetters();
   applyReadOnly();
+  // LAST, deliberately: it reads every banner's state and is the only writer
+  // of the Approve button's disabled flag.
+  refreshApproveGate();
 }
 
 // ------------------------------------------------------- referral letters
@@ -608,21 +647,96 @@ function renderUrgentBanner() {
     'The transcript does not show these as done or arranged. AI-flagged during the live consultation — clinical judgement remains yours.' +
     (state.urgent_ack_at ? ` · acknowledged ${state.urgent_ack_at.slice(0,16)}` : '')));
   banner.appendChild(box);
-  if (state.urgent_ack_at) {
-    approveBtn.disabled = false;
-    approveBtn.title = '';
-  } else {
-    const ackWrap = el('span', 'ack');
-    const ack = el('button', null, 'Acknowledge');
-    ack.addEventListener('click', async () => {
-      await fetch(`/api/consultations/${cid}/acknowledge-urgent`, {method: 'POST'});
-      refresh();
-    });
-    ackWrap.appendChild(ack);
-    banner.appendChild(ackWrap);
-    approveBtn.disabled = true;
-    approveBtn.title = 'Acknowledge the urgent-action alert first';
+  if (!state.urgent_ack_at) {
+    banner.appendChild(ackButton('acknowledge-urgent'));
   }
+}
+
+// One acknowledge button, three banners. Each renderer draws itself and
+// NOTHING touches the Approve button — that is refreshApproveGate's single
+// job. Three renderers each setting approveBtn.disabled would mean the last
+// one to run decided, which is how a gate quietly stops gating.
+function ackButton(endpoint) {
+  const wrap = el('span', 'ack');
+  const button = el('button', null, 'Acknowledge');
+  button.addEventListener('click', async () => {
+    await fetch(`/api/consultations/${cid}/${endpoint}`, {method: 'POST'});
+    refresh();
+  });
+  wrap.appendChild(button);
+  return wrap;
+}
+
+function renderSingleVoiceBanner() {
+  const banner = document.getElementById('singleVoiceBanner');
+  if (!state.single_voice_detected) { banner.style.display = 'none'; return; }
+  const acked = !!state.single_voice_ack_at;
+  banner.style.display = '';
+  banner.className = 'urgency' + (acked ? ' acked' : '');
+  banner.innerHTML = '';
+  banner.appendChild(el('span', 'icon', acked ? '✓' : '⚠'));
+  const box = el('div');
+  box.appendChild(el('h3', null, acked
+    ? 'Speaker labels checked'
+    : 'Speaker roles were NOT determined from the audio'));
+  box.appendChild(el('p', null,
+    'Only one voice was detected in this recording, so every line has been '
+    + 'labelled Patient by default — not by measurement. Read the transcript '
+    + 'below and correct any line whose speaker is wrong (click its label) '
+    + 'before approving.'));
+  box.appendChild(el('p', 'when',
+    'The note was drafted from these labels. If they are wrong, correct them '
+    + 'and Regenerate.'
+    + (acked ? ` · checked ${state.single_voice_ack_at.slice(0,16)}` : '')));
+  banner.appendChild(box);
+  if (!acked) banner.appendChild(ackButton('acknowledge-single-voice'));
+}
+
+function renderLabelsBanner() {
+  const banner = document.getElementById('labelsBanner');
+  const labels = state.labels || {};
+  if (!labels.stale) { banner.style.display = 'none'; return; }
+  banner.style.display = '';
+  banner.className = 'urgency' + (labels.acknowledged ? ' acked' : '');
+  banner.innerHTML = '';
+  banner.appendChild(el('span', 'icon', labels.acknowledged ? '✓' : '⚠'));
+  const box = el('div');
+  box.appendChild(el('h3', null, labels.acknowledged
+    ? 'Note checked against the corrected labels'
+    : 'This note was drafted against the OLD speaker labels'));
+  box.appendChild(el('p', null,
+    'A Doctor/Patient label changed after the note was drafted, so a claim '
+    + 'may now cite a line attributed to the other speaker. Regenerate the '
+    + 'note, or confirm you have re-read it against the corrected labels.'));
+  box.appendChild(el('p', 'when',
+    'The note is not regenerated automatically — it is your document.'
+    + (labels.labels_changed_at
+       ? ` · labels changed ${String(labels.labels_changed_at).slice(0,16)}` : '')));
+  banner.appendChild(box);
+  if (!labels.acknowledged) banner.appendChild(ackButton('acknowledge-labels'));
+}
+
+function refreshApproveGate() {
+  // The ONE place that decides whether Approve can be pressed, and it must
+  // agree with the server's own refusals in main.py::approve — a disabled
+  // button is a courtesy, the 409 is the rule.
+  const approveBtn = document.getElementById('approve');
+  const labels = state.labels || {};
+  const reasons = [];
+  if ((state.urgent_actions || []).length && !state.urgent_ack_at) {
+    reasons.push('acknowledge the urgent-action alert');
+  }
+  if (state.single_voice_detected && !state.single_voice_ack_at) {
+    reasons.push('check the speaker labels — only one voice was detected');
+  }
+  if (labels.stale && !labels.acknowledged) {
+    reasons.push('the labels changed after this note was drafted — regenerate or acknowledge');
+  }
+  approveBtn.disabled = reasons.length > 0;
+  // Standing rule: the reason goes ON the control, not only in the banner.
+  approveBtn.title = reasons.length
+    ? 'Before approving: ' + reasons.join('; ')
+    : '';
 }
 
 document.getElementById('approve').addEventListener('click', async () => {
