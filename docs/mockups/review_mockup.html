@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Review page (Heidi-inspired, v2)</title>
+<style>
+  :root {
+    --paper: #FAF6F1; --panel: #FFFFFF;
+    --ink: #29231F; --ink-soft: #6E645C; --ink-faint: #A39A91;
+    --line: #E9E1D8;
+    --plum: #4E2A3A; --plum-hover: #3E2130;
+    --red: #C2402F; --amber: #B07C1E; --green: #2E7D4F;
+    --radius: 10px;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--sans); font-size: 15px; line-height: 1.55; }
+
+  header.app {
+    display: flex; align-items: center; gap: 1.5rem;
+    padding: .65rem 1.4rem; border-bottom: 1px solid var(--line);
+    background: var(--paper); position: sticky; top: 0; z-index: 5;
+  }
+  .brand { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+  nav.tabs { display: flex; gap: .25rem; }
+  nav.tabs a { text-decoration: none; color: var(--ink-soft); padding: .35rem .8rem; border-radius: 999px; font-size: .9rem; }
+  nav.tabs a.active { background: #EFE7DE; color: var(--ink); font-weight: 600; }
+  .spacer { flex: 1; }
+  .whoami { font-size: .82rem; color: var(--ink-faint); text-align: right; line-height: 1.3; }
+  .whoami b { color: var(--ink-soft); font-weight: 600; }
+
+  .wrap { max-width: 1080px; margin: 1.1rem auto 2rem; padding: 0 1.4rem; }
+
+  .session-head { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+  .patient .name { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margin-right: .5rem; }
+  .patient .demo { color: var(--ink-soft); font-size: .95rem; }
+  .chips { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: .35rem; font-size: .78rem; color: var(--ink-soft);
+    border: 1px solid var(--line); background: var(--panel); padding: .18rem .6rem; border-radius: 999px;
+  }
+  .chip.status { border-color: #E3D9C8; background: #F7F1E6; color: var(--amber); font-weight: 600; }
+  .chip.status.approved { border-color: #CDE3D5; background: #F0F7F2; color: var(--green); }
+
+  .actions { margin-left: auto; display: flex; gap: .6rem; align-items: center; position: relative; }
+  button { font-family: var(--sans); font-size: .9rem; cursor: pointer; border-radius: 999px; padding: .5rem 1.2rem; }
+  button.secondary { background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); }
+  button.secondary:hover { border-color: #D8CEC3; color: var(--ink); }
+  button.primary { background: var(--plum); border: none; color: #FBF6F1; font-weight: 600; }
+  button.primary:hover { background: var(--plum-hover); }
+  button.primary:disabled { opacity: .45; cursor: not-allowed; }
+  button.plus {
+    background: var(--plum); border: none; color: #FBF6F1; font-weight: 700;
+    width: 2.4rem; height: 2.4rem; border-radius: 50%; font-size: 1.25rem; line-height: 1;
+    display: none; align-items: center; justify-content: center; padding: 0;
+  }
+  button.plus:hover { background: var(--plum-hover); }
+
+  /* Referral suggestion menu (opens from the + button) */
+  .ref-menu {
+    position: absolute; right: 0; top: calc(100% + .5rem); z-index: 10;
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: 0 6px 24px #29231F14; min-width: 310px; padding: .45rem; display: none;
+  }
+  .ref-menu.open { display: block; }
+  .ref-menu .menu-title { font-size: .7rem; text-transform: uppercase; letter-spacing: .08em; color: var(--ink-faint); font-weight: 600; padding: .35rem .6rem .25rem; }
+  .ref-menu button.item {
+    display: block; width: 100%; text-align: left; background: none; border: none;
+    border-radius: 7px; padding: .5rem .6rem; font-size: .9rem; color: var(--ink);
+  }
+  .ref-menu button.item:hover { background: #F3EDE6; }
+  .ref-menu button.item small { display: block; color: var(--ink-faint); font-size: .76rem; }
+
+  /* Urgency banner — acknowledge-gated */
+  .urgency {
+    border: 1.5px solid var(--red); background: #FBF1EF; border-radius: var(--radius);
+    padding: .85rem 1rem; margin: 1rem 0; display: flex; gap: .9rem; align-items: flex-start;
+  }
+  .urgency .icon { font-size: 1.1rem; color: var(--red); line-height: 1.4; }
+  .urgency h3 { margin: 0 0 .2rem; font-size: .95rem; color: var(--red); }
+  .urgency p { margin: 0; font-size: .86rem; color: var(--ink-soft); }
+  .urgency .when { font-size: .76rem; color: var(--ink-faint); }
+  .urgency .ack { margin-left: auto; flex: none; align-self: center; }
+  .urgency.acked { border-color: var(--line); background: var(--panel); }
+  .urgency.acked .icon, .urgency.acked h3 { color: var(--green); }
+
+  .pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 1rem; }
+  .pane-head {
+    display: flex; align-items: center; gap: .6rem; padding: .7rem 1.1rem;
+    border-bottom: 1px solid var(--line);
+  }
+  .pane-head h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-faint); margin: 0; font-weight: 600; }
+  .pane-head .tools { margin-left: auto; display: flex; gap: .5rem; font-size: .76rem; color: var(--ink-faint); }
+  .pane-body { padding: 1rem 1.1rem; }
+
+  /* SOAP note — first */
+  .soap h3 { font-family: var(--serif); font-size: 1.02rem; margin: 1rem 0 .35rem; }
+  .soap h3:first-child { margin-top: 0; }
+  .soap ul { margin: 0; padding-left: 1.15rem; }
+  .soap li { margin-bottom: .35rem; font-size: .95rem; }
+  .cchip {
+    display: inline-block; font-size: .68rem; font-weight: 700; color: var(--ink-soft);
+    background: #EFEAE4; border-radius: 4px; padding: .02rem .35rem; margin-left: .3rem;
+    cursor: pointer; vertical-align: middle;
+  }
+  .cchip:hover { background: #E3D9C8; color: var(--ink); }
+  .flag {
+    display: inline-flex; align-items: center; gap: .25rem; font-size: .68rem; font-weight: 700;
+    color: var(--amber); background: #F7F1E6; border: 1px solid #E9DCC0;
+    border-radius: 4px; padding: .02rem .4rem; margin-left: .3rem; vertical-align: middle;
+  }
+  .note-foot {
+    display: flex; align-items: center; gap: .6rem; padding: .7rem 1.1rem;
+    border-top: 1px solid var(--line); font-size: .78rem; color: var(--ink-faint);
+  }
+  .note-foot .grounding { margin-right: auto; }
+
+  /* Referral letter draft pane */
+  .letter { display: none; }
+  .letter.open { display: block; }
+  .letter .pane-head h2 { color: var(--plum); }
+  .letter-body { font-size: .95rem; max-width: 46rem; }
+  .letter-body p { margin: 0 0 .8rem; }
+  .draft-tag {
+    display: inline-flex; font-size: .7rem; font-weight: 700; color: var(--amber);
+    background: #F7F1E6; border: 1px solid #E9DCC0; border-radius: 4px; padding: .05rem .45rem;
+  }
+
+  /* Diarised transcript — last */
+  .turn { display: flex; gap: .7rem; margin-bottom: .65rem; padding: .3rem .45rem; border-radius: 6px; }
+  .turn .n { flex: none; width: 1.6rem; text-align: right; color: var(--ink-faint); font-size: .76rem; font-variant-numeric: tabular-nums; padding-top: .15rem; }
+  .turn .who { flex: none; width: 4.2rem; font-size: .78rem; font-weight: 700; padding-top: .12rem; }
+  .turn.doctor .who { color: var(--plum); }
+  .turn.patient .who { color: var(--green); }
+  .turn .text { font-size: .95rem; }
+  .turn.lowconf .text { border-bottom: 2px dotted var(--amber); }
+  .turn.hl { background: #F7F1E6; outline: 1px solid #E3D9C8; }
+
+  footer.disclaimer { text-align: center; font-size: .72rem; color: var(--ink-faint); padding: .6rem 1rem 1.2rem; }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="brand">Consultation AI</div>
+  <nav class="tabs">
+    <a href="#">Today</a>
+    <a href="#">Consultation</a>
+    <a href="#" class="active">Consultations</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="whoami"><b>Dr S. Herath</b> · doctor<br>Change password · Sign out</div>
+</header>
+
+<div class="wrap">
+  <div class="session-head">
+    <div class="patient">
+      <span class="name">Nimal Perera</span>
+      <span class="demo">54 y · M</span>
+    </div>
+    <div class="chips">
+      <span class="chip">24/07/2026 · 09:41</span>
+      <span class="chip">04:52 recorded</span>
+      <span class="chip">English</span>
+      <span class="chip status" id="statusChip">Awaiting review</span>
+    </div>
+    <div class="actions">
+      <button class="secondary">Regenerate</button>
+      <button class="secondary">Copy as text</button>
+      <button class="primary" id="approveBtn" disabled title="Acknowledge the urgent-action alert first">Approve</button>
+      <button class="plus" id="plusBtn" title="Add to this consultation">+</button>
+      <div class="ref-menu" id="refMenu">
+        <div class="menu-title">Suggested from the approved note</div>
+        <button class="item" id="refCardio">Referral letter — Cardiology
+          <small>Plan: urgent assessment for suspected ACS · exertional chest pain, FH of MI</small></button>
+        <div class="menu-title">Other</div>
+        <button class="item">Referral letter — choose specialty…</button>
+        <button class="item">Patient information letter</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="urgency" id="urgency">
+    <span class="icon">⚠</span>
+    <div>
+      <h3>Unresolved urgent action from the live session</h3>
+      <p>Perform ECG now — the alarm fired during the consultation and the transcript never showed it arranged.</p>
+      <p class="when">First fired at 01:14 of the recording · consultation stopped 09:46</p>
+    </div>
+    <span class="ack"><button class="secondary" id="ackBtn">Acknowledge</button></span>
+  </div>
+
+  <!-- 1. DRAFT NOTE — the document the doctor is here to sign -->
+  <div class="pane">
+    <div class="pane-head"><h2>Draft SOAP note</h2>
+      <div class="tools"><span>draft — nothing is final until approved</span></div>
+    </div>
+    <div class="pane-body soap">
+      <h3>Subjective</h3>
+      <ul>
+        <li>Intermittent central chest tightness since last night, radiating to jaw this morning, associated diaphoresis.<span class="cchip" data-t="t2">2</span><span class="cchip" data-t="t4">4</span></li>
+        <li>Exertional component — had to stop halfway on stairs.<span class="cchip" data-t="t6">6</span><span class="flag">⚠ low-confidence audio</span></li>
+        <li>Family history: father had myocardial infarction at age 60.<span class="cchip" data-t="t6">6</span><span class="flag">⚠ low-confidence audio</span></li>
+        <li>Residual mild heaviness at time of consultation.<span class="cchip" data-t="t8">8</span></li>
+      </ul>
+      <h3>Objective</h3>
+      <ul>
+        <li>Examination begun at close of recording; findings not captured in transcript.<span class="cchip" data-t="t9">9</span></li>
+      </ul>
+      <h3>Assessment</h3>
+      <ul>
+        <li>Chest pain of recent onset — acute coronary syndrome to be excluded as first priority; exertional pattern also consistent with angina.<span class="cchip" data-t="t2">2</span><span class="cchip" data-t="t4">4</span><span class="cchip" data-t="t6">6</span></li>
+      </ul>
+      <h3>Plan</h3>
+      <ul>
+        <li>Immediate 12-lead ECG, arranged during consultation.<span class="cchip" data-t="t9">9</span></li>
+        <li>Suggested investigations: troponin, FBC, U&amp;E, lipids, HbA1c; CXR if examination indicates.</li>
+      </ul>
+    </div>
+    <div class="note-foot">
+      <span class="grounding">Grounding: 9/10 claims cited · 2 flagged for low-confidence audio</span>
+      <span>Generated 09:48 · MedGemma 27B · draft v1</span>
+    </div>
+  </div>
+
+  <!-- 2. REFERRAL LETTER DRAFT — appears after Approve → + → suggestion -->
+  <div class="pane letter" id="letterPane">
+    <div class="pane-head"><h2>Referral letter — Cardiology</h2>
+      <div class="tools"><span class="draft-tag">DRAFT — review, edit, approve before sending</span></div>
+    </div>
+    <div class="pane-body letter-body">
+      <p>Dear Colleague,</p>
+      <p><b>Re: Nimal Perera, 54 y, M — chest pain of recent onset</b></p>
+      <p>I would be grateful for your urgent assessment of this 54-year-old gentleman who presented today with intermittent central chest tightness since last night, radiating to the jaw with associated diaphoresis, and a clear exertional component (stopped halfway on stairs). His father suffered a myocardial infarction at age 60.</p>
+      <p>A 12-lead ECG was arranged at the time of consultation. I have requested troponin, FBC, U&amp;E, lipids and HbA1c.</p>
+      <p>On examination at the time of review — <i>[to be completed by the referring doctor]</i>.</p>
+      <p>Thank you for seeing him at your earliest opportunity.</p>
+      <p>Yours faithfully,<br>Dr S. Herath</p>
+    </div>
+    <div class="note-foot">
+      <span class="grounding">Drafted from the approved note only — no new clinical claims introduced</span>
+      <button class="secondary">Copy as text</button>
+      <button class="primary">Approve letter</button>
+    </div>
+  </div>
+
+  <!-- 3. DIARISED TRANSCRIPT — reference material, at the bottom -->
+  <div class="pane">
+    <div class="pane-head"><h2>Diarised transcript</h2>
+      <div class="tools"><span>click a citation chip in the note to highlight its source turn</span></div>
+    </div>
+    <div class="pane-body">
+      <div class="turn doctor" id="t1"><span class="n">1</span><span class="who">Doctor</span><span class="text">Good morning, have a seat. What's brought you in today?</span></div>
+      <div class="turn patient" id="t2"><span class="n">2</span><span class="who">Patient</span><span class="text">Doctor, I've been getting this tightness in my chest since last night. It comes and goes.</span></div>
+      <div class="turn doctor" id="t3"><span class="n">3</span><span class="who">Doctor</span><span class="text">Tell me more about the tightness — where exactly do you feel it?</span></div>
+      <div class="turn patient" id="t4"><span class="n">4</span><span class="who">Patient</span><span class="text">Here in the middle. This morning it went up to my jaw as well. I was sweating a lot.</span></div>
+      <div class="turn doctor" id="t5"><span class="n">5</span><span class="who">Doctor</span><span class="text">Does anything bring it on — walking, climbing stairs?</span></div>
+      <div class="turn patient lowconf" id="t6" title="ASR confidence 0.54 on this turn"><span class="n">6</span><span class="who">Patient</span><span class="text">Climbing the stairs at home. I had to stop halfway. My father had a heart attack at sixty.</span></div>
+      <div class="turn doctor" id="t7"><span class="n">7</span><span class="who">Doctor</span><span class="text">Are you having any pain right now? Any breathlessness?</span></div>
+      <div class="turn patient" id="t8"><span class="n">8</span><span class="who">Patient</span><span class="text">A little heaviness now. Not so bad as this morning.</span></div>
+      <div class="turn doctor" id="t9"><span class="n">9</span><span class="who">Doctor</span><span class="text">I'm going to arrange an ECG for you straight away, and I'll examine you now.</span></div>
+    </div>
+  </div>
+</div>
+
+<footer class="disclaimer">Research/educational prototype — not a medical device. Synthetic consultations only. All AI output is a draft until the doctor approves it.</footer>
+
+<script>
+  // Mockup interactions only.
+  document.querySelectorAll('.cchip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      document.querySelectorAll('.turn').forEach(t => t.classList.remove('hl'));
+      const turn = document.getElementById(chip.dataset.t);
+      turn.classList.add('hl');
+      turn.scrollIntoView({behavior: 'smooth', block: 'center'});
+    });
+  });
+
+  // Acknowledge → unlock Approve
+  const ackBtn = document.getElementById('ackBtn');
+  ackBtn.addEventListener('click', () => {
+    const u = document.getElementById('urgency');
+    u.classList.add('acked');
+    u.querySelector('.icon').textContent = '✓';
+    u.querySelector('h3').textContent = 'Urgent-action alert acknowledged';
+    u.querySelector('.when').textContent += ' · acknowledged just now by Dr S. Herath';
+    ackBtn.remove();
+    const approve = document.getElementById('approveBtn');
+    approve.disabled = false; approve.title = '';
+  });
+
+  // Approve → status flips, button becomes "+"
+  const approveBtn = document.getElementById('approveBtn');
+  approveBtn.addEventListener('click', () => {
+    const chip = document.getElementById('statusChip');
+    chip.textContent = 'Approved';
+    chip.classList.add('approved');
+    approveBtn.style.display = 'none';
+    document.getElementById('plusBtn').style.display = 'inline-flex';
+  });
+
+  // "+" → suggested referral letters (inferred from the note's Assessment/Plan)
+  const plusBtn = document.getElementById('plusBtn');
+  const refMenu = document.getElementById('refMenu');
+  plusBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    refMenu.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (!refMenu.contains(e.target)) refMenu.classList.remove('open');
+  });
+  document.getElementById('refCardio').addEventListener('click', () => {
+    refMenu.classList.remove('open');
+    const pane = document.getElementById('letterPane');
+    pane.classList.add('open');
+    pane.scrollIntoView({behavior: 'smooth', block: 'start'});
+  });
+</script>
+</body>
+</html>

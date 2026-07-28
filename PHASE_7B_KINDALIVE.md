@@ -82,11 +82,12 @@ A small **bedside-device panel** inside the existing cream theme, with
 kindalive's mood accent recoloured to our palette. See `docs/mockups/`
 and `DESIGN_SPEC.md`.
 
-> **Note for whoever builds this:** neither `docs/mockups/` nor
-> `DESIGN_SPEC.md` is currently in the repository — `DESIGN_SPEC.md` and
-> the approved `live_mockup.html` / `review_mockup.html` live in the
-> owner's Downloads (same arrangement as the 2026-07-24 design pass, see
-> HANDOVER). Ask for them before styling rather than inventing a panel.
+> **Note (updated 2026-07-28):** `DESIGN_SPEC.md` and the approved
+> mockups (`docs/mockups/live_mockup.html` / `review_mockup.html`) are
+> now IN the repository. The original spec was lost — it existed only in
+> Downloads and a deleted chat — and the committed DESIGN_SPEC.md is a
+> reconstruction (its header says so; the code and mockups are
+> authoritative where they disagree).
 
 ### 6. Expect a calibration pass
 

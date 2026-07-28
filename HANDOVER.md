@@ -294,10 +294,22 @@ nvidia-smi --query-gpu=timestamp,memory.used,memory.total --format=csv,noheader,
 
 ## Design pass + referral letters (2026-07-24)
 
+> **Document loss and recovery (2026-07-28).** The original
+> `DESIGN_SPEC.md`, `NOTE_ICE_SPEC.md` and `REFERRAL_LETTER_STYLE.md`
+> were LOST — they existed only in the owner's Downloads and deleted
+> chat sessions, never in the repo. All three were reconstructed
+> 2026-07-28 from the code that implemented them, the mockups and this
+> document, and are now committed at the repo root; each header says it
+> is a reconstruction and that the code is authoritative where they
+> disagree. The approved mockups (originals, not reconstructions) are
+> committed at `docs/mockups/`. The lesson is already visible in this
+> file's own history: a spec that lives only in Downloads is one cleanup
+> away from existing only as its implementation.
+
 Implemented from `DESIGN_SPEC.md` (Claude Cowork + owner; approved
 mockups `live_mockup.html`/`review_mockup.html` are the visual source of
-truth — both in the owner's Downloads, spec decisions restated here).
-Five commits, "Design pass 1/5 … 5/5":
+truth — both now committed at `docs/mockups/`, spec decisions restated
+here). Five commits, "Design pass 1/5 … 5/5":
 
 - **Design system** (`app/static/theme.css`, linked everywhere): warm
   cream canvas, one plum accent reserved for the primary action + active

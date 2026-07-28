@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mockup — Live consultation (Heidi-inspired, v2)</title>
+<style>
+  /* ============ Design tokens (proposed) ============ */
+  :root {
+    --paper: #FAF6F1;          /* warm cream canvas */
+    --panel: #FFFFFF;          /* cards / panes */
+    --ink: #29231F;            /* warm near-black */
+    --ink-soft: #6E645C;       /* secondary text */
+    --ink-faint: #A39A91;      /* metadata */
+    --line: #E9E1D8;           /* hairline borders */
+    --plum: #4E2A3A;           /* single brand accent (primary action) */
+    --plum-hover: #3E2130;
+    --red: #C2402F;            /* urgency ONLY */
+    --amber: #B07C1E;          /* low-confidence flags */
+    --green: #2E7D4F;          /* mic level / healthy states */
+    --radius: 10px;
+    --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--paper); color: var(--ink);
+    font-family: var(--sans); font-size: 15px; line-height: 1.55;
+  }
+
+  /* ============ App chrome ============ */
+  header.app {
+    display: flex; align-items: center; gap: 1.5rem;
+    padding: .65rem 1.4rem; border-bottom: 1px solid var(--line);
+    background: var(--paper); position: sticky; top: 0; z-index: 5;
+  }
+  .brand { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; letter-spacing: .01em; }
+  nav.tabs { display: flex; gap: .25rem; }
+  nav.tabs a {
+    text-decoration: none; color: var(--ink-soft); padding: .35rem .8rem;
+    border-radius: 999px; font-size: .9rem;
+  }
+  nav.tabs a.active { background: #EFE7DE; color: var(--ink); font-weight: 600; }
+  .spacer { flex: 1; }
+  .whoami { font-size: .82rem; color: var(--ink-faint); text-align: right; line-height: 1.3; }
+  .whoami b { color: var(--ink-soft); font-weight: 600; }
+
+  /* ============ Session header ============ */
+  .session-head {
+    max-width: 1080px; margin: 1.1rem auto 0; padding: 0 1.4rem;
+    display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;
+  }
+  .patient { display: flex; align-items: baseline; gap: .6rem; }
+  .patient .name { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; }
+  .patient .demo { color: var(--ink-soft); font-size: .95rem; }
+  .chips { display: flex; gap: .45rem; align-items: center; flex-wrap: wrap; }
+  .chip {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .78rem; color: var(--ink-soft);
+    border: 1px solid var(--line); background: var(--panel);
+    padding: .18rem .6rem; border-radius: 999px;
+  }
+  .chip.linked { border-color: #CDE3D5; background: #F0F7F2; color: var(--green); }
+
+  /* ============ Right cluster: timer · mic · stop ============ */
+  .live-cluster { margin-left: auto; display: flex; align-items: center; gap: .8rem; }
+  .timer {
+    font-variant-numeric: tabular-nums; font-size: .95rem; color: var(--ink-soft);
+    display: inline-flex; align-items: center; gap: .35rem;
+  }
+  .rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--red); animation: blink 1.4s infinite; }
+  @keyframes blink { 50% { opacity: .25; } }
+
+  /* Mic pill — Heidi-style: device name + animated level bars, live even when idle */
+  .mic {
+    display: inline-flex; align-items: center; gap: .5rem;
+    border: 1px solid var(--line); background: var(--panel);
+    border-radius: 999px; padding: .32rem .75rem; font-size: .85rem; color: var(--ink-soft);
+    cursor: pointer; max-width: 260px;
+  }
+  .mic .dev { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mic svg.micicon { flex: none; opacity: .6; }
+  .bars { display: inline-flex; align-items: center; gap: 2px; height: 14px; }
+  .bars i {
+    width: 3.5px; border-radius: 2px; background: var(--green);
+    animation: level 1.1s ease-in-out infinite;
+  }
+  .bars i:nth-child(1) { height: 6px;  animation-delay: 0s;   }
+  .bars i:nth-child(2) { height: 11px; animation-delay: .15s; }
+  .bars i:nth-child(3) { height: 14px; animation-delay: .3s;  }
+  .bars i:nth-child(4) { height: 9px;  animation-delay: .45s; }
+  .bars i:nth-child(5) { height: 5px;  animation-delay: .6s;  }
+  @keyframes level { 0%,100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+  .mic .chev { opacity: .5; font-size: .7rem; }
+  .mic.dead { border-color: #EBC7C0; background: #FBF1EF; color: var(--red); }
+  .mic.dead .bars i { background: var(--red); animation: none; transform: scaleY(.28); }
+  .mic.dead svg.micicon { opacity: .9; stroke: var(--red); }
+
+  button.stop {
+    font-family: var(--sans); font-size: .92rem; font-weight: 600;
+    background: var(--plum); color: #FBF6F1; border: none; cursor: pointer;
+    padding: .55rem 1.35rem; border-radius: 999px;
+  }
+  button.stop:hover { background: var(--plum-hover); }
+
+  /* ============ Stacked layout, priority order ============ */
+  .stack {
+    max-width: 1080px; margin: 1rem auto 2rem; padding: 0 1.4rem;
+    display: flex; flex-direction: column; gap: 1.1rem;
+  }
+  .pane {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: var(--radius); padding: 1.1rem 1.25rem;
+  }
+  .pane h2 {
+    font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--ink-faint); margin: 0 0 .45rem; font-weight: 600;
+  }
+  .duo { display: grid; grid-template-columns: 1fr 1fr; gap: 1.1rem; }
+  @media (max-width: 760px) { .duo { grid-template-columns: 1fr; } }
+
+  /* 1 — Urgent actions */
+  .urgent {
+    border: 1.5px solid var(--red); background: #FBF1EF;
+    border-radius: var(--radius); padding: .8rem 1.1rem;
+  }
+  .urgent h2 { color: var(--red); }
+  .urgent ul { margin: 0; padding-left: 1.15rem; }
+  .urgent li { font-weight: 600; font-size: 1.02rem; margin-bottom: .3rem; }
+  .urgent .why { display: block; font-weight: 400; color: var(--ink-soft); font-size: .85rem; }
+
+  /* 2 — Questions / Signs */
+  .cds ul { margin: 0; padding-left: 1.15rem; }
+  .cds li { margin-bottom: .4rem; font-size: .98rem; }
+
+  /* 3 — Differential */
+  .lk {
+    font-size: .68rem; font-weight: 700; border-radius: 4px; padding: .06rem .4rem;
+    margin-right: .4rem; vertical-align: middle; text-transform: lowercase;
+  }
+  .lk.high { background: #F7E8E5; color: var(--red); }
+  .lk.moderate { background: #F5EBDA; color: var(--amber); }
+  .lk.low { background: #EFEAE4; color: var(--ink-soft); }
+  .why { display: block; color: var(--ink-faint); font-size: .8rem; }
+
+  /* Guidelines (kept with differential, collapsed by default) */
+  details.gl summary {
+    cursor: pointer; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em;
+    color: var(--ink-faint); font-weight: 600; margin-top: .9rem;
+  }
+  .cite { font-size: .8rem; color: var(--ink-soft); margin: .5rem 0 0; padding-left: 1.2rem; text-indent: -1.2rem; }
+  .cite b { color: var(--ink); font-weight: 600; }
+  .provenance {
+    font-size: .72rem; color: var(--ink-faint); margin-top: .8rem;
+    border-top: 1px solid var(--line); padding-top: .5rem;
+  }
+
+  /* 4 — Transcript, last */
+  #transcript p { margin: 0 0 .55rem; font-size: .95rem; }
+  .ts { color: var(--ink-faint); font-size: .78rem; font-variant-numeric: tabular-nums; margin-right: .55rem; }
+  .partial { color: var(--ink-faint); font-style: italic; }
+
+  footer.disclaimer {
+    text-align: center; font-size: .72rem; color: var(--ink-faint);
+    padding: .6rem 1rem 1.2rem;
+  }
+  .demo-toggle { position: fixed; bottom: 12px; right: 12px; font-size: .72rem; opacity: .65; }
+</style>
+</head>
+<body>
+
+<header class="app">
+  <div class="brand">Consultation AI</div>
+  <nav class="tabs">
+    <a href="#">Today</a>
+    <a href="#" class="active">Consultation</a>
+    <a href="#">Consultations</a>
+  </nav>
+  <div class="spacer"></div>
+  <div class="whoami"><b>Dr S. Herath</b> · doctor<br>Change password · Sign out</div>
+</header>
+
+<div class="session-head">
+  <div class="patient">
+    <span class="name">Nimal Perera</span>
+    <span class="demo">54 y · M</span>
+  </div>
+  <div class="chips">
+    <span class="chip linked">✓ linked from Today queue</span>
+    <span class="chip">English</span>
+  </div>
+  <div class="live-cluster">
+    <span class="timer"><span class="rec-dot"></span> 04:37</span>
+    <span class="mic" id="micPill" title="Input device — click to change">
+      <svg class="micicon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg>
+      <span class="dev" id="devName">Microphone (Logi C615 HD WebCam)</span>
+      <span class="bars"><i></i><i></i><i></i><i></i><i></i></span>
+      <span class="chev">▾</span>
+    </span>
+    <button class="stop">Stop</button>
+  </div>
+</div>
+
+<div class="stack">
+
+  <!-- 1. URGENT ACTIONS — always first -->
+  <div class="urgent">
+    <h2>⚠ Urgent actions</h2>
+    <ul>
+      <li>Perform ECG now
+        <span class="why">Ongoing chest tightness with radiation to jaw, diaphoresis and exertional pattern — exclude acute coronary syndrome.</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- 2. QUESTIONS TO ASK · SIGNS TO CHECK — the doctor's working prompts -->
+  <div class="duo">
+    <div class="pane cds">
+      <h2>Questions to ask</h2>
+      <ul>
+        <li>Duration of each episode — any episode lasting over 15 minutes?</li>
+        <li>Any nausea, vomiting or light-headedness with the pain?</li>
+        <li>Smoking history, diabetes, hypertension, lipid status?</li>
+      </ul>
+    </div>
+    <div class="pane cds">
+      <h2>Signs to check</h2>
+      <ul>
+        <li>Blood pressure both arms; heart rate and rhythm</li>
+        <li>Signs of heart failure — basal crackles, raised JVP, oedema</li>
+        <li>Chest wall tenderness (reproducibility of pain)</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- 3. DIFFERENTIAL DIAGNOSIS (guidelines tucked beneath) -->
+  <div class="pane cds">
+    <h2>Differential diagnosis</h2>
+    <ul>
+      <li><span class="lk high">high</span>Acute coronary syndrome
+        <span class="why">Central chest tightness radiating to jaw, sweating, exertional trigger, first-degree family history.</span></li>
+      <li><span class="lk moderate">moderate</span>Stable angina
+        <span class="why">Exertional pattern relieved by rest; symptoms recurrent rather than sustained.</span></li>
+      <li><span class="lk low">low</span>Gastro-oesophageal reflux
+        <span class="why">Retrosternal discomfort possible, but autonomic features make reflux alone unlikely.</span></li>
+      <li><span class="lk low">low</span>Musculoskeletal chest pain
+        <span class="why">No positional or palpation-related component reported.</span></li>
+    </ul>
+    <details class="gl" open>
+      <summary>Guidelines — grounded in local corpus</summary>
+      <p style="margin:.5rem 0 0; font-size:.92rem">For suspected acute coronary syndrome, arrange emergency assessment; a resting 12-lead ECG should be performed as soon as possible <b>[1]</b>. Do not delay transfer to hospital to await the result <b>[1]</b>. Offer aspirin 300&nbsp;mg as a single loading dose unless there is clear evidence of allergy <b>[2]</b>.</p>
+      <p class="cite"><b>[1]</b> NICE — CG95 Chest pain of recent onset: §1.2 Emergency referral</p>
+      <p class="cite"><b>[2]</b> NICE — CG95 Chest pain of recent onset: §1.2.5 Initial management</p>
+      <p class="provenance">starter-uk-cdc-who · v3 · 12 sources, 1,482 passages · ingested 2026-07-06</p>
+    </details>
+  </div>
+
+  <!-- 4. LIVE TRANSCRIPT — last; the doctor listens to the patient, not the screen -->
+  <div class="pane" id="transcript">
+    <h2>Live transcript</h2>
+    <p><span class="ts">0:12</span>Good morning, have a seat. What's brought you in today?</p>
+    <p><span class="ts">0:19</span>Doctor, I've been getting this tightness in my chest since last night. It comes and goes.</p>
+    <p><span class="ts">0:31</span>Tell me more about the tightness — where exactly do you feel it?</p>
+    <p><span class="ts">0:38</span>Here in the middle. This morning it went up to my jaw as well. I was sweating a lot.</p>
+    <p><span class="ts">0:52</span>Does anything bring it on — walking, climbing stairs?</p>
+    <p><span class="ts">1:01</span>Climbing the stairs at home. I had to stop halfway. My father had a heart attack at sixty.</p>
+    <p><span class="ts">1:14</span>Are you having any pain right now? Any breathlessness?</p>
+    <p><span class="ts">1:22</span>A little heaviness now. Not so bad as this morning.</p>
+    <p><span class="ts">1:30</span>I'm going to arrange an ECG for you straight away, and I'll examine you now.</p>
+    <p class="partial">okay just lie back on the couch for me and I'll listen to your…</p>
+  </div>
+
+</div>
+
+<footer class="disclaimer">Research/educational prototype — not a medical device. Synthetic consultations only. All AI output is a draft until the doctor approves it.</footer>
+
+<label class="demo-toggle"><input type="checkbox" id="deadToggle"> demo: wrong-device / no-signal state</label>
+<script>
+  document.getElementById('deadToggle').addEventListener('change', (e) => {
+    const pill = document.getElementById('micPill');
+    pill.classList.toggle('dead', e.target.checked);
+    document.getElementById('devName').textContent = e.target.checked
+      ? 'Default — Microphone (Hifi Audio)' : 'Microphone (Logi C615 HD WebCam)';
+  });
+</script>
+</body>
+</html>
