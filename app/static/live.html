@@ -312,6 +312,24 @@
     <button id="scOfferSkip" type="button">Skip</button>
   </div>
 
+  <!-- HOW MANY PEOPLE SPOKE — asked at Stop, answered in one tap.
+       The count is declared rather than detected because detection was
+       measured and is unreliable both ways (see app/finalize.py
+       DEFAULT_SPEAKERS). Every answer, including Skip, proceeds immediately:
+       Stop has already completed by the time this appears, so nothing here
+       can hold the consultation open. Deliberately NO auto-dismiss timer —
+       a timer would make the behaviour depend on how fast the doctor reads. -->
+  <div class="scoffer" id="spkAsk">
+    <span class="what">How many people spoke in this consultation?</span>
+    <button class="go" id="spkOne" type="button">Just me</button>
+    <button class="go" id="spkTwo" type="button">Two of us</button>
+    <button id="spkSkip" type="button">Skip</button>
+  </div>
+  <div class="scresult" id="spkResult">
+    <span class="what" id="spkResultWhat"></span>
+    <button id="spkResultDismiss" type="button">Dismiss</button>
+  </div>
+
   <!-- Sound-check result. Four classes (spec 10.2): heard well, heard
        faint, not heard, unverified. Faint reads differently from silent
        on purpose — it predicts both a patient who strains and an
@@ -1201,6 +1219,76 @@ document.getElementById('scResultDismiss').addEventListener('click',
   () => scResult.classList.remove('on'));
 soundCheckBtn.addEventListener('click', runSoundCheck);
 
+// ============================================= how many people spoke (at Stop)
+//
+// The doctor declares the speaker count; it is not detected. Detection was
+// measured on the real recordings and is unreliable in both directions — it
+// split one voice into two clusters (447) and collapsed two people into one
+// (66). See app/finalize.py DEFAULT_SPEAKERS.
+//
+// AN OFFER, NOT A GATE, and the timing is what makes that true: this appears
+// only after the server has confirmed the consultation is complete, so Stop
+// has already happened and no answer here can hold the consultation open.
+// Every button — including Skip — closes the question immediately and then
+// says what it did. There is deliberately NO auto-dismiss timer: a timer
+// would make the behaviour depend on how fast the doctor reads.
+const spkAsk = document.getElementById('spkAsk');
+const spkResult = document.getElementById('spkResult');
+const spkResultWhat = document.getElementById('spkResultWhat');
+
+function showSpeakerResult(text, tone) {
+  spkResult.className = 'scresult on' + (tone ? ' ' + tone : '');
+  spkResultWhat.textContent = text;
+}
+
+async function declareSpeakers(cid, count) {
+  // Close the question FIRST, so the tap is visibly acted on even if the
+  // request is slow or fails. The standing rule: never accept a tap, do
+  // nothing, and explain elsewhere.
+  spkAsk.classList.remove('on');
+  if (count === null) {
+    showSpeakerResult('Skipped — assuming two people spoke. If that is wrong, '
+      + 'correct the speaker labels on the review page.', 'faint');
+    return;
+  }
+  try {
+    const response = await fetch(`/api/consultations/${cid}/declared-speakers`, {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({count: count})
+    });
+    const body = await response.json();
+    if (!response.ok) {
+      showSpeakerResult('Could not record that: ' + (body.error || response.status)
+        + '. Check the speaker labels on the review page.', 'bad');
+    } else if (body.applied) {
+      showSpeakerResult(count === 1
+        ? 'Recorded: one voice. Every line will be labelled Patient — check them '
+          + 'on the review page.'
+        : 'Recorded: two voices.', 'good');
+    } else {
+      // Honest about the race rather than silent: the answer is stored but it
+      // did not shape this transcript.
+      showSpeakerResult('Recorded, but speaker identification had already run '
+        + `with ${body.used} — this transcript was not affected. Correct the `
+        + 'speaker labels on the review page.', 'faint');
+    }
+  } catch (err) {
+    showSpeakerResult('Could not reach the server to record that. Check the '
+      + 'speaker labels on the review page.', 'bad');
+  }
+}
+
+function askSpeakers(cid) {
+  spkResult.classList.remove('on');
+  spkAsk.classList.add('on');
+  document.getElementById('spkOne').onclick = () => declareSpeakers(cid, 1);
+  document.getElementById('spkTwo').onclick = () => declareSpeakers(cid, 2);
+  document.getElementById('spkSkip').onclick = () => declareSpeakers(cid, null);
+}
+
+document.getElementById('spkResultDismiss').addEventListener('click',
+  () => spkResult.classList.remove('on'));
+
 // Hard rule 3, two independent one-tap paths. A false stop costs a
 // re-tap; not being able to stop cost a whole consultation in 447.
 document.getElementById('speakStop').addEventListener('click',
@@ -1334,6 +1422,13 @@ function onWsMessage(event) {
       // Finalisation (diarisation + note) runs in the background. Keep the
       // live view — transcript, CDS panel and any urgent alert stay on
       // screen — and flip the button to "See results" when the note is ready.
+      //
+      // Ask the speaker count HERE, not when Stop was pressed: the server has
+      // confirmed the consultation is complete, so the question cannot hold it
+      // open. Diarisation reads the count immediately before the audio phase,
+      // after MedGemma is unloaded, which is what gives a one-tap answer time
+      // to land — and if it does not, the reply says so.
+      askSpeakers(msg.consultation_id);
       awaitResults(msg.consultation_id);
     } else {
       btn.textContent = 'Start';

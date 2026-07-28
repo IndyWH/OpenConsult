@@ -412,6 +412,52 @@ def _review_html() -> str:
     return Path("app/static/review.html").read_text()
 
 
+def _live_html() -> str:
+    from pathlib import Path
+    return Path("app/static/live.html").read_text()
+
+
+def test_the_speaker_question_is_asked_at_stop_with_three_one_tap_answers():
+    html = _live_html()
+    assert "How many people spoke in this consultation?" in html
+    assert 'id="spkOne"' in html and ">Just me<" in html
+    assert 'id="spkTwo"' in html and ">Two of us<" in html
+    assert 'id="spkSkip"' in html and ">Skip<" in html
+    # Asked from the `done` handler — after the server confirms the
+    # consultation is complete, so it cannot hold it open.
+    done = html[html.index("else if (msg.type === 'done')"):]
+    done = done[:done.index("\n  }")]
+    assert "askSpeakers(msg.consultation_id)" in done
+
+
+def test_no_answer_can_hold_the_consultation_open_and_none_leaves_a_dead_tap():
+    """An offer, not a gate. Each button closes the question BEFORE the request
+    goes out, so the tap is visibly acted on even if the request is slow or
+    fails, and every branch — success, late, error, network failure, skip —
+    ends by saying something."""
+    html = _live_html()
+    declare = html[html.index("async function declareSpeakers("):]
+    declare = declare[:declare.index("\nfunction askSpeakers(")]
+    assert declare.index("spkAsk.classList.remove('on')") < declare.index("fetch("), (
+        "the question must close before the request, not after it")
+    # Skip needs no request at all and still reports the default it applied.
+    assert "if (count === null)" in declare
+    assert "Skipped — assuming two people spoke" in declare
+    # Every failure path speaks.
+    assert "Could not record that" in declare
+    assert "Could not reach the server" in declare
+    assert "had already run" in declare, (
+        "a late answer must say it did not shape this transcript")
+
+
+def test_the_speaker_question_has_no_auto_dismiss_timer():
+    """A timer would make the behaviour depend on how fast the doctor reads."""
+    html = _live_html()
+    block = html[html.index("// ============================================= how many people spoke"):]
+    block = block[:block.index("// Hard rule 3, two independent one-tap paths")]
+    assert "setTimeout" not in block and "setInterval" not in block
+
+
 def test_the_label_itself_is_the_control():
     """The place a person looks when they notice a label is wrong is the
     label. Same reasoning as the live page's companion rule."""
