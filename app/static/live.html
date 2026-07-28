@@ -366,6 +366,18 @@
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 5 6 9H2v6h4l5 4V5z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M19 5a9 9 0 0 1 0 14"/></svg>
       <span>Sound check</span>
     </button>
+    <!-- Face pill (session 4, room finding item 9): the manual on-path.
+         With the face off its sticky card is ABSENT, so before this pill
+         existed there was no way to turn the face (back) on manually —
+         session 3's "a manual off is final" rule existed only because no
+         control could reverse it; the owner has now added one. A full
+         toggle that shows its state (a control that can act must not look
+         as if it cannot). Auto-on after a manual off stays suppressed —
+         only this pill overrides a manual off. -->
+    <button class="soundcheck" id="facePill" type="button" aria-pressed="false"
+            title="Start the consultation first — the face runs inside a live session">
+      <span id="facePillLabel">Face: off</span>
+    </button>
     <button class="primary" id="btn" disabled title="Recording needs a linked patient">Start</button>
   </div>
   <div id="status" class="hint"></div>
@@ -394,14 +406,13 @@
     <div class="facepane" id="facePane">
       <div class="fhead">
         <h2 class="pane-label">Assistant face</h2>
-        <!-- The on/off toggle lives on the face card. With the card
-             absent (face off) there is deliberately NO manual-on control:
-             the on-path is the disclosure auto-on (or the study's
-             face-off arm runs with that flag disabled and no face at
-             all). A manual off is final for the session — the doctor
-             always wins. -->
+        <!-- The OFF toggle lives on the face card. The on-paths are the
+             disclosure auto-on and, since session 4, the Face pill beside
+             Sound check — which is also the only thing that can override
+             a manual off (auto-on stays suppressed after one; the doctor
+             always wins). -->
         <button class="ftoggle" id="faceToggle" type="button" aria-pressed="true"
-                title="Turn the face off for the rest of this consultation">● on</button>
+                title="Turn the face off (the Face pill beside Sound check turns it back on)">● on</button>
       </div>
       <div id="faceMount"></div>
     </div>
@@ -1144,9 +1155,16 @@ function refreshSpeechControls() {
     const connected = ws && ws.readyState === WebSocket.OPEN;
     faceBtn.disabled = !connected;
     faceBtn.title = connected
-      ? 'Turn the face off for the rest of this consultation'
+      ? 'Turn the face off (the Face pill beside Sound check turns it back on)'
       : 'Reconnecting — the face cannot be changed until the connection is back';
   }
+  // The Face pill (session 4): the manual on-path. Needs a live session,
+  // like every speak control — disabled with the reason on it otherwise.
+  const pill = document.getElementById('facePill');
+  pill.disabled = !live;
+  pill.title = !live
+    ? 'Start the consultation first — the face runs inside a live session'
+    : 'Toggle the assistant face (the label shows its current state)';
   // Disabled while recording (spec 10.3): a test phrase inside a live
   // consultation would be a system utterance and would need the whole
   // exclusion machinery for no clinical benefit.
@@ -1723,18 +1741,32 @@ function updateStickyRow(alarm, face) {
   }
 }
 
-// The toggle on the card turns the face OFF — and off is final for the
-// session: with the card gone there is deliberately no manual-on control
-// (the on-path is the disclosure auto-on), and the server never overrides
-// a manual off. The doctor always wins.
+// The toggle on the card turns the face OFF. Turning it (back) ON is the
+// Face pill beside Sound check (session 4) — the manual counterpart of
+// the disclosure auto-on, and the only thing that overrides a manual off
+// (the server keeps suppressing AUTO-on after one; the doctor always
+// wins).
+const facePill = document.getElementById('facePill');
+const facePillLabel = document.getElementById('facePillLabel');
+
 faceToggle.addEventListener('click', () => {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
   ws.send(JSON.stringify({type: 'face', on: false}));
 });
 
+facePill.addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
+  ws.send(JSON.stringify({type: 'face', on: !faceOn}));
+});
+
 async function applyFaceToggle(on) {
   faceOn = on;
   updateStickyRow(alarmLive, on);
+  // The pill shows the current state — a control that can act must not
+  // look as if it cannot (and the reverse; the 448 companion rule).
+  facePillLabel.textContent = on ? 'Face: on' : 'Face: off';
+  facePill.setAttribute('aria-pressed', String(on));
+  facePill.classList.toggle('done', on);
   refreshSpeechControls();
   if (on && !faceStage) {
     faceStage = document.createElement('div');

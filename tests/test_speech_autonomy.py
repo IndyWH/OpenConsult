@@ -196,7 +196,13 @@ def test_auto_on_respects_the_flag(autonomy_env, monkeypatch):
     assert _face_toggle_audits(session_id) == []
 
 
-def test_a_manual_off_is_never_overridden(autonomy_env, monkeypatch):
+def test_a_manual_off_suppresses_auto_on_but_the_pill_can_reverse_it(
+        autonomy_env, monkeypatch):
+    """AMENDED in session 4 (owner decision): session 3 said a manual off
+    was final — a rule that existed only because no control could reverse
+    it. The Face pill now exists, so a MANUAL on works after a manual off;
+    what stays suppressed is the disclosure AUTO-on. Only the pill
+    overrides a manual off."""
     monkeypatch.setattr(appmain, "AUTO_INVITATION_AFTER_DISCLOSURE", False)
     client = _client_for(_make_user())
     session_id = secrets.token_hex(8)
@@ -205,16 +211,21 @@ def test_a_manual_off_is_never_overridden(autonomy_env, monkeypatch):
         ready = _speak(ws, "disclosure")
         _play_through(ws, ready)
         _drain_until(ws, {"disclosure"})
-        # The doctor turns it off — that is final for the session.
+        # The doctor turns it off.
         ws.send_text(json.dumps({"type": "face", "on": False}))
         _drain_until(ws, {"face_toggled"})
-        # A repeated disclosure must NOT bring it back.
+        # A repeated disclosure must NOT bring it back (auto-on suppressed)…
         ready = _speak(ws, "disclosure", seen := [])
         assert not [m for m in seen if m.get("type") == "face_toggled"]
         _play_through(ws, ready)
+        # …but the pill's manual on DOES — the doctor changed their mind,
+        # and the doctor always wins in both directions.
+        ws.send_text(json.dumps({"type": "face", "on": True}))
+        message = _drain_until(ws, {"face_toggled"})
+        assert message["on"] is True
 
     assert _face_toggle_audits(session_id) == [
-        ("true", "disclosure_auto"), ("false", "manual")]
+        ("true", "disclosure_auto"), ("false", "manual"), ("true", "manual")]
 
 
 # --- item 3: the invitation auto-chains after a completed disclosure --------

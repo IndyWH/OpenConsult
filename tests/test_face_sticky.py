@@ -173,11 +173,29 @@ def test_render_cds_routes_the_alarm_through_the_membership_model():
         "the urgent panel's state is membership, not a display toggle")
 
 
-def test_the_face_off_toggle_lives_on_the_card_and_off_is_final():
+def test_the_face_off_toggle_lives_on_the_card_and_the_pill_turns_it_on():
+    """AMENDED in session 4: 'off is final' held only while no control
+    could reverse it. The Face pill beside Sound check is now the manual
+    on-path; the card's own toggle stays off-only."""
     card = SOURCE[SOURCE.index('id="stickyRight"'):SOURCE.index('<div class="stack">')]
-    assert 'id="faceToggle"' in card, "the toggle lives on the face card"
+    assert 'id="faceToggle"' in card, "the off toggle lives on the face card"
     handler = SOURCE[SOURCE.index("faceToggle.addEventListener"):]
     handler = handler[:handler.index("});") + 3]
-    assert "on: false" in handler, (
-        "the card's toggle only turns the face OFF; the on-path is the "
-        "disclosure auto-on, and a manual off is final for the session")
+    assert "on: false" in handler, "the card's toggle only turns the face OFF"
+
+
+def test_the_face_pill_sits_beside_sound_check_and_shows_its_state():
+    """Session 4, room finding: after a manual off there was no way back
+    on, and before the disclosure no on-path at all. The pill is the
+    manual counterpart of the disclosure auto-on."""
+    controls = SOURCE[SOURCE.index('id="soundCheckBtn"'):SOURCE.index('id="btn"')]
+    assert 'id="facePill"' in controls, (
+        "the Face pill lives beside the Sound check button")
+    handler = SOURCE[SOURCE.index("facePill.addEventListener"):]
+    handler = handler[:handler.index("});") + 3]
+    assert "on: !faceOn" in handler, "the pill is a full toggle"
+    # It shows its state (a control that can act must not look as if it
+    # cannot — and the reverse, the 448 companion rule).
+    apply_fn = SOURCE[SOURCE.index("async function applyFaceToggle("):]
+    apply_fn = apply_fn[:apply_fn.index("\n}")]
+    assert "facePillLabel.textContent = on ? 'Face: on' : 'Face: off'" in apply_fn
