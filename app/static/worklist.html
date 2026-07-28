@@ -12,6 +12,9 @@
   .voidreason { font-size: .78rem; color: var(--red); display: block; }
   #purge { margin-top: 1rem; }
   td button, td a.open { margin-right: .25rem; }
+  /* Rule 3: a refused control is marked WHERE IT IS, because #err is above a
+     table whose rows can be a screen away. Named colours only. */
+  .rejected { outline: 2px solid var(--red); }
 </style>
 </head>
 <body>
@@ -33,8 +36,59 @@
 
 <script src="/static/nav.js"></script>
 <script>
+// =====================================================================
+// THE THREE STANDING RULES FOR THIS PAGE
+//
+//  1. NEVER SWALLOW AN ACTION. Either PERFORM it, or VISIBLY DISABLE the
+//     control with the reason attached to the control itself. Never accept a
+//     tap, do nothing, and explain it somewhere else on the page.
+//     (2026-07-25, after three instances in one evening.)
+//
+//  2. A CONTROL THAT CAN ACT MUST NOT LOOK AS IF IT CANNOT. Same cost as
+//     rule 1 — a tap not taken — from the opposite direction. (2026-07-28,
+//     consultation 448: an asked chip turned green, green means finished
+//     everywhere else in this app, and the doctor did not re-tap.)
+//
+//  3. A CONTROL THE DOCTOR MUST REACH MUST BE WHERE THEY ARE LOOKING.
+//     (2026-07-25, consultation 447: the Stop control existed the whole time
+//     but sat above the chips that trigger it, so it scrolled out of sight
+//     exactly when it was needed. Then again on 2026-07-28 in consultation
+//     449, in a NEW control — the speaker-count question, rendered inside the
+//     scrolling stack where nobody was looking, and never answered.)
+//
+// ALL THREE ARE AN ACCESSIBILITY REQUIREMENT, NOT A PREFERENCE. The owner is
+// dyslexic with ADHD; a quiet explanation placed away from the control he just
+// pressed is, for him, no explanation at all. In a consultation room with a
+// patient waiting it is no explanation for anyone.
+//
+// On THIS page rule 3 is what #err offends against: it sits above the table,
+// and Void / Unvoid / keep live in rows that can be far down it. The message
+// may ACCOMPANY the refusal there; the reason also goes on the control that was
+// pressed, which is where the person is looking.
+// =====================================================================
 let ME = null;
 const errEl = document.getElementById('err');
+
+async function act(url, options, control, whatFailed) {
+  errEl.textContent = '';
+  if (control) { control.classList.remove('rejected'); control.title = ''; }
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (err) {
+    const message = `${whatFailed}: could not reach the server. Nothing was saved.`;
+    errEl.textContent = message;
+    if (control) { control.classList.add('rejected'); control.title = message; }
+    return false;
+  }
+  if (response.ok) return true;
+  let detail = `error ${response.status}`;
+  try { detail = (await response.json()).error || detail; } catch (e) { /* no body */ }
+  const message = `${whatFailed}: ${detail}`;
+  errEl.textContent = message;
+  if (control) { control.classList.add('rejected'); control.title = message; }
+  return false;
+}
 
 function fmtBytes(n) {
   // Decimal units: KB/MB/GB mean 10^3/10^6/10^9. This used to divide by
@@ -49,10 +103,15 @@ function fmtBytes(n) {
   return n + ' B';
 }
 
-async function voidConsultation(cid) {
+async function voidConsultation(cid, control) {
   const reason = prompt(`Void consultation #${cid} — reason (required):`);
-  if (reason === null) return;
-  if (!reason.trim()) { errEl.textContent = 'A reason is required to void.'; return; }
+  if (reason === null) return;           // the admin cancelled; not a swallow
+  if (!reason.trim()) {
+    const message = 'A reason is required to void.';
+    errEl.textContent = message;
+    if (control) { control.classList.add('rejected'); control.title = message; }
+    return;
+  }
   // The class decides whether this void can ever be reversed here.
   // test_data is the default because it is the common case; a
   // clinical_safety void is irreversible over HTTP by design.
@@ -65,22 +124,28 @@ async function voidConsultation(cid) {
   if (clinical && !confirm(
       `Confirm: void #${cid} as CLINICAL SAFETY.\n\n` +
       `There is no Unvoid button for this class. Continue?`)) return;
-  errEl.textContent = '';
-  const response = await fetch(`/api/admin/consultations/${cid}/void`, {
+  await act(`/api/admin/consultations/${cid}/void`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({reason: reason.trim(),
                           reason_class: clinical ? 'clinical_safety' : 'test_data'})
-  });
-  if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
+  }, control, `#${cid} not voided`);
   load();
 }
 
+const purgeBtn = document.getElementById('purge');
+
 async function purgeVoided() {
+  purgeBtn.classList.remove('rejected'); purgeBtn.title = '';
   // Name the numbers before asking. A blind "delete all voided data?" is
   // how the clinical-safety fixture would have been lost.
   errEl.textContent = '';
   const preview = await fetch('/api/admin/purge-preview');
-  if (!preview.ok) { errEl.textContent = 'could not read purge preview'; return; }
+  if (!preview.ok) {
+    const message = 'Could not read the purge preview — nothing was deleted.';
+    errEl.textContent = message;
+    purgeBtn.classList.add('rejected'); purgeBtn.title = message;
+    return;
+  }
   const {purgeable, protected: guarded} = await preview.json();
   if (!purgeable) {
     alert(guarded
@@ -98,8 +163,13 @@ async function purgeVoided() {
   if (!confirm(`Second confirmation: really hard-delete ${purgeable} voided ` +
       `consultation(s) now?`)) return;
   const response = await fetch('/api/admin/purge-voided', {method: 'POST'});
-  const body = await response.json();
-  if (!response.ok) { errEl.textContent = body.error || 'failed'; return; }
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = 'Nothing purged: ' + (body.error || `error ${response.status}`);
+    errEl.textContent = message;
+    purgeBtn.classList.add('rejected'); purgeBtn.title = message;
+    return;
+  }
   alert(`Purged ${body.consultations} consultation(s), ${body.patients} patient(s), ` +
         `${body.audio_files} recording(s).` +
         (body.protected ? `\n\nProtected (clinical safety, not purged): ` +
@@ -157,11 +227,11 @@ async function load() {
         box.type = 'checkbox'; box.style.width = 'auto';
         box.checked = !!c.keep_for_research;
         box.addEventListener('change', async () => {
-          const response = await fetch(`/api/admin/consultations/${c.id}/keep-for-research`, {
+          await act(`/api/admin/consultations/${c.id}/keep-for-research`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
-            body: JSON.stringify({value: box.checked})});
-          if (!response.ok) { errEl.textContent = (await response.json()).error || 'failed'; }
-          load();
+            body: JSON.stringify({value: box.checked})},
+            box, `#${c.id}'s retention flag not changed`);
+          load();   // reverts the box if the server refused
         });
         keep.append(box, ' keep');
         audioCell.appendChild(keep);
@@ -202,13 +272,16 @@ async function load() {
               `Restore it to the working views?`)) return;
           const reason = prompt(`Why are you unvoiding #${c.id}? (required)`);
           if (reason === null) return;
-          if (!reason.trim()) { errEl.textContent = 'A reason is required to unvoid.'; return; }
-          errEl.textContent = '';
-          const response = await fetch(`/api/admin/consultations/${c.id}/unvoid`, {
+          if (!reason.trim()) {
+            const message = 'A reason is required to unvoid.';
+            errEl.textContent = message;
+            btn.classList.add('rejected'); btn.title = message;
+            return;
+          }
+          await act(`/api/admin/consultations/${c.id}/unvoid`, {
             method: 'POST', headers: {'Content-Type': 'application/json'},
             body: JSON.stringify({reason: reason.trim()})
-          });
-          if (!response.ok) errEl.textContent = (await response.json()).error || 'failed';
+          }, btn, `#${c.id} not unvoided`);
           load();
         });
         cell.appendChild(btn);
@@ -217,7 +290,7 @@ async function load() {
         cell.appendChild(document.createTextNode(' '));
         const btn = document.createElement('button');
         btn.className = 'small'; btn.textContent = 'Void…';
-        btn.addEventListener('click', () => voidConsultation(c.id));
+        btn.addEventListener('click', () => voidConsultation(c.id, btn));
         cell.appendChild(btn);
       }
     }

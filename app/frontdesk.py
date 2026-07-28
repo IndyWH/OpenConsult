@@ -118,12 +118,17 @@ async def start_walk_in(name: str, age: int | None, sex: str | None) -> dict | N
 
 
 def _entry_row_to_dict(r) -> dict:
+    # `added_at` is here so a live-slot refusal can say WHEN the blocking entry
+    # was opened. "Another consultation is in progress" tells a doctor nothing
+    # they can act on; "Mrs Perera, opened at 09:14" tells them whether it is a
+    # real consultation or something abandoned an hour ago.
     return {"entry_id": r[0], "position": r[1], "status": r[2], "patient_id": r[3],
-            "name": r[4], "age": r[5], "sex": r[6]}
+            "name": r[4], "age": r[5], "sex": r[6],
+            "added_at": str(r[7]) if r[7] else None}
 
 
 _ENTRY_SELECT = (
-    "SELECT q.id, q.position, q.status, p.id, p.name, p.age, p.sex"
+    "SELECT q.id, q.position, q.status, p.id, p.name, p.age, p.sex, q.added_at"
     " FROM queue_entry q JOIN patient p ON p.id = q.patient_id"
     " WHERE q.queue_date = CURRENT_DATE"
 )

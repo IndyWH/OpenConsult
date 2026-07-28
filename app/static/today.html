@@ -53,10 +53,27 @@ async function resumeEntry(entryId) {
 // Concurrency guard: the server refuses to start while another
 // consultation is active; offer to resume it instead.
 function offerResume(payload) {
-  if (!payload || !payload.active) { refresh(); return; }
+  // A refused live slot must say WHAT is holding it. "Something is busy" is
+  // unactionable and identical whether the blocker is a colleague mid-
+  // consultation or a walk-in abandoned an hour ago — which is exactly what
+  // locked the practice out via queue entry 164.
+  //
+  // The guard itself is untouched: one live consultation at a time is a safety
+  // property (two would share the transcriber, and an urgency alarm arriving
+  // late under contention is a safety regression). Only the refusal changes.
+  if (!payload || !payload.active) {
+    // Previously a silent refresh — the tap did nothing and said nothing.
+    alert((payload && payload.error)
+      || 'Could not start: a live consultation is already in progress.');
+    refresh();
+    return;
+  }
   const a = payload.active;
-  if (confirm(`${a.name} is already in consultation. Resume that consultation?\n` +
-              `(Cancel to stay here — you can Close their entry from the queue.)`)) {
+  const opened = a.added_at ? ` (opened at ${String(a.added_at).slice(11, 16)})` : '';
+  if (confirm(`${a.name} is already in consultation${opened}.\n\n` +
+              `Resume that consultation?\n\n` +
+              `Cancel to stay here — if it was abandoned, use Close on their ` +
+              `row in the queue below to free the slot.`)) {
     resumeEntry(a.entry_id);
   } else {
     refresh();

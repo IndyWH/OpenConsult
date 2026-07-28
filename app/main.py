@@ -644,6 +644,47 @@ async def queue_move(
     return {"ok": moved}
 
 
+def _clock(timestamp: str | None) -> str:
+    """HH:MM out of a stored timestamp, for a refusal message."""
+    if not timestamp:
+        return "an unknown time"
+    return timestamp[11:16] if len(timestamp) >= 16 else timestamp
+
+
+async def _live_slot_refusal(active: dict | None = None) -> JSONResponse:
+    """ONE refusal message for the live slot, used by every site that refuses it.
+
+    The guard is NOT weakened here and must not be: one live consultation at a
+    time is a safety property, because two would share the faster-whisper model
+    and an urgency alarm arriving late under contention is a safety regression.
+    This only makes the refusal legible.
+
+    A doctor refused the slot used to learn that "another consultation is already
+    in progress" — true, unactionable, and identical whether the blocker is a
+    colleague mid-consultation or a walk-in somebody abandoned an hour ago. Now
+    it names the patient, the time it was opened, and — because a queue entry is
+    something the caller can actually deal with — that it can be closed from
+    Today.
+    """
+    active = active if active is not None else await frontdesk.current_entry()
+    if not active:
+        # The slot is held by something outside today's queue. Say that rather
+        # than falling back to a bare "busy": an unexplained refusal is what
+        # this change exists to remove.
+        return JSONResponse(status_code=409, content={
+            "error": "A live consultation is already in progress, but no entry "
+                     "in today's queue is holding it. Reload Today; if this "
+                     "persists an administrator can check for a live session.",
+            "active": None,
+        })
+    return JSONResponse(status_code=409, content={
+        "error": (f"{active['name']} is already in consultation "
+                  f"(opened at {_clock(active.get('added_at'))}). "
+                  "Resume it, or close their entry from Today to free the slot."),
+        "active": active,
+    })
+
+
 @app.post("/api/queue/walk-in")
 async def queue_walk_in(
     body: QueueAddBody, user: dict = Depends(api_user(*CLINICAL_ROLES))
@@ -657,10 +698,7 @@ async def queue_walk_in(
     if entry is None:  # concurrency guard: another consultation is active
         await audit.log(user["id"], "live.slot_rejected", None, None,
                         {"via": "walk_in"})
-        return JSONResponse(status_code=409, content={
-            "error": "another consultation is already in progress",
-            "active": await frontdesk.current_entry(),
-        })
+        return await _live_slot_refusal()
     await audit.log(user["id"], "queue.walk_in_started", "queue_entry",
                     entry["entry_id"], {"patient_id": entry["patient_id"]})
     return JSONResponse(content=entry)
@@ -676,10 +714,7 @@ async def queue_start(
         if active and active["entry_id"] != entry_id:  # concurrency guard
             await audit.log(user["id"], "live.slot_rejected", "queue_entry",
                             entry_id, {"via": "queue_start"})
-            return JSONResponse(status_code=409, content={
-                "error": "another consultation is already in progress",
-                "active": active,
-            })
+            return await _live_slot_refusal(active)
         return JSONResponse(status_code=409, content={"error": "entry is not waiting"})
     await audit.log(user["id"], "queue.started", "queue_entry", entry_id,
                     {"patient_id": started["patient_id"]})
@@ -1379,8 +1414,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         {"via": "ws_duplicate"})
         await websocket.send_json({
             "type": "busy",
-            "detail": "This consultation is already streaming from another "
-                      "tab or device. One live consultation at a time.",
+            "detail": "This consultation is already streaming from another tab "
+                      "or device on your account. Close the other tab, or carry "
+                      "on recording there — one live consultation at a time.",
         })
         await websocket.close(code=4409)
         return
@@ -1394,11 +1430,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             active = next(e for e in sessions.values() if e["attached"])
             await audit.log(user["id"], "live.slot_rejected", None, None,
                             {"via": "ws"})
+            # The blocker here is a live STREAM, not a queue entry, so name the
+            # user holding it — and the patient too when the session is linked,
+            # since that is what makes it recognisable in the room.
+            holder = (active["user"].get("display_name")
+                      or active["user"]["username"])
+            in_consultation = await frontdesk.current_entry()
+            patient = in_consultation["name"] if in_consultation else None
             await websocket.send_json({
                 "type": "busy",
-                "detail": "Another live consultation is already in progress "
-                          f"(started by {active['user']['username']}). "
-                          "One live consultation at a time.",
+                "detail": (f"{holder} is already recording a live consultation"
+                           + (f" with {patient}" if patient else "")
+                           + ". One live consultation at a time — it must be "
+                             "stopped before another can start."),
             })
             await websocket.close(code=4409)
             return

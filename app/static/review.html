@@ -102,6 +102,17 @@
              border: 3px solid var(--line); border-top-color: var(--plum); border-radius: 50%;
              animation: spin 1s linear infinite; vertical-align: -0.3rem; }
   @keyframes spin { to { transform: rotate(360deg); } }
+  /* A refusal shown AT the controls. Solid, named colours only — the 449
+     lesson about var(--accent), which was never defined and computed to
+     transparent. */
+  .actionerr {
+    display: none; flex-basis: 100%; margin-top: .5rem;
+    border: 1px solid var(--red); background-color: #FBF1EF; color: var(--red);
+    border-radius: var(--radius); padding: .5rem .75rem; font-size: .86rem;
+    opacity: 1;
+  }
+  .actionerr.on { display: block; }
+  .turn .who .rolebtn.rejected { outline: 2px solid var(--red); }
 </style>
 </head>
 <body>
@@ -118,6 +129,9 @@
       <button class="primary" id="approve">Approve</button>
       <button class="plus" id="plusBtn" title="Add to this consultation">+</button>
       <div class="ref-menu" id="refMenu"></div>
+      <!-- Server refusals land HERE, beside the button that was pressed, not in
+           a banner further down the page. See the standing rules below. -->
+      <div class="actionerr" id="actionErr" role="alert"></div>
     </div>
   </div>
 
@@ -173,12 +187,79 @@
 
 <script src="/static/nav.js"></script>
 <script>
+// =====================================================================
+// THE THREE STANDING RULES FOR THIS PAGE
+//
+//  1. NEVER SWALLOW AN ACTION. Either PERFORM it, or VISIBLY DISABLE the
+//     control with the reason attached to the control itself. Never accept a
+//     tap, do nothing, and explain it somewhere else on the page.
+//     (2026-07-25, after three instances in one evening.)
+//
+//  2. A CONTROL THAT CAN ACT MUST NOT LOOK AS IF IT CANNOT. Same cost as
+//     rule 1 — a tap not taken — from the opposite direction. (2026-07-28,
+//     consultation 448: an asked chip turned green, green means finished
+//     everywhere else in this app, and the doctor did not re-tap.)
+//
+//  3. A CONTROL THE DOCTOR MUST REACH MUST BE WHERE THEY ARE LOOKING.
+//     (2026-07-25, consultation 447: the Stop control existed the whole time,
+//     in normal flow above the chips that trigger it, so it scrolled out of
+//     sight exactly when it was needed. Then again on 2026-07-28 in
+//     consultation 449, in a NEW control — the speaker-count question, two
+//     divs deep inside the scrolling stack, rendered where nobody was
+//     looking and never answered.)
+//
+// ALL THREE ARE AN ACCESSIBILITY REQUIREMENT, NOT A PREFERENCE. The owner is
+// dyslexic with ADHD; a quiet explanation placed away from the control he just
+// pressed is, for him, no explanation at all. In a consultation room with a
+// patient waiting it is no explanation for anyone.
+//
+// On this page the highest-stakes instance is Approve: it is gated on the
+// urgency acknowledgement, on the speaker-labels acknowledgement, and on the
+// stale-labels one. refreshApproveGate() is the ONLY writer of its disabled
+// flag and puts every outstanding reason in its own title; a server refusal
+// that arrives anyway is shown in #actionErr, beside the button, never only in
+// a banner above the note.
+// =====================================================================
 const cid = location.pathname.split('/').pop();
 const processingEl = document.getElementById('processing');
 const contentEl = document.getElementById('content');
 const noteEl = document.getElementById('note');
 const transcriptEl = document.getElementById('transcript');
 let state = null;
+
+// Rule 1, in one place. Every server call from a control goes through this, so
+// a refusal can never be dropped on the floor: a non-ok response is reported
+// beside the controls AND on the control's own title. Returns whether it worked,
+// so callers can decline to carry on.
+const actionErrEl = document.getElementById('actionErr');
+
+function clearActionError() {
+  actionErrEl.classList.remove('on');
+  actionErrEl.textContent = '';
+}
+
+function showActionError(message, control) {
+  actionErrEl.textContent = message;
+  actionErrEl.classList.add('on');
+  if (control) control.title = message;
+}
+
+async function act(url, options, control, whatFailed) {
+  clearActionError();
+  let response;
+  try {
+    response = await fetch(url, options);
+  } catch (err) {
+    showActionError(`${whatFailed}: could not reach the server. Nothing was `
+      + 'saved — check your connection and try again.', control);
+    return false;
+  }
+  if (response.ok) return true;
+  let detail = `error ${response.status}`;
+  try { detail = (await response.json()).error || detail; } catch (err) { /* no body */ }
+  showActionError(`${whatFailed}: ${detail}`, control);
+  return false;
+}
 
 function el(tag, className, text) {
   const n = document.createElement(tag);
@@ -280,10 +361,13 @@ function renderTurn(t) {
       ? 'This consultation is read-only'
       : `Wrong speaker? Click to change this line to ${t.role === 'Doctor' ? 'Patient' : 'Doctor'}`;
     roleBtn.addEventListener('click', async () => {
-      await fetch(`/api/consultations/${cid}/turns/${t.idx}`, {
+      const ok = await act(`/api/consultations/${cid}/turns/${t.idx}`, {
         method: 'PATCH', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({role: t.role === 'Doctor' ? 'Patient' : 'Doctor'})
-      });
+      }, roleBtn, `Turn ${t.idx}'s speaker not changed`);
+      // Mark the control itself as well as the message: on a long transcript
+      // the refused label may be nowhere near the top of the page.
+      roleBtn.classList.toggle('rejected', !ok);
       refresh();
     });
     who.appendChild(roleBtn);
@@ -291,17 +375,28 @@ function renderTurn(t) {
     who.appendChild(el('span', 'ts', fmt(t.start)));
     div.appendChild(who);
     const body = el('span', 'ttext', t.text);
+    const readOnly = state.status === 'approved' || !!state.voided_at;
+    // Rule 1 on the double-click affordance: say why it will not open, rather
+    // than returning silently and letting the doctor double-click twice more.
+    body.title = readOnly
+      ? 'Read-only — this consultation has been approved'
+      : 'Double-click to correct the words, then Regenerate';
     body.addEventListener('dblclick', () => {
-      if (state.status === 'approved') return;
+      if (readOnly) return;   // the reason is on the control, above
       body.contentEditable = 'true'; body.focus();
     });
     body.addEventListener('blur', async () => {
       if (body.contentEditable !== 'true') return;
       body.contentEditable = 'false';
-      await fetch(`/api/consultations/${cid}/turns/${t.idx}`, {
+      // A REJECTED CORRECTION IS THE WORST SWALLOW ON THIS PAGE: the doctor's
+      // typed words stay on screen looking saved until something else reloads
+      // and silently reverts them. Report it and restore the stored text, so
+      // what is displayed is always what the server holds.
+      const ok = await act(`/api/consultations/${cid}/turns/${t.idx}`, {
         method: 'PATCH', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({text: body.textContent})
-      });
+      }, body, `Turn ${t.idx}'s correction not saved`);
+      if (!ok) body.textContent = t.text;
     });
     div.appendChild(body);
     transcriptEl.appendChild(div);
@@ -461,12 +556,16 @@ function renderLetters() {
       area.value = letter.body;
       area.rows = Math.max(10, letter.body.split('\n').length + 2);
       area.addEventListener('blur', async () => {
-        if (area.value === letter.body) return;
-        await fetch(`/api/consultations/${cid}/letters/${letter.id}`, {
+        if (area.value === letter.body) return;   // nothing changed
+        // Same swallow as the transcript edit, and worse: it used to record the
+        // new text locally whether or not the server accepted it, so the page
+        // believed an edit the server had refused.
+        const ok = await act(`/api/consultations/${cid}/letters/${letter.id}`, {
           method: 'PUT', headers: {'Content-Type': 'application/json'},
           body: JSON.stringify({body: area.value})
-        });
-        letter.body = area.value;
+        }, area, 'Letter edit not saved');
+        if (ok) letter.body = area.value;
+        else area.value = letter.body;
       });
       body.appendChild(area);
       getText = () => area.value;
@@ -660,7 +759,8 @@ function ackButton(endpoint) {
   const wrap = el('span', 'ack');
   const button = el('button', null, 'Acknowledge');
   button.addEventListener('click', async () => {
-    await fetch(`/api/consultations/${cid}/${endpoint}`, {method: 'POST'});
+    await act(`/api/consultations/${cid}/${endpoint}`, {method: 'POST'},
+              button, 'Not acknowledged');
     refresh();
   });
   wrap.appendChild(button);
@@ -788,18 +888,28 @@ function refreshApproveGate() {
     : '';
 }
 
-document.getElementById('approve').addEventListener('click', async () => {
-  await fetch(`/api/consultations/${cid}/approve`, {
+document.getElementById('approve').addEventListener('click', async (e) => {
+  // THE highest-stakes control on the site. The three acknowledge gates already
+  // disable it with their reasons in its title, so this handles the refusals the
+  // client does not model — a quality-gate refusal, an ungrounded draft, a
+  // consultation approved in another tab. Before this, all of those refreshed
+  // the page and said nothing at all.
+  const ok = await act(`/api/consultations/${cid}/approve`, {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({text: currentPlainText()})
-  });
+  }, e.currentTarget, 'Not approved');
   refresh();
+  if (!ok) return;
 });
 
-document.getElementById('regen').addEventListener('click', async () => {
+document.getElementById('regen').addEventListener('click', async (e) => {
+  const control = e.currentTarget;
   processingEl.style.display = 'block'; contentEl.style.display = 'none';
   processingEl.innerHTML = '<span class="spinner"></span>Re-drafting the note from the corrected transcript…';
-  await fetch(`/api/consultations/${cid}/regenerate`, {method: 'POST'});
+  // A refused regenerate used to show the spinner, come back unchanged, and
+  // leave the doctor to work out that nothing had happened.
+  await act(`/api/consultations/${cid}/regenerate`, {method: 'POST'},
+            control, 'Not regenerated');
   refresh();
 });
 
@@ -809,8 +919,9 @@ document.getElementById('copy').addEventListener('click', async (e) => {
   setTimeout(() => e.target.textContent = 'Copy as text', 1500);
 });
 
-document.getElementById('swap').addEventListener('click', async () => {
-  await fetch(`/api/consultations/${cid}/swap-roles`, {method: 'POST'});
+document.getElementById('swap').addEventListener('click', async (e) => {
+  await act(`/api/consultations/${cid}/swap-roles`, {method: 'POST'},
+            e.currentTarget, 'Labels not swapped');
   refresh();
 });
 

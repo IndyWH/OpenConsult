@@ -1099,8 +1099,7 @@ def test_the_companion_rule_is_written_down_in_the_page():
     """Recorded beside the standing rule, with its reason attached — a rule
     stripped of its why reads as a style opinion and gets traded away."""
     html = _live_html()
-    assert "a control that CAN act must not" in html
-    assert "look as if it cannot" in html
+    assert "A CONTROL THAT CAN ACT MUST NOT LOOK AS IF IT CANNOT." in html
     assert "a tap not taken" in html
     assert "approved, linked and mic-live" in html, (
         "the reason green is the trap must survive, or the colour comes back")
@@ -1123,12 +1122,29 @@ def test_the_companion_rule_is_written_down_in_the_page():
 # for anyone.
 
 def test_the_rule_is_written_down_in_the_page():
+    """Re-pointed 2026-07-28 when the header became the numbered set of three
+    (the third had been learned twice on this page and written down nowhere).
+    The property is unchanged: the rule and its REASON must both survive."""
     html = _live_html()
-    assert "STANDING RULE FOR THIS PAGE — never swallow an action." in html
+    assert "THE THREE STANDING RULES FOR THIS PAGE" in html
+    assert "RULE 1 — NEVER SWALLOW AN ACTION." in html
     assert "VISIBLY DISABLE the control with the" in html
     assert "reason attached to the control itself" in html
     assert "dyslexic with ADHD" in html, (
         "the rule must keep its reason, or it reads as a style preference")
+
+
+def test_the_third_rule_is_written_down_in_the_page():
+    """It was learned HERE, twice — 447's Stop control and then 449's
+    speaker-count question in a new control three days later — and had never
+    been recorded anywhere. Both incidents are named so the next reader meets it
+    as a rule rather than rediscovering it in a room."""
+    html = _live_html()
+    assert "A CONTROL THE DOCTOR MUST REACH MUST BE WHERE THEY ARE LOOKING." in html
+    assert "447" in html and "449" in html
+    assert "Existing is not enough" in html
+    # It governs reasons as well as controls, which is what ties it to rule 1.
+    assert "a refusal explained where the" in html
 
 
 def test_speak_controls_go_dead_looking_when_the_socket_drops():
