@@ -36,6 +36,16 @@ from app.transcription import LiveTranscriber
 
 # Run a CDS pass once this much new confirmed text has accumulated.
 CDS_MIN_NEW_CHARS = 150
+# Session 5 (owner decision, from the session-4 latency report): the FIRST
+# assessment of a session fires as soon as the first committed turn
+# exists, instead of waiting for the 150-character gate — the gate was
+# 30-45 s of the ~50 s speech-to-questions latency. Subsequent calls keep
+# the 150-char cadence unchanged. The urgency officer rides the same
+# update it always has, so the alarm can only arrive EARLIER, never
+# later. Env-switchable so the owner can restore the old behaviour
+# without a deploy.
+CDS_FIRST_CALL_ON_FIRST_TURN = (
+    os.getenv("CDS_FIRST_CALL_ON_FIRST_TURN", "true").lower() != "false")
 # Stop trying after this many consecutive failures (e.g. Ollama not running).
 CDS_MAX_FAILURES = 2
 
@@ -1583,10 +1593,22 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     )
             cds_task = None
         transcript = "\n".join(entry["transcript_parts"])
+        # First call of the session: fire on the FIRST committed turn
+        # (cds_sent_len == 0 means nothing has ever been handed to the
+        # CDS engine — it survives reconnects with the entry). The
+        # revision rules already tolerate a thin first list: the prompt
+        # says "early, prefer a short list", and the pinned-name rule
+        # simply starts from a smaller one (session-4 report).
+        first_call_due = (
+            CDS_FIRST_CALL_ON_FIRST_TURN
+            and entry["cds_sent_len"] == 0
+            and len(transcript) > 0
+        )
         if (
             cds_task is None
             and cds_failures < CDS_MAX_FAILURES
-            and len(transcript) - entry["cds_sent_len"] >= CDS_MIN_NEW_CHARS
+            and (first_call_due
+                 or len(transcript) - entry["cds_sent_len"] >= CDS_MIN_NEW_CHARS)
         ):
             entry["cds_sent_len"] = len(transcript)
             cds_task = asyncio.create_task(
