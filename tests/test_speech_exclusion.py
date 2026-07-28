@@ -300,6 +300,7 @@ def test_the_protocol_has_no_path_from_client_text_to_audio():
 
 import json        # noqa: E402
 import os          # noqa: E402
+import re          # noqa: E402
 import secrets     # noqa: E402
 import struct      # noqa: E402
 
@@ -943,6 +944,29 @@ def test_speak_controls_go_dead_looking_when_the_socket_drops():
     close = html[html.index("function onWsClose()"):]
     close = close[:close.index("\n}")]
     assert "refreshSpeechControls();" in close
+
+
+def test_speak_controls_are_disabled_on_first_render():
+    """The rule applies BEFORE the first connection, not only after a drop.
+
+    Consultation 448: the doctor tapped a phrase button before pressing
+    Start and got the "Not connected — cannot speak" panel; the controls
+    greyed out only afterwards. Neither onWsClose nor openSocket had fired,
+    because there had never been a socket — so the markup's default enabled
+    state was what rendered. The test above (refresh-after-disconnect)
+    passed throughout, which is why this shipped.
+
+    Asserted as a TOP-LEVEL call — zero indentation — because that is what
+    makes it run at page load rather than only from a handler.
+    """
+    html = _live_html()
+    assert re.search(r"^refreshSpeechControls\(\);$", html, re.M), (
+        "refreshSpeechControls() must be called at page load, outside any "
+        "handler, or the speak controls render enabled before Start")
+    assert "INITIAL RENDER" in html
+    # The markup itself is enabled by default, which is precisely why the
+    # call is needed; if that ever changes this test still holds.
+    assert '<button class="phrase" data-phrase="invitation" type="button">' in html
 
 
 def test_the_not_connected_banner_is_only_a_last_resort():

@@ -1185,6 +1185,21 @@ discCheck.addEventListener('change', () => {
   ws.send(JSON.stringify({type: 'disclosure_given'}));
 });
 
+// INITIAL RENDER — the standing rule applies before the first connection,
+// not only after a drop.
+//
+// Consultation 448 (2026-07-28): the doctor tapped a phrase button before
+// pressing Start, got the red "Not connected — cannot speak" panel, and
+// only THEN did the controls grey out. A tap accepted, nothing done, the
+// reason placed elsewhere — the exact shape the rule forbids.
+//
+// The cause was a gap, not a bug in the refresh: before Start there has
+// never BEEN a WebSocket, so neither onWsClose nor openSocket had ever
+// fired, and the markup's default state is enabled. The drop-handler could
+// not cover this direction. Now the controls start in the same disabled
+// state, with the same reason on them, as they hold after a drop.
+refreshSpeechControls();
+
 // ============================================================= start / stop
 function standDown(statusText) {
   // Fully reset to the not-recording state (used by busy/resume_failed).
