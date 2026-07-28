@@ -365,18 +365,52 @@ def _client_for(user: dict) -> TestClient:
 
 @pytest.fixture()
 def speech_state(monkeypatch, tmp_path):
-    """Manual app.state (no lifespan), matching tests/test_resilience.py."""
+    """Manual app.state (no lifespan), matching tests/test_resilience.py.
+
+    Everything installed here is REMOVED again on teardown. Until 2026-07-28
+    it was not: `app.state.speech` kept its StubSpeech after these tests
+    finished, and `tests/test_speech.py` — which writes to the real service's
+    `_utterances` — then failed with
+    `AttributeError: 'StubSpeech' object has no attribute '_utterances'`.
+
+    Four tests failed that way, and the suite was green anyway, because
+    alphabetical collection puts `test_speech.py` BEFORE
+    `test_speech_exclusion.py`. A suite that can hide a failure by ordering is
+    the same class of problem as a test that encodes the bug as the
+    requirement: in both cases the tests agree with something that is wrong.
+
+    `app.state` is process-global (one `appmain.app`), so leaking into it
+    leaks into every later test in the session.
+    """
     consultations.ensure_schema()
     system_utterances.ensure_schema()
-    appmain.app.state.transcriber = SilentTranscriber()
-    appmain.app.state.speech = StubSpeech()
-    appmain.app.state.cds_engine = object()   # never invoked: no transcript text
-    appmain.app.state.rag = object()
-    appmain.app.state.live_sessions = {}
-    appmain.app.state.finalize_queue = asyncio.Queue()
+    state = appmain.app.state
+    missing = object()
+    installed = {
+        "transcriber": SilentTranscriber(),
+        "speech": StubSpeech(),
+        "cds_engine": object(),   # never invoked: no transcript text
+        "rag": object(),
+        "live_sessions": {},
+        "finalize_queue": asyncio.Queue(),
+    }
+    previous = {name: getattr(state, name, missing) for name in installed}
+    for name, value in installed.items():
+        setattr(state, name, value)
     monkeypatch.setattr(appmain, "RECORDINGS_DIR", tmp_path)
-    yield appmain.app.state
-    appmain.app.state.live_sessions = {}
+    try:
+        yield state
+    finally:
+        # try/finally, not post-yield: a failing test must not be able to
+        # leave the stub installed for everything that follows it.
+        for name, old in previous.items():
+            if old is missing:
+                delattr(state, name)
+            else:
+                setattr(state, name, old)
+        assert not isinstance(getattr(state, "speech", None), StubSpeech), (
+            "the speech stub outlived its fixture — this is exactly what broke "
+            "tests/test_speech.py whenever it ran after this file")
 
 
 def _frame(seq: int, samples: int, amplitude: int) -> bytes:

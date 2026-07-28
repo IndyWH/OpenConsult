@@ -557,6 +557,37 @@ def _db_ready() -> bool:
 needs_db = pytest.mark.skipif(not _db_ready(), reason="PostgreSQL not available")
 
 
+@pytest.fixture(autouse=True)
+def speech_service():
+    """Guarantee a REAL SpeechService on app.state for every test in this file,
+    and put back whatever was there before.
+
+    These tests used to depend on collection order twice over (found
+    2026-07-28 by running the suite in reverse). `_register` created the
+    service lazily and left it behind, so the sound-check tests — which never
+    call `_register` — only worked because some earlier test in this file had
+    already installed one. Run first, they raised
+    `AttributeError: 'State' object has no attribute 'speech'`.
+
+    Depending on another test having set up your state is the same fault as
+    leaking state into another test; it just fails in the opposite direction.
+    """
+    from app.main import app
+    from app import speech as speech_module
+
+    missing = object()
+    previous = getattr(app.state, "speech", missing)
+    if not isinstance(previous, speech_module.SpeechService):
+        app.state.speech = speech_module.SpeechService()
+    try:
+        yield app.state.speech
+    finally:
+        if previous is missing:
+            delattr(app.state, "speech")
+        else:
+            app.state.speech = previous
+
+
 def _make_user(role: str) -> dict:
     auth.ensure_schema()
     return asyncio.run(auth.create_user(
@@ -572,11 +603,13 @@ def _client_for(user: dict) -> TestClient:
 
 
 def _register(user_id: int) -> speech.Utterance:
-    """Put a prepared utterance in the running app's service, without Piper."""
+    """Put a prepared utterance in the running app's service, without Piper.
+
+    The service is provided by the autouse `speech_service` fixture — this used
+    to create it lazily and leave it installed for whatever ran next.
+    """
     from app.main import app
 
-    if not hasattr(app.state, "speech"):
-        app.state.speech = speech.SpeechService()
     utterance = speech.Utterance(
         utterance_id=secrets.token_hex(8), text=speech.PHRASES["invitation"],
         voice="test", wav=make_wav(1.0), duration_ms=1000, synth_ms=5,
