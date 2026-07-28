@@ -214,7 +214,81 @@ containing only what the doctor signs.
 WhisperX+pyannote (~6–8 GB) cannot coexist in 24 GB. The pipeline
 explicitly unloads MedGemma (keep_alive=0, polls /api/ps), runs the audio
 models, frees them (del + empty_cache), and lets MedGemma reload on the
-note call. ~17 s for a 4.6-min consultation.
+note call. ~17 s for a 4.6-min consultation. **Measured baseline: see the
+VRAM section below** — the numbers there are measurements, and they replace
+the estimates in this paragraph.
+
+## VRAM baseline — MEASURED, 2026-07-28
+
+Measured with `nvidia-smi` and `ollama ps`, not estimated, on the 24564 MiB
+RTX 4090. **Nothing was changed**: models were loaded exactly as the app loads
+them, and the card was confirmed back at its idle baseline afterwards with
+nothing left resident. This is the starting point for any offload decision, and
+no placement decision has been taken.
+
+| Phase | Total | What is resident |
+|---|---|---|
+| **Idle** | **2930–2983 MiB** | the app's faster-whisper `distil-large-v3` (live ASR, loaded at startup) + its CUDA context + the Windows desktop. Ollama holds nothing. |
+| **Audio phase** of a finalisation | **8318–12374 MiB** (peak 12374) | idle baseline + WhisperX `large-v3` + pyannote. MedGemma unloaded by the pipeline. |
+| **Note generation** (MedGemma, `num_ctx` 16384) | **21242 MiB** | idle baseline + MedGemma |
+| **Live consultation** (MedGemma `num_ctx` 8192 + embeddinggemma) | **21683–21717 MiB**, ~2.85 GB free | idle baseline + both Ollama models |
+| **Worst measured** (MedGemma 16384 + embeddinggemma) | **22309 MiB**, **2255 MiB free** | the transition case |
+
+Component costs, by difference:
+
+| | |
+|---|---|
+| MedGemma 27B Q4_K_M @ `num_ctx` 8192 | **~17 633 MiB** |
+| KV cache growth 8192 → 16384 | **~679 MiB** only |
+| `embeddinggemma` resident | **~1067 MiB** (its `ollama ps` SIZE reads 681 MB) |
+| faster-whisper + CUDA context + Windows desktop | **~2950 MiB**, not separable — see below |
+
+**Configuration, checked rather than assumed:** `/etc/systemd/system/
+ollama.service` has **no `Environment=` lines at all**, so there is **no KV
+cache quantisation** (`OLLAMA_KV_CACHE_TYPE` unset → f16) and no
+`OLLAMA_FLASH_ATTENTION`. Context lengths are per-call: **16384** for notes
+(`app/notes.py`), **8192** for CDS (`app/cds.py`) and RAG (`app/rag.py`).
+**`embeddinggemma` does stay resident alongside MedGemma** — confirmed with
+both in `ollama ps` at once, which is the live-consultation shape.
+
+**The largest reclaimable item is `embeddinggemma`, ~1067 MiB.** It is used only
+to embed RAG queries, it is small, and CPU latency there is tolerable —
+retrieval is not on the urgency path. Everything else is either the point
+(MedGemma) or latency-critical (faster-whisper on the live path).
+
+**Two findings that matter more than the headline totals:**
+
+- **KV quantisation is not the win it looks like.** 8k → 16k costs only 679
+  MiB, so the whole KV cache is a few hundred MB against ~17.6 GB of weights.
+  Quantising it would free far less than moving `embeddinggemma` off. Nothing
+  short of a smaller or differently-quantised MedGemma changes the picture
+  materially.
+- **MedGemma is reloaded between phases because `num_ctx` differs.** CDS and
+  RAG ask for 8192, the note asks for 16384, and Ollama reloads on a `num_ctx`
+  change — measured directly: a warm 16384 instance took 3.9 s to answer a
+  trivial 8192 request. That reload is an unrecorded cost in the live → note
+  transition and is fixable by making the two agree, but **no change has been
+  made**.
+
+**The Windows/WSL split is not resolvable from inside WSL.** Under WDDM,
+`nvidia-smi --query-compute-apps` reports `[N/A]` for per-process memory —
+both from WSL and from `nvidia-smi.exe` on the Windows side, which enumerates
+the desktop processes holding the GPU (explorer, SearchHost, two
+`NVIDIA Overlay.exe`, `msedgewebview2`, PowerToys) without sizing any of them.
+The one way to get the number: **read `nvidia-smi` once with the app service
+stopped** — the idle total minus that reading is the app's share, and the
+reading itself is the Windows desktop's. That is worth doing during the next
+restart rather than as a special exercise.
+
+**To watch the live path** — the one phase nobody had measured, and the one with
+the urgency alarm on it — run this in a second terminal during a consultation.
+One command, no install, no sudo; the line rewrites in place and the peak is
+always on screen, so Ctrl-C leaves it visible:
+
+```bash
+nvidia-smi --query-gpu=timestamp,memory.used,memory.total --format=csv,noheader,nounits -l 2 \
+  | awk -F', ' '{if($2>m){m=$2;t=$1}; printf "\r%s  now %6d MiB | PEAK %6d MiB (free %5d) at %s   ", $1, $2, m, $3-m, t; fflush()}'
+```
 
 ## Design pass + referral letters (2026-07-24)
 
@@ -1041,6 +1115,114 @@ consultation raises the review notice regardless.
   *second* role change re-arms the gate instead of inheriting the first
   acknowledgement.
 
+### The count is DECLARED, not detected (owner decision, 2026-07-28)
+
+**The permitted range was tried, measured and replaced — not extended.** This
+is the second correction to the same line in one day, and the sequence is the
+point:
+
+| Setting | Result |
+|---|---|
+| `num_speakers=2` (original) | splits a lone voice in two — 446, 447, 448 all mislabelled |
+| `min_speakers=1, max_speakers=2` | fixed 448 and 446; **did not fix 447** (pyannote still chose two clusters when allowed one); **REGRESSED recording 66**, two real people, to one cluster |
+| `num_speakers` = declared (now) | **all eight recordings correct** |
+
+**A change that fixed two of three artificial cases and broke one real one.**
+That is the sentence worth carrying: the range looked like the principled fix —
+stop over-constraining the model, let it answer — and letting it answer is
+precisely what it cannot do reliably on this data. It is wrong in *both*
+directions, over-splitting one voice and under-splitting two, so no automatic
+setting can be right.
+
+Every row resolves once the count is **stated** rather than inferred: 447 is
+correct forced to one, 66 is correct forced to two. So the doctor declares it.
+**This is the sound check's established pattern — the human in the room is
+authoritative and the measurement corroborates** — and it is the second place
+in the project where that pattern has been the answer.
+
+- **Asked at Stop**, three one-tap answers (just me / two of us / skip). It
+  appears from the `done` handler, *after* the server confirms the
+  consultation is complete, so no answer can hold the consultation open. Skip
+  sends nothing at all, because NULL already means defaulted. **No
+  auto-dismiss timer** — a timer would make the behaviour depend on how fast
+  the doctor reads.
+- **`DEFAULT_SPEAKERS = 2`** when nobody answers: today's behaviour, correct on
+  four of the five real two-person recordings, so a defaulted consultation
+  behaves exactly as it did before this work.
+- **Two columns, and the distinction is load-bearing.** `declared_speakers` is
+  what the doctor SAID (NULL = not asked or skipped); `speakers_used` is what
+  the pipeline actually handed pyannote. The count is read as late as possible,
+  immediately before the audio phase, so a one-tap answer has the whole
+  MedGemma-unload window to arrive — and if it arrives later, the endpoint
+  returns `applied: false` and stores the answer **without** rewriting
+  `speakers_used`. A best-effort write that never blocks the doctor must also
+  never claim more than happened, and the UI says which of the two it got.
+- **Per-turn role correction stays the backstop.** A declaration can be
+  mis-tapped, and it is still the only thing that can repair a consultation
+  after the fact.
+
+**The single-voice notice was reworded to describe what the system did.** It
+said *"only one voice was detected in this recording"* — and recording 66 is
+two real people arriving on that exact path, so the sentence can be flatly
+false. A safety notice that can state something untrue about the consultation
+teaches the doctor to discount it. It now says identification returned a single
+voice, that every line was labelled Patient **by default**, and that the labels
+must be checked; and it distinguishes a declared count from a defaulted one,
+because two-because-you-said-so and two-because-nobody-answered are the same
+number and different statements.
+
+#### Item 5 verification — measurements, not a success claim
+
+Re-diarised offline against the stored WAVs, real pipeline functions, **nothing
+written to the database**. 446, 447, 448 and 66–70 were **not re-finalised**;
+they remain the evidence set.
+
+| cid | declared | clusters | turns before → after | roles after |
+|---|---|---|---|---|
+| **448** | 1 | 1 | 3 → 10 | all Patient ✓ |
+| **446** | 1 | 1 | 2 → 9 | all Patient ✓ |
+| **447** | 1 | 1 | 6 → 18 | all Patient ✓ — **the row no automatic setting fixed** |
+| **66** | 2 | 2 | 22 → 22 | alternating D/P, spot-checked against the text ✓ — **regression repaired** |
+| **67** | 2 | 2 | 19 → 21 | alternating ✓ |
+| **68** | 2 | 2 | 27 → 27 | alternating ✓ |
+| **69** | 2 | 2 | 25 → 30 | alternating ✓ |
+| **70** | 2 | 2 | 29 → 27 | alternating ✓ |
+
+**Eight of eight correct.** Two things not to read generously, both stated
+because the table would otherwise flatter itself:
+
+- **Turn counts move on 67, 69 and 70** (±2 to +5). That is WhisperX
+  re-transcription variance between runs, not a role change — the alternation
+  and the alignment are preserved. It does mean turn *indices* are not stable
+  across re-finalisation, which matters to anything holding stored citations.
+- **Within-turn speaker bleed is unchanged and pre-existing**: some 67 and 70
+  turns contain a few words of the other speaker at a boundary. It is
+  independent of the speaker count, was there before all of this, and is not
+  addressed by any of it.
+
+#### The merge has now been the amplifier twice
+
+Worth its own note, because the pattern is more useful than either instance:
+
+1. **Consultation 445** — the silence invariant dropped any segment
+   overlapping an excluded span, and *after* the merge a hallucinated fragment
+   sat inside a 204-second merged turn, so removing 12.7 s of muted audio
+   discarded six minutes of consultation.
+2. **Recording 66** — a single cluster gave the merge nothing to join *on*, so
+   it joined the entire 300-second consultation into one turn: 22 turns down to
+   1, citations pointing at a blob, one label to correct where the doctor needs
+   twenty-two.
+
+Different upstream causes, same amplifier. **A small upstream error becomes a
+large downstream one at the merge, so that is where proportionality rules
+belong** — the majority-fraction rule for 445, keeping segment boundaries for a
+single cluster.
+
+**It had no test of its own until this week.** The merge loop lived inline
+inside `transcribe_and_diarise`, which needs WhisperX and pyannote loaded, so
+nothing exercised it directly — which is how both amplifications were possible.
+It is now `finalize.merge_into_turns()` with unit tests on both branches.
+
 ### 448's open question 1 — one human, two labels (diarisation)
 
 **The original investigation, kept as written. Superseded by the section
@@ -1636,12 +1818,16 @@ lost while Phase 7 takes attention:**
    448 turns 0, 2), caused by the fixed `num_speakers=2`, and hidden for
    three consultations because the notes were correct — the model inferred
    speakers from content and wrote accurate notes over wrong labels.
-   **(a)** The count is unpinned (`min_speakers=1, max_speakers=2`), a
-   single cluster is labelled Patient and flagged, the review page raises an
-   acknowledge-gated notice, per-turn role correction exists, and a role
-   change marks the note as drafted against older labels. **Not a clean win,
-   and the numbers are in the section above:** 447 is still split, and
-   recording **66 regressed** from two clusters to one. **(b)** The
+   **(a)** RESOLVED by a **declared** count, after the unpinned range was
+   tried, measured and replaced — it fixed 448 and 446, failed on 447 and
+   **regressed recording 66**. The doctor now declares the count at Stop
+   (default 2), a single cluster is labelled Patient and flagged, the review
+   page raises an acknowledge-gated notice worded to describe what the system
+   did rather than what was in the room, per-turn role correction is the
+   backstop, and a role change marks the note as drafted against older
+   labels. **Verified 8/8 on the real recordings** — table in the section
+   above, with the turn-count variance and the pre-existing within-turn
+   speaker bleed both stated rather than glossed. **(b)** The
    speaker-aware grounding gate is **deliberately not built** until the
    labels are trustworthy — owner decision, the sequencing argument was
    accepted. **446, 447 and 448 are retained unrepaired as the evidence
