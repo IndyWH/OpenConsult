@@ -36,7 +36,10 @@ def test_cds_update_returns_valid_assessment():
     )
     assessment = asyncio.run(engine.update(transcript, previous=None))
 
-    assert set(assessment) == {
+    # patient_affect is OPTIONAL by design (Phase 7b affect hint): absent
+    # means neutral, so the exact-set assertion admits it without
+    # requiring it. When present it must be a legal value.
+    assert set(assessment) - {"patient_affect"} == {
         "reasoning",
         "differentials",
         "questions_to_ask",
@@ -44,6 +47,9 @@ def test_cds_update_returns_valid_assessment():
         "urgency_check",
         "urgent_actions",
     }
+    if "patient_affect" in assessment:
+        assert assessment["patient_affect"] in {
+            "positive", "neutral", "low", "anxious", "distressed"}
     assert 1 <= len(assessment["differentials"]) <= 5
     conditions = " ".join(d["condition"].lower() for d in assessment["differentials"])
     assert "angina" in conditions or "coronary" in conditions or "cardiac" in conditions

@@ -1529,6 +1529,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await websocket.send_json(
                     {"type": "cds", "assessment": entry["assessment"]}
                 )
+                # Phase 7b: the affect hint rides the assessment (zero
+                # extra model calls). The driver injects only on change;
+                # absent means neutral. Urgency is NOT an input here.
+                if entry["face"] is not None:
+                    entry["face"].on_affect(
+                        entry["assessment"].get("patient_affect"))
             except Exception as exc:  # noqa: BLE001 - degrade, don't crash the stream
                 cds_failures += 1
                 logger.warning("CDS pass failed (%d): %s", cds_failures, exc)

@@ -67,6 +67,14 @@ ASSESSMENT_SCHEMA = {
         },
         "questions_to_ask": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
         "signs_to_check": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
+        # Phase 7b affect hint (owner decision 2026-07-28, brief decision
+        # 2's piggyback option): drives the face's listening response.
+        # OPTIONAL — deliberately not in `required`; absent means neutral.
+        # Zero extra model calls: it rides this existing assessment call.
+        "patient_affect": {
+            "type": "string",
+            "enum": ["positive", "neutral", "low", "anxious", "distressed"],
+        },
     },
     "required": ["reasoning", "differentials", "questions_to_ask", "signs_to_check"],
 }
@@ -85,6 +93,11 @@ would best narrow the differential. Remove a question once the transcript \
 shows it was asked or answered.
 3. signs_to_check — up to 4 focused examination findings worth checking. \
 Remove one once the transcript shows it was examined.
+4. patient_affect (optional) — judge the patient's CURRENT emotional \
+presentation from the transcript: how they seem right now — their manner, \
+not their diagnosis. One of "positive", "neutral", "low", "anxious", \
+"distressed". Use "neutral" when unsure or when there is too little to go \
+on.
 
 REVISION RULES — you are REVISING your previous assessment, not writing a \
 new one:

@@ -160,6 +160,63 @@ EVENT_IMPULSES: dict[str, list[tuple[Chemical, float, float]]] = {
 }
 
 
+# Affect hint → impulses (Phase 7b session 2). Shaped as an ATTENTIVE
+# LISTENER'S RESPONSE, not a mirror: a distressed patient gets warm
+# concern from the face, never a distressed face reflected back at them.
+# Upstream chemistry is used unmodified. Every magnitude is a first guess
+# for the mock-patient feedback sessions — commented, not calibrated.
+#
+#   affect     | chemicals injected                  | why
+#   -----------|-------------------------------------|----------------------
+#   positive   | dopamine +0.10, oxytocin +0.10,     | engaged warmth: joy
+#              | endorphins +0.05                    | muscles (AU6/AU12)
+#   low        | oxytocin +0.12, cortisol +0.04      | gentle concern: warmth
+#              |                                     | forward, a shade of
+#              |                                     | seriousness — NOT a
+#              |                                     | dopamine crash (that
+#              |                                     | would mirror sadness)
+#   anxious    | oxytocin +0.08, gaba +0.06,         | alert, steady
+#              | adrenaline +0.05                    | attention: present and
+#              |                                     | calm, not startled
+#   distressed | oxytocin +0.15, cortisol +0.06,     | stronger gentle
+#              | adrenaline +0.03                    | concern; the face
+#              |                                     | leans in, stays warm
+#   neutral    | no injection; each affect chemical's| settle toward baseline
+#              | EXCESS over baseline is halved      | (species half-lives
+#              | (deterministic, computed from state)| are 20 min-4 h, far
+#              |                                     | too slow on their own)
+AFFECT_VALUES = ("positive", "neutral", "low", "anxious", "distressed")
+
+AFFECT_IMPULSES: dict[str, list[tuple[Chemical, float]]] = {
+    "positive": [
+        (Chemical.DOPAMINE, 0.10),
+        (Chemical.OXYTOCIN, 0.10),
+        (Chemical.ENDORPHINS, 0.05),
+    ],
+    "low": [
+        (Chemical.OXYTOCIN, 0.12),
+        (Chemical.CORTISOL, 0.04),
+    ],
+    "anxious": [
+        (Chemical.OXYTOCIN, 0.08),
+        (Chemical.GABA, 0.06),
+        (Chemical.ADRENALINE, 0.05),
+    ],
+    "distressed": [
+        (Chemical.OXYTOCIN, 0.15),
+        (Chemical.CORTISOL, 0.06),
+        (Chemical.ADRENALINE, 0.03),
+    ],
+}
+
+# The chemicals the neutral settle acts on: everything any affect ever
+# raises. GABA is deliberately included — an anxious-phase calm boost
+# should also ebb once the room settles.
+_AFFECT_CHEMICALS = sorted(
+    {chem for impulses in AFFECT_IMPULSES.values() for chem, _ in impulses},
+    key=lambda c: c.value)
+
+
 class FaceDriver:
     """One engine instance for one live session, created only when the
     face is toggled on. Event methods are called from EXISTING code paths
@@ -193,17 +250,23 @@ class FaceDriver:
         self._neutral = project_face(self.engine.state).as_dict()
         self._last_advance = self._clock.now()
         self._last_audio_inject = float("-inf")
+        self._last_affect = "neutral"
         self._stopped = False
 
     # ---- events (deterministic; no detection, no model calls) ----
 
     def _inject(self, event: str) -> None:
+        # source_id is per (event, chemical), not per event: the engine's
+        # saturation dampening is keyed by source_id, and a shared id made
+        # it damp the SECOND chemical of one event because the first had
+        # just used the key. Repeats of the same event still saturate,
+        # which is the behaviour saturation is for.
         for chemical, delta, duration in EVENT_IMPULSES[event]:
             self.engine.apply_impulse(ChemicalImpulse(
                 chemical=chemical,
                 delta=delta * self._affinity,
                 duration_seconds=duration,
-                source_id=f"face:{event}",
+                source_id=f"face:{event}:{chemical.value}",
             ))
 
     def on_consultation_started(self) -> None:
@@ -226,6 +289,36 @@ class FaceDriver:
 
     def on_system_speech_ended(self) -> None:
         self._inject("system_speech_ended")
+
+    def on_affect(self, affect: str | None) -> None:
+        """A CDS revision arrived carrying the patient_affect hint.
+
+        Injects only when the value CHANGED — a stable affect across
+        revisions is one state, not a repeated stimulus. Absent or
+        unrecognised means neutral (the schema keeps the field optional).
+        Deterministic: same assessment sequence, same injections. The
+        urgency alarm is NOT an affect and never reaches this method —
+        see the module docstring.
+        """
+        affect = affect if affect in AFFECT_VALUES else "neutral"
+        if affect == self._last_affect:
+            return
+        self._last_affect = affect
+        if affect == "neutral":
+            # Settle toward baseline. Decay alone is far too slow (the
+            # species half-lives run 20 min-4 h), so halve each affect
+            # chemical's excess — computed from state, so deterministic.
+            for chem in _AFFECT_CHEMICALS:
+                excess = self.engine.state.get(chem) - self.engine.state.baseline(chem)
+                if excess > 0:
+                    self.engine.apply_impulse(ChemicalImpulse(
+                        chemical=chem, delta=-excess / 2,
+                        source_id=f"face:affect_settle:{chem.value}"))
+            return
+        for chemical, delta in AFFECT_IMPULSES[affect]:
+            self.engine.apply_impulse(ChemicalImpulse(
+                chemical=chemical, delta=delta * self._affinity,
+                source_id=f"face:affect:{affect}:{chemical.value}"))
 
     def stop(self) -> None:
         """Consultation stopped or face toggled off: the tick loop exits

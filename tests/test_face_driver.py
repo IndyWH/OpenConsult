@@ -153,7 +153,58 @@ def test_default_mode_is_full_and_unknown_falls_back_loudly():
 
 def test_urgency_is_deliberately_not_an_event():
     """The face must not signal clinical state to the patient. If someone
-    wires the urgency alarm in, this fails and points at the reasoning."""
-    assert not any("urgen" in event for event in face_mod.EVENT_IMPULSES), (
-        "the urgency alarm must not drive the face — see the module "
-        "docstring in app/face.py")
+    wires the urgency alarm in, this fails and points at the reasoning.
+    The 2026-07-28 full-range decision changed expression RANGE, not
+    inputs — this guard now covers the affect map as well."""
+    for mapping in (face_mod.EVENT_IMPULSES, face_mod.AFFECT_IMPULSES):
+        assert not any("urgen" in event for event in mapping), (
+            "the urgency alarm must not drive the face — see the module "
+            "docstring in app/face.py")
+    assert not any("urgen" in v for v in face_mod.AFFECT_VALUES)
+
+
+def test_affect_injects_on_change_only_and_absent_means_neutral():
+    clock = ManualClock()
+    driver = FaceDriver(clock=clock, mode="full")
+    state = driver.engine.state
+    base_oxy = state.baseline(Chemical.OXYTOCIN)
+
+    driver.on_affect("distressed")
+    lifted = state.get(Chemical.OXYTOCIN)
+    assert lifted > base_oxy, "gentle concern must raise warmth"
+
+    driver.on_affect("distressed")  # unchanged affect: one state, not a
+    assert state.get(Chemical.OXYTOCIN) == lifted  # repeated stimulus
+
+    driver.on_affect(None)  # absent means neutral: the excess halves
+    settled = state.get(Chemical.OXYTOCIN)
+    assert base_oxy < settled < lifted
+    assert settled - base_oxy == pytest.approx((lifted - base_oxy) / 2)
+
+
+def test_affect_response_is_a_listener_not_a_mirror():
+    """A distressed patient gets warm concern, not a distressed face:
+    warmth (oxytocin) must rise MORE than any stress chemical."""
+    driver = FaceDriver(clock=ManualClock(), mode="full")
+    state = driver.engine.state
+    before = {c: state.get(c) for c in Chemical}
+    driver.on_affect("distressed")
+    rise = {c: state.get(c) - before[c] for c in Chemical}
+    assert rise[Chemical.OXYTOCIN] > rise[Chemical.CORTISOL]
+    assert rise[Chemical.OXYTOCIN] > rise[Chemical.ADRENALINE]
+
+
+def test_same_affect_sequence_produces_identical_states():
+    def run() -> list[dict]:
+        clock = ManualClock()
+        driver = FaceDriver(clock=clock, mode="full")
+        states = []
+        for affect in ["neutral", "anxious", "anxious", "distressed",
+                       "neutral", "positive", None, "low"]:
+            driver.on_affect(affect)
+            clock.advance(seconds=1.0)
+            driver.advance(1.0)
+            states.append(driver.payload())
+        return states
+
+    assert run() == run()
