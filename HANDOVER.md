@@ -1328,6 +1328,109 @@ What closing it would cost, so the decision is informed:
   and does not re-validate, so any stored verdict must be recomputed when
   roles change or it silently describes the old labels.
 
+### Run 5 — consultation 450: PHASE 7a'S HARD RULES ARE VERIFIED IN A ROOM
+
+**The fifth run of the real-room check, and the one that clears it.** Runs 1–4
+each found a serious defect no test would have caught (445 the missing six
+minutes, 446 the offer eating taps, 447 no way to stop an utterance, 448 the
+speaker misattribution and the invisible speaking bar). 450 is the run where
+every hard rule held.
+
+**450 is the evidence. What passed, in the room:**
+
+| | |
+|---|---|
+| **Hard rule 3 — the doctor always wins** | the speaking bar rendered **solid and pinned**, and **Stop cut playback mid-sentence five times** |
+| **Hard rule 1 — reference-only speech** | seven system utterances, all resolved server-side |
+| **The transcript guarantee** | all seven in the grey channel, **none numbered**, note grounded **12/12** citing human turns only |
+| **Hard rule 4 — the disclosure lock** | disclosure spoken as *"Dr Herath … you can speak to them"* — the 2026-07-28 wording, in the room |
+| **The standing rule** | speak controls carried their reason **on the control** before Start; the labels gate disabled Approve with its reason in its own title |
+| **The companion rule** | the asked chip read **"Again"** in words, not a lone glyph |
+| **Single-voice labelling** | the one voice was labelled **Patient**, correctly |
+
+**And the correction loop ran end to end on real data for the first time.**
+Wrong labels → per-turn correction (turns 0 and 2, `turn.role_changed`
+Doctor→Patient) → the stale-note gate arming → acknowledgement → approval.
+**450 is the first consultation in this project approved after a hand-corrected
+speaker label.** The audit trail carries the whole sequence, which is what
+makes it evidence rather than a recollection: two `turn.role_changed`, two
+`labels.acknowledged` (the second because the first correction's acknowledgement
+was re-armed by the second correction — the gate behaving exactly as designed),
+then `note.approved`.
+
+**Third confirmation that the phantom filler is a live-path phenomenon:** three
+"Thank you." turns appeared in 450's LIVE transcript and **none** in its final
+transcript. That now holds for 445 (fifteen live, none final), 448 (~80 s of
+near-silence, none final) and 450. Docket item 8 stays open, and its scope is
+now firmly "the live transcript the doctor reads", not the note.
+
+#### The defect run 5 found: an answer accepted and discarded in silence
+
+The doctor tapped the speaker-count answer and **the pipeline ignored it**. 450
+came out with the two-cluster split (turns 0 and 2 Doctor) and **no notice
+anywhere**. The audit row settles the cause without guesswork:
+
+    speakers.declared  {"count": 1, "applied": false, "already_used": 2}
+
+The answer arrived **11 s after the consultation row was created** and found
+`speakers_used` already set to 2. My own documented race, and the assumption
+underneath it was simply wrong: the count was read immediately before the audio
+phase on the theory that unloading MedGemma bought 10–30 s of slack, and on a
+three-minute consultation it bought less than eleven seconds.
+
+Both halves are fixed, and **the second half is the one that matters**:
+
+1. **The pipeline now waits for the answer** rather than hoping to be slower
+   than it — an event registered at Stop before the job is queued, released by
+   any of the three taps, abandoned after a bounded 25 s. What must never wait
+   is the RECORDING, and it does not: Stop still ends the consultation
+   immediately and the patient can leave, because finalisation is already an
+   asynchronous queued job. Pausing that job is not holding the consultation
+   open. **Skip now posts** rather than staying silent, purely so it releases
+   the wait at once — an offer that costs time is not an offer. A grace-period
+   finalisation registers no waiter, because nobody is at the screen.
+2. **A declaration that does not apply is now visible in three places**: the
+   state says `declaration_ignored` explicitly rather than leaving two numbers
+   to be compared, the review page carries the count used and the count declared
+   and that the answer arrived too late, and approval is refused until it is
+   acknowledged. One helper — `consultations.speaker_labels_unverified()` — is
+   read by both the page and the approve guard so they cannot drift apart.
+
+**The lesson is the pattern, not the instance.** This is the **fourth time in a
+week** that a control accepted an action and explained itself somewhere the
+doctor never looked — the sound-check offer, the finalisation spinner, the speak
+controls, and now the feature built to fix the third one. Writing the standing
+rule down did not prevent the fourth instance; what has actually caught each one
+is a room. So the response is a test per instance rather than another reminder:
+the new test fails if an answer can be accepted and then discarded without a
+trace in the state, the guard, or the banner.
+
+**Three smaller faults from the same run, all fixed:**
+
+- **"Just me" contradicted the pipeline.** One declared voice labels every turn
+  **Patient**, so a doctor who genuinely was the only speaker would tap "just
+  me" and have their own words attributed to the patient — the exact failure this
+  line of work exists to prevent, arriving through the wording. Options now
+  describe who spoke: **only the patient / both of us / skip**. **A doctor-only
+  recording is unsupported by design** (owner's call). Revisit it if a
+  doctor-only recording ever becomes a real case: it would need a third option
+  and a role rule that can label a lone voice Doctor.
+- **The live transcript was ordered by arrival, not by time** — the Assistant
+  line at 2:25 rendered above the patient line at 2:24. Not a lost race but the
+  guaranteed outcome of the commit margin: a transcript line is committed only
+  once it ends >2 s before the newest audio, while a spoken utterance is logged
+  the instant it plays, so the machine is always ahead. One `insertByTime()` for
+  both channels, and the tests **execute** it under Node rather than recognising
+  it in the source.
+- **The sound check claimed the room heard it on headphones**, in the same
+  breath as saying no sound reached the microphone. Both cannot be true. It now
+  reports what the doctor confirmed and says the room was not tested — and
+  **every reading records its output device**, because the three readings so far
+  (27 dB, 15 dB, 4 dB) cannot be compared when the audio path differed each time
+  and nothing recorded it. The cause was the resolver, not the schema:
+  `device_label` was filled from `audioCtx.sinkId`, a device id that is empty for
+  the default device, so it recorded nothing.
+
 ### The real-room check — this, not the suite, is what proves it
 
 The suite is evidence about the code. Nothing in it drives a browser, and
@@ -1802,17 +1905,31 @@ lost while Phase 7 takes attention:**
    **two open questions that are still open**: the diarisation
    misattribution and the speaker-blind grounding gate. 448 **stopped
    early**, so the parts of the walkthrough after the chip defect —
-   including hard rule 3's scroll-away Stop — have still not been done in a
-   room. Re-run before calling 7a done.
+   including hard rule 3's scroll-away Stop — were not done in that run.
+
+   **RUN 5 — consultation 450, 2026-07-28 — CLEARED IT.** Every hard rule
+   verified in a room: the speaking bar solid and pinned with Stop cutting
+   playback mid-sentence five times, seven system utterances all in the grey
+   channel and none numbered, note grounded 12/12 on human turns only, the
+   amended disclosure spoken, the standing rule and its companion both holding
+   on screen. The full correction loop also ran end to end on real data for the
+   first time, and **450 is the first consultation approved after a
+   hand-corrected speaker label.** Full account in "Run 5 — consultation 450"
+   above. **The pattern held a fifth time**: 450 found the declared count being
+   accepted and silently discarded, plus three smaller faults, all fixed. It is
+   the fourth instance in a week of a control accepting an action and explaining
+   itself where nobody looked — see the lesson in that section.
 8. **Hallucinated filler on ordinary silence: assessed, not built.** About
    fifteen phantom "Thank you." turns in 445's LIVE transcript. Confidence
    cannot catch it (there is none on the live path, and on the final path
    it does not separate); acoustic energy separates it by more than an
    order of magnitude. Findings and a sketch are in its own section; the
-   shape of any defence is the owner's call. **Narrowed by 448**: ~80 s of
-   near-silence at the start of that recording produced **no** phantom
-   turns in the final transcript, which is further support for this being a
-   live-path phenomenon only.
+   shape of any defence is the owner's call. **Narrowed by 448 and confirmed
+   again by 450**: 448's ~80 s of near-silence produced **no** phantom turns in
+   the final transcript, and 450 produced **three** in its live transcript and
+   **none** in its final one. Three consultations, same split — this is a
+   live-path phenomenon, and its scope is the transcript the doctor reads in the
+   room rather than the note.
 9a. **Speaker misattribution — (a) ADDRESSED 2026-07-28, (b) HELD.** The
    defect was in ALL THREE 7a consultations (446 turn 0; 447 turns 0, 2, 4;
    448 turns 0, 2), caused by the fixed `num_speakers=2`, and hidden for
@@ -2121,6 +2238,52 @@ docket item 5.
    the 2026-07-24 ICE prompt change exists to capture. The expectations
    entry was distinct and correct ("Wants a PSA test as it is simple").
    Prompt-level observation for the owner, not a code defect.
+
+12. **Guideline retrieval drifted to the wrong anaemia (consultation 450,
+   2026-07-28). MEASURED, NOT CHANGED** — retrieval evaluates 9/9 and a change
+   made without a harness run risks that, so the fix (if any) belongs with one.
+
+   450 was a 47-year-old with fatigue, brain fog, lighter periods and flushes;
+   the differential led with perimenopause and the panel gave three of six
+   citations to **NG203, chronic kidney disease** — erythropoiesis-stimulating
+   agents, IV iron in stage 5 haemodialysis. Accurate, cited, and irrelevant to
+   this patient.
+
+   Reproduced against the live corpus (read-only). **The condition that drove it
+   is the bare word "Anaemia".** Perimenopause and Hypothyroidism retrieve
+   cleanly from their own guidelines (NG23 top hit 0.631, NG145 0.570, nothing
+   else near). The anaemia query does not: of its top 12, **six are NG203 and
+   five are CKS iron-deficiency**, and NG203's best (0.570) outranks four of the
+   five CKS passages. CKD-anaemia text genuinely *is* about anaemia, and NG203
+   brings **75 chunks to CKS's 32**.
+
+   **What each control did, measured:**
+
+   - **The similarity floor (0.45) did nothing at all.** Every candidate is well
+     above it, and structurally it can never trim a mixed set: it gates only
+     `passages[0]`, the single top hit. It is a relevance floor, not a
+     composition control.
+   - **The per-source cap (2) is the only thing that held**, and it worked: the
+     merged pool held **seven** NG203 passages and the cap admitted two.
+   - **But the cap is symmetric, and that is the finding.** With a six-slot
+     budget it limits the RIGHT source exactly as hard as the wrong one. Asked
+     the more specific *"Iron deficiency anaemia"*, CKS contributed **ten**
+     passages to the pool and **eight were discarded by the cap** while NG203
+     still took two slots (0.613, 0.594). The correct guideline can never exceed
+     2 of 6 however well it matches.
+   - **The cap governs PASSAGES, not CITATIONS.** Two NG203 passages can carry
+     three of six citations, which is the likely arithmetic behind what the owner
+     saw. Nothing limits how often the summariser cites the same passage.
+
+   **It is only partly the NG28-versus-CG173 shape.** That was one guideline's
+   *title vocabulary* dominating a concatenated query, and the per-condition
+   search already fixed it. This is different: two guidelines legitimately
+   competing for the same one-word query, with the larger corpus winning more
+   slots. Options for a harness run, none started — a per-condition slot budget
+   instead of a global six; citation-level diversity rather than passage-level;
+   or having the CDS name conditions more specifically, since *"iron deficiency
+   anaemia"* retrieves visibly better than *"anaemia"* and that is a CDS-side
+   change, not a retrieval one.
 
 ## Phase 5 — CLOSED with a negative result (2026-07-25)
 
