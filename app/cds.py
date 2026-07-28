@@ -89,8 +89,10 @@ under 120 words. Then produce the assessment:
 1. differentials — up to 5 diagnoses, MOST LIKELY FIRST, each with a short \
 rationale grounded in what was actually said.
 2. questions_to_ask — up to 4 questions the doctor has NOT yet asked that \
-would best narrow the differential. Remove a question once the transcript \
-shows it was asked or answered.
+would best narrow the differential, ORDERED BY CLINICAL PRIORITY: the most \
+clinically appropriate next question FIRST. Re-rank freely as new \
+information changes what matters most — the order is living, not pinned. \
+Remove a question once the transcript shows it was asked or answered.
 3. signs_to_check — up to 4 focused examination findings worth checking. \
 Remove one once the transcript shows it was examined.
 4. patient_affect (optional) — judge the patient's CURRENT emotional \
