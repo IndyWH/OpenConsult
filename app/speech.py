@@ -137,7 +137,13 @@ class SpeechRefused(ValueError):
 
 PHRASES: dict[str, str] = {
     # Hard rule 4 — disclosure. Wording APPROVED BY THE OWNER 2026-07-25,
-    # verbatim; do not edit without them.
+    # amended by them 2026-07-28 ("him" → "them"), verbatim; do not edit
+    # without them.
+    #
+    # The amendment removes an assumption the original carried: the doctor
+    # is not necessarily male, and the sentence is spoken to a patient about
+    # a named real person. It was flagged in the first session rather than
+    # changed, because the words a patient hears are the owner's to set.
     #
     # It deliberately says NOTHING about interrupting the system, so that
     # it stays true whether or not barge-in is enabled and stays constant
@@ -146,7 +152,7 @@ PHRASES: dict[str, str] = {
     "disclosure": (
         "Hello. I'm a computer, not a person. I'll ask you some questions "
         "about what's brought you in. Dr {doctor} is here with you and you "
-        "can speak to him at any time."
+        "can speak to them at any time."
     ),
     # Golden minutes: the single opening invitation (spec Part 5, and the
     # behaviour policy in PHASE_7_SPEC.md).

@@ -74,13 +74,23 @@ def test_spec_quoted_wording_is_verbatim():
 
 
 def test_the_approved_disclosure_is_verbatim():
-    """Owner-approved 2026-07-25. Asserted word for word, not by substance:
-    this is the sentence a patient hears, and a silent edit to it is a
+    """Owner-approved 2026-07-25, amended by the owner 2026-07-28 to say
+    "them" rather than "him". Asserted word for word, not by substance: this
+    is the sentence a patient hears, and a silent edit to it is a
     clinical-communication change nobody signed off."""
     assert speech.render_phrase("disclosure", "Herath") == (
         "Hello. I'm a computer, not a person. I'll ask you some questions "
         "about what's brought you in. Dr Herath is here with you and you "
-        "can speak to him at any time.")
+        "can speak to them at any time.")
+
+
+def test_the_disclosure_does_not_assume_the_doctor_is_male():
+    """The 2026-07-28 amendment, pinned as its own assertion so a revert
+    fails loudly rather than reading as a wording tweak. The doctor is a real
+    named person and the patient is being told about them."""
+    text = speech.render_phrase("disclosure", "Herath")
+    assert "speak to them at any time" in text
+    assert " him" not in text and " his " not in text
 
 
 def test_the_disclosure_says_nothing_about_interrupting():
