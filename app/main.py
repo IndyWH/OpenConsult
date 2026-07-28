@@ -22,8 +22,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import (audit, auth, consultations, frontdesk, letters, monitor, ratelimit,
-                 retention, schema, speech, system_utterances)
+from app import (audit, auth, consultations, face, frontdesk, letters, monitor,
+                 ratelimit, retention, schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import (expect_declaration, finalize_consultation,
@@ -1245,6 +1245,14 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
         logger.info("Consultation %d: %d system utterance(s) recorded",
                     cid, len(entry["utterances"]))
 
+    # Phase 7b: one consultation-linked audit row with the whole toggle
+    # history, so a study arm is one query — the live face.toggled rows
+    # carry only the session id, because no consultation row existed yet.
+    if entry.get("face_toggles"):
+        await audit.log(user["id"], "face.arms", "consultation", cid,
+                        {"toggles": entry["face_toggles"],
+                         "face_ever_on": any(t["on"] for t in entry["face_toggles"])})
+
     # Persist urgent actions still unresolved at session end (the CDS
     # engine clears an action once the transcript shows it arranged, so
     # anything remaining was never seen to be actioned). Shown as an
@@ -1478,6 +1486,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # not a UI courtesy — a disabled button can be re-enabled from
             # the console, a server refusal cannot.
             "disclosed": False,
+            # Phase 7b: the face driver (created only when toggled on;
+            # None = off, and off means NO face_state traffic at all —
+            # off is the control arm of a study, not a blanked panel)
+            # and the toggle history for study-arm reconstruction.
+            "face": None,
+            "face_toggles": [],
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -1492,6 +1506,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     cds_failures = 0
     gl_task: asyncio.Task | None = None
     gl_conditions: tuple = ()  # conditions the current guideline panel is for
+    face_task: asyncio.Task | None = None  # Phase 7b tick loop, per-connection
     last_acked = -1
 
     async def maybe_run_cds() -> None:
@@ -1666,6 +1681,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         start = session.open_speaking_window(
             utterance.utterance_id, utterance.duration_ms,
             speech.SPEECH_EXCLUSION_TAIL_MS)
+        # Phase 7b: the same server-held speak window that drives
+        # transcript exclusion also tells the face we started talking.
+        if entry["face"] is not None:
+            entry["face"].on_system_speech_started()
         # The client's declared seq is a cross-check only. The server's own
         # byte count is what says where in the file playback began, and
         # trusting the client here would put the guarantee in its hands.
@@ -1685,6 +1704,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if reason not in system_utterances.END_REASONS:
             reason = "complete"
         span = session.close_speaking_window(reason)
+        if entry["face"] is not None:
+            entry["face"].on_system_speech_ended()
         cut_latency = payload.get("cut_latency_ms")
         record_utterance(utterance, span, reason,
                          int(cut_latency) if cut_latency is not None else None)
@@ -1701,6 +1722,45 @@ async def ws_transcribe(websocket: WebSocket) -> None:
              "excluded_ms": bytes_to_ms(
                  span["end_byte"] - span["start_byte"]),
              **({"cut_latency_ms": int(cut_latency)} if cut_latency is not None else {})})
+
+    async def handle_face(payload: dict) -> None:
+        """Phase 7b: toggle the face. OFF is a first-class state — the
+        control arm of the planned CARE study — so off means the driver is
+        gone and the server sends no face_state messages at all, not a
+        blanked panel. Every toggle is audited (hard rule 5) and confirmed
+        back to the client, which renders the panel only on confirmation."""
+        nonlocal face_task
+        on = bool(payload.get("on"))
+        driver: face.FaceDriver | None = None
+        if on:
+            if entry["face"] is not None and not entry["face"].stopped:
+                return  # already on — idempotent, nothing to re-audit
+            driver = face.FaceDriver()
+            entry["face"] = driver
+            driver.on_consultation_started()
+            # The tick task starts AFTER the confirmation below, so the
+            # client always sees face_toggled before the first face_state.
+        else:
+            if entry["face"] is None and face_task is None:
+                return  # already off
+            if entry["face"] is not None:
+                entry["face"].stop()
+                entry["face"] = None
+            if face_task is not None:
+                face_task.cancel()
+                face_task = None
+        entry["face_toggles"].append(
+            {"on": on, "at_audio_s": round(session.audio_seconds, 1)})
+        # The consultation row does not exist until Stop, so this row
+        # carries the session; _complete_session writes the
+        # consultation-linked `face.arms` summary the study reads.
+        await audit.log(user["id"], "face.toggled", None, None,
+                        {"on": on, "session_id": session_id,
+                         "patient_id": entry["patient_id"],
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        await websocket.send_json({"type": "face_toggled", "on": on})
+        if driver is not None:
+            face_task = asyncio.create_task(driver.run(websocket.send_json))
 
     try:
         while True:
@@ -1722,6 +1782,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                            session_id, entry["last_seq"], seq)
                         session.append_pcm16(data[4:])
                         entry["last_seq"] = seq
+                        # Phase 7b: mild attention while the patient talks.
+                        # The live path already knows when audio arrives —
+                        # no new detection. Frames inside a speaking window
+                        # are mostly our own playback, so they don't count.
+                        if entry["face"] is not None and not session.speaking:
+                            entry["face"].on_patient_audio()
                 elif (text_message := message.get("text")) == "stop":
                     entry["stopped"] = True
                     break
@@ -1734,6 +1800,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         await handle_speak_started(payload)
                     elif kind == "speak_ended":
                         await handle_speak_ended(payload)
+                    elif kind == "face":
+                        await handle_face(payload)
                     elif kind == "disclosure_given":
                         # The doctor's own words instead of ours. Only the
                         # doctor running the consultation may attest it.
@@ -1780,6 +1848,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             cds_task.cancel()
         if gl_task is not None:
             gl_task.cancel()
+        # The tick loop is per-connection, like the CDS task. The driver
+        # itself is stopped too: chemistry does not survive a drop, and a
+        # reconnecting client re-sends its toggle if the face was on.
+        if face_task is not None:
+            face_task.cancel()
+        if entry["face"] is not None:
+            entry["face"].stop()
+            entry["face"] = None
         still_mine = sessions.get(session_id) is entry
         if still_mine and not entry["stopped"]:
             if entry["last_seq"] > 0:

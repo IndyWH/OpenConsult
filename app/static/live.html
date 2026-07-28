@@ -431,6 +431,19 @@
     <div id="transcript" style="margin-top:.5rem"><span id="partial" class="partial"></span></div>
   </div>
 
+  <!-- 5. ROBOT FACE (Phase 7b) — DELIBERATELY UNSTYLED machinery.
+       DESIGN_SPEC.md and the mockups are not available yet; the bedside-
+       device styling is a later pass, not something to invent here.
+       Default OFF, and OFF is a first-class state: it is the control arm
+       of the planned CARE study, so when the face is off the renderer is
+       ABSENT (no canvas in the DOM, no face_state traffic from the
+       server) — never merely blanked. -->
+  <div class="pane" id="facePane">
+    <h2 class="pane-label">Robot face</h2>
+    <button id="faceToggle" type="button" aria-pressed="false">Face: off</button>
+    <div id="faceMount" style="display:none; height:280px; max-width:420px"></div>
+  </div>
+
 </div>
 
 <!-- SPEAKING STATE — hard rule 3, the doctor always wins.
@@ -1009,6 +1022,10 @@ function showSpeakError(detail) {
 function setSpeakingUI(on, label) {
   speakingBar.classList.toggle('on', on);
   speakingWhat.textContent = on ? ('Speaking: \u201c' + label + '\u201d') : '';
+  // Phase 7b: the mouth flap tracks TTS playback. Wired to the same
+  // client-side speaking transitions that drive the pill \u2014 one source of
+  // "are we talking", the renderer just follows it.
+  if (window.kindaliveFace) window.kindaliveFace.setSpeaking(on);
   refreshSpeechControls();
 }
 
@@ -1054,6 +1071,17 @@ function refreshSpeechControls() {
             : busy ? 'One utterance at a time'
             : 'Speak this to the patient';
   });
+  // Phase 7b: the face runs inside a live session only. Same standing
+  // rule as every control here — disabled with the reason on it, never a
+  // tap that does nothing. Looked up by id (not the const declared below)
+  // because this function runs once at page load before that declaration.
+  const faceBtn = document.getElementById('faceToggle');
+  faceBtn.disabled = !live;
+  if (faceBtn.disabled) {
+    faceBtn.title = 'Start the consultation first — the face runs inside a live session';
+  } else {
+    faceBtn.title = 'Toggle the robot face (off is a first-class state — the study\'s control arm)';
+  }
   // Disabled while recording (spec 10.3): a test phrase inside a live
   // consultation would be a system utterance and would need the whole
   // exclusion machinery for no clinical benefit.
@@ -1504,6 +1532,52 @@ discCheck.addEventListener('change', () => {
 // state, with the same reason on them, as they hold after a drop.
 refreshSpeechControls();
 
+// ============================================== Phase 7b: the robot face
+//
+// Machinery only — styling waits for DESIGN_SPEC.md. Default OFF, and OFF
+// is a first-class state (the control arm of the planned CARE study): the
+// server sends no face_state traffic and the renderer is ABSENT from the
+// DOM, not blanked. The client renders the panel only on the server's
+// face_toggled confirmation, so the panel can never claim a state the
+// server is not in.
+//
+// The vendored face3d.js (copied unchanged) starts one requestAnimation-
+// Frame loop per init and has no teardown, so it is initialised at most
+// ONCE per page; toggling detaches and re-attaches the same stage node.
+// Nothing loads until the first toggle-on — face-off costs zero.
+const faceToggle = document.getElementById('faceToggle');
+const faceMount = document.getElementById('faceMount');
+let faceOn = false;      // server-confirmed state
+let faceStage = null;    // the once-initialised renderer node
+
+faceToggle.addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
+  ws.send(JSON.stringify({type: 'face', on: !faceOn}));
+});
+
+async function applyFaceToggle(on) {
+  faceOn = on;
+  faceToggle.setAttribute('aria-pressed', String(on));
+  faceToggle.textContent = on ? 'Face: on' : 'Face: off';
+  refreshSpeechControls();
+  if (on) {
+    if (!faceStage) {
+      faceStage = document.createElement('div');
+      faceStage.id = 'face3dStage';
+      faceStage.style.height = '100%';
+      faceMount.appendChild(faceStage);
+      const mod = await import('/static/face3d.js');
+      mod.default('face3dStage');
+    } else if (!faceStage.parentNode) {
+      faceMount.appendChild(faceStage);
+    }
+    faceMount.style.display = '';
+  } else {
+    faceMount.style.display = 'none';
+    if (faceStage && faceStage.parentNode) faceStage.remove();  // absent, not blanked
+  }
+}
+
 // ============================================================= start / stop
 function standDown(statusText) {
   // Fully reset to the not-recording state (used by busy/resume_failed).
@@ -1537,6 +1611,9 @@ function onWsMessage(event) {
     reconnecting = false;
     reconnectAttempts = 0;
     micPill.classList.remove('reconnect');
+    // The server stops the face driver on a drop; if the doctor had it on,
+    // ask for it again — the panel stays as the server last confirmed it.
+    if (faceOn) ws.send(JSON.stringify({type: 'face', on: true}));
     if (stopRequested) {
       stopRequested = false;
       awaitingDone = true;
@@ -1556,6 +1633,10 @@ function onWsMessage(event) {
     // so stand down completely: worklet, timer, flags, button.
     standDown(msg.detail);
   }
+  else if (msg.type === 'face_state') {
+    if (window.kindaliveFace) window.kindaliveFace.setTargets(msg);
+  }
+  else if (msg.type === 'face_toggled') { applyFaceToggle(msg.on); }
   else if (msg.type === 'speak_ready') { onSpeakReady(msg); }
   else if (msg.type === 'speak_refused') {
     pendingSpeakText = '';
@@ -1585,6 +1666,7 @@ function onWsMessage(event) {
   }
   else if (msg.type === 'done') {
     awaitingDone = false;
+    if (faceOn) applyFaceToggle(false);  // session over; server driver is gone
     if (ws) { ws.onclose = null; ws.close(); ws = null; }
     if (msg.consultation_id) {
       // Finalisation (diarisation + note) runs in the background. Keep the
