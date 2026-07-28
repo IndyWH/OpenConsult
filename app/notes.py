@@ -22,6 +22,10 @@ import httpx
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 NOTE_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M")
+# The shared MedGemma context length (session 5): one value across CDS,
+# RAG and this note call, so Ollama never reloads the model between the
+# live path and the note path. See the constant's comment in app/cds.py.
+from app.cds import CDS_NUM_CTX  # noqa: E402
 
 LOW_CONFIDENCE = float(os.getenv("ASR_LOW_CONFIDENCE", "0.60"))
 # Below this fraction of validly-cited claims the note is demoted to a
@@ -173,7 +177,7 @@ async def draft_note(turns: list[dict]) -> dict:
                 "options": {
                     "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
                     "seed": int(os.getenv("CDS_SEED", "42")),
-                    "num_ctx": 16384,  # a full consultation is long
+                    "num_ctx": CDS_NUM_CTX,  # a full consultation is long
                 },
             },
         )

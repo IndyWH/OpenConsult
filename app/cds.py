@@ -37,6 +37,18 @@ logger = logging.getLogger(__name__)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 CDS_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M")
 
+# ONE context length for every MedGemma call in the app — CDS, RAG and
+# the note (app/rag.py and app/notes.py import this). Session 5, owner
+# decision: Ollama RELOADS the model whenever num_ctx changes between
+# calls, and the live path (8192) and note path (16384) used to differ —
+# a reload measured at 3.9 s warm in the VRAM investigation and ~10 s on
+# consultation 454's first live assessment. One shared constant so the
+# paths cannot drift apart again. VRAM cost of 16384 over 8192 is only
+# ~679 MiB of KV cache; the worst measured total in exactly this
+# configuration (MedGemma @16384 + embeddinggemma) was 22309 MiB with
+# 2255 MiB free — it fits (HANDOVER, "VRAM baseline — MEASURED").
+CDS_NUM_CTX = int(os.getenv("CDS_NUM_CTX", "16384"))
+
 ASR_CAVEAT = """\
 You receive a rough LIVE TRANSCRIPT produced by speech recognition: it has \
 no speaker labels and may garble words, especially medication names — \
@@ -226,7 +238,7 @@ class CDSEngine:
                         # and evaluations must be reproducible.
                         "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
                         "seed": int(os.getenv("CDS_SEED", "42")),
-                        "num_ctx": 8192,
+                        "num_ctx": CDS_NUM_CTX,
                     },
                 },
             )

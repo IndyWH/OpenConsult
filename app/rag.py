@@ -35,6 +35,10 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "embeddinggemma")
 RAG_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M")
+# The shared MedGemma context length — imported, not copied, so the live
+# and note paths can never disagree and trigger Ollama's reload again
+# (session 5; see the constant's comment in app/cds.py).
+from app.cds import CDS_NUM_CTX  # noqa: E402
 # Cosine-similarity floor below which we refuse without asking the LLM.
 # Calibrated in evals/2026-07-07_rag_grounding_evaluation.md.
 MIN_SIMILARITY = float(os.getenv("RAG_MIN_SIMILARITY", "0.45"))
@@ -219,7 +223,7 @@ class RAGService:
                     "options": {
                         "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
                         "seed": int(os.getenv("CDS_SEED", "42")),
-                        "num_ctx": 8192,
+                        "num_ctx": CDS_NUM_CTX,
                     },
                 },
             )
