@@ -280,3 +280,102 @@ def test_the_chain_respects_its_flag(autonomy_env, monkeypatch):
         assert ready["text"] == "Please, tell me what's brought you in."
         _play_through(ws, ready)
     assert _speak_request_audits()[-1] == ("invitation", "tap")
+
+
+# --- item 4: the silence nudge's cage, server-enforced -----------------------
+
+def _through_invitation(ws):
+    """Disclosure spoken and played through; the chained invitation played
+    through too. Leaves the session with the nudge window open."""
+    ready = _speak(ws, "disclosure")
+    _play_through(ws, ready)
+    chained = _drain_until(ws, {"speak_ready"})
+    assert chained["ref_id"] == "invitation"
+    _play_through(ws, chained)
+
+
+def test_nudge_before_the_invitation_is_refused(autonomy_env):
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "disclosure_given"}))
+        _drain_until(ws, {"disclosure"})
+        ws.send_text(json.dumps({"type": "speak", "via": "silence_nudge",
+                                 "ref": {"kind": "phrase", "id": "silence_nudge"}}))
+        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        assert message["type"] == "speak_refused"
+        assert "completed invitation" in message["detail"]
+
+
+def test_nudge_is_disclosure_gated_like_every_clinical_phrase(autonomy_env):
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "silence_nudge"}}))
+        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        assert message["type"] == "speak_refused"
+        assert "not been told" in message["detail"]
+
+
+def test_nudge_is_one_shot_server_enforced_with_quiet_duration_audited(autonomy_env):
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        _through_invitation(ws)
+        ready = _speak(ws, "silence_nudge",
+                       extra={"via": "silence_nudge", "quiet_s": 6.2})
+        assert ready["text"] == (
+            "When you're ready, tell me what's brought you in today.")
+        _play_through(ws, ready)
+        # The second request is refused SERVER-side — a client-side-only
+        # cage would be a suggestion.
+        ws.send_text(json.dumps({"type": "speak", "via": "silence_nudge",
+                                 "ref": {"kind": "phrase", "id": "silence_nudge"}}))
+        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        assert message["type"] == "speak_refused"
+        assert "already been used" in message["detail"]
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT detail->>'via', detail->>'quiet_s' FROM audit_event"
+                " WHERE action = 'speech.requested'"
+                "   AND detail->'ref_detail'->>'id' = 'silence_nudge'"
+                " ORDER BY id DESC LIMIT 1")
+            via, quiet = cur.fetchone()
+    assert via == "silence_nudge"
+    assert float(quiet) == 6.2
+
+
+def test_nudge_stays_one_shot_even_when_cut_off(autonomy_env):
+    """Used is marked at REQUEST: a nudge the doctor cut with Stop/Esc was
+    still the consultation's one nudge."""
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        _through_invitation(ws)
+        ready = _speak(ws, "silence_nudge", extra={"via": "silence_nudge"})
+        _play_through(ws, ready, reason="doctor_stop")
+        ws.send_text(json.dumps({"type": "speak", "via": "silence_nudge",
+                                 "ref": {"kind": "phrase", "id": "silence_nudge"}}))
+        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        assert message["type"] == "speak_refused"
+        assert "already been used" in message["detail"]
+
+
+def test_nudge_disabled_flag_refuses_server_side(autonomy_env, monkeypatch):
+    monkeypatch.setattr(appmain, "SILENCE_NUDGE_ENABLED", False)
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        # The client is told, so it never even asks…
+        config = _drain_until(ws, {"speech_config"})
+        assert config["silence_nudge_enabled"] is False
+        _through_invitation(ws)
+        # …and if it asks anyway, the server refuses.
+        ws.send_text(json.dumps({"type": "speak", "via": "silence_nudge",
+                                 "ref": {"kind": "phrase", "id": "silence_nudge"}}))
+        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        assert message["type"] == "speak_refused"
+        assert "disabled" in message["detail"]

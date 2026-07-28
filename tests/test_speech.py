@@ -60,7 +60,15 @@ def test_phrase_table_holds_exactly_the_specified_phrases():
         "disclosure", "invitation", "mm-hm", "i_see", "go_on",
         "examination_handover",
         "sound_check",   # spec Part 10, added 2026-07-25
+        "silence_nudge",  # session 3, the ONLY autonomous utterance in 7a/7b
     }
+
+
+def test_the_silence_nudge_wording_is_the_owners_verbatim():
+    """Session 3: the owner's wording, word for word — it is a sentence a
+    patient hears, so a silent edit is a clinical-communication change."""
+    assert speech.PHRASES["silence_nudge"] == (
+        "When you're ready, tell me what's brought you in today.")
 
 
 def test_spec_quoted_wording_is_verbatim():
@@ -171,7 +179,8 @@ def test_the_disclosure_gate_list_exempts_the_encouragers():
     """Gating "mm-hm" would make the lock feel like a nuisance rather than
     a rule; it is not a clinical interaction."""
     assert set(speech.DISCLOSURE_GATED_PHRASES) == {"invitation",
-                                                    "examination_handover"}
+                                                    "examination_handover",
+                                                    "silence_nudge"}
     for encourager in speech.ENCOURAGER_IDS:
         assert encourager not in speech.DISCLOSURE_GATED_PHRASES
     assert "disclosure" not in speech.DISCLOSURE_GATED_PHRASES, (

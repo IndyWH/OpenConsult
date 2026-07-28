@@ -761,6 +761,10 @@ async function initMic() {
       silentSinceMs = null;
       micPill.classList.remove('dead');
     }
+    // Silence nudge: energy above the silence floor is activity. The
+    // SAME floor as the dead-mic pill, reused so the two surfaces cannot
+    // disagree about what silence is; the bias is toward not firing.
+    if (rms > 1e-4) nudge.activity(now);
     const level = Math.min(1, rms * 8);
     barEls.forEach((bar, k) => {
       bar.style.transform = `scaleY(${Math.max(.28, Math.min(1, level * BAR_GAIN[k] * 4))})`;
@@ -1153,7 +1157,7 @@ function refreshSpeechControls() {
   discCheck.disabled = disclosed || !live;
 }
 
-function requestSpeak(ref, label) {
+function requestSpeak(ref, label, extra) {
   if (!ws || ws.readyState !== WebSocket.OPEN) {
     // LAST-RESORT guard only. Under the standing rule the controls are
     // already disabled with the reason on them whenever the socket is
@@ -1167,18 +1171,77 @@ function requestSpeak(ref, label) {
   speakError.classList.remove('on');
   pendingSpeakText = label;
   refreshSpeechControls();
-  // A REFERENCE, never text. There is no field here for words.
-  ws.send(JSON.stringify({type: 'speak', ref: ref}));
+  // A REFERENCE, never text. There is no field here for words. `extra`
+  // carries request metadata only (the nudge's via and measured quiet
+  // duration) — the server rejects any text outright.
+  ws.send(JSON.stringify({type: 'speak', ref: ref, ...(extra || {})}));
 }
+
+// ============================== Phase 7b session 3: the silence nudge
+//
+// THE ONLY AUTONOMOUS UTTERANCE IN 7a/7b, deliberately caged — and it
+// must stay the only one until 7c's behaviour-policy machinery exists.
+// Do not generalise this into an encourager loop.
+//
+// The client detects the quiet window (it holds the mic analyser and
+// sees the transcript stream) and requests the phrase through the NORMAL
+// speak path; the server enforces the disclosure gate, the one-shot and
+// reference-only resolution regardless of anything this code does. The
+// bias is toward NOT firing: any activity — audio energy above the
+// silence floor (the same 1e-4 the dead-mic pill uses, so the two
+// surfaces agree about what silence is; ambient room noise suppressing
+// the nudge is the accepted cost), any partial/committed transcript
+// movement, any playback — resets the window. A phantom live-path
+// partial suppressing the nudge is acceptable; the reverse is not.
+const nudge = {
+  enabled: true,     // from the server's speech_config
+  windowS: 5,        // from the server's speech_config
+  armed: false,      // invitation played through; window open
+  used: false,       // at most once per consultation (server re-enforces)
+  quietSince: 0,
+  arm(now) {
+    if (this.used || !this.enabled) return;
+    this.armed = true;
+    this.quietSince = now;
+  },
+  activity(now) { this.quietSince = now; },
+  due(now) {
+    return this.armed && !this.used
+        && (now - this.quietSince) >= this.windowS * 1000;
+  },
+  fire(now) {         // returns the measured quiet duration in seconds
+    this.used = true;
+    this.armed = false;
+    return (now - this.quietSince) / 1000;
+  },
+};
+
+setInterval(() => {
+  if (!recording || !ws || ws.readyState !== WebSocket.OPEN) return;
+  if (speaking !== null || pendingSpeakText !== '') return;  // we are talking
+  const now = performance.now();
+  if (!nudge.due(now)) return;
+  const quiet = nudge.fire(now);
+  requestSpeak({kind: 'phrase', id: 'silence_nudge'},
+               'When you’re ready, tell me what’s brought you in today.',
+               {via: 'silence_nudge', quiet_s: Math.round(quiet * 10) / 10});
+}, 250);
 
 function stopSpeaking(reason) {
   if (!speaking) return;
-  const {utterance_id, audio} = speaking;
+  const {utterance_id, audio, refId} = speaking;
   try { audio.pause(); } catch (e) { /* already ended */ }
   ws.send(JSON.stringify({type: 'speak_ended', utterance_id: utterance_id,
                           seq: seq + 1, reason: reason}));
   speaking = null;
   setSpeakingUI(false, '');
+  // The silence-nudge window opens ONLY when the invitation played
+  // through; any other end of playback merely counts as activity.
+  if (reason === 'complete' && refId === 'invitation') {
+    nudge.arm(performance.now());
+  } else {
+    nudge.activity(performance.now());
+  }
 }
 
 async function onSpeakReady(msg) {
@@ -1208,7 +1271,8 @@ async function onSpeakReady(msg) {
   // before any audio recorded during playback.
   if (msg.text) askedQuestions.add(msg.text);
   markAskedQuestions();
-  speaking = {utterance_id: msg.utterance_id, audio: audio, text: msg.text || label};
+  speaking = {utterance_id: msg.utterance_id, audio: audio,
+              text: msg.text || label, refId: msg.ref_id || null};
   ws.send(JSON.stringify({type: 'speak_started', utterance_id: msg.utterance_id,
                           seq: seq + 1}));
   setSpeakingUI(true, label);
@@ -1689,10 +1753,27 @@ function standDown(statusText) {
   setStatus(statusText);
 }
 
+let lastPartialText = '';
+
 function onWsMessage(event) {
   const msg = JSON.parse(event.data);
-  if (msg.type === 'final') { addFinal(msg); partialEl.textContent = ''; }
-  else if (msg.type === 'partial') { partialEl.textContent = msg.text; }
+  if (msg.type === 'final') {
+    addFinal(msg); partialEl.textContent = '';
+    nudge.activity(performance.now());   // committed transcript movement
+  }
+  else if (msg.type === 'partial') {
+    partialEl.textContent = msg.text;
+    // Transcript MOVEMENT is activity — a phantom partial suppressing
+    // the nudge is acceptable, the reverse is not.
+    if (msg.text !== lastPartialText) {
+      lastPartialText = msg.text;
+      if (msg.text) nudge.activity(performance.now());
+    }
+  }
+  else if (msg.type === 'speech_config') {
+    nudge.enabled = msg.silence_nudge_enabled !== false;
+    nudge.windowS = Number(msg.silence_nudge_s) || nudge.windowS;
+  }
   else if (msg.type === 'cds') { renderCDS(msg.assessment); }
   else if (msg.type === 'guidelines') { renderGuidelines(msg); }
   else if (msg.type === 'ack') {

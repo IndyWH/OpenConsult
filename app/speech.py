@@ -168,6 +168,13 @@ PHRASES: dict[str, str] = {
     # addressed to the patient — it is a check spoken in the room, and it
     # should sound like one.
     "sound_check": "Sound check. If you can hear this clearly, press yes.",
+    # Silence nudge (Phase 7b session 3, owner's wording verbatim). THE
+    # ONLY AUTONOMOUS UTTERANCE IN 7a/7b — the caging lives in main.py's
+    # speak handler (one-shot per consultation, only after the invitation
+    # has played through, any activity cancels it client-side). It must
+    # stay the only one until 7c's behaviour-policy machinery exists — do
+    # not generalise it into an encourager loop.
+    "silence_nudge": "When you're ready, tell me what's brought you in today.",
 }
 
 ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
@@ -175,7 +182,7 @@ ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
 # Phrases the patient must have heard the disclosure before (hard rule 4).
 # The encouragers are exempt: "mm-hm" is not a clinical interaction, and
 # gating them would make the lock feel like a nuisance rather than a rule.
-DISCLOSURE_GATED_PHRASES = ("invitation", "examination_handover")
+DISCLOSURE_GATED_PHRASES = ("invitation", "examination_handover", "silence_nudge")
 
 
 # --- sound check (spec Part 10) --------------------------------------------

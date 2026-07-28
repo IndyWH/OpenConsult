@@ -1225,6 +1225,14 @@ FACE_AUTO_ON_DISCLOSURE = os.getenv("FACE_AUTO_ON_DISCLOSURE", "true").lower() !
 # the normal speak path, as its own utterance and audit rows.
 AUTO_INVITATION_AFTER_DISCLOSURE = (
     os.getenv("AUTO_INVITATION_AFTER_DISCLOSURE", "true").lower() != "false")
+# The silence nudge — THE ONLY AUTONOMOUS UTTERANCE IN 7a/7b, deliberately
+# caged (one-shot per consultation, server-enforced; only after the
+# invitation has played through; disclosure-gated like every clinical
+# phrase; any activity cancels it client-side, biased toward NOT firing).
+# It must stay the only one until 7c's behaviour-policy machinery exists —
+# do not generalise it into an encourager loop.
+SILENCE_NUDGE_ENABLED = os.getenv("SILENCE_NUDGE_ENABLED", "true").lower() != "false"
+SILENCE_NUDGE_S = float(os.getenv("SILENCE_NUDGE_S", "5"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1509,11 +1517,24 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "face_toggles": [],
             # Session 3: a manual face-off is FINAL for the session — the
             # disclosure auto-on never overrides it (the doctor always
-            # wins).
+            # wins) — and the silence nudge's cage: at most once per
+            # consultation, only after the invitation has played through.
             "face_manual_off": False,
+            "invitation_completed": False,
+            "nudge_used": False,
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
+
+    # Session 3: the client runs the silence-nudge quiet-window detector
+    # (it holds the mic analyser and sees the transcript stream), so it is
+    # told the server's settings — env lives server-side only. The SERVER
+    # still enforces the cage regardless of what the client does.
+    await websocket.send_json({
+        "type": "speech_config",
+        "silence_nudge_enabled": SILENCE_NUDGE_ENABLED,
+        "silence_nudge_s": SILENCE_NUDGE_S,
+    })
 
     session: LiveSession = entry["session"]
     engine: CDSEngine = state.cds_engine
@@ -1610,9 +1631,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         client — buggy, modified or compromised — can make the system
         advise, reassure or diagnose to the patient.
 
-        `via` says what initiated the request — "tap", or
-        "auto_invitation" (the server chaining the invitation after a
-        completed disclosure) — and is audited.
+        `via` says what initiated the request — "tap", "auto_invitation"
+        (the server chaining the invitation after a completed disclosure),
+        or "silence_nudge" (the client's quiet-window detector) — and is
+        audited. The nudge is THE ONLY AUTONOMOUS UTTERANCE in 7a/7b and
+        its cage is enforced HERE, server-side, not only in the client:
+        one shot per consultation, only after the invitation has played
+        through, and disclosure-gated like every clinical phrase. Keep it
+        that way until 7c's behaviour-policy machinery exists — do not
+        generalise it into an encourager loop.
         """
         if "text" in payload or "text" in (payload.get("ref") or {}):
             # Rejected outright rather than stripped. Sanitising would make
@@ -1636,6 +1663,20 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 "the patient has not been told they are talking to a machine — "
                 "play the disclosure, or tick 'disclosure given'")
             return
+        if (payload.get("ref") or {}).get("id") == "silence_nudge":
+            # The nudge's cage (see the docstring): server-enforced,
+            # because a client-side-only cage is a suggestion.
+            if not SILENCE_NUDGE_ENABLED:
+                await refuse_speech("the silence nudge is disabled")
+                return
+            if not entry["invitation_completed"]:
+                await refuse_speech(
+                    "the silence nudge only follows a completed invitation")
+                return
+            if entry["nudge_used"]:
+                await refuse_speech(
+                    "the silence nudge has already been used this consultation")
+                return
         try:
             utterance = await asyncio.to_thread(
                 functools.partial(
@@ -1656,6 +1697,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await refuse_speech(f"synthesis failed: {exc}")
             return
         entry["pending_utterance"] = utterance
+        if utterance.ref_detail.get("id") == "silence_nudge":
+            # Marked used at REQUEST, not completion: at most once means
+            # once, even if the one firing is cut off.
+            entry["nudge_used"] = True
         # Auto-on at Disclosure (owner decision 2026-07-28): the SPOKEN
         # disclosure switches the face on — the "in my own words" tick
         # does not (the owner named the button). Never after a manual
@@ -1665,14 +1710,20 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 and entry["face"] is None
                 and not entry["face_manual_off"]):
             await handle_face({"on": True}, via="disclosure_auto")
+        quiet_s = payload.get("quiet_s")
         await audit.log(user["id"], "speech.requested", None, None,
                         {"utterance_id": utterance.utterance_id,
                          "ref_kind": utterance.ref_kind,
                          "ref_detail": utterance.ref_detail,
                          "stale": utterance.stale,
-                         "via": via})
+                         "via": via,
+                         # The measured quiet duration, nudges only —
+                         # calibration data for SILENCE_NUDGE_S.
+                         **({"quiet_s": round(float(quiet_s), 1)}
+                            if quiet_s is not None else {})})
         await websocket.send_json({
             "type": "speak_ready", "utterance_id": utterance.utterance_id,
+            "ref_id": utterance.ref_detail.get("id"),
             "duration_ms": utterance.duration_ms,
             # What the server decided to say. The client needs it to log
             # the utterance faithfully rather than by button label — it
@@ -1761,6 +1812,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
              "excluded_ms": bytes_to_ms(
                  span["end_byte"] - span["start_byte"]),
              **({"cut_latency_ms": int(cut_latency)} if cut_latency is not None else {})})
+        # The nudge window opens only once the invitation has PLAYED
+        # THROUGH — a cut-off invitation opens nothing (session 3).
+        if utterance.ref_detail.get("id") == "invitation" and reason == "complete":
+            entry["invitation_completed"] = True
         # Auto-chain (owner decision 2026-07-28): a disclosure that played
         # THROUGH is followed by the invitation, through the NORMAL speak
         # path — its own utterance, its own audit rows, and behind the
@@ -1858,7 +1913,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     payload = json.loads(text_message)
                     kind = payload.get("type")
                     if kind == "speak":
-                        await handle_speak(payload)
+                        # The client may declare via="silence_nudge" (its
+                        # quiet-window detector); anything else is a tap.
+                        # The nudge CAGE keys on the phrase reference, not
+                        # on this label — via is audit vocabulary only.
+                        await handle_speak(
+                            payload,
+                            via=("silence_nudge"
+                                 if payload.get("via") == "silence_nudge"
+                                 else "tap"))
                     elif kind == "speak_started":
                         await handle_speak_started(payload)
                     elif kind == "speak_ended":
