@@ -674,6 +674,52 @@ def test_unknown_utterance_id_is_404_not_a_confirmation():
 # from the transcript by construction. A dead speaker converts quietly
 # into missing transcript.
 
+def test_the_sound_check_never_claims_the_room_heard_it_on_headphones():
+    """450 reported "Heard clearly. The room can hear the machine." AND, in the
+    same breath, that no sound reached the microphone. Both cannot be true — on
+    headphones the ROOM heard nothing and only the doctor did.
+
+    What the human answer establishes is that HE heard it. Whether the room can
+    is exactly what an absent acoustic path leaves untested, so the panel must
+    not assert it."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    show = html[html.index("function showSoundCheckResult("):]
+    show = show[:show.index("\n}")]
+    # The room claim survives ONLY where there is an acoustic path.
+    assert "'Heard clearly. The room can hear the machine.'" in show
+    assert "const headphones = verdict.discrepancy ===" in show
+    assert "'You confirmed hearing it clearly.'" in show, (
+        "on headphones, report what the doctor confirmed, not what the room did")
+    assert "Whether the room can hear the machine was not tested." in show
+    assert "expected on headphones" in show   # still not framed as a warning
+
+
+def test_every_sound_check_reading_carries_its_output_device():
+    """A level without its path is not a measurement. The three readings so far
+    — 27 dB, 15 dB, 4 dB — cannot be compared because the audio path differed
+    each time and nothing recorded which one it was, which makes them useless
+    for setting the thresholds they were collected to set."""
+    from pathlib import Path
+
+    html = Path("app/static/live.html").read_text()
+    # Displayed with the reading...
+    show = html[html.index("function showSoundCheckResult("):]
+    show = show[:show.index("\n}")]
+    assert "' · output: '" in show
+    # ...and resolved to a human-readable LABEL, not the device id that used to
+    # be sent (audioCtx.sinkId is empty for the default device, so it recorded
+    # nothing at all).
+    resolver = html[html.index("async function outputDeviceLabel("):]
+    resolver = resolver[:resolver.index("\n}")]
+    assert "enumerateDevices()" in resolver
+    assert "d.kind === 'audiooutput'" in resolver
+    assert "(system default)" in resolver, (
+        "the default device must be named, not left blank")
+    assert "await outputDeviceLabel(audio)" in html
+
+
 def test_the_sound_check_phrase_is_the_approved_wording():
     """Deliberately not clinical and not addressed to the patient — it is
     a check spoken in the room and should sound like one (spec 10.4)."""
@@ -820,6 +866,11 @@ def test_sound_check_prepares_an_utterance_and_audits_the_result():
         "answer": "yes", "device_label": "Speakers (Realtek)"})
     assert result.status_code == 200
     assert result.json()["result"] == speech.RESULT_HEARD_GOOD
+    # Echoed back, so the panel shows the device that was RECORDED rather than
+    # one the client re-derives: a reading and its audio path must not be able
+    # to disagree about which path it was (450 — three readings, 27/15/4 dB,
+    # uncomparable because nothing recorded the path).
+    assert result.json()["output_device"] == "Speakers (Realtek)"
 
     with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
         row = conn.execute(

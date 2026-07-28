@@ -1180,8 +1180,17 @@ function askHeard() {
 function showSoundCheckResult(verdict) {
   const level = verdict.level || {};
   const db = level.ratio_db == null ? '—' : level.ratio_db.toFixed(0) + ' dB';
+  // WORDING (450): it said "Heard clearly. The room can hear the machine" AND,
+  // in the same breath, that no sound reached the microphone. Both cannot be
+  // true — on headphones the ROOM heard nothing and only the doctor did. The
+  // claim the measurement supports is that HE confirmed hearing it, which is
+  // all the human answer ever established; whether the room can hear is exactly
+  // what an absent acoustic path leaves unknown.
+  const headphones = verdict.discrepancy === 'no_acoustic_path_headphones_likely';
   const texts = {
-    heard_good: ['good', 'Heard clearly. The room can hear the machine.'],
+    heard_good: ['good', headphones
+      ? 'You confirmed hearing it clearly.'
+      : 'Heard clearly. The room can hear the machine.'],
     heard_faint: ['faint', 'Heard, but faint — the patient may struggle, and barge-in will be unreliable at this volume.'],
     not_heard: ['bad', 'Not heard. Check the speaker is on, unmuted, and the right output device.'],
     unverified: ['', 'Unverified — recorded as not checked rather than as a pass.'],
@@ -1191,11 +1200,21 @@ function showSoundCheckResult(verdict) {
   scResultWhat.textContent = message;
   const lvl = el('span', 'lvl', ' (' + db + ' over the noise floor)');
   if (verdict.result !== 'unverified') scResultWhat.appendChild(lvl);
-  if (verdict.discrepancy === 'no_acoustic_path_headphones_likely') {
+  if (headphones) {
     // NOT a warning (spec 10.2): headphones defeat the acoustic path, so
-    // absent energy plus "yes" is expected. Record it, accept the answer.
-    scResultWhat.appendChild(
-      el('span', 'lvl', ' — no sound reached the microphone, which is normal on headphones.'));
+    // absent energy plus "yes" is expected. Record it, accept the answer — and
+    // do not dress an unmeasured room up as a measured one.
+    scResultWhat.appendChild(el('span', 'lvl',
+      ' — no sound reached the microphone, which is expected on headphones. '
+      + 'Whether the room can hear the machine was not tested.'));
+  }
+  // The output device, with every reading. Three readings so far — 27 dB, 15 dB
+  // and 4 dB — cannot be compared because the audio path differed each time,
+  // which makes them useless for setting the thresholds they were collected to
+  // set. A level without its path is not a measurement.
+  const device = verdict.output_device || level.output_device;
+  if (device) {
+    scResultWhat.appendChild(el('span', 'lvl', ' · output: ' + device));
   }
   soundCheckBtn.classList.toggle('done', verdict.result !== 'not_heard');
 }
@@ -1242,7 +1261,7 @@ async function runSoundCheck() {
         peak_rms: heard.peak,
         mean_rms: heard.mean,
         answer: answer,
-        device_label: outputDeviceLabel(),
+        device_label: await outputDeviceLabel(audio),
       })
     });
     const verdict = await result.json();
@@ -1257,13 +1276,35 @@ async function runSoundCheck() {
   }
 }
 
-function outputDeviceLabel() {
-  // Browsers only expose this when the page has device permission and the
-  // API exists; null is a legitimate answer and is recorded as such.
+async function outputDeviceLabel(audio) {
+  // A LEVEL WITHOUT ITS PATH IS NOT A MEASUREMENT. The three readings taken so
+  // far — 27 dB, 15 dB and 4 dB — cannot be compared, because the audio path
+  // differed each time and nothing recorded which one it was. They are useless
+  // for setting the thresholds they were collected to set.
+  //
+  // This used to return audioCtx.sinkId, which is a device ID rather than a
+  // label and is the empty string for the default device — so in practice it
+  // recorded nothing at all. Resolve the id to the human-readable label the
+  // browser already has (the page holds mic permission, so labels are
+  // populated), and name the default explicitly rather than leaving it blank.
+  let sink = '';
   try {
-    if (typeof audioCtx?.sinkId === 'string' && audioCtx.sinkId) return audioCtx.sinkId;
+    if (audio && typeof audio.sinkId === 'string') sink = audio.sinkId;
+    else if (typeof audioCtx?.sinkId === 'string') sink = audioCtx.sinkId;
   } catch (e) { /* not supported */ }
-  return null;
+  try {
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const outputs = devices.filter(d => d.kind === 'audiooutput');
+    const match = outputs.find(d => d.deviceId === (sink || 'default'))
+      || outputs.find(d => d.deviceId === 'default');
+    if (match && match.label) {
+      return sink ? match.label : match.label + ' (system default)';
+    }
+  } catch (e) { /* enumerateDevices unavailable */ }
+  // Null is a legitimate answer and is recorded as such — but say WHICH
+  // unknown it is, so a run with no label is distinguishable from one nobody
+  // asked about.
+  return sink || null;
 }
 
 // The offer is PASSIVE. It never intercepts anything.

@@ -333,10 +333,13 @@ async def sound_check_result(
                      "discrepancy": verdict["discrepancy"],
                      "device_label": body.device_label,
                      **verdict["level"]})
-    logger.info("Sound check by %s: %s (ratio %.2f, answer %s)",
+    logger.info("Sound check by %s: %s (ratio %.2f, answer %s, output %s)",
                 user["username"], verdict["result"],
-                verdict["level"]["ratio"], verdict["answer"])
-    return JSONResponse(content=verdict)
+                verdict["level"]["ratio"], verdict["answer"], body.device_label)
+    # Echoed back so the panel shows the device that was RECORDED, not one the
+    # client re-derives — a reading and its audio path must not be able to
+    # disagree about which path it was.
+    return JSONResponse(content={**verdict, "output_device": body.device_label})
 
 
 class ChangePasswordBody(BaseModel):
