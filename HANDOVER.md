@@ -51,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled until DESIGN_SPEC.md arrives (see "Phase 7b — session 1"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled (see "Phase 7b — session 1"). **Session 2 the same day**: full expression range by owner decision (evaluation-first; brief decision 3 superseded for this phase, clinical retained as the comparison arm), the CDS affect hint, interim top-of-stack placement, and the lost specs reconstructed and committed (see "Phase 7b — session 2"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -1737,6 +1737,72 @@ changed.**
   load-bearing: re-running the pipeline is not reproducible (WhisperX
   turn counts moved ±2‥+5 on identical audio in the 2026-07-28 item-5
   verification), so a rebuilt view would describe a different run.
+
+## Phase 7b — session 2 (2026-07-28): full range, the affect hint, placement
+
+Two owner decisions made after using the face in the room, both the same
+day. Four commits ("Phase 7b s2 1/4 … 4/4"); no dependency changes.
+
+**1. Evaluation-first on expression range — PHASE_7B_KINDALIVE.md
+decision 3 is SUPERSEDED for this phase, by the owner who wrote it.**
+The face now displays kindalive's FULL emotional range, un-damped, and
+the owner will gather feedback from human mock patients playing
+difficult patients before deciding any caps. `FACE_EXPRESSION_MODE`
+(env): **"full" (default)** runs the upstream default personality with
+the per-muscle policy bypassed entirely — original kindalive behaviour;
+**"clinical"** is exactly the session-1 behaviour ([clinical] preset +
+per-muscle caps). The clinical arm is deliberately retained, built and
+tested — it is one arm of the later comparison, not dead code, and the
+session-1 section above describes it. The mode is read at driver
+creation and recorded in `face.toggled` (every on-toggle) and
+`face.arms` (`modes` list), so feedback sessions can always be
+correlated with what the face was running; an unknown env value falls
+back to full WITH a warning while the audit records what actually ran.
+
+**2. The affect hint is in** (the piggyback option in brief decision 2).
+Found in the room: with the upstream LLM interpreter skipped, nothing
+drove the emotions — the engine only ever received the neutral attention
+impulses, so the face could not respond to the patient at all. One
+OPTIONAL field now rides the existing CDS assessment call (zero extra
+model calls): `patient_affect`, enum positive/neutral/low/anxious/
+distressed, judged from how the patient seems rather than their
+diagnosis, "neutral" when unsure, absent means neutral. On a CHANGED
+value `FaceDriver.on_affect` injects impulses shaped as **an attentive
+listener's response, not a mirror** — warmth (oxytocin) always rises
+more than any stress chemical, asserted by test; a distressed patient
+gets warm concern, never a distressed face reflected back. Neutral
+halves each affect chemical's excess over baseline (species half-lives
+run 20 min–4 h — decay alone would never visibly settle a face within a
+consultation). Magnitudes are commented first guesses for the
+mock-patient sessions; the mapping table is in `app/face.py`.
+Deterministic throughout; the real CDS model already emits the field
+(seen in the live-Ollama test the day it was added).
+
+**The urgency alarm stays NOT wired to the face — unchanged.** The
+full-range decision changed expression RANGE, not inputs. The guard test
+now covers the affect map as well as the event map.
+
+**Fixed en route, worth knowing:** every multi-chemical injection shared
+one `source_id`, and the engine's per-source saturation dampening is
+keyed by source_id — so the second and third chemicals of a single event
+were silently dampened because the first had just used the key. Source
+ids are now per (event, chemical); repeats of the same event still
+saturate, which is what saturation is for.
+
+**3. Panel placement, interim:** the face pane moved from last in the
+stack to directly below the session header, above the urgent-actions
+position — visible without scrolling with a patient in front of the
+screen. The transient alert banners keep priority above it (rule 3).
+Commented as interim: final placement is an owner decision with the
+styling pass (DESIGN_SPEC.md 7b addendum). Off still means absent from
+the DOM entirely.
+
+**Housekeeping the same session:** the lost specs were reconstructed and
+committed (see the note at the design-pass section) — `DESIGN_SPEC.md`,
+`NOTE_ICE_SPEC.md`, `REFERRAL_LETTER_STYLE.md` (all marked as
+reconstructions; code authoritative where they disagree), the approved
+`RAW_TRANSCRIPT_VIEW_SPEC.md`, and the original mockups at
+`docs/mockups/`.
 
 ## Shared schema module (2026-07-25)
 
