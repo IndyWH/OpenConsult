@@ -1502,6 +1502,49 @@ docket item 5.
    models as merely mediocre. Aggregate error rates do not see this
    class of loss; the step 6 method (curated terms, adjudicated) does.
 
+10. **A stale `in_consultation` queue entry, and what day-scoping does to
+   it** (observed 2026-07-27, deliberately NOT fixed — recorded for the
+   owner's decision). **Queue entry 164 exists and is stale**: patient 253
+   ("Shivesh"), `queue_date` **2026-07-26**, position 1, created 14:53:24
+   by user 182 (`herath`) via `queue.walk_in_started`. Verified against
+   the database: it is still `in_consultation`, there is **no consultation
+   row for that patient at all**, and its only audit event is the walk-in
+   start — no `queue.cancelled`, no completion. A walk-in was opened for
+   the 2026-07-26 demo and abandoned before Start.
+
+   **Every queue query is scoped to `queue_date = CURRENT_DATE`** —
+   `frontdesk._ENTRY_SELECT` (so `get_entry`/`current_entry`),
+   `close_entry`'s own `SELECT`, and the concurrency guard inside
+   `start_walk_in`. The consequence, checked in the code rather than
+   inferred: once the date rolls over, **both** front-desk recovery paths
+   for an abandoned session stop being able to see it. `GET
+   /api/queue/{id}/resume` answers **404 "no such queue entry today"**
+   (`get_entry` returns None) and `POST /api/queue/{id}/close` answers
+   **409 "entry is not open"** (`close_entry` returns None). Nothing that
+   can close such an entry is left; it is now permanent.
+
+   **While it is still the current day, the same entry holds the
+   one-active-consultation slot with nothing to resume into.** The guard
+   is stronger than "that doctor's" slot — it is the single system-wide
+   slot from the capacity statement, so an abandoned walk-in blocks
+   **every** doctor, not just the one who opened it (`start_walk_in`
+   inserts only `WHERE NOT EXISTS (… queue_date = CURRENT_DATE AND status
+   = 'in_consultation')`; `queue_start` refuses via `current_entry` the
+   same way, auditing `live.slot_rejected`). Resume would have sent the
+   doctor to the live page (`mode: live`, since no consultation exists),
+   which is survivable — but the slot stays held until someone closes the
+   entry or the day ends. Nobody was actually blocked here: there are no
+   `live.slot_rejected` events on 2026-07-26 or after.
+
+   So day-scoping is both the reason it becomes unreachable and the reason
+   its blast radius is bounded — the block expires overnight, and what
+   survives is an uncloseable row. **The decision is the owner's** and
+   there is a real one in it: whether an `in_consultation` entry with no
+   consultation row should be resumable at all, whether the recovery paths
+   should be able to look past today, and whether an abandoned walk-in
+   should release the slot by itself. Not something to settle by quietly
+   updating one row.
+
 ## Phase 5 — CLOSED with a negative result (2026-07-25)
 
 Benchmark stage (plan §7 "benchmark FIRST, train later") completed
