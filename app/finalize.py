@@ -306,6 +306,12 @@ def transcribe_and_diarise(wav_path: str,
                         int(b * SAMPLE_RATE * BYTES_PER_SAMPLE))
                        for a, b in limits["spans"]]
 
+    # Kept for S4's trailing-region energy check, which MUST see the original:
+    # the muted copy is zero exactly where the system spoke, and consultation
+    # 445's failure was segments transcribed and then lost downstream — only
+    # the unmuted audio can still show that the speech was really there.
+    original_audio = audio
+
     # From here on every model sees the derived copy only. The original
     # array is untouched, and the file was never opened for writing.
     audio = mute_spans(audio, exclusion_spans or [])
@@ -399,6 +405,15 @@ def transcribe_and_diarise(wav_path: str,
 
     turns = merge_into_turns(raw_segments)
 
+    # S4's content check, measured here because this is where both the original
+    # audio and the final turn boundaries exist at the same time. Deliberately
+    # NOT a second silero VAD pass: the VAD finding no speech is frequently what
+    # created the gap, so re-running it would make the gate agree with itself.
+    trailing_speech = transcript_quality.measure_trailing_speech(
+        original_audio, SAMPLE_RATE, turns, audio_duration_s,
+        excluded_spans_s=excluded_s)
+    logger.info("S4 trailing region: %s", trailing_speech)
+
     # Free everything before MedGemma comes back.
     del model, align_model, diarizer, result
     gc.collect()
@@ -415,7 +430,8 @@ def transcribe_and_diarise(wav_path: str,
             "excluded_spans_s": excluded_s,
             "hallucinated_segments": hallucinated,
             "exclusion_anomalies": limits["anomalies"],
-            "excluded_fraction": limits["fraction"]}
+            "excluded_fraction": limits["fraction"],
+            "trailing_speech": trailing_speech}
 
 
 def merge_into_turns(raw_segments: list[dict]) -> list[dict]:
@@ -596,6 +612,10 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
             # system utterance at the end of a recording would otherwise
             # look like dropped audio to S4.
             excluded_spans_s=transcription.get("excluded_spans_s"),
+            # S4 decides on content, not duration (2026-07-28). Every measured
+            # value travels with it and is stored in quality_signals, so the
+            # threshold can be set from real data rather than re-guessed.
+            trailing_speech=transcription.get("trailing_speech"),
         )
         verdict = transcript_quality.evaluate(signals)
         await consultations.save_quality(cid, signals, verdict["outcome"])

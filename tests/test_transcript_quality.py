@@ -110,13 +110,198 @@ def test_shipped_thresholds_are_the_owner_set_values():
 def test_margins_between_good_recordings_and_the_thresholds():
     """Records the actual headroom. The worst good recording is 0.185
     above the S2 threshold and 15.6 s below the S4 one — if either
-    narrows, this test says so before a demo does."""
+    narrows, this test says so before a demo does.
+
+    The S4 line now guards the FALLBACK tolerance only; S4's real decision is
+    the content check below.
+    """
     worst_s2 = min(CALIBRATION[c]["s2"] for c in (66, 67, 68, 69))
     worst_s4 = max(CALIBRATION[c]["s4"] for c in (66, 67, 68, 69))
     assert worst_s2 - tq.MIN_AVG_CONFIDENCE_REFUSE >= 0.05, \
         "S2 margin below 0.05 — thinner than the calibration table suggested"
     assert tq.TRUNCATION_REFUSE_S - worst_s4 >= 5.0, \
         "S4 margin below 5 s — thinner than the calibration table suggested"
+
+
+# ------------------------- S4 decides on CONTENT, not duration (2026-07-28)
+#
+# The owner's rule, which SUPERSEDES the tolerance rather than tuning it:
+# silence is ignored however long it is, and speech that was not transcribed
+# refuses however short it is.
+#
+# A duration cannot tell missed speech from an empty room, and that is the only
+# reason a tolerance ever existed — it was slack for the imprecision of a proxy.
+# It cut both ways, and the second way was the serious one: 20 s of allowance
+# meant up to twenty seconds of genuinely missed speech at the END of a
+# consultation passed silently, and the end is where the plan lives. #70 lost
+# its last 33 s.
+#
+# 449 is the case that forced this: refused on 307.8 s of trailing audio that
+# was silent because the doctor was reading a checklist. Arithmetically correct,
+# clinically wrong.
+
+def _tone(seconds, amplitude, sample_rate=16000):
+    """Speech-like energy: a loud-ish band-limited wobble, not pure silence."""
+    import numpy as np
+
+    t = np.arange(int(seconds * sample_rate)) / sample_rate
+    return (amplitude * np.sin(2 * np.pi * 180 * t)
+            * (1 + 0.4 * np.sin(2 * np.pi * 3 * t))).astype("float32")
+
+
+def _quiet(seconds, amplitude=0.001, sample_rate=16000):
+    import numpy as np
+
+    rng = np.random.default_rng(42)
+    return (rng.normal(0, amplitude, int(seconds * sample_rate))).astype("float32")
+
+
+def test_s4_ignores_a_long_silence_however_long_it_is():
+    """449's shape. 300 s of quiet room after the last transcribed word must
+    NOT refuse — the old tolerance refused it at 15x over."""
+    import numpy as np
+
+    audio = np.concatenate([_tone(30, 0.2), _quiet(300)])
+    turns = [turn(0, 0.0, 30.0, "the transcribed part", 0.8)]
+    trailing = tq.measure_trailing_speech(audio, 16000, turns, len(audio) / 16000)
+    assert trailing["measured"] is True
+    assert trailing["has_speech"] is False
+    signals = tq.compute_signals(turns, audio_duration_s=len(audio) / 16000,
+                                 trailing_speech=trailing)
+    assert signals["s4_truncation"]["gap_s"] == pytest.approx(300.0, abs=0.5)
+    verdict = tq.evaluate(signals)
+    assert verdict["outcome"] == tq.OUTCOME_PASS, (
+        "a silent trailing region must not refuse, whatever its length")
+
+
+def test_s4_refuses_short_untranscribed_speech():
+    """THE BLIND SPOT BEING CLOSED, and the point of the change rather than a
+    bonus: 10 s of real speech at the end passed under the 20 s tolerance."""
+    import numpy as np
+
+    audio = np.concatenate([_tone(30, 0.2), _quiet(5), _tone(10, 0.2)])
+    turns = [turn(0, 0.0, 30.0, "the transcribed part", 0.8)]
+    duration = len(audio) / 16000
+    trailing = tq.measure_trailing_speech(audio, 16000, turns, duration)
+    assert trailing["has_speech"] is True
+    signals = tq.compute_signals(turns, audio_duration_s=duration,
+                                 trailing_speech=trailing)
+    gap = signals["s4_truncation"]["gap_s"]
+    assert gap < tq.TRUNCATION_REFUSE_S, (
+        "this case must be BELOW the old tolerance, or it proves nothing")
+    assert tq.evaluate(signals)["outcome"] == tq.OUTCOME_REFUSED
+
+
+def test_s4_decides_on_a_continuous_run_not_a_total():
+    """Energy is not speech. A cough, a chair or a page turn is exactly the
+    broadband transient an energy measure mistakes for a voice, so the verdict
+    is the longest CONTINUOUS run. This is the residual allowance, and it is an
+    allowance for the DETECTOR's noise rather than a length of audio we are
+    willing to ignore."""
+    import numpy as np
+
+    # Six isolated 0.25 s transients: 1.5 s of energy in total, no run.
+    parts = [_tone(30, 0.2)]
+    for _ in range(6):
+        parts += [_quiet(4), _tone(0.25, 0.2)]
+    audio = np.concatenate(parts)
+    turns = [turn(0, 0.0, 30.0, "the transcribed part", 0.8)]
+    trailing = tq.measure_trailing_speech(audio, 16000, turns, len(audio) / 16000)
+    assert trailing["over_threshold_s"] > 0, "the transients must be detected"
+    assert trailing["longest_run_s"] < tq.TRAILING_MIN_RUN_S
+    assert trailing["has_speech"] is False
+
+
+def test_s4_never_counts_the_systems_own_voice_as_missed_speech():
+    """Phase 7a: a spoken handover at the end is OUR voice in the original
+    audio. Counting it would refuse a perfectly good consultation."""
+    import numpy as np
+
+    audio = np.concatenate([_tone(30, 0.2), _tone(8, 0.2)])
+    turns = [turn(0, 0.0, 30.0, "the transcribed part", 0.8)]
+    duration = len(audio) / 16000
+    without = tq.measure_trailing_speech(audio, 16000, turns, duration)
+    assert without["has_speech"] is True          # it is speech-level energy
+    with_span = tq.measure_trailing_speech(audio, 16000, turns, duration,
+                                           excluded_spans_s=[(30.0, 38.0)])
+    assert with_span["has_speech"] is False       # ...but it was us
+
+
+def test_s4_falls_back_to_the_duration_tolerance_only_when_unmeasurable():
+    """No audio on disk (retention sweep) means no content check is possible.
+    Passing an unmeasurable gap silently would be the weakening; keeping the
+    previous behaviour there is not."""
+    unmeasured = tq.measure_trailing_speech(None, 16000, [], 0.0)
+    assert unmeasured["measured"] is False
+    signals = tq.compute_signals([turn(0, 0.0, 417.0, "final words", 0.8)],
+                                 audio_duration_s=450.0,
+                                 trailing_speech=unmeasured)
+    verdict = tq.evaluate(signals)
+    assert verdict["outcome"] == tq.OUTCOME_REFUSED
+    assert verdict["fired"][0]["name"] == "audio truncation (unmeasured)"
+    # And a short unmeasurable gap still passes, exactly as before.
+    short = tq.compute_signals([turn(0, 0.0, 447.0, "final words", 0.8)],
+                               audio_duration_s=450.0, trailing_speech=unmeasured)
+    assert tq.evaluate(short)["outcome"] == tq.OUTCOME_PASS
+
+
+def test_s4_cannot_calibrate_without_transcribed_audio():
+    """With nothing transcribed there is no measured idea of what speech sounds
+    like in this room, so the content check must decline rather than guess."""
+    trailing = tq.measure_trailing_speech(_quiet(60), 16000, [], 60.0)
+    assert trailing["measured"] is False
+    assert "no transcribed audio" in trailing["why_unmeasured"]
+
+
+def test_the_speech_threshold_is_relative_to_this_recordings_own_speech():
+    """A noise-floor multiple was tried and MEASURED WRONG: 449's five silent
+    minutes drag a whole-recording low percentile below the level the 445 filler
+    assessment measured for genuine silence, so the quieter the room the more
+    sensitive the detector became. The reference is the transcribed speech."""
+    import numpy as np
+
+    loud = np.concatenate([_tone(30, 0.4), _quiet(60)])
+    soft = np.concatenate([_tone(30, 0.05), _quiet(60)])
+    turns = [turn(0, 0.0, 30.0, "the transcribed part", 0.8)]
+    a = tq.measure_trailing_speech(loud, 16000, turns, len(loud) / 16000)
+    b = tq.measure_trailing_speech(soft, 16000, turns, len(soft) / 16000)
+    assert a["threshold_rms"] > b["threshold_rms"], (
+        "the threshold must scale with the room's own speech level")
+    assert a["has_speech"] is False and b["has_speech"] is False
+
+
+def test_every_measured_value_is_stored_for_recalibration():
+    """Same convention as the sound check: the stored signals must let the
+    threshold be set from real data rather than re-guessed."""
+    import numpy as np
+
+    audio = np.concatenate([_tone(30, 0.2), _quiet(30)])
+    turns = [turn(0, 0.0, 30.0, "the transcribed part", 0.8)]
+    trailing = tq.measure_trailing_speech(audio, 16000, turns, len(audio) / 16000)
+    for key in ("reference_rms", "threshold_rms", "peak_rms", "mean_rms",
+                "longest_run_s", "over_threshold_s", "windows", "region_from_s",
+                "region_to_s", "window_s", "fraction", "reference_percentile",
+                "min_run_s"):
+        assert key in trailing, f"{key} must be recorded for recalibration"
+    stored = tq.compute_signals(turns, audio_duration_s=len(audio) / 16000,
+                                trailing_speech=trailing)
+    assert stored["s4_truncation"]["trailing_speech"] is trailing
+
+
+def test_s4_does_not_re_run_the_vad_it_is_auditing():
+    """The trap, asserted so it is not walked into later: the VAD deciding there
+    was no speech is frequently what CREATED the gap, so re-running it would
+    make the gate agree with itself and become decorative. The check has to be
+    independent of the thing it audits."""
+    from pathlib import Path
+
+    source = Path("app/transcript_quality.py").read_text()
+    code = "\n".join(line for line in source.splitlines()
+                     if not line.lstrip().startswith("#"))
+    for banned in ("silero", "vad", "load_vad", "whisperx"):
+        assert banned not in code.lower(), (
+            f"S4's content check must not use {banned} — it would be auditing "
+            "the component that produced the gap")
 
 
 # ------------------------------------------------------------ signal units

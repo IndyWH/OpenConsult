@@ -60,8 +60,59 @@ GATE_ENABLED = os.getenv("TRANSCRIPT_GATE_ENABLED", "true").lower() != "false"
 # the worst good recording and 0.095 above #70 — deliberately biased
 # toward missing a bad recording rather than blocking a good one.
 MIN_AVG_CONFIDENCE_REFUSE = float(os.getenv("TRANSCRIPT_MIN_AVG_CONFIDENCE_REFUSE", "0.60"))
-# S4: the good four sit 0.1-4.4 s, #70 at 33.3 s.
+# S4 FALLBACK ONLY (see s4_trailing_region). The duration tolerance is no
+# longer how S4 decides — it survives for the one case where the trailing
+# region cannot be measured at all, e.g. the audio has been purged by the
+# retention sweep. Retaining the previous behaviour there is not a weakening;
+# silently passing an unmeasurable gap would be.
 TRUNCATION_REFUSE_S = float(os.getenv("TRANSCRIPT_TRUNCATION_REFUSE_S", "20"))
+
+# S4 speech detection in the trailing region (owner's rule, 2026-07-28):
+# SILENCE IS IGNORED HOWEVER LONG IT IS, AND SPEECH THAT WAS NOT TRANSCRIBED
+# REFUSES HOWEVER SHORT IT IS.
+#
+# Windowed RMS from the ORIGINAL WAV, relative to the recording's own noise
+# floor. Deliberately NOT silero VAD: the VAD deciding there was no speech is
+# frequently what created the gap, so re-running it would make the gate agree
+# with itself and become decorative. The check has to be independent of the
+# thing it audits, and acoustic energy is the independent signal available.
+#
+# Separation measured during the 445 filler assessment: 0.008-0.010 RMS under
+# genuine silence against 0.153 for real speech — more than tenfold. A 4x
+# floor-relative ratio sits well inside that, and floor-relative is what stops
+# a quietly-spoken patient reading as silence.
+TRAILING_WINDOW_S = float(os.getenv("TRANSCRIPT_TRAILING_WINDOW_S", "0.25"))
+
+# The reference is THIS RECORDING'S OWN TRANSCRIBED SPEECH, at p75 of window
+# energy, and the threshold is a fraction of it. Self-calibrating per room, mic
+# and gain, which no global constant can be.
+#
+# A noise-floor multiple was tried first and MEASURED WRONG, which is why it is
+# not what ships: 449's five silent minutes drag a whole-recording low
+# percentile down to 0.0012, below the 0.008-0.010 that the 445 filler
+# assessment measured for genuine silence, so a 4x floor threshold lands at
+# 0.0048 and anything faintly audible clears it. The quieter the room, the more
+# sensitive the detector became — backwards.
+TRAILING_SPEECH_FRACTION = float(os.getenv("TRANSCRIPT_TRAILING_SPEECH_FRACTION", "0.5"))
+TRAILING_REFERENCE_PERCENTILE = float(os.getenv("TRANSCRIPT_TRAILING_REF_PCT", "75"))
+
+# Decide on a CONTINUOUS run, not on a total. This is the residual allowance,
+# and it is an allowance for the SPEECH DETECTOR's noise rather than a length of
+# audio we are willing to ignore: energy is not speech, and a cough, a chair or
+# a page turn is exactly the broadband transient an energy measure mistakes for
+# a voice. Speech runs on for seconds; a transient does not.
+#
+# Measured on the real recordings at this fraction (longest run above threshold
+# in the trailing region):
+#     449, silent room      2.25 s   -> passes
+#     445, missed speech    4.75 s   -> refuses (the regression fixture)
+#     constructed 10 s      9.50 s   -> refuses (the blind spot being closed)
+# 3.0 s separates all three. THE MARGIN ON 445 IS 1.75 s AND THAT IS THIN;
+# every measured value is stored on the consultation so this can be set from
+# more rooms rather than re-guessed. The residual risk is stated rather than
+# hidden: a genuine utterance shorter than the run threshold, at the very end of
+# a recording, still passes.
+TRAILING_MIN_RUN_S = float(os.getenv("TRANSCRIPT_TRAILING_MIN_RUN_S", "3.0"))
 
 # Measured, not acted on. Kept here so the stored signals are
 # self-describing; changing them changes no behaviour.
@@ -115,6 +166,123 @@ def s3_repetition(turns: list[dict]) -> dict:
             "max_consecutive_identical": best}
 
 
+def _window_rms(samples, sample_rate: int, window_s: float):
+    """Per-window RMS over a 1-D float array. Pure numeric, no I/O."""
+    import numpy as np
+
+    size = max(1, int(round(window_s * sample_rate)))
+    usable = (len(samples) // size) * size
+    if usable == 0:
+        return np.empty(0, dtype="float64")
+    block = np.asarray(samples[:usable], dtype="float64").reshape(-1, size)
+    return np.sqrt((block * block).mean(axis=1))
+
+
+def _longest_run(mask) -> int:
+    best = current = 0
+    for value in mask:
+        current = current + 1 if value else 0
+        best = max(best, current)
+    return best
+
+
+def measure_trailing_speech(samples, sample_rate: int, turns: list[dict],
+                            audio_duration_s: float, *,
+                            excluded_spans_s: list[tuple[float, float]] | None = None,
+                            window_s: float = TRAILING_WINDOW_S,
+                            fraction: float = TRAILING_SPEECH_FRACTION,
+                            reference_percentile: float = TRAILING_REFERENCE_PERCENTILE,
+                            min_run_s: float = TRAILING_MIN_RUN_S) -> dict:
+    """Is there SPEECH in the untranscribed trailing region?
+
+    `samples` must be the ORIGINAL audio, not the muted derived copy — the muted
+    copy is zero exactly where the system spoke, and consultation 445's failure
+    was segments transcribed and then LOST downstream, which only the unmuted
+    audio can still show.
+
+    The threshold is a fraction of this recording's own transcribed-speech
+    energy, so it self-calibrates to the room, the microphone and the gain. The
+    verdict is the longest CONTINUOUS run above it, because energy is not speech
+    and a transient is what an energy measure mistakes for a voice.
+
+    Phase 7a speaking windows are dropped: our own voice is not missed patient
+    speech, and counting it would refuse a good consultation.
+
+    Returns every measured value, so the stored signals are the calibration data
+    for these thresholds rather than a verdict nobody can re-derive — the same
+    convention as the sound check's audit row.
+    """
+    import numpy as np
+
+    out = {"measured": False, "has_speech": None, "window_s": window_s,
+           "fraction": fraction, "reference_percentile": reference_percentile,
+           "min_run_s": min_run_s}
+    if samples is None or sample_rate <= 0 or len(samples) == 0:
+        return {**out, "why_unmeasured": "no audio"}
+    all_rms = _window_rms(samples, sample_rate, window_s)
+    if all_rms.size == 0:
+        return {**out, "why_unmeasured": "recording shorter than one window"}
+
+    def _drop_excluded(mask):
+        for start, end in (excluded_spans_s or []):
+            lo = max(0, int(np.floor(float(start) / window_s)))
+            hi = min(all_rms.size, int(np.ceil(float(end) / window_s)))
+            if hi > lo:
+                mask[lo:hi] = False
+        return mask
+
+    # The speech reference: windows inside a stored turn, minus our own voice.
+    inside = np.zeros(all_rms.size, dtype=bool)
+    for turn in turns or []:
+        lo = max(0, int(float(turn.get("start", 0)) / window_s))
+        hi = min(all_rms.size, int(np.ceil(float(turn.get("end", 0)) / window_s)))
+        if hi > lo:
+            inside[lo:hi] = True
+    spoken = all_rms[_drop_excluded(inside)]
+    if spoken.size == 0:
+        # Nothing was transcribed, so there is no measured idea of what speech
+        # sounds like here. Cannot decide on content; the caller falls back.
+        return {**out, "why_unmeasured": "no transcribed audio to calibrate against"}
+    reference = float(np.percentile(spoken, reference_percentile))
+    threshold = reference * fraction
+
+    first = max(0, int(round(_last_end(turns) / window_s)))
+    trailing_mask = np.zeros(all_rms.size, dtype=bool)
+    trailing_mask[first:] = True
+    considered_mask = _drop_excluded(trailing_mask)
+    considered = all_rms[considered_mask]
+    if considered.size == 0:
+        return {**out, "measured": True, "has_speech": False,
+                "reference_rms": round(reference, 6),
+                "threshold_rms": round(threshold, 6),
+                "region_from_s": round(_last_end(turns), 2),
+                "region_to_s": round(audio_duration_s, 2),
+                "windows": 0, "longest_run_s": 0.0, "over_threshold_s": 0.0,
+                "peak_rms": 0.0}
+
+    over = considered >= threshold
+    longest_run_s = _longest_run(over) * window_s
+    return {
+        "measured": True,
+        "has_speech": bool(longest_run_s >= min_run_s),
+        "reference_rms": round(reference, 6),
+        "threshold_rms": round(threshold, 6),
+        "peak_rms": round(float(considered.max()), 6),
+        "mean_rms": round(float(considered.mean()), 6),
+        "longest_run_s": round(longest_run_s, 2),
+        "over_threshold_s": round(float(over.sum()) * window_s, 2),
+        "windows": int(considered.size),
+        "region_from_s": round(_last_end(turns), 2),
+        "region_to_s": round(audio_duration_s, 2),
+        "window_s": window_s, "fraction": fraction,
+        "reference_percentile": reference_percentile, "min_run_s": min_run_s,
+    }
+
+
+def _last_end(turns: list[dict]) -> float:
+    return max((float(t.get("end", 0)) for t in (turns or [])), default=0.0)
+
+
 def s4_truncation_gap(turns: list[dict], audio_duration_s: float | None,
                       excluded_spans_s: list[tuple[float, float]] | None = None
                       ) -> float | None:
@@ -148,7 +316,8 @@ def s4_truncation_gap(turns: list[dict], audio_duration_s: float | None,
 def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
                     detected_language: str | None = None,
                     language_probability: float | None = None,
-                    excluded_spans_s: list[tuple[float, float]] | None = None) -> dict:
+                    excluded_spans_s: list[tuple[float, float]] | None = None,
+                    trailing_speech: dict | None = None) -> dict:
     """All four signals. Always computed, always stored (spec §3, §7).
 
     `excluded_spans_s` are the Phase 7a speaking windows in seconds. Only
@@ -170,11 +339,17 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
             "acts": True,
         },
         "s3_repetition": {**s3_repetition(turns), "acts": False},
+        # S4 measures the gap as before — it is useful context and it is the
+        # fallback — but it DECIDES on `trailing_speech`. A duration cannot tell
+        # missed speech from an empty room, which is the only reason a tolerance
+        # ever existed.
         "s4_truncation": {
             "gap_s": s4_truncation_gap(turns, audio_duration_s, excluded_spans_s),
             "audio_duration_s": audio_duration_s,
             "excluded_s": round(sum(e - s for s, e in (excluded_spans_s or [])), 2),
             "refuse_above_s": TRUNCATION_REFUSE_S,
+            "trailing_speech": trailing_speech or {"measured": False,
+                                                   "has_speech": None},
             "acts": True,
         },
         "segments": len(turns),
@@ -203,15 +378,44 @@ def evaluate(signals: dict) -> dict:
                        f"is below {MIN_AVG_CONFIDENCE_REFUSE}"),
         })
 
-    gap = signals.get("s4_truncation", {}).get("gap_s")
-    if gap is not None and gap > TRUNCATION_REFUSE_S:
+    # S4 decides on CONTENT, not duration (owner's rule, 2026-07-28): silence is
+    # ignored however long it is, and untranscribed speech refuses however short
+    # it is. The old tolerance cut both ways and the second way was the serious
+    # one — 20 s of allowance meant up to twenty seconds of genuinely missed
+    # speech at the END of a consultation passed silently, and the end is where
+    # the plan lives. #70 lost its last 33 s.
+    s4 = signals.get("s4_truncation", {})
+    gap = s4.get("gap_s")
+    trailing = s4.get("trailing_speech") or {}
+    if trailing.get("measured"):
+        if trailing.get("has_speech"):
+            fired.append({
+                "signal": "S4",
+                "name": "untranscribed speech at the end of the recording",
+                "value": trailing.get("longest_run_s"),
+                "threshold": trailing.get("min_run_s"),
+                "detail": (
+                    f"{trailing.get('longest_run_s')}s of continuous speech-level "
+                    f"audio in the {gap:.1f}s after the last transcribed segment "
+                    f"({trailing.get('over_threshold_s')}s over threshold in "
+                    f"total; peak RMS {trailing.get('peak_rms')} against a "
+                    f"transcribed-speech reference of "
+                    f"{trailing.get('reference_rms')}, threshold "
+                    f"{trailing.get('threshold_rms')}) — this speech is missing "
+                    f"from the transcript"),
+            })
+    elif gap is not None and gap > TRUNCATION_REFUSE_S:
+        # FALLBACK, and only when the region could not be measured at all (no
+        # audio on disk). Passing an unmeasurable gap silently would be the
+        # weakening; keeping the previous behaviour here is not.
         fired.append({
             "signal": "S4",
-            "name": "audio truncation",
+            "name": "audio truncation (unmeasured)",
             "value": round(gap, 1),
             "threshold": TRUNCATION_REFUSE_S,
-            "detail": (f"{gap:.1f}s of audio after the last transcribed "
-                       f"segment, tolerance {TRUNCATION_REFUSE_S:.0f}s"),
+            "detail": (f"{gap:.1f}s of audio after the last transcribed segment "
+                       f"could not be checked for speech; refusing above "
+                       f"{TRUNCATION_REFUSE_S:.0f}s"),
         })
 
     if not GATE_ENABLED:
