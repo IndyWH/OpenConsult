@@ -1182,7 +1182,10 @@ function stopSpeaking(reason) {
 }
 
 async function onSpeakReady(msg) {
-  const label = pendingSpeakText;
+  // A server-initiated utterance (the auto-chained invitation) arrives
+  // with no pending tap, so the label falls back to the server's text —
+  // the pill must never read as speaking nothing.
+  const label = pendingSpeakText || msg.text || '';
   pendingSpeakText = '';
   const audio = new Audio(msg.url);
   audio.onended = () => { if (speaking) stopSpeaking('complete'); };

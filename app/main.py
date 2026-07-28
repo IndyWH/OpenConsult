@@ -1220,6 +1220,11 @@ LIVE_RECONNECT_GRACE_S = float(os.getenv("LIVE_RECONNECT_GRACE_S", "120"))
 # HANDOVER). A manual face-off is never overridden — the doctor always
 # wins.
 FACE_AUTO_ON_DISCLOSURE = os.getenv("FACE_AUTO_ON_DISCLOSURE", "true").lower() != "false"
+# Auto-chain: when the disclosure plays THROUGH (end_reason complete — a
+# cut-off disclosure never chains), the invitation is spoken next, through
+# the normal speak path, as its own utterance and audit rows.
+AUTO_INVITATION_AFTER_DISCLOSURE = (
+    os.getenv("AUTO_INVITATION_AFTER_DISCLOSURE", "true").lower() != "false")
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1597,13 +1602,17 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         {"reason": reason, **(detail or {})})
         await websocket.send_json({"type": "speak_refused", "detail": reason})
 
-    async def handle_speak(payload: dict) -> None:
+    async def handle_speak(payload: dict, via: str = "tap") -> None:
         """Prepare an utterance from a REFERENCE — never from client text.
 
         PHASE_7A_SPEC.md §2.1. This is where hard rule 1 is enforced in
         code: there is no branch that reads words from the client, so no
         client — buggy, modified or compromised — can make the system
         advise, reassure or diagnose to the patient.
+
+        `via` says what initiated the request — "tap", or
+        "auto_invitation" (the server chaining the invitation after a
+        completed disclosure) — and is audited.
         """
         if "text" in payload or "text" in (payload.get("ref") or {}):
             # Rejected outright rather than stripped. Sanitising would make
@@ -1660,7 +1669,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         {"utterance_id": utterance.utterance_id,
                          "ref_kind": utterance.ref_kind,
                          "ref_detail": utterance.ref_detail,
-                         "stale": utterance.stale})
+                         "stale": utterance.stale,
+                         "via": via})
         await websocket.send_json({
             "type": "speak_ready", "utterance_id": utterance.utterance_id,
             "duration_ms": utterance.duration_ms,
@@ -1751,6 +1761,20 @@ async def ws_transcribe(websocket: WebSocket) -> None:
              "excluded_ms": bytes_to_ms(
                  span["end_byte"] - span["start_byte"]),
              **({"cut_latency_ms": int(cut_latency)} if cut_latency is not None else {})})
+        # Auto-chain (owner decision 2026-07-28): a disclosure that played
+        # THROUGH is followed by the invitation, through the NORMAL speak
+        # path — its own utterance, its own audit rows, and behind the
+        # same disclosure lock. That lock is the structural safety: a
+        # cut-off disclosure never reaches here (reason != complete), and
+        # even if this condition regressed, the session would have no
+        # disclosure recorded and handle_speak would refuse the
+        # invitation anyway. Stop/Esc cuts the chained utterance like any
+        # other.
+        if (AUTO_INVITATION_AFTER_DISCLOSURE
+                and utterance.ref_detail.get("id") == "disclosure"
+                and reason == "complete"):
+            await handle_speak({"ref": {"kind": "phrase", "id": "invitation"}},
+                               via="auto_invitation")
 
     async def handle_face(payload: dict, via: str = "manual") -> None:
         """Phase 7b: toggle the face. OFF is a first-class state — the

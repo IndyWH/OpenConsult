@@ -143,7 +143,11 @@ def _face_toggle_audits(session_id: str) -> list[tuple]:
 
 # --- item 2: auto-on at Disclosure ------------------------------------------
 
-def test_spoken_disclosure_switches_the_face_on_once_audited_with_via(autonomy_env):
+def test_spoken_disclosure_switches_the_face_on_once_audited_with_via(
+        autonomy_env, monkeypatch):
+    # Chain off: this test replays the disclosure and is about auto-on
+    # only; the chain has its own tests below.
+    monkeypatch.setattr(appmain, "AUTO_INVITATION_AFTER_DISCLOSURE", False)
     client = _client_for(_make_user())
     session_id = secrets.token_hex(8)
     with client.websocket_connect("/ws/transcribe") as ws:
@@ -192,7 +196,8 @@ def test_auto_on_respects_the_flag(autonomy_env, monkeypatch):
     assert _face_toggle_audits(session_id) == []
 
 
-def test_a_manual_off_is_never_overridden(autonomy_env):
+def test_a_manual_off_is_never_overridden(autonomy_env, monkeypatch):
+    monkeypatch.setattr(appmain, "AUTO_INVITATION_AFTER_DISCLOSURE", False)
     client = _client_for(_make_user())
     session_id = secrets.token_hex(8)
     with client.websocket_connect("/ws/transcribe") as ws:
@@ -210,3 +215,68 @@ def test_a_manual_off_is_never_overridden(autonomy_env):
 
     assert _face_toggle_audits(session_id) == [
         ("true", "disclosure_auto"), ("false", "manual")]
+
+
+# --- item 3: the invitation auto-chains after a completed disclosure --------
+
+def _speak_request_audits() -> list[tuple]:
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT detail->'ref_detail'->>'id', detail->>'via'"
+                " FROM audit_event WHERE action = 'speech.requested'"
+                " ORDER BY id")
+            return cur.fetchall()
+
+
+def test_a_disclosure_that_plays_through_chains_the_invitation(autonomy_env):
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ready = _speak(ws, "disclosure")
+        _play_through(ws, ready)
+        chained = _drain_until(ws, {"speak_ready"})
+        # Two utterances, not one: the chained invitation has its own id
+        # and the owner's unchanged wording.
+        assert chained["utterance_id"] != ready["utterance_id"]
+        assert chained["text"] == "Please, tell me what's brought you in."
+        _play_through(ws, chained)
+
+    rows = _speak_request_audits()[-2:]
+    assert rows == [("disclosure", "tap"), ("invitation", "auto_invitation")]
+
+
+def test_a_cut_off_disclosure_never_chains_and_the_lock_refuses(autonomy_env):
+    """The structural safety, tested from both ends: a barge-in disclosure
+    chains nothing, and because the session then has NO disclosure, the
+    server's existing lock refuses the invitation anyway — so even a
+    regressed chain condition could not speak it."""
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ready = _speak(ws, "disclosure")
+        _play_through(ws, ready, reason="barge_in")
+        # If the chain had (wrongly) fired, the next speak would be
+        # refused as "in flight"; the lock message proves both that no
+        # chain happened and that the lock holds.
+        ws.send_text(json.dumps({"type": "speak",
+                                 "ref": {"kind": "phrase", "id": "invitation"}}))
+        message = _drain_until(ws, {"speak_refused", "speak_ready"})
+        assert message["type"] == "speak_refused"
+        assert "not been told" in message["detail"]
+
+
+def test_the_chain_respects_its_flag(autonomy_env, monkeypatch):
+    monkeypatch.setattr(appmain, "AUTO_INVITATION_AFTER_DISCLOSURE", False)
+    client = _client_for(_make_user())
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        ready = _speak(ws, "disclosure")
+        _play_through(ws, ready)
+        _drain_until(ws, {"disclosure"})
+        # A manual invitation still works — only the CHAIN is off — and
+        # its readiness doubles as proof no chained one is in flight.
+        ready = _speak(ws, "invitation")
+        assert ready["text"] == "Please, tell me what's brought you in."
+        _play_through(ws, ready)
+    assert _speak_request_audits()[-1] == ("invitation", "tap")
