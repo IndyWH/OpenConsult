@@ -207,6 +207,29 @@
   }
   .speaking button:hover { background-color: #F6F1F5; }
   .speaking .esc { font-size: .78rem; opacity: .95; white-space: nowrap; }
+  /* The speaker-count question, pinned for the same reason the bar above is:
+     in 449 it lived inside the scrolling .stack and was never seen. Solid
+     panel, plum outline, named colours only. */
+  .spkask {
+    display: none; align-items: center; gap: .7rem;
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: 1.4rem; z-index: 60; width: min(760px, calc(100vw - 2rem));
+    border: 2px solid var(--plum);
+    background-color: var(--panel); color: var(--ink); opacity: 1;
+    border-radius: var(--radius); padding: .85rem 1.1rem; font-size: 1rem;
+    box-shadow: 0 10px 34px #29231F55;
+  }
+  .spkask.on { display: flex; }
+  .spkask .what { flex: 1; font-weight: 600; }
+  .spkask button {
+    flex: none; border: 2px solid var(--line); background-color: var(--panel);
+    color: var(--ink); border-radius: 999px; padding: .45rem 1.1rem;
+    font-size: .95rem; cursor: pointer;
+  }
+  .spkask button.go {
+    border-color: var(--plum); background-color: var(--plum); color: #fff;
+    font-weight: 700;
+  }
   .speakwave { display: inline-flex; align-items: flex-end; gap: 2px; height: 13px; }
   .speakwave i { width: 3px; background-color: #fff; border-radius: 2px;
                  height: 13px; transform-origin: bottom; animation: sp 900ms infinite; }
@@ -335,23 +358,7 @@
     <button id="scOfferSkip" type="button">Skip</button>
   </div>
 
-  <!-- HOW MANY PEOPLE SPOKE — asked at Stop, answered in one tap.
-       The count is declared rather than detected because detection was
-       measured and is unreliable both ways (see app/finalize.py
-       DEFAULT_SPEAKERS). Every answer, including Skip, proceeds immediately:
-       Stop has already completed by the time this appears, so nothing here
-       can hold the consultation open. Deliberately NO auto-dismiss timer —
-       a timer would make the behaviour depend on how fast the doctor reads. -->
-  <div class="scoffer" id="spkAsk">
-    <span class="what">How many people spoke in this consultation?</span>
-    <button class="go" id="spkOne" type="button">Just me</button>
-    <button class="go" id="spkTwo" type="button">Two of us</button>
-    <button id="spkSkip" type="button">Skip</button>
-  </div>
-  <div class="scresult" id="spkResult">
-    <span class="what" id="spkResultWhat"></span>
-    <button id="spkResultDismiss" type="button">Dismiss</button>
-  </div>
+  <!-- (the speaker-count question is pinned to the viewport, below) -->
 
   <!-- Sound-check result. Four classes (spec 10.2): heard well, heard
        faint, not heard, unverified. Faint reads differently from silent
@@ -435,6 +442,26 @@
   <span class="what" id="speakingWhat"></span>
   <span class="esc">or press Esc</span>
   <button id="speakStop" type="button">Stop</button>
+</div>
+
+<!-- HOW MANY PEOPLE SPOKE — asked at Stop, answered in one tap.
+     DELIBERATELY OUTSIDE .stack AND PINNED, for the same reason the speaking
+     bar is. In 449 this sat two divs deep inside the scrolling stack, near
+     the top of the page, so it rendered where the doctor was not looking and
+     was never answered — the same defect as 447's Stop control, repeated in a
+     new control within days of fixing the first one.
+     Every answer, including Skip, acts immediately. Stop has already
+     completed by the time this appears, so nothing here can hold the
+     consultation open, and there is NO auto-dismiss timer. -->
+<div class="spkask" id="spkAsk" role="alert" aria-live="assertive">
+  <span class="what">How many people spoke in this consultation?</span>
+  <button class="go" id="spkOne" type="button">Just me</button>
+  <button class="go" id="spkTwo" type="button">Two of us</button>
+  <button id="spkSkip" type="button">Skip</button>
+</div>
+<div class="spkask" id="spkResult">
+  <span class="what" id="spkResultWhat"></span>
+  <button id="spkResultDismiss" type="button">Dismiss</button>
 </div>
 
 <script src="/static/nav.js"></script>
@@ -1259,8 +1286,16 @@ const spkAsk = document.getElementById('spkAsk');
 const spkResult = document.getElementById('spkResult');
 const spkResultWhat = document.getElementById('spkResultWhat');
 
+// Set while the question is outstanding. It gates ONLY the "See results"
+// navigation, never the consultation — which the server has already completed
+// by the time the question appears. Holding the navigation is what stops the
+// question being destroyed unanswered, which is the other half of 449: even
+// pinned, it dies the moment the doctor leaves the page, and leaving the page
+// is the very next thing they do.
+let speakersOutstanding = false;
+
 function showSpeakerResult(text, tone) {
-  spkResult.className = 'scresult on' + (tone ? ' ' + tone : '');
+  spkResult.className = 'spkask on' + (tone ? ' ' + tone : '');
   spkResultWhat.textContent = text;
 }
 
@@ -1269,6 +1304,8 @@ async function declareSpeakers(cid, count) {
   // request is slow or fails. The standing rule: never accept a tap, do
   // nothing, and explain elsewhere.
   spkAsk.classList.remove('on');
+  speakersOutstanding = false;
+  refreshResultButton();
   if (count === null) {
     showSpeakerResult('Skipped — assuming two people spoke. If that is wrong, '
       + 'correct the speaker labels on the review page.', 'faint');
@@ -1304,9 +1341,22 @@ async function declareSpeakers(cid, count) {
 function askSpeakers(cid) {
   spkResult.classList.remove('on');
   spkAsk.classList.add('on');
+  speakersOutstanding = true;
+  refreshResultButton();
   document.getElementById('spkOne').onclick = () => declareSpeakers(cid, 1);
   document.getElementById('spkTwo').onclick = () => declareSpeakers(cid, 2);
   document.getElementById('spkSkip').onclick = () => declareSpeakers(cid, null);
+}
+
+function refreshResultButton() {
+  // Standing rule: the reason goes ON the control. A "See results" button that
+  // silently did nothing while a question waited elsewhere would be the exact
+  // fault the rule exists to prevent.
+  if (!resultUrl) return;
+  btn.disabled = speakersOutstanding;
+  btn.title = speakersOutstanding
+    ? 'Answer "How many people spoke?" first — one tap, Skip is fine'
+    : '';
 }
 
 document.getElementById('spkResultDismiss').addEventListener('click',
@@ -1633,6 +1683,11 @@ async function awaitResults(cid) {
     resultUrl = '/review/' + cid;
     btn.textContent = label;
     btn.disabled = false;
+    // ...unless the speaker question is still outstanding. Navigating away
+    // destroys it, and the review page is exactly where the doctor is headed
+    // (449). This gates only the navigation; the consultation is already
+    // finalised, and Skip is one tap away.
+    refreshResultButton();
     setStatus(message);
     return;
   }
@@ -1640,6 +1695,10 @@ async function awaitResults(cid) {
 
 btn.addEventListener('click', () => {
   if (recording) { stop(); }
+  // Last-resort guard, matching the speak controls' pattern: the button is
+  // already visibly disabled with its reason whenever this is true, so this is
+  // a defence against a race, not the way the doctor finds out.
+  else if (resultUrl && speakersOutstanding) { spkAsk.classList.add('on'); }
   else if (resultUrl) { window.location.href = resultUrl; }
   else { start(); }
 });

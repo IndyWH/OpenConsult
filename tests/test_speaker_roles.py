@@ -450,6 +450,62 @@ def test_no_answer_can_hold_the_consultation_open_and_none_leaves_a_dead_tap():
         "a late answer must say it did not shape this transcript")
 
 
+def test_the_speaker_question_is_pinned_and_not_inside_the_scrolling_stack():
+    """449: it was never answered, and the review page recorded that nobody
+    declared a count. The cause was placement — it sat two divs deep inside
+    `.stack`, near the top of a scrolling page, so it rendered where the doctor
+    was not looking. That is 447's Stop-control defect reproduced in a new
+    control days after the first one was fixed, which is why placement is
+    asserted and not just existence.
+    """
+    html = _live_html()
+    stack = html.index('<div class="stack">')
+    ask = html.index('id="spkAsk"')
+    bar = html.index('id="speakingBar"')
+    assert ask > bar, (
+        "the question must live outside .stack, beside the speaking bar")
+    assert 'id="spkAsk"' not in html[stack:bar]
+    css = html[html.index("  .spkask {"):html.index("  .spkask.on {")]
+    assert "position: fixed" in css and "z-index" in css
+    # Solid, for the same reason the speaking bar had to be (449).
+    assert "background-color: var(--panel)" in css and "opacity: 1" in css
+
+
+def test_the_question_cannot_be_destroyed_by_navigation_before_it_is_answered():
+    """The other half of 449. Even pinned, the question dies the moment the
+    doctor leaves the page — and leaving the page is the very next thing they
+    do, because Stop turns the button into "See results" and the review page is
+    where they are going.
+
+    So the navigation waits for one of the three taps. It gates ONLY the
+    navigation: the consultation is already finalised by the time the question
+    appears, so nothing here holds it open, and Skip is one tap.
+    """
+    html = _live_html()
+    assert "let speakersOutstanding = false;" in html
+    # Set when asked, cleared when answered — cleared in declareSpeakers, which
+    # every one of the three buttons calls, including Skip.
+    ask = html[html.index("function askSpeakers("):]
+    ask = ask[:ask.index("\nfunction refreshResultButton(")]
+    assert "speakersOutstanding = true;" in ask
+    declare = html[html.index("async function declareSpeakers("):]
+    declare = declare[:declare.index("\nfunction askSpeakers(")]
+    assert "speakersOutstanding = false;" in declare
+    assert "spkSkip').onclick = () => declareSpeakers(cid, null)" in html
+
+    # The navigation itself is gated, and the reason is ON the control.
+    refresh = html[html.index("function refreshResultButton()"):]
+    refresh = refresh[:refresh.index("\n}")]
+    assert "btn.disabled = speakersOutstanding;" in refresh
+    assert "Answer \"How many people spoke?\" first" in refresh
+    # And the click handler cannot navigate past an outstanding question.
+    handler = html[html.index("btn.addEventListener('click'"):]
+    handler = handler[:handler.index("});")]
+    assert handler.index("speakersOutstanding") < handler.index(
+        "window.location.href = resultUrl"), (
+        "the outstanding-question branch must be checked before navigating")
+
+
 def test_the_speaker_question_has_no_auto_dismiss_timer():
     """A timer would make the behaviour depend on how fast the doctor reads."""
     html = _live_html()
