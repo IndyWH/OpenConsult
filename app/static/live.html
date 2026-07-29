@@ -710,10 +710,38 @@ let currentDeviceId = null;
 let silentSinceMs = null;   // for the no-signal (dead) state
 let recording = false;
 
+// THE CAPTURE CHAIN — what browser processing runs on the ONE stream that
+// feeds the meter, the transcriber and the stored recording. All three
+// are EXPLICIT since 2026-07-30; nothing on this stream runs on a browser
+// default any more. Owner decision, 2026-07-30 (option B of the
+// constraints report, HANDOVER):
+//
+// - echoCancellation: FALSE. Chrome's AEC used the page's own playback as
+//   its reference and was DELETING THE MACHINE'S OWN VOICE from the
+//   recording — a faithful record of the room should contain it; she was
+//   in the room. It also made loopback measurement impossible: an
+//   adaptive filter whose job is to remove exactly the measured signal
+//   (the x13 within-minute collapse of 2026-07-29). The transcript never
+//   needed AEC — exclusion is server-held byte windows, not a signal.
+// - noiseSuppression: TRUE, and autoGainControl: TRUE (AGC was running on
+//   Chrome's default until now; choosing the status quo is still a
+//   choice). Both STAY because every RMS calibration in this project —
+//   the 445 forensics, the S4 thresholds, the silence floors — was
+//   derived through them. Changing them is the v2 raw-capture campaign
+//   (option A, deliberately deferred), not a tweak.
+//
+// This object is the single source: it builds the getUserMedia
+// constraints AND is reported with every sound-check reading, so a
+// stored measurement can never disagree about the chain that made it.
+const CAPTURE_CHAIN = {ec: false, ns: true, agc: true};
+
 async function acquireStream(deviceId) {
   const constraints = {
     audio: {
-      channelCount: 1, echoCancellation: true, noiseSuppression: true,
+      channelCount: 1,
+      echoCancellation: CAPTURE_CHAIN.ec,
+      noiseSuppression: CAPTURE_CHAIN.ns,
+      autoGainControl: CAPTURE_CHAIN.agc,
       ...(deviceId ? {deviceId: {exact: deviceId}} : {}),
     },
   };

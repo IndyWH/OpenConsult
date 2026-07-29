@@ -89,6 +89,32 @@ def test_the_detector_stream_never_leaves_the_detector_section():
     assert "barEls" not in detector
 
 
+# --- the capture chain (owner decision 2026-07-30) --------------------------
+
+def test_the_main_capture_chain_is_explicit_ec_off_ns_on_agc_on():
+    """Option B, owner's decision 2026-07-30: echo cancellation OFF on the
+    stream feeding meter/transcriber/recording (it was deleting the
+    machine's own voice from the WAV and made loopback measurement
+    impossible); NS and AGC pinned EXPLICITLY at their previously-
+    effective values, because every RMS calibration in the project was
+    derived through them — changing those is the v2 raw-capture campaign,
+    not a tweak. Nothing on this stream runs on a browser default."""
+    assert "const CAPTURE_CHAIN = {ec: false, ns: true, agc: true};" in LIVE
+    assert "echoCancellation: CAPTURE_CHAIN.ec" in LIVE
+    assert "noiseSuppression: CAPTURE_CHAIN.ns" in LIVE
+    assert "autoGainControl: CAPTURE_CHAIN.agc" in LIVE
+    # The why lives at the constraint site, not only in HANDOVER.
+    assert "DELETING THE MACHINE'S OWN VOICE" in LIVE
+
+
+def test_the_detector_streams_constraints_are_untouched_by_the_chain_change():
+    """The detector deliberately KEEPS echo cancellation (it listens while
+    we play audio; playback echo is its dominant false-trigger cause) and
+    AGC off. The 2026-07-30 decision covers the main stream only."""
+    assert ("audio: {channelCount: 1, echoCancellation: true,\n"
+            "              noiseSuppression: true, autoGainControl: false}") in LIVE
+
+
 # --- constraint 2: the disclosure gains no interruption line ----------------
 
 def test_the_original_disclosure_absence_test_is_unamended():
