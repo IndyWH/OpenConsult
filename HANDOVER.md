@@ -2169,6 +2169,58 @@ decision because it touches the faithfulness guarantee):**
   sound-check rows should record the constraint set in force (a small
   follow-up), so readings are comparable within a configuration epoch.
 
+### Threshold design under the split chains (2026-07-30, REPORT ONLY)
+
+With EC off on the main stream (the 2026-07-30 decision, next section),
+the sound check now measures the TRUE acoustic loopback — stable, at
+last calibratable — while the detector still listens through its own
+echo-cancelled stream, where our playback arrives as a much smaller,
+convergence-dependent *residual*. The question item 3 asked: can a
+raw-stream measurement drive an EC-stream detector threshold?
+
+- **Yes, as an upper bound — and the bias direction is the safe one.**
+  Threshold = margin × raw loopback × envelope is always ≥ margin × the
+  residual the detector actually hears, so echo-driven false stops
+  become nearly impossible (D5 side 1 strengthened). The cost lands on
+  side 2: during loud playback the threshold (raw peaks measured at
+  0.15–0.18 → threshold 0.3+) sits above quiet interrupting speech
+  (0.056), so soft interruptions are missed in loud moments. A miss IS
+  hard mute, per utterance — the failure mode the spec explicitly
+  blesses — and no setting here touches a transcript. Two honest
+  caveats: (1) AGC still rides the main stream, so the measured absolute
+  peak drifts slowly with gain state — if the five fresh readings still
+  spread wide, AGC is the next suspect, and comparing the stored ratio
+  (floor and peak ride together) against the absolute peak will say so;
+  (2) under option 1 the margin's meaning changes — it is now a margin
+  over the TRUE loopback, not over the residual, and the room run may
+  justify lowering it (1.2–1.5) if misses dominate.
+- **The dual measurement (recommended if side 2 fails in the room):**
+  the sound check samples BOTH streams during the same playback — the
+  main stream giving the true loopback, the detector stream giving the
+  residual the detector will actually compare against. The pair yields
+  the detector's true expected residual (an envelope scale neither over-
+  nor under-estimated), and their ratio is the canceller's attenuation —
+  the ×13 story becomes a measured convergence curve across repeated
+  checks instead of a mystery. Costs: the check must open (or briefly
+  open) the detector stream before a consultation, which brushes spec
+  10.3's "do not open a second stream for this" — that sentence was
+  written to protect the mic-cluster invariant for the check's own
+  measurement, but extending the check to a second stream is a spec
+  amendment and therefore the owner's; the audit row would carry two
+  measurement sets with per-stream chains; and a pre-consultation
+  convergence state is representative of, not identical to,
+  mid-consultation state.
+- **Rejected: a fixed attenuation factor** scaling raw loopback down to
+  a guessed residual — the attenuation is exactly the unstable quantity,
+  and only the dual measurement can measure it.
+
+**Recommendation (nothing built beyond items 1–2, per the brief):** run
+the calibration campaign on the raw-stream measurement first — stable,
+calibratable, fails toward hard mute. If the D5 scripted room run then
+fails side 2 for soft speech, build the dual measurement with the
+owner's spec-10.3 amendment; it is the principled fix and makes the
+canceller's convergence visible into the bargain.
+
 **`calibrate_barge_in.py --since YYYY-MM-DD`** (built the same session):
 limits every per-device analysis to readings from that date onward, so
 the current room configuration is evaluated without the device's history
