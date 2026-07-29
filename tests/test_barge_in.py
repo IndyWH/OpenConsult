@@ -133,6 +133,35 @@ def test_the_example_env_ships_barge_in_off():
     assert "BARGE_IN_ENABLED=false" in Path(".env.example").read_text()
 
 
+# --- the threshold scale (Part 10 amendment, 2026-07-30) --------------------
+
+def test_the_scale_is_the_residual_when_the_row_carries_one():
+    scale = speech.barge_in_scale({"peak_rms": 0.4,
+                                   "residual": {"peak_rms": 0.012}})
+    assert scale == {"raw_peak_rms": 0.4, "residual_peak_rms": 0.012,
+                     "anomaly": None}
+
+
+def test_the_scale_falls_back_to_raw_without_a_residual():
+    """Conservative on purpose: a raw-scaled threshold misses soft
+    interruptions, and a miss is hard mute — the blessed failure."""
+    scale = speech.barge_in_scale({"peak_rms": 0.4})
+    assert scale["residual_peak_rms"] is None
+    assert scale["raw_peak_rms"] == 0.4
+    assert speech.barge_in_scale(None) == {
+        "raw_peak_rms": None, "residual_peak_rms": None, "anomaly": None}
+
+
+def test_a_residual_above_raw_is_clamped_and_reported():
+    """A canceller only removes: residual > raw is physically wrong.
+    The value is clamped to the raw bound and the anomaly handed back —
+    never silently used, never silently dropped."""
+    scale = speech.barge_in_scale({"peak_rms": 0.1,
+                                   "residual": {"peak_rms": 0.3}})
+    assert scale["residual_peak_rms"] == 0.1
+    assert scale["anomaly"] == {"residual_peak_rms": 0.3, "raw_peak_rms": 0.1}
+
+
 # --- audit read: the loopback level -----------------------------------------
 
 @needs_db
@@ -285,6 +314,29 @@ def test_enabled_config_reads_the_loopback_from_this_doctors_audit_rows(
 
 
 @needs_db
+def test_the_residual_reaches_the_client_through_speech_config(
+        barge_env, monkeypatch):
+    """Part 10 amendment: the threshold scale the client receives is the
+    detector-stream residual from the newest reading, with the raw
+    loopback alongside as the sanity bound."""
+    monkeypatch.setattr(speech, "BARGE_IN_ENABLED", True)
+    doctor = _make_user()
+    asyncio.run(audit.log(doctor["id"], "speech.sound_check", None, None,
+                          {"peak_rms": 0.41, "noise_floor_rms": 0.004,
+                           "device_label": "Room speakers",
+                           "residual": {"peak_rms": 0.011, "mean_rms": 0.006,
+                                        "series": [0.03, 0.01, 0.006],
+                                        "window_ms": 250}}))
+    client = _client_for(doctor)
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        config = _drain_until(ws, {"speech_config"})
+    block = config["barge_in"]
+    assert block["residual_peak_rms"] == pytest.approx(0.011)
+    assert block["loopback_peak_rms"] == pytest.approx(0.41)
+
+
+@needs_db
 def test_a_doctor_with_no_sound_check_rows_gets_a_null_loopback(
         barge_env, monkeypatch):
     """No reading means no echo prediction: the client falls back to its
@@ -373,6 +425,16 @@ bargeIn.end();
 out.afterEndOnset = bargeIn.onsetAt;
 out.afterEndEnvelope = bargeIn.envelope;
 
+// Part 10 amendment: with a residual reading the threshold scales by
+// what the detector's canceller LEAVES of our playback, not by the raw
+// loopback — which is what lets quiet real speech (0.056 RMS) cross it.
+bargeIn.configure({enabled: true, min_ms: 150, margin: 2.0, abs_floor: 0.02,
+                   loopback_peak_rms: 0.41, residual_peak_rms: 0.015});
+bargeIn.begin([1.0, 0.1], 100, 0);
+out.residualThresholdLoud = bargeIn.threshold(50);    // 2.0 * 0.015
+out.residualThresholdQuiet = bargeIn.threshold(150);  // the floor bites
+out.softSpeechCrosses = 0.056 >= bargeIn.threshold(50);
+
 // A disabled config stays disabled — the client never self-enables.
 bargeIn.configure({enabled: false});
 out.disabled = bargeIn.enabled;
@@ -403,6 +465,14 @@ def test_the_shipped_detector_logic_executed_under_node():
     assert out["noEnvThreshold"] == pytest.approx(0.02)
 
     assert out["afterEndOnset"] is None and out["afterEndEnvelope"] is None
+
+    assert out["residualThresholdLoud"] == pytest.approx(0.03)
+    assert out["residualThresholdQuiet"] == pytest.approx(0.02)
+    assert out["softSpeechCrosses"] is True, (
+        "the amendment's whole point: quiet speech must clear a "
+        "residual-derived threshold where the raw-derived one (0.82 here) "
+        "was unreachable")
+
     assert out["disabled"] is False
 
 

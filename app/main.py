@@ -1575,6 +1575,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             loopback = await audit.latest_detail("speech.sound_check", user["id"])
         except Exception as exc:  # noqa: BLE001 - config, not the consultation
             logger.warning("Could not read sound-check rows for barge-in: %s", exc)
+    # Part 10 amendment: the threshold scale is the DETECTOR-stream
+    # residual when the row carries one; the raw loopback stays as the
+    # sanity upper bound. A residual above raw is physically wrong — the
+    # value is clamped and the anomaly audited, never silently used.
+    scale = speech.barge_in_scale(loopback)
+    if scale["anomaly"] is not None:
+        await audit.log(user["id"], "speech.barge_in_anomaly", None, None,
+                        {"kind": "residual_exceeds_raw_loopback",
+                         **scale["anomaly"],
+                         "device_label": (loopback or {}).get("device_label")})
+        logger.warning("Barge-in scale anomaly for %s: residual %s > raw %s",
+                       user["username"], scale["anomaly"]["residual_peak_rms"],
+                       scale["anomaly"]["raw_peak_rms"])
     await websocket.send_json({
         "type": "speech_config",
         "silence_nudge_enabled": SILENCE_NUDGE_ENABLED,
@@ -1584,7 +1597,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "min_ms": speech.BARGE_IN_MIN_MS,
             "margin": speech.BARGE_IN_MARGIN,
             "abs_floor": speech.BARGE_IN_RMS_THRESHOLD,
-            "loopback_peak_rms": (loopback or {}).get("peak_rms"),
+            "loopback_peak_rms": scale["raw_peak_rms"],
+            "residual_peak_rms": scale["residual_peak_rms"],
             "loopback_device": (loopback or {}).get("device_label"),
         },
     })

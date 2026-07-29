@@ -490,6 +490,34 @@ def wav_duration_ms(wav_bytes: bytes) -> int:
         return round(1000 * w.getnframes() / w.getframerate())
 
 
+# --- barge-in threshold scale (Part 10 amendment, 2026-07-30) ---------------
+
+def barge_in_scale(detail: dict | None) -> dict:
+    """The threshold scale for the client, from the newest sound-check row.
+
+    The threshold is envelope-proportional to the DETECTOR-STREAM RESIDUAL
+    when the row carries one (spec Part 10 amendment): the detector
+    listens through its echo canceller, so the echo it must ignore is the
+    residual, not the raw loopback — measured on this room, raw loopback
+    (0.30–0.58 RMS) towers over quiet speech (0.056), a gap no raw-derived
+    threshold can bridge. The raw loopback is retained as a SANITY UPPER
+    BOUND: a residual above it is physically wrong (a canceller only
+    removes), so the value is clamped to raw and the anomaly reported for
+    the caller to audit. Rows without a residual fall back to the raw
+    figure — conservative, since its failure direction is a miss, which
+    is hard mute.
+    """
+    detail = detail or {}
+    raw = detail.get("peak_rms")
+    residual = (detail.get("residual") or {}).get("peak_rms")
+    anomaly = None
+    if residual is not None and raw is not None and residual > raw:
+        anomaly = {"residual_peak_rms": residual, "raw_peak_rms": raw}
+        residual = raw
+    return {"raw_peak_rms": raw, "residual_peak_rms": residual,
+            "anomaly": anomaly}
+
+
 # --- playback envelope (Phase 7a session 3, barge-in) -----------------------
 
 ENVELOPE_WINDOW_MS = 100
