@@ -2271,6 +2271,60 @@ fails side 2 for soft speech, build the dual measurement with the
 owner's spec-10.3 amendment; it is the principled fix and makes the
 canceller's convergence visible into the bargain.
 
+### Barge-in stage 2 (2026-07-30): the dual measurement, built
+
+The owner approved the stage-2 recommendation the same day the room
+data proved the need: on the new ec-off chain the loopback is finally
+stable (spread ×2.0 over five readings) and D5 side 1 reads predicted
+MET — but side 2 fails exactly as the report above anticipated, raw
+loopback 0.30–0.58 RMS against quiet speech at 0.056, a tenfold gap no
+raw-derived threshold can bridge. Six commits this session; no
+dependency changes.
+
+- **Spec Part 10 carries a dated, owner-approved amendment** (appended
+  verbatim, superseding nothing silently): the sound check measures
+  BOTH streams during one playback. The main stream (EC off) keeps
+  giving the true acoustic loopback — still what the doctor-facing
+  result reports, because "can the room hear the machine" is a question
+  about the room, not about a filter. The detector stream (EC on) gives
+  the canceller's RESIDUAL.
+- **Implementation:** the check opens the detector-constraints stream
+  through the same single acquisition function the detector uses
+  (`openDetectorStream` — still exactly two `getUserMedia` calls on the
+  page), **before playback starts**, so the unconverged first window —
+  the false-stop risk — is captured; it closes on every exit path. The
+  same `speech.sound_check` row now carries `residual` (peak, mean, a
+  250 ms-window convergence series) or `residual_unavailable` with the
+  reason — a missing residual is visible, never a silent zero. The
+  doctor-facing message is unchanged; the check stays disabled while
+  recording.
+- **The threshold now scales by the residual** — the echo the detector
+  stream actually hears — with the raw loopback retained as a sanity
+  upper bound: `speech.barge_in_scale` clamps a physically-wrong
+  residual (> raw) to the raw figure and the server audits
+  `speech.barge_in_anomaly`. Rows without a residual fall back to the
+  raw scale, which is conservative (its failure direction is a miss —
+  hard mute). **`BARGE_IN_ENABLED` remains FALSE; nothing this session
+  flips it.**
+- **The calibration report** now takes verdicts from residual-bearing
+  readings only, grouped (device, chain, measurement mode) — raw-only
+  rows, including the five ec-off readings of 2026-07-29/30, are listed,
+  marked "no residual — predates the dual measurement", never pooled,
+  and still feed the raw-acoustics ratio recommendation. Each dual
+  reading gets a convergence line (first window vs settled, and whether
+  the first window ALONE would have crossed the threshold — the case
+  the sustain requirement exists to cover). The footer no longer claims
+  sufficiency when no residual-bearing readings exist (caught against
+  the live data, where that was briefly true of every row).
+
+**What the owner runs next:** after the restart, **five fresh
+sound-check readings** (same discipline: door shut, patient-level
+volume, untouched between taps) on the room's output device — each now
+carries the detector-stream residual automatically — then
+`uv run python scripts/calibrate_barge_in.py` again. Those five are the
+first readings that can produce a residual-based verdict; if both sides
+read predicted met, the next step is the D5 scripted room run.
+
 ### Regression insurance for the chain change (2026-07-30)
 
 The note-quality harness was re-run against its stored expectations
