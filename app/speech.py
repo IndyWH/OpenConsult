@@ -246,8 +246,9 @@ SOUND_CHECK_SILENT_RMS = float(os.getenv("SOUND_CHECK_SILENT_RMS", "1e-4"))
 # +5 dB, chosen so that "faint" covers the band where a patient would
 # strain and the barge-in detector would be unreliable. Every measurement
 # is stored raw in the `speech.sound_check` audit row precisely so these
-# can be set from real data later — see `scripts/calibrate_barge_in.py`
-# when it is built (build order item 5).
+# can be set from real data later — `scripts/calibrate_barge_in.py`
+# (built, 7a session 3) reads those rows and RECOMMENDS values when the
+# data supports them; setting them stays the owner's.
 # ---------------------------------------------------------------------------
 SOUND_CHECK_GOOD_RATIO = float(os.getenv("SOUND_CHECK_GOOD_RATIO", "4.0"))
 SOUND_CHECK_FAINT_RATIO = float(os.getenv("SOUND_CHECK_FAINT_RATIO", "1.8"))
