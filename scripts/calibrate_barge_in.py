@@ -96,6 +96,7 @@ REFERENCE_SPEECH_RMS = 0.056
 NO_DEVICE = "(no output device recorded — predates the device-label fix; not comparable)"
 NO_CHAIN = ("(no capture-chain record — predates the chain field, "
             "2026-07-30; not comparable)")
+NO_RESIDUAL = "no residual — predates the dual measurement"
 
 
 def chain_label(row: dict) -> str | None:
@@ -140,17 +141,32 @@ def fetch_rows() -> tuple[list[dict], list[dict]]:
     return checks, ends
 
 
-def group_readings(checks: list[dict]) -> dict[tuple[str, str | None], list[dict]]:
-    """Readings keyed by (output device, capture chain).
+def measurement_mode(row: dict) -> str:
+    """"dual" when the row carries a detector-stream residual (Part 10
+    amendment), else "raw-only". Verdicts come from dual readings ONLY:
+    the threshold operates on the detector stream, and a raw-only row
+    says nothing about the residual there."""
+    residual = row.get("residual")
+    if isinstance(residual, dict) and residual.get("peak_rms") is not None:
+        return "dual"
+    return "raw-only"
+
+
+def group_readings(
+        checks: list[dict]) -> dict[tuple[str, str | None, str], list[dict]]:
+    """Readings keyed by (output device, capture chain, measurement mode).
 
     Two readings land in the same group — and may therefore be averaged,
-    spread-checked or recommended from — only when BOTH match. A None
-    chain (pre-2026-07-30 rows) forms its own group per device and is
-    reported as incomparable, exactly as the pre-device-label rows are.
+    spread-checked or recommended from — only when ALL THREE match. A
+    None chain (pre-2026-07-30 rows) forms its own group per device and
+    is reported as incomparable, exactly as the pre-device-label rows
+    are; raw-only rows (no residual — including the five ec-off readings
+    of 2026-07-29/30) are likewise never pooled with dual readings.
     """
-    groups: dict[tuple[str, str | None], list[dict]] = {}
+    groups: dict[tuple[str, str | None, str], list[dict]] = {}
     for row in checks:
-        key = (row.get("device_label") or NO_DEVICE, chain_label(row))
+        key = (row.get("device_label") or NO_DEVICE, chain_label(row),
+               measurement_mode(row))
         groups.setdefault(key, []).append(row)
     return groups
 
@@ -192,49 +208,58 @@ def _db(ratio: float) -> str:
 
 def assess_device(readings: list[dict], *, margin: float, abs_floor: float,
                   min_ms: int) -> dict:
-    """Predicted verdict for one device's acoustic readings.
+    """Predicted verdict for one group's DUAL (residual-bearing) readings.
 
+    Part 10 amendment: verdicts come from the RESIDUAL — the echo the
+    detector stream actually hears — with the raw loopback reported
+    alongside as the sanity upper bound, never as the verdict's basis.
     Returns {"side_a": ..., "side_b": ..., "numbers": ...} where each side
     is True (predicted met), False (predicted not met) or None
     (insufficient data), with the reasons spelled out as text.
     """
     numbers: dict = {"n": len(readings)}
     if len(readings) < MIN_READINGS:
-        why = (f"only {len(readings)} usable reading(s) — "
+        why = (f"only {len(readings)} usable residual-bearing reading(s) — "
                f"{MIN_READINGS} needed before this device is calibrated")
         return {"side_a": None, "side_b": None,
                 "side_a_why": [why], "side_b_why": [why], "numbers": numbers}
 
-    peaks = [float(r["peak_rms"]) for r in readings]
+    residuals = [float(r["residual"]["peak_rms"]) for r in readings]
+    raws = [float(r["peak_rms"]) for r in readings]
     floors = [max(float(r.get("noise_floor_rms") or 0.0),
                   speech.SOUND_CHECK_SILENT_RMS) for r in readings]
     numbers.update(
-        peak_min=min(peaks), peak_median=statistics.median(peaks),
-        peak_max=max(peaks), floor_max=max(floors),
-        floor_median=statistics.median(floors),
-        spread=max(peaks) / min(peaks))
+        resid_min=min(residuals), resid_median=statistics.median(residuals),
+        resid_max=max(residuals),
+        raw_min=min(raws), raw_median=statistics.median(raws),
+        raw_max=max(raws),
+        floor_max=max(floors), floor_median=statistics.median(floors),
+        spread=max(residuals) / max(min(residuals), 1e-9))
     # The threshold the client will actually hold during the loudest part
-    # of playback, and the floor it holds during quiet parts.
+    # of playback, and the floor it holds during quiet parts — plus the
+    # raw-derived figure it replaced, kept visible as the upper bound.
     numbers["threshold_loud"] = max(abs_floor,
-                                    margin * numbers["peak_median"])
-    numbers["threshold_worst"] = max(abs_floor, margin * numbers["peak_max"])
+                                    margin * numbers["resid_median"])
+    numbers["threshold_worst"] = max(abs_floor, margin * numbers["resid_max"])
+    numbers["raw_bound_worst"] = max(abs_floor, margin * numbers["raw_max"])
 
-    # Side A — false stops. Two predicted causes: our own residual echo
-    # (controlled by the margin over the measured loopback, IF the
-    # loopback is consistent reading to reading) and room noise crossing
-    # the absolute floor.
+    # Side A — false stops. Two predicted causes: the residual of our own
+    # playback on the detector stream (controlled by the margin over it,
+    # IF the residual is consistent reading to reading) and room noise
+    # crossing the absolute floor.
     side_a_why, side_a = [], True
     if numbers["spread"] > MAX_SPREAD:
         side_a = False
         side_a_why.append(
-            f"loopback readings spread x{numbers['spread']:.1f} "
-            f"(max {MAX_SPREAD:.1f}) — the volume or path is not stable "
-            "between readings, so no threshold predicted from them is either")
+            f"residual readings spread x{numbers['spread']:.1f} "
+            f"(max {MAX_SPREAD:.1f}) — the canceller's leavings are not "
+            "stable between readings, so no threshold predicted from them "
+            "is either")
     else:
         side_a_why.append(
-            f"loopback consistent (spread x{numbers['spread']:.1f}); "
+            f"residual consistent (spread x{numbers['spread']:.1f}); "
             f"threshold sits x{margin:.1f} ({_db(margin)}) above the echo "
-            "it predicts")
+            "the detector stream actually hears")
     noise_clear = abs_floor / numbers["floor_max"]
     numbers["noise_clearance"] = noise_clear
     if noise_clear < NOISE_CLEARANCE:
@@ -284,6 +309,22 @@ def assess_device(readings: list[dict], *, margin: float, abs_floor: float,
     return {"side_a": side_a, "side_b": side_b,
             "side_a_why": side_a_why, "side_b_why": side_b_why,
             "numbers": numbers}
+
+
+def convergence_summary(reading: dict, threshold_loud: float) -> dict | None:
+    """First-window vs settled residual for one dual reading, and whether
+    the FIRST window alone would have crossed the residual-derived
+    threshold. An unconverged canceller at the start of an utterance is
+    the false-stop risk the sustain requirement must cover, so it is
+    stated per reading rather than averaged away."""
+    series = (reading.get("residual") or {}).get("series") or []
+    if not series:
+        return None
+    first = float(series[0])
+    settled = min(float(v) for v in series)
+    return {"first": first, "settled": settled,
+            "ratio": first / max(settled, 1e-9),
+            "would_fire": first >= threshold_loud}
 
 
 # --- sound-check ratio recommendations --------------------------------------
@@ -354,13 +395,15 @@ def main(argv: list[str] | None = None) -> int:
         print("There is nothing to calibrate from yet.\n")
 
     thin_devices: list[tuple[str, int]] = []
-    for (device, chain), all_rows in group_readings(checks).items():
+    dual_groups_assessed = 0
+    for (device, chain, mode), all_rows in group_readings(checks).items():
         rows, excluded = split_since(all_rows, args.since)
         usable = acoustic_readings(rows)
         headphones = sum(1 for r in rows
                          if r.get("discrepancy") == "no_acoustic_path_headphones_likely")
         print(f"Output device: {device}")
         print(f"  capture chain: {chain or NO_CHAIN}")
+        print(f"  measurement: {'dual (raw + detector-stream residual)' if mode == 'dual' else NO_RESIDUAL}")
         print(f"  readings: {len(rows)} total, {len(usable)} with an acoustic"
               f" path ({headphones} headphone/no-path, "
               f"{len(rows) - len(usable) - headphones} other)")
@@ -371,10 +414,12 @@ def main(argv: list[str] | None = None) -> int:
                   f"reading(s) from {first}..{last} — not in any number below")
         for r in rows:
             db = f"{r['ratio_db']:.0f} dB" if r.get("ratio_db") is not None else "—"
+            resid = (r.get("residual") or {}).get("peak_rms")
+            resid_txt = f" res={resid:.5f}" if resid is not None else ""
             print(f"    {str(r['at'])[:19]}  {r.get('username') or '?':<12}"
                   f" result={r.get('result', '?'):<12} answer={r.get('answer', '?'):<5}"
                   f" floor={r.get('noise_floor_rms', 0) or 0:.5f}"
-                  f" peak={r.get('peak_rms', 0) or 0:.5f}  {db}")
+                  f" peak={r.get('peak_rms', 0) or 0:.5f}{resid_txt}  {db}")
         if device == NO_DEVICE:
             print("  These readings cannot support any threshold: nothing "
                   "recorded which audio path produced them.\n")
@@ -385,16 +430,54 @@ def main(argv: list[str] | None = None) -> int:
                   "rows went through Chrome's echo canceller, which is what "
                   "the x13 collapse was). Never pooled with any other group.\n")
             continue
+        if mode != "dual":
+            print(f"  {NO_RESIDUAL} (Part 10 amendment): the threshold "
+                  "operates on the detector stream, and these rows say "
+                  "nothing about the residual there. Raw acoustics listed; "
+                  "no verdict comes from them and they are never pooled "
+                  "with dual readings.")
+            recommendation = recommend_ratios(usable)
+            if recommendation:
+                print(f"  Sound-check ratio recommendation (raw acoustics, "
+                      f"still valid — from {recommendation['n']} "
+                      f"confirmed-heard readings, ratios "
+                      f"{recommendation['min']:.1f}/{recommendation['median']:.1f}"
+                      f"/{recommendation['max']:.1f} min/median/max):")
+                print(f"      SOUND_CHECK_GOOD_RATIO={recommendation['good']}   "
+                      f"(currently {speech.SOUND_CHECK_GOOD_RATIO})")
+                print(f"      SOUND_CHECK_FAINT_RATIO={recommendation['faint']}  "
+                      f"(currently {speech.SOUND_CHECK_FAINT_RATIO})")
+            print()
+            continue
 
         verdicts = assess_device(usable, margin=margin, abs_floor=abs_floor,
                                  min_ms=min_ms)
         n = verdicts["numbers"]
-        if n.get("peak_median") is not None:
-            print(f"  loopback peak RMS: min {n['peak_min']:.5f} / median"
-                  f" {n['peak_median']:.5f} / max {n['peak_max']:.5f}"
+        if n.get("resid_median") is not None:
+            print(f"  residual peak RMS (detector stream): min {n['resid_min']:.5f}"
+                  f" / median {n['resid_median']:.5f} / max {n['resid_max']:.5f}"
                   f" (spread x{n['spread']:.1f})")
-            print(f"  threshold during loud playback: {n['threshold_loud']:.5f}"
-                  f" (worst case {n['threshold_worst']:.5f})")
+            print(f"  raw loopback peak RMS (main stream):  min {n['raw_min']:.5f}"
+                  f" / median {n['raw_median']:.5f} / max {n['raw_max']:.5f}")
+            print(f"  residual-derived threshold: {n['threshold_loud']:.5f} loud"
+                  f" / {n['threshold_worst']:.5f} worst — raw-derived sanity"
+                  f" upper bound {n['raw_bound_worst']:.5f}")
+            # Convergence, per reading: an unconverged first utterance is
+            # the false-stop risk the sustain requirement must cover.
+            for r in usable:
+                curve = convergence_summary(r, n["threshold_loud"])
+                if curve is None:
+                    continue
+                fired = ("WOULD have crossed the threshold "
+                         f"({n['threshold_loud']:.5f}) — the sustain "
+                         "requirement is what stands between an unconverged "
+                         "canceller and a false stop"
+                         if curve["would_fire"] else
+                         f"would NOT have crossed the threshold "
+                         f"({n['threshold_loud']:.5f})")
+                print(f"    convergence {str(r['at'])[:19]}: first window "
+                      f"{curve['first']:.5f} → settled {curve['settled']:.5f} "
+                      f"(x{curve['ratio']:.1f}); first window {fired}")
         print(f"  D5 side 1 — false stops <= {D5_FALSE_STOP_MAX:.0%}: "
               f"{_verdict(verdicts['side_a'])}")
         for why in verdicts["side_a_why"]:
@@ -406,7 +489,7 @@ def main(argv: list[str] | None = None) -> int:
         both = verdicts["side_a"] and verdicts["side_b"]
         print(f"  BOTH SIDES on this device: "
               f"{_verdict(both if None not in (verdicts['side_a'], verdicts['side_b']) else None)}")
-        print("  (Predicted from loopback geometry. The behavioural numbers "
+        print("  (Predicted from residual geometry. The behavioural numbers "
               "come from scripted runs in the room; this report cannot "
               "manufacture them.)")
 
@@ -426,6 +509,7 @@ def main(argv: list[str] | None = None) -> int:
             print("  Sound-check ratios: not enough consistent confirmed-heard "
                   "readings to recommend values — the current ones remain "
                   "uncalibrated guesses.")
+        dual_groups_assessed += 1
         if len(usable) < MIN_READINGS:
             thin_devices.append((f"{device} [{chain}]", len(usable)))
         print()
@@ -449,12 +533,14 @@ def main(argv: list[str] | None = None) -> int:
 
     print("What to do next" )
     print("-" * 70)
-    if thin_devices or not checks:
+    if thin_devices or not checks or dual_groups_assessed == 0:
         need = ", ".join(f"{d} ({n}/{MIN_READINGS})" for d, n in thin_devices) \
-            or "every device"
+            or ("every device — no residual-bearing readings exist yet "
+                "(verdicts need the dual measurement, live since 2026-07-30)")
         print(f"1. Take more sound-check readings AT NORMAL ROOM VOLUME on the "
               f"device the room actually uses — too few so far: {need}. Each "
-              "reading is stored automatically; then re-run this script.")
+              "reading now carries the detector-stream residual "
+              "automatically; then re-run this script.")
     else:
         print("1. Readings are sufficient. If the verdicts above say both "
               "sides are predicted met, the next step is a scripted room run "

@@ -39,12 +39,25 @@ def _db_ready() -> bool:
 
 def reading(peak=0.01, floor=0.004, answer="yes", ratio=None,
             discrepancy=None, device="Speakers", at="2026-07-29",
-            chain=None) -> dict:
-    return {"at": at, "username": "doctor", "peak_rms": peak,
-            "noise_floor_rms": floor, "answer": answer,
-            "ratio": ratio if ratio is not None else peak / floor,
-            "discrepancy": discrepancy, "device_label": device,
-            **({"chain": chain} if chain is not None else {})}
+            chain=None, residual_peak=None, residual_series=None) -> dict:
+    row = {"at": at, "username": "doctor", "peak_rms": peak,
+           "noise_floor_rms": floor, "answer": answer,
+           "ratio": ratio if ratio is not None else peak / floor,
+           "discrepancy": discrepancy, "device_label": device,
+           **({"chain": chain} if chain is not None else {})}
+    if residual_peak is not None:
+        row["residual"] = {"peak_rms": residual_peak,
+                           "mean_rms": residual_peak * 0.6,
+                           "series": residual_series or [residual_peak],
+                           "window_ms": 250}
+    return row
+
+
+def dual(residual_peak, raw=0.40, **kw) -> dict:
+    """A residual-bearing (dual-measurement) reading — the only kind
+    verdicts come from since the Part 10 amendment. Raw defaults loud
+    (0.40, the measured room) to keep the raw-vs-residual gap honest."""
+    return reading(peak=raw, residual_peak=residual_peak, **kw)
 
 
 # --- the D5 target is the spec's, verbatim ----------------------------------
@@ -64,8 +77,9 @@ def test_readings_group_by_device_and_unlabelled_rows_are_quarantined():
     groups = calib.group_readings([
         reading(device="Speakers"), reading(device="Monitor"),
         reading(device=None)])
-    assert set(groups) == {("Speakers", None), ("Monitor", None),
-                           (calib.NO_DEVICE, None)}
+    assert set(groups) == {("Speakers", None, "raw-only"),
+                           ("Monitor", None, "raw-only"),
+                           (calib.NO_DEVICE, None, "raw-only")}
     assert "not comparable" in calib.NO_DEVICE
 
 
@@ -83,9 +97,9 @@ def test_readings_across_two_chains_never_pool():
     assert len(groups) == 3
     assert all(len(g) in (1, 5) for g in groups.values())
     labels = set(groups)
-    assert ("Speakers", "ec=on ns=on agc=on") in labels
-    assert ("Speakers", "ec=off ns=on agc=on") in labels
-    assert ("Speakers", None) in labels
+    assert ("Speakers", "ec=on ns=on agc=on", "raw-only") in labels
+    assert ("Speakers", "ec=off ns=on agc=on", "raw-only") in labels
+    assert ("Speakers", None, "raw-only") in labels
     # And the labels are honest about what None means.
     assert "not comparable" in calib.NO_CHAIN
 
@@ -110,43 +124,65 @@ def test_fewer_than_five_readings_is_insufficient_data_not_a_verdict():
     assert any("5 needed" in why for why in verdicts["side_a_why"])
 
 
-def test_consistent_quiet_loopback_predicts_both_sides_met():
-    """Loopback ~0.01, noise floor 0.004: the threshold clears room noise
-    and quiet speech clears the threshold — both sides predicted met."""
-    verdicts = _assess([reading(peak=0.010), reading(peak=0.011),
-                        reading(peak=0.009), reading(peak=0.012),
-                        reading(peak=0.010)])
+# AMENDED for the Part 10 amendment (2026-07-30): verdicts now come from
+# residual-bearing readings — the threshold operates on the detector
+# stream, so stability and headroom are judged on the residual there,
+# with the loud raw loopback (0.40 in these fixtures, per the measured
+# room) reported only as the sanity upper bound.
+
+def test_consistent_quiet_residual_predicts_both_sides_met():
+    """Residual ~0.01 under a 0.40 raw loopback, noise floor 0.004: the
+    threshold clears room noise and quiet speech clears the
+    residual-derived threshold — exactly the case the raw-derived
+    threshold could never pass (its bound here would be 0.8)."""
+    verdicts = _assess([dual(0.010), dual(0.011), dual(0.009),
+                        dual(0.012), dual(0.010)])
     assert verdicts["side_a"] is True
     assert verdicts["side_b"] is True
     assert verdicts["numbers"]["predicted_latency_ms"] == 200
+    assert verdicts["numbers"]["raw_bound_worst"] == pytest.approx(0.8)
 
 
-def test_inconsistent_loopback_fails_the_false_stop_side():
-    verdicts = _assess([reading(peak=0.005), reading(peak=0.030),
-                        reading(peak=0.008), reading(peak=0.010),
-                        reading(peak=0.020)])
+def test_inconsistent_residual_fails_the_false_stop_side():
+    verdicts = _assess([dual(0.005), dual(0.030), dual(0.008),
+                        dual(0.010), dual(0.020)])
     assert verdicts["side_a"] is False
     assert any("spread" in why for why in verdicts["side_a_why"])
 
 
 def test_a_floor_close_to_room_noise_fails_the_false_stop_side():
-    verdicts = _assess([reading(floor=0.015) for _ in range(5)])
+    verdicts = _assess([dual(0.010, floor=0.015) for _ in range(5)])
     assert verdicts["side_a"] is False
     assert any("noise floor" in why for why in verdicts["side_a_why"])
 
 
-def test_a_loud_loopback_fails_the_catch_side_for_quiet_speech():
-    """Echo at 0.05 RMS pushes the worst-case threshold to 0.1 — above
-    the quietest real speech this system has measured (0.056, 445)."""
-    verdicts = _assess([reading(peak=0.05) for _ in range(5)])
+def test_a_loud_residual_fails_the_catch_side_for_quiet_speech():
+    """Residual at 0.05 RMS pushes the worst-case threshold to 0.1 —
+    above the quietest real speech this system has measured (0.056, 445).
+    A canceller that leaves that much behind is not helping."""
+    verdicts = _assess([dual(0.05) for _ in range(5)])
     assert verdicts["side_b"] is False
     assert any("445" in why for why in verdicts["side_b_why"])
 
 
 def test_a_sustain_requirement_over_the_budget_fails_the_catch_side():
-    verdicts = _assess([reading() for _ in range(5)], min_ms=300)
+    verdicts = _assess([dual(0.010) for _ in range(5)], min_ms=300)
     assert verdicts["side_b"] is False
     assert verdicts["numbers"]["predicted_latency_ms"] == 350
+
+
+def test_convergence_summary_flags_a_first_window_that_would_fire():
+    """The unconverged first window is the false-stop risk: the summary
+    says per reading whether it alone would have crossed the threshold."""
+    hot_start = dual(0.010, residual_series=[0.045, 0.012, 0.006, 0.005])
+    curve = calib.convergence_summary(hot_start, threshold_loud=0.020)
+    assert curve["first"] == pytest.approx(0.045)
+    assert curve["settled"] == pytest.approx(0.005)
+    assert curve["would_fire"] is True
+
+    calm = dual(0.010, residual_series=[0.012, 0.008, 0.006])
+    assert calib.convergence_summary(calm, threshold_loud=0.020)["would_fire"] is False
+    assert calib.convergence_summary(reading(), 0.02) is None
 
 
 # --- the --since window -----------------------------------------------------
@@ -170,9 +206,9 @@ def test_a_recent_consistent_cluster_passes_under_since_and_fails_without():
     readings (x30 spread) drown a recent consistent cluster; --since cuts
     to the cluster and the spread check passes."""
     import datetime
-    old = [reading(peak=p, at="2026-07-20")
+    old = [dual(p, at="2026-07-20")
            for p in (0.005, 0.060, 0.150, 0.010, 0.090)]
-    recent = [reading(peak=p, at="2026-07-30")
+    recent = [dual(p, at="2026-07-30")
               for p in (0.010, 0.011, 0.009, 0.012, 0.010)]
     rows = old + recent
 
