@@ -104,6 +104,21 @@ def test_readings_across_two_chains_never_pool():
     assert "not comparable" in calib.NO_CHAIN
 
 
+def test_residual_and_no_residual_readings_never_pool():
+    """Same device, same chain, but one set carries the detector-stream
+    residual and the other predates the dual measurement: two groups,
+    never one — a raw-only row must not lend its raw peak to a residual
+    spread or vice versa."""
+    chain = {"ec": False, "ns": True, "agc": True}
+    rows = ([dual(0.010, chain=chain) for _ in range(5)]
+            + [reading(chain=chain) for _ in range(5)])
+    groups = calib.group_readings(rows)
+    assert set(groups) == {("Speakers", "ec=off ns=on agc=on", "dual"),
+                           ("Speakers", "ec=off ns=on agc=on", "raw-only")}
+    assert all(len(g) == 5 for g in groups.values())
+    assert "predates the dual measurement" in calib.NO_RESIDUAL
+
+
 def test_headphone_and_silent_readings_carry_no_loopback():
     rows = [reading(),
             reading(discrepancy="no_acoustic_path_headphones_likely"),

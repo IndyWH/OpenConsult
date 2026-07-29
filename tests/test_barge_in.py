@@ -382,6 +382,79 @@ def test_a_bad_wav_degrades_to_no_envelope_never_to_no_speech(
     assert ready["text"] == "Mm-hm."
 
 
+# --- the audit row's shape, with and without a residual ---------------------
+
+@needs_db
+def test_the_row_carries_the_residual_when_measured(barge_env):
+    doctor = _make_user()
+    client = _client_for(doctor)
+    residual = {"peak_rms": 0.031, "mean_rms": 0.012,
+                "series": [0.05, 0.02, 0.008, 0.007], "window_ms": 250}
+    result = client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 2e-4, "peak_rms": 0.4, "answer": "yes",
+        "device_label": "Room speakers",
+        "chain": {"ec": False, "ns": True, "agc": True},
+        "residual": residual})
+    assert result.status_code == 200
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        detail = conn.execute(
+            "SELECT detail FROM audit_event WHERE action = 'speech.sound_check'"
+            " ORDER BY id DESC LIMIT 1").fetchone()[0]
+    assert detail["residual"] == residual
+    assert "residual_unavailable" not in detail
+
+
+@needs_db
+def test_a_missing_residual_is_visible_never_a_silent_zero(barge_env):
+    """The reading stores raw-only AND says so: the row carries WHY there
+    is no residual — the client's reason when it sent one, 'not measured'
+    when it sent nothing at all (an old client)."""
+    doctor = _make_user()
+    client = _client_for(doctor)
+    client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 2e-4, "peak_rms": 0.4, "answer": "yes",
+        "residual": None, "residual_unavailable": "Permission denied"})
+    client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 2e-4, "peak_rms": 0.4, "answer": "yes"})
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        details = [r[0] for r in conn.execute(
+            "SELECT detail FROM audit_event WHERE action = 'speech.sound_check'"
+            " ORDER BY id DESC LIMIT 2")]
+    assert details[0]["residual_unavailable"] == "not measured"
+    assert details[1]["residual_unavailable"] == "Permission denied"
+    for detail in details:
+        assert "residual" not in detail
+
+
+@needs_db
+def test_the_clamp_anomaly_fires_when_residual_exceeds_the_raw_bound(
+        barge_env, monkeypatch):
+    """A canceller only removes, so residual > raw is physically wrong:
+    the client receives the clamped value and the anomaly is AUDITED —
+    something wrong must leave a record, not a quietly corrected number."""
+    monkeypatch.setattr(speech, "BARGE_IN_ENABLED", True)
+    doctor = _make_user()
+    asyncio.run(audit.log(doctor["id"], "speech.sound_check", None, None,
+                          {"peak_rms": 0.1, "device_label": "Room speakers",
+                           "residual": {"peak_rms": 0.3, "series": [0.3]}}))
+    client = _client_for(doctor)
+    with client.websocket_connect("/ws/transcribe") as ws:
+        ws.send_json({"session_id": secrets.token_hex(8)})
+        config = _drain_until(ws, {"speech_config"})
+    assert config["barge_in"]["residual_peak_rms"] == pytest.approx(0.1)
+    assert config["barge_in"]["loopback_peak_rms"] == pytest.approx(0.1)
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        row = conn.execute(
+            "SELECT detail FROM audit_event"
+            " WHERE action = 'speech.barge_in_anomaly'"
+            " ORDER BY id DESC LIMIT 1").fetchone()
+    assert row is not None
+    assert row[0]["kind"] == "residual_exceeds_raw_loopback"
+    assert row[0]["residual_peak_rms"] == pytest.approx(0.3)
+    assert row[0]["raw_peak_rms"] == pytest.approx(0.1)
+
+
 # --- the client's decision object, executed under Node ----------------------
 
 def _extract_barge_in() -> str:

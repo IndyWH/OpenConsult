@@ -89,6 +89,36 @@ def test_the_detector_stream_never_leaves_the_detector_section():
     assert "barEls" not in detector
 
 
+# --- the dual measurement stays out of the meter (Part 10 amendment) --------
+
+def test_the_meter_never_reads_the_residual_measurement_either():
+    """The sound check's residual measurement opens the SAME echo-cancelled
+    stream kind the detector uses — and the meter's one-capture invariant
+    covers it identically: the level meter and the sound check's own
+    room measurement keep reading the shared capture, never anything
+    echo-cancelled."""
+    meter = _section("// Level meter:", "}, 100);")
+    assert "resid" not in meter.lower()
+    current_rms = _section("function currentRms()", "\n}")
+    assert "resid" not in current_rms.lower()
+
+
+def test_the_residual_stream_has_one_sink_and_is_always_closed():
+    """One boolean's worth of data, one sink, short-lived: the residual
+    measurement's source connects only to its own analyser, touches no
+    meter bars and no worklet, and every exit path of the sound check
+    closes it."""
+    residual = _section("async function openResidualMeasurement",
+                        "function askHeard()")
+    assert residual.count(".connect(") == 1
+    assert "source.connect(analyser)" in residual
+    assert "barEls" not in residual and "workletNode" not in residual
+    # Closed on every exit path — the finally block owns the teardown.
+    check = _section("async function runSoundCheck()", "\n}")
+    assert "closeResidualMeasurement(residualMeasure)" in check
+    assert "finally" in check
+
+
 # --- the capture chain (owner decision 2026-07-30) --------------------------
 
 def test_the_main_capture_chain_is_explicit_ec_off_ns_on_agc_on():
