@@ -2169,9 +2169,59 @@ decision because it touches the faithfulness guarantee):**
   sound-check rows should record the constraint set in force (a small
   follow-up), so readings are comparable within a configuration epoch.
 
+**`calibrate_barge_in.py --since YYYY-MM-DD`** (built the same session):
+limits every per-device analysis to readings from that date onward, so
+the current room configuration is evaluated without the device's history
+polluting the spread — the intended cut after any change of volume,
+position, or capture constraints. Excluded readings are counted and
+dated in the output; a narrowed window is never silent. Default remains
+all readings. Live run with `--since 2026-07-29`: the NVIDIA device
+still read spread ×16.5 — the collapse was *inside* the window, which is
+the finding above confirmed by the tool built to see it.
+
+### THE CAPTURE-CHAIN DECISION (owner, 2026-07-30): EC OFF on the main stream
+
+**Option B of the constraints report, decided by the owner 2026-07-30.**
+The main capture stream — the one feeding the meter, the transcriber and
+the stored recording — now requests `echoCancellation: false`, with
+`noiseSuppression: true` and `autoGainControl: true` pinned EXPLICITLY
+at their previously-effective values, so nothing on that stream runs on
+a browser default any more (AGC in particular was never chosen by
+anyone until now; choosing the status quo is still a choice, and it is
+now written down). The single source is `CAPTURE_CHAIN` in `live.html`,
+which builds the constraints AND is recorded with every sound-check
+reading. The barge-in detector stream is untouched (EC on, NS on, AGC
+off, all explicit already). Full raw capture — NS and AGC off too,
+option A — is **explicitly deferred to a planned v2 campaign**, because
+it invalidates every RMS calibration at once.
+
+**Why:** the echo canceller was deleting the machine's own voice from
+the recording — a faithful record of the room should contain it; she was
+in the room — and made loopback measurement impossible (an adaptive
+filter whose job is to remove exactly the measured signal; the ×13
+collapse above). NS and AGC stay because every RMS calibration in the
+project was derived through them.
+
+**The epoch line, prominently: every recording made before 2026-07-30
+went through Chrome's EC+NS+AGC chain. Their bytes remain the project's
+evidence set, unchanged, and their RMS numbers are calibrations OF THAT
+CHAIN. Recordings made after this change are EC-free (NS+AGC still on).
+The evidence rows — 445, 446–448, 450, #70 — are unaffected in status:
+nothing about them is voided, repaired or reinterpreted by this
+decision.** Pre-change sound-check rows carry no chain record and the
+calibration report marks them incomparable; post-change rows carry
+`chain: {ec, ns, agc}`.
+
+**Expected side effect, noted rather than "fixed": the mic level meter
+now moves while the machine speaks.** That is honest — the room IS loud
+while she talks — and the meter's one-capture invariant is exactly why
+it must show it. Do not re-point the meter or filter its display to
+make it sit still during playback; a meter that disagrees with what the
+server hears is the fault, not the movement.
+
 ### Threshold design under the split chains (2026-07-30, REPORT ONLY)
 
-With EC off on the main stream (the 2026-07-30 decision, next section),
+With EC off on the main stream (the decision above),
 the sound check now measures the TRUE acoustic loopback — stable, at
 last calibratable — while the detector still listens through its own
 echo-cancelled stream, where our playback arrives as a much smaller,
@@ -2240,16 +2290,6 @@ the owner's two-minute job after the restart**: one short scripted
 recording through live→Stop→review on the new EC-free capture, read the
 transcript and note. Until that is done, the new chain has never
 produced a consultation.
-
-**`calibrate_barge_in.py --since YYYY-MM-DD`** (built the same session):
-limits every per-device analysis to readings from that date onward, so
-the current room configuration is evaluated without the device's history
-polluting the spread — the intended cut after any change of volume,
-position, or capture constraints. Excluded readings are counted and
-dated in the output; a narrowed window is never silent. Default remains
-all readings. Live run with `--since 2026-07-29`: the NVIDIA device
-still reads spread ×16.5 — the collapse is *inside* the window, which is
-the finding above confirmed by the tool built to see it.
 
 ## Shared schema module (2026-07-25)
 
