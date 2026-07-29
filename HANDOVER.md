@@ -2093,6 +2093,92 @@ under silence, under room noise, and with scripted interruptions,
 tallied against the script — before any flip of the flag. Re-run on any
 change of speakers, microphone or room, and record results here.
 
+### The within-minute loopback collapse, and what is processing the mic (2026-07-29)
+
+The owner took four sound checks in 32 seconds on the NVIDIA monitor
+output at a volume he confirms he did not change (22:42:49–22:43:21,
+in the audit rows): **peaks 0.148, 0.182, 0.014, 0.025 — a ×13 collapse
+inside one minute**, with the noise floor stable (0.004–0.008) and the
+doctor answering *yes* every time. The room stayed audible; only the
+measurement collapsed. Separately, two low-ratio readings that morning
+carry visibly inflated noise floors (0.089, 0.077) from street noise
+through an open door — procedural, explained, and not this finding.
+
+**The capture-stream constraints report (item 1, REPORT ONLY — no
+behaviour change; which streams get which constraints is the owner's
+decision because it touches the faithfulness guarantee):**
+
+- **What each stream actually requests** (`live.html`). Stream (a) — the
+  one capture feeding the meter, the transcriber and the recording —
+  explicitly sets `echoCancellation: true` and `noiseSuppression: true`;
+  `autoGainControl` is **unspecified, and Chrome defaults it ON**. So all
+  three processors are active on the audio the server stores, and AGC
+  was never chosen by anyone. Stream (b) — the barge-in detector — sets
+  all three explicitly (EC on, NS on, AGC off).
+- **The hypothesis holds.** Chrome's echo canceller uses the browser's
+  own playback as its reference, and it is *adaptive*: repeated exposure
+  to the same signal converges the filter. The sound check plays the
+  same phrase through the same path — readings 1–2 are pre-convergence
+  residual, readings 3–4 post-convergence. A stable floor, a constant
+  volume, a human hearing it fine, and a ×13 measured collapse in nine
+  seconds is the textbook AEC-convergence signature (NS adaptation and
+  AGC can contribute; AEC is the dominant term). The constraint
+  configuration doesn't merely permit this — it guarantees it: **the
+  sound check measures our own playback through a canceller whose
+  entire job is to remove that exact signal.**
+- **Implication 1 — the recording.** The stored WAV is **already
+  processed audio**: our own utterances arrive partially cancelled,
+  quiet speech is shaped by NS, and absolute levels ride on AGC. The
+  transcript-exclusion guarantee is untouched (server-held byte windows,
+  signal-independent), but "the original WAV is the faithful record of
+  the room" is true of the bytes, not of the room: they were never raw.
+  Every RMS number this project has derived from recordings — the 445
+  forensics, the S4 trailing-content thresholds, the hallucinated-filler
+  analysis, the barge-in absolute-floor default — is a calibration of
+  the *processed* chain. Internally consistent while the constraints
+  stay put; re-derive them if the constraints ever change.
+- **Implication 2 — ASR.** EC/NS/AGC is the standard comms chain and can
+  help or hurt Whisper (NS strips hiss but eats soft consonants; AGC
+  pumps room noise in silences — possibly feeding the live-path filler
+  turns). Unmeasured on this system either way; recordings 66–70 were
+  all made through the current chain, so any constraint change needs at
+  least the note-quality eval re-run before being trusted.
+- **Implication 3 — measurement stability, the barge-in input.** The
+  measured "loopback level" is an AEC *residual*, which depends on
+  convergence state, not just room and volume — so the spread check can
+  never pass on this chain, however many readings are taken: the
+  instrument adapts, the room doesn't. Worse, the failure direction is
+  the bad one: at the first utterance after a quiet gap the canceller is
+  unconverged (residual at its highest) while a stored converged-low
+  reading would set the threshold low — a predicted false stop, D5's
+  side 1.
+- **Options (costs stated, NONE taken):** (A) raw capture on stream (a)
+  — all three explicitly off: the WAV becomes the actual room, levels
+  stabilise, sound checks become calibratable; costs an ASR re-check and
+  re-deriving every RMS threshold, and old sound-check rows stop being
+  comparable (the `--since` cut below exists for exactly that). (B) EC
+  off on stream (a) only — the transcript path never needed AEC
+  (exclusion is server-held), and this alone removes both the ×13
+  instability and the erasure of our voice from the WAV; NS/AGC
+  decisions stay separable. (C) measure loopback on the detector's own
+  stream (b) — measures what the detector actually hears, but it is a
+  different AEC instance, still convergence-dependent, and does nothing
+  for the recording. (D) status quo — barge-in calibration stays
+  impossible on this chain and the D5 ship rule resolves to hard mute,
+  which the spec explicitly blesses. Whatever is chosen, future
+  sound-check rows should record the constraint set in force (a small
+  follow-up), so readings are comparable within a configuration epoch.
+
+**`calibrate_barge_in.py --since YYYY-MM-DD`** (built the same session):
+limits every per-device analysis to readings from that date onward, so
+the current room configuration is evaluated without the device's history
+polluting the spread — the intended cut after any change of volume,
+position, or capture constraints. Excluded readings are counted and
+dated in the output; a narrowed window is never silent. Default remains
+all readings. Live run with `--since 2026-07-29`: the NVIDIA device
+still reads spread ×16.5 — the collapse is *inside* the window, which is
+the finding above confirmed by the tool built to see it.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
