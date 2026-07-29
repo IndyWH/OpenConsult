@@ -2221,6 +2221,26 @@ fails side 2 for soft speech, build the dual measurement with the
 owner's spec-10.3 amendment; it is the principled fix and makes the
 canceller's convergence visible into the bargain.
 
+### Regression insurance for the chain change (2026-07-30)
+
+The note-quality harness was re-run against its stored expectations
+after the capture-chain change: **mean coverage 94%, 0 discrepancies
+across all 10 notes, citations 100% bar the one pre-existing 23/24**.
+Nine of ten notes are byte-identical to the stored baseline
+(`evals/note_results.json`, refreshed); script 01's note is reworded at
+identical marks — the known temperature-0 wobble of this stack (same
+class as the session-4 CDS re-run's differential drift), reported rather
+than glossed.
+
+**What this does and does not cover, plainly:** the stored recordings
+and mock scripts all predate the chain change, so this run proves the
+NOTE PIPELINE is undisturbed by this session's code — it says nothing
+about audio captured through the new chain. **The live-chain check is
+the owner's two-minute job after the restart**: one short scripted
+recording through live→Stop→review on the new EC-free capture, read the
+transcript and note. Until that is done, the new chain has never
+produced a consultation.
+
 **`calibrate_barge_in.py --since YYYY-MM-DD`** (built the same session):
 limits every per-device analysis to readings from that date onward, so
 the current room configuration is evaluated without the device's history
