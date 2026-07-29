@@ -34,10 +34,22 @@ calibrate_transcript_quality convention).
 
 Usage:
     uv run python scripts/calibrate_barge_in.py
+    uv run python scripts/calibrate_barge_in.py --since 2026-07-30
+
+`--since YYYY-MM-DD` limits every per-device analysis to readings from
+that date onward, so the CURRENT room configuration can be evaluated
+without the device's whole history polluting the spread — the intended
+cut after any change of volume, position, or capture-stream constraints
+(readings across such a change are not comparable, the same lesson as
+the device grouping). When the flag excludes readings the report says
+how many and from when, so a narrowed window is always visible in the
+output rather than silent. Default remains all readings.
 """
 
 from __future__ import annotations
 
+import argparse
+import datetime
 import math
 import os
 import statistics
@@ -111,6 +123,23 @@ def group_by_device(checks: list[dict]) -> dict[str, list[dict]]:
     for row in checks:
         groups.setdefault(row.get("device_label") or NO_DEVICE, []).append(row)
     return groups
+
+
+def _reading_date(row: dict) -> datetime.date:
+    at = row.get("at")
+    if hasattr(at, "date"):
+        return at.date()
+    return datetime.date.fromisoformat(str(at)[:10])
+
+
+def split_since(rows: list[dict],
+                since: datetime.date | None) -> tuple[list[dict], list[dict]]:
+    """(kept, excluded) by reading date; since=None keeps everything."""
+    if since is None:
+        return rows, []
+    kept = [r for r in rows if _reading_date(r) >= since]
+    excluded = [r for r in rows if _reading_date(r) < since]
+    return kept, excluded
 
 
 def acoustic_readings(rows: list[dict]) -> list[dict]:
@@ -261,7 +290,17 @@ def _verdict(met: bool | None) -> str:
             None: "INSUFFICIENT DATA"}[met]
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(
+        description="Barge-in calibration report (D5) — report only.")
+    parser.add_argument(
+        "--since", metavar="YYYY-MM-DD", type=datetime.date.fromisoformat,
+        default=None,
+        help="analyse only readings from this date onward, per device — "
+             "use after any change of volume, position or capture "
+             "constraints; excluded readings are counted in the output")
+    args = parser.parse_args(argv or [])
+
     schema.ensure_all()
     checks, ends = fetch_rows()
 
@@ -273,6 +312,9 @@ def main() -> int:
     print("=" * 70)
     print(f"Settings in force: BARGE_IN_ENABLED={speech.BARGE_IN_ENABLED}"
           f"  margin=x{margin}  abs_floor={abs_floor} RMS  min_ms={min_ms}")
+    if args.since is not None:
+        print(f"Window: readings from {args.since} onward only (--since); "
+              "anything older is excluded per device, and said so.")
     print(f"D5 target: false stops <= {D5_FALSE_STOP_MAX:.0%} of utterances"
           f"  AND  >= {D5_CATCH_MIN:.0%} of interruptions caught within"
           f" {D5_CATCH_WITHIN_MS} ms\n")
@@ -282,7 +324,8 @@ def main() -> int:
         print("There is nothing to calibrate from yet.\n")
 
     thin_devices: list[tuple[str, int]] = []
-    for device, rows in group_by_device(checks).items():
+    for device, all_rows in group_by_device(checks).items():
+        rows, excluded = split_since(all_rows, args.since)
         usable = acoustic_readings(rows)
         headphones = sum(1 for r in rows
                          if r.get("discrepancy") == "no_acoustic_path_headphones_likely")
@@ -290,6 +333,11 @@ def main() -> int:
         print(f"  readings: {len(rows)} total, {len(usable)} with an acoustic"
               f" path ({headphones} headphone/no-path, "
               f"{len(rows) - len(usable) - headphones} other)")
+        if excluded:
+            first, last = (str(_reading_date(excluded[0])),
+                           str(_reading_date(excluded[-1])))
+            print(f"  EXCLUDED by --since {args.since}: {len(excluded)} "
+                  f"reading(s) from {first}..{last} — not in any number below")
         for r in rows:
             db = f"{r['ratio_db']:.0f} dB" if r.get("ratio_db") is not None else "—"
             print(f"    {str(r['at'])[:19]}  {r.get('username') or '?':<12}"
@@ -384,4 +432,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    sys.exit(main(sys.argv[1:]))

@@ -38,8 +38,8 @@ def _db_ready() -> bool:
 
 
 def reading(peak=0.01, floor=0.004, answer="yes", ratio=None,
-            discrepancy=None, device="Speakers") -> dict:
-    return {"at": "2026-07-29", "username": "doctor", "peak_rms": peak,
+            discrepancy=None, device="Speakers", at="2026-07-29") -> dict:
+    return {"at": at, "username": "doctor", "peak_rms": peak,
             "noise_floor_rms": floor, "answer": answer,
             "ratio": ratio if ratio is not None else peak / floor,
             "discrepancy": discrepancy, "device_label": device}
@@ -122,6 +122,70 @@ def test_a_sustain_requirement_over_the_budget_fails_the_catch_side():
     verdicts = _assess([reading() for _ in range(5)], min_ms=300)
     assert verdicts["side_b"] is False
     assert verdicts["numbers"]["predicted_latency_ms"] == 350
+
+
+# --- the --since window -----------------------------------------------------
+
+def test_split_since_partitions_by_date_and_none_keeps_everything():
+    import datetime
+    rows = [reading(at="2026-07-20"), reading(at="2026-07-29"),
+            # datetime objects (what the database actually returns) work too
+            reading(at=datetime.datetime(2026, 7, 30, 22, 42, 49))]
+    kept, excluded = calib.split_since(rows, None)
+    assert kept == rows and excluded == []
+    kept, excluded = calib.split_since(rows, datetime.date(2026, 7, 29))
+    assert [str(calib._reading_date(r)) for r in kept] == \
+        ["2026-07-29", "2026-07-30"]
+    assert [str(calib._reading_date(r)) for r in excluded] == ["2026-07-20"]
+
+
+def test_a_recent_consistent_cluster_passes_under_since_and_fails_without():
+    """The flag's whole purpose: the current room configuration evaluated
+    without the device's history polluting the spread. Old scattered
+    readings (x30 spread) drown a recent consistent cluster; --since cuts
+    to the cluster and the spread check passes."""
+    import datetime
+    old = [reading(peak=p, at="2026-07-20")
+           for p in (0.005, 0.060, 0.150, 0.010, 0.090)]
+    recent = [reading(peak=p, at="2026-07-30")
+              for p in (0.010, 0.011, 0.009, 0.012, 0.010)]
+    rows = old + recent
+
+    without = calib.assess_device(calib.acoustic_readings(rows),
+                                  margin=2.0, abs_floor=0.02, min_ms=150)
+    assert without["side_a"] is False
+    assert any("spread" in why for why in without["side_a_why"])
+
+    kept, excluded = calib.split_since(rows, datetime.date(2026, 7, 30))
+    assert len(excluded) == 5
+    narrowed = calib.assess_device(calib.acoustic_readings(kept),
+                                   margin=2.0, abs_floor=0.02, min_ms=150)
+    assert narrowed["side_a"] is True
+    assert narrowed["side_b"] is True
+
+
+@pytest.mark.skipif(not _db_ready(), reason="PostgreSQL not available")
+def test_excluded_readings_are_announced_never_silent(capsys):
+    """A narrowed window must be visible in the output: the report names
+    how many readings --since excluded and from when."""
+    from app import schema
+    schema.ensure_all()
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        conn.execute(
+            "INSERT INTO audit_event (at, action, detail) VALUES"
+            " ('2026-06-01T10:00:00Z', 'speech.sound_check',"
+            "  '{\"peak_rms\": 0.02, \"noise_floor_rms\": 0.004,"
+            "    \"answer\": \"yes\", \"ratio\": 5.0,"
+            "    \"device_label\": \"Since-flag test device\"}')")
+    assert calib.main(["--since", "2026-06-15"]) == 0
+    out = capsys.readouterr().out
+    assert "readings from 2026-06-15 onward only" in out
+    assert "EXCLUDED by --since 2026-06-15: 1 reading(s) from 2026-06-01" in out
+
+
+def test_an_invalid_since_date_is_an_argparse_error_not_a_guess():
+    with pytest.raises(SystemExit):
+        calib.main(["--since", "yesterday"])
 
 
 # --- sound-check ratio recommendations --------------------------------------
