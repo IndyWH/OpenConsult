@@ -51,7 +51,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
 | 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker Compose packaging, demo script. **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
-| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end, barge-in is session 3** (see "Phase 7a — the transcript guarantee" below, and run its real-room check before calling 7a done). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled (see "Phase 7b — session 1"). **Session 2 the same day**: full expression range by owner decision (evaluation-first; brief decision 3 superseded for this phase, clinical retained as the comparison arm), the CDS affect hint, interim top-of-stack placement, and the lost specs reconstructed and committed (see "Phase 7b — session 2"). **Session 3, also the same day**: sticky top row (urgent LEFT, face RIGHT — supersedes session 2's placement), auto-on at Disclosure, the auto-chained invitation, the caged silence nudge (the only autonomous utterance until 7c), and the sound-check wording fix (see "Phase 7b — session 3"); **room-checked the same evening (452, 454)**. **Session 4**: the Face pill (manual on-path; "manual off is final" amended by the owner), questions_to_ask ordered by clinical priority (harness re-run 9/10, the known script-02 boundary case the only FAIL), and the first-assessment latency report (see "Phase 7b — session 4"). **Session 5**: first CDS call on the first committed turn (~20 s to first questions, was ~50 s), one num_ctx across all MedGemma calls (the 3.9 s reload eliminated, measured), and PHASE_7C_EVAL_PREREG.md committed FROZEN (see "Phase 7b — session 5"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
+| 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end; barge-in (session 3) built 2026-07-29, `BARGE_IN_ENABLED` false pending calibration** (see "Phase 7a — session 3" below). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled (see "Phase 7b — session 1"). **Session 2 the same day**: full expression range by owner decision (evaluation-first; brief decision 3 superseded for this phase, clinical retained as the comparison arm), the CDS affect hint, interim top-of-stack placement, and the lost specs reconstructed and committed (see "Phase 7b — session 2"). **Session 3, also the same day**: sticky top row (urgent LEFT, face RIGHT — supersedes session 2's placement), auto-on at Disclosure, the auto-chained invitation, the caged silence nudge (the only autonomous utterance until 7c), and the sound-check wording fix (see "Phase 7b — session 3"); **room-checked the same evening (452, 454)**. **Session 4**: the Face pill (manual on-path; "manual off is final" amended by the owner), questions_to_ask ordered by clinical priority (harness re-run 9/10, the known script-02 boundary case the only FAIL), and the first-assessment latency report (see "Phase 7b — session 4"). **Session 5**: first CDS call on the first committed turn (~20 s to first questions, was ~50 s), one num_ctx across all MedGemma calls (the 3.9 s reload eliminated, measured), and PHASE_7C_EVAL_PREREG.md committed FROZEN (see "Phase 7b — session 5"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
 reusable harness in `scripts/evaluate_*.py`. Raw per-case JSON sits next
@@ -2012,6 +2012,87 @@ touched for a 3–4 s gain). Three commits ("Phase 7b s5 1/3 … 3/3").
   one-page open/closed question-classification rule (metric 5), to be
   written before the first 7c run.
 
+## Phase 7a — session 3 (2026-07-29): the barge-in detector, built and OFF
+
+The deliberately-held last 7a item, unblocked by owner decision
+2026-07-29 (the mock-patient round moved to next week; barge-in is a hard
+precondition for 7c). Five commits ("Phase 7a s3 1/5 … 5/5"). No new
+dependencies; `pyproject.toml` and `uv.lock` byte-identical.
+
+**What was built (spec build item 5 / Part 9 D5, gate-and-cut's detection
+half):**
+
+- **The detector** (`live.html`): a SECOND, echo-cancelled capture stream
+  (`echoCancellation: true`, `autoGainControl: false` — AGC would break
+  the envelope proportionality) feeding one analyser and nothing else.
+  Detection runs ONLY while a system utterance is playing. On a sustained
+  crossing it cuts through `stopSpeaking('barge_in', latency)` — the SAME
+  server-audited path as the Stop button, `end_reason` distinguishing the
+  two, measured `cut_latency_ms` riding `speak_ended` into the existing
+  column. Nothing is ever queued behind an utterance (queue depth zero),
+  so cutting the current one cancels everything; a barged disclosure does
+  not chain the invitation (reason ≠ complete — the session-3 chain
+  condition already guarantees it).
+- **The envelope-proportional threshold**: `speech.playback_envelope()`
+  computes each utterance's normalised RMS envelope server-side from the
+  same bytes the client plays (no second implementation in JS to drift);
+  it rides `speak_ready` only when the flag is up, so the shipped
+  protocol is byte-identical to session 2's. The expected residual echo
+  is **the measured loopback level — read from the newest
+  `speech.sound_check` audit row for the session's doctor
+  (`audit.latest_detail`), never re-measured — scaled by that envelope**;
+  mic energy must exceed it by `BARGE_IN_MARGIN` (2.0, an uncalibrated
+  guess, stated as such), sustained `BARGE_IN_MIN_MS` (150), with an
+  absolute floor `BARGE_IN_RMS_THRESHOLD` (default 0.02 — a guess placed
+  between this project's own measurements: room noise 0.008–0.011, real
+  speech 0.056–0.153, the 445 numbers). Config reaches the client in
+  `speech_config`; a doctor with no sound-check rows gets a null loopback
+  and absolute-floor-only detection, stated rather than invented.
+- **The two standing constraints, enforced as tests**
+  (`tests/test_barge_in_constraints.py`): the detector stream is NEVER
+  wired to the mic meter (structural asserts — one `connect` on the
+  detector source, no barge token in the meter's loop or the sound
+  check's measurement function, no reassignment of the shared analyser),
+  and the approved disclosure gains no interruption line (the original
+  absence test in `test_speech.py` is **pinned verbatim** — amending it
+  there fails loudly here; the phrase table is asserted not to branch on
+  any BARGE_IN flag). One pre-existing test was AMENDED, not weakened:
+  "exactly one getUserMedia in the page" became "exactly two, and the
+  second only inside the detector" — the spec (§1.4) requires the second
+  stream, while the sound check still reads the shared capture.
+- **`scripts/calibrate_barge_in.py`** — REPORT ONLY (reads in a READ ONLY
+  transaction; sets nothing). Groups the `speech.sound_check` rows by
+  output device (readings on different devices are not comparable),
+  reports both sides of the D5 target with the measured numbers and a
+  plain per-device verdict — predicted MET / predicted NOT MET /
+  INSUFFICIENT DATA — plus recommended sound-check good/faint ratios
+  when ≥5 consistent confirmed-heard readings exist, and a what-next
+  footer. **First live run, 2026-07-29: 14 readings across three device
+  groups; seven predate the device-label fix and can support nothing;
+  the NVIDIA monitor output has 4 usable of the 5 needed; the Realtek
+  speakers have 1 (a `not_heard`, same day). Verdict everywhere:
+  INSUFFICIENT DATA.** So the current state is exactly what the report
+  says: more sound checks at normal room volume on the device the room
+  actually uses, then re-run.
+
+**`BARGE_IN_ENABLED` is FALSE and stays false pending calibration.** Hard
+mute is this design with the detector off; both failure modes degrade
+safely (a false stop costs a re-tap, a miss IS hard mute). It flips only
+when both sides of the D5 target are met — false stops ≤ 1% of
+utterances AND ≥ 90% of true interruptions caught within 300 ms — **and
+flipping it is the owner's act, recorded here, not a code change.** This
+is a comfort parameter, not a safety parameter: exclusion is structural,
+so no threshold setting can corrupt a transcript.
+
+**What the owner runs next:** sound checks at normal room volume on the
+room's real output device until a device group reaches 5 usable readings
+(each check is stored automatically), then
+`uv run python scripts/calibrate_barge_in.py` again. If both sides read
+predicted met, the next step is the D5 scripted room run — utterances
+under silence, under room noise, and with scripted interruptions,
+tallied against the script — before any flip of the flag. Re-run on any
+change of speakers, microphone or room, and record results here.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
@@ -2396,20 +2477,15 @@ lost while Phase 7 takes attention:**
    — the same recording as gate item 1, so the two unblock together.
 5. **Consultations #78 and #162 await the owner's review** (both
    `awaiting_review` in the live database, verified 2026-07-25).
-6. **Phase 7a session 3**: the barge-in detector (second echo-cancelled
-   stream, envelope-proportional threshold) and
-   `scripts/calibrate_barge_in.py` reporting both sides of the D5 target.
-   Deliberately held until the owner has used tap-to-ask in the real
-   room. `BARGE_IN_ENABLED` ships false — hard mute is this design with
-   the detector off — and flips only if calibration meets both sides of
-   the target. Two standing constraints for whoever builds it: the
-   detector stream must never be wired to the mic meter, and the approved
-   disclosure must not gain an interruption line. **Read the sound-check
-   levels from the `speech.sound_check` audit rows rather than
-   re-measuring** — that loopback level is exactly what the
-   envelope-proportional threshold needs, and it is already being
-   recorded. The good/faint ratios there are uncalibrated guesses and
-   should be set from the same run.
+6. **Phase 7a session 3: BUILT 2026-07-29** — the barge-in detector
+   (second echo-cancelled stream, envelope-proportional threshold fed
+   from the `speech.sound_check` audit rows, never re-measured) and
+   `scripts/calibrate_barge_in.py` reporting both sides of the D5 target
+   per output device. The two standing constraints are enforced as tests
+   (`tests/test_barge_in_constraints.py`). `BARGE_IN_ENABLED` remains
+   **false pending calibration** — the first live report read
+   INSUFFICIENT DATA on every device — and flipping it is the owner's
+   act. Full account in "Phase 7a — session 3" below.
 7. **The Phase 7a real-room check has now been run FOUR times, and the
    fourth passed the guarantee** — 445, 446, 447 on 2026-07-25 (the missing
    six minutes, the offer eating taps, no way to stop an utterance) and
@@ -2977,12 +3053,13 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
   `app/speech.py` (Piper as an isolated subprocess), the live-path
   exclusion with the `system_utterance` table, the finalisation
   exclusion, the doctor-facing UI with the disclosure lock, and the sound
-  check (spec Part 10). **Tap-to-ask works end to end.** Session 3 is the barge-in detector and
-  its calibration script, deliberately held until the owner has used this
-  in the real room — and **the real-room check in "Phase 7a — the
-  transcript guarantee" has not been run yet**, so the guarantee is
-  proven in code and not in the room. **OPENED 2026-07-25 by owner
-  decision**,
+  check (spec Part 10). **Tap-to-ask works end to end.** **Session 3 (the
+  barge-in detector + its calibration script) was built 2026-07-29 after
+  the real room had used tap-to-ask; `BARGE_IN_ENABLED` stays false
+  pending calibration — see "Phase 7a — session 3".** The real-room check
+  has since been run five times and **run 5 (consultation 450) cleared
+  every hard rule** — see "Phase 7 opened" item 7. **OPENED 2026-07-25 by
+  owner decision**,
   with `05_epigastric_pain_en` and the Docker/demo work **deliberately
   carried** rather than met; the transcript-quality gate item is **met
   for its refuse path**, which is live. Full amendment, plus the five
