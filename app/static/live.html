@@ -1643,6 +1643,12 @@ async function runSoundCheck() {
         mean_rms: heard.mean,
         answer: answer,
         device_label: await outputDeviceLabel(audio),
+        // The chain that made this measurement — the SAME object that
+        // built the capture constraints, so the two cannot disagree.
+        // Readings across different chains are not comparable (the
+        // device-label lesson), and the calibration report refuses to
+        // pool them.
+        chain: CAPTURE_CHAIN,
       })
     });
     const verdict = await result.json();

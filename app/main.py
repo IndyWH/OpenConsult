@@ -286,6 +286,14 @@ class SoundCheckResultBody(BaseModel):
     mean_rms: float | None = None
     answer: str | None = None          # 'yes' | 'no' | anything else = skipped
     device_label: str | None = None    # output device, when the browser exposes it
+    # The capture chain the page REQUESTED for the measuring stream
+    # (ec/ns/agc booleans, live.html's CAPTURE_CHAIN — the single source
+    # that also builds the getUserMedia constraints). The device-label
+    # lesson applied before it bites twice: a level without its
+    # processing chain is not a measurement either, and readings across
+    # different chains must never pool. Absent on rows from before
+    # 2026-07-30, which the calibration report marks incomparable.
+    chain: dict[str, bool] | None = None
 
 
 def _user_is_recording(user_id: int) -> bool:
@@ -352,6 +360,7 @@ async def sound_check_result(
                     {"result": verdict["result"], "answer": verdict["answer"],
                      "discrepancy": verdict["discrepancy"],
                      "device_label": body.device_label,
+                     **({"chain": body.chain} if body.chain else {}),
                      **verdict["level"]})
     logger.info("Sound check by %s: %s (ratio %.2f, answer %s, output %s)",
                 user["username"], verdict["result"],

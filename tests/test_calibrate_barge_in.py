@@ -38,11 +38,13 @@ def _db_ready() -> bool:
 
 
 def reading(peak=0.01, floor=0.004, answer="yes", ratio=None,
-            discrepancy=None, device="Speakers", at="2026-07-29") -> dict:
+            discrepancy=None, device="Speakers", at="2026-07-29",
+            chain=None) -> dict:
     return {"at": at, "username": "doctor", "peak_rms": peak,
             "noise_floor_rms": floor, "answer": answer,
             "ratio": ratio if ratio is not None else peak / floor,
-            "discrepancy": discrepancy, "device_label": device}
+            "discrepancy": discrepancy, "device_label": device,
+            **({"chain": chain} if chain is not None else {})}
 
 
 # --- the D5 target is the spec's, verbatim ----------------------------------
@@ -57,12 +59,35 @@ def test_the_d5_target_matches_the_spec():
 
 def test_readings_group_by_device_and_unlabelled_rows_are_quarantined():
     """A level without its path is not a measurement: rows with no device
-    label land in their own named group and never mix with real ones."""
-    groups = calib.group_by_device([
+    label land in their own named group and never mix with real ones.
+    (Amended for the chain field: grouping keys are now (device, chain).)"""
+    groups = calib.group_readings([
         reading(device="Speakers"), reading(device="Monitor"),
         reading(device=None)])
-    assert set(groups) == {"Speakers", "Monitor", calib.NO_DEVICE}
+    assert set(groups) == {("Speakers", None), ("Monitor", None),
+                           (calib.NO_DEVICE, None)}
     assert "not comparable" in calib.NO_DEVICE
+
+
+def test_readings_across_two_chains_never_pool():
+    """The device-label lesson applied to the processing chain: the same
+    device under two capture chains is two instruments, and their
+    readings must never share a spread, an average or a recommendation.
+    Pre-chain rows (no record at all) form a third, incomparable group."""
+    old_chain = {"ec": True, "ns": True, "agc": True}
+    new_chain = {"ec": False, "ns": True, "agc": True}
+    rows = ([reading(chain=old_chain) for _ in range(5)]
+            + [reading(chain=new_chain) for _ in range(5)]
+            + [reading()])                        # pre-chain row
+    groups = calib.group_readings(rows)
+    assert len(groups) == 3
+    assert all(len(g) in (1, 5) for g in groups.values())
+    labels = set(groups)
+    assert ("Speakers", "ec=on ns=on agc=on") in labels
+    assert ("Speakers", "ec=off ns=on agc=on") in labels
+    assert ("Speakers", None) in labels
+    # And the labels are honest about what None means.
+    assert "not comparable" in calib.NO_CHAIN
 
 
 def test_headphone_and_silent_readings_carry_no_loopback():

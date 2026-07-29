@@ -94,6 +94,28 @@ SPEECH_HEADROOM = 2.0
 REFERENCE_SPEECH_RMS = 0.056
 
 NO_DEVICE = "(no output device recorded — predates the device-label fix; not comparable)"
+NO_CHAIN = ("(no capture-chain record — predates the chain field, "
+            "2026-07-30; not comparable)")
+
+
+def chain_label(row: dict) -> str | None:
+    """Compact label for the capture chain a reading was made through, or
+    None when the row predates the chain record.
+
+    The device-label lesson, applied to the processing chain: a level
+    without the chain that produced it is not a measurement either (the
+    2026-07-29 finding — the same room and volume read x13 apart because
+    an adaptive canceller sat in the path). Readings are comparable ONLY
+    within one device AND one chain, and this report never pools across
+    either.
+    """
+    chain = row.get("chain")
+    if not isinstance(chain, dict):
+        return None
+    def onoff(value: object) -> str:
+        return "on" if value else "off"
+    return (f"ec={onoff(chain.get('ec'))} ns={onoff(chain.get('ns'))} "
+            f"agc={onoff(chain.get('agc'))}")
 
 
 # --- data -------------------------------------------------------------------
@@ -118,10 +140,18 @@ def fetch_rows() -> tuple[list[dict], list[dict]]:
     return checks, ends
 
 
-def group_by_device(checks: list[dict]) -> dict[str, list[dict]]:
-    groups: dict[str, list[dict]] = {}
+def group_readings(checks: list[dict]) -> dict[tuple[str, str | None], list[dict]]:
+    """Readings keyed by (output device, capture chain).
+
+    Two readings land in the same group — and may therefore be averaged,
+    spread-checked or recommended from — only when BOTH match. A None
+    chain (pre-2026-07-30 rows) forms its own group per device and is
+    reported as incomparable, exactly as the pre-device-label rows are.
+    """
+    groups: dict[tuple[str, str | None], list[dict]] = {}
     for row in checks:
-        groups.setdefault(row.get("device_label") or NO_DEVICE, []).append(row)
+        key = (row.get("device_label") or NO_DEVICE, chain_label(row))
+        groups.setdefault(key, []).append(row)
     return groups
 
 
@@ -324,12 +354,13 @@ def main(argv: list[str] | None = None) -> int:
         print("There is nothing to calibrate from yet.\n")
 
     thin_devices: list[tuple[str, int]] = []
-    for device, all_rows in group_by_device(checks).items():
+    for (device, chain), all_rows in group_readings(checks).items():
         rows, excluded = split_since(all_rows, args.since)
         usable = acoustic_readings(rows)
         headphones = sum(1 for r in rows
                          if r.get("discrepancy") == "no_acoustic_path_headphones_likely")
         print(f"Output device: {device}")
+        print(f"  capture chain: {chain or NO_CHAIN}")
         print(f"  readings: {len(rows)} total, {len(usable)} with an acoustic"
               f" path ({headphones} headphone/no-path, "
               f"{len(rows) - len(usable) - headphones} other)")
@@ -347,6 +378,12 @@ def main(argv: list[str] | None = None) -> int:
         if device == NO_DEVICE:
             print("  These readings cannot support any threshold: nothing "
                   "recorded which audio path produced them.\n")
+            continue
+        if chain is None:
+            print("  These readings cannot support any threshold: nothing "
+                  "recorded which capture chain produced them (pre-2026-07-30 "
+                  "rows went through Chrome's echo canceller, which is what "
+                  "the x13 collapse was). Never pooled with any other group.\n")
             continue
 
         verdicts = assess_device(usable, margin=margin, abs_floor=abs_floor,
@@ -390,7 +427,7 @@ def main(argv: list[str] | None = None) -> int:
                   "readings to recommend values — the current ones remain "
                   "uncalibrated guesses.")
         if len(usable) < MIN_READINGS:
-            thin_devices.append((device, len(usable)))
+            thin_devices.append((f"{device} [{chain}]", len(usable)))
         print()
 
     barge_ends = [e for e in ends if e["action"] == "speech.barge_in"]

@@ -930,6 +930,39 @@ def test_sound_check_prepares_an_utterance_and_audits_the_result():
 
 
 @needs_db
+def test_sound_check_records_the_capture_chain_it_was_measured_through():
+    """The device-label lesson applied before it bites twice (2026-07-30):
+    a level without its processing chain is not a measurement either. The
+    client reports the ec/ns/agc it requested; the row stores it; the
+    calibration report pools only within one device AND one chain. Rows
+    without the field (pre-change) are handled as incomparable there."""
+    doctor = _make_user("doctor")
+    client = _client_for(doctor)
+    from app.main import app
+    app.state.live_sessions = {}
+
+    result = client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 2e-4, "peak_rms": 2e-3, "answer": "yes",
+        "device_label": "Speakers (Realtek)",
+        "chain": {"ec": False, "ns": True, "agc": True}})
+    assert result.status_code == 200
+
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        detail = conn.execute(
+            "SELECT detail FROM audit_event"
+            " WHERE action = 'speech.sound_check' ORDER BY id DESC LIMIT 1"
+        ).fetchone()[0]
+    assert detail["chain"] == {"ec": False, "ns": True, "agc": True}
+
+    # And the client sends the SAME object that built the capture
+    # constraints — the single source, so a stored measurement can never
+    # disagree about the chain that made it.
+    from pathlib import Path
+    html = Path("app/static/live.html").read_text()
+    assert "chain: CAPTURE_CHAIN," in html
+
+
+@needs_db
 def test_sound_check_is_refused_during_a_consultation():
     """Spec 10.3. A test phrase inside a live consultation would be a
     system utterance needing the whole exclusion machinery for no clinical
