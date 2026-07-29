@@ -440,3 +440,9 @@ envelope-proportional threshold in build order item 5 has to know how loud our o
 into the microphone; that is the number this check produces. `scripts/calibrate_barge_in.py` should
 read the recorded sound-check levels rather than re-measuring from scratch, which is why the two are
 best built together.
+
+---
+**Amendment, 2026-07-30 (owner-approved): the sound check measures both streams.**
+During its playback the sound check now measures BOTH capture streams simultaneously. The main stream (echo cancellation off since 2026-07-30) gives the true acoustic loopback — this remains what the doctor-facing result reports, because "can the room hear the machine" is a question about the room, not about a filter. The barge-in detector stream (echo cancellation on) gives the canceller's RESIDUAL, recorded alongside in the same speech.sound_check audit row, together with enough samples across the utterance to show the canceller's convergence as a curve rather than a point.
+Rationale: the barge-in threshold operates on the detector stream, so it must be proportional to the residual there, not to the raw loopback. Measured 2026-07-29/30 on this room's monitor output: raw loopback 0.30–0.58 RMS against quiet real speech at 0.056 RMS — a tenfold gap no raw-derived threshold can bridge, where a residual-derived threshold can, with the raw figure retained as a sanity upper bound. The human answer remains authoritative; the mic meter still reads the main stream only.
+---
