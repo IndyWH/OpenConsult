@@ -56,6 +56,24 @@ async def log(
         )
 
 
+async def latest_detail(action: str, user_id: int) -> dict | None:
+    """Newest detail payload this user recorded for one action, or None.
+
+    Added for the barge-in threshold (Phase 7a session 3): the measured
+    loopback level lives in the `speech.sound_check` rows, stored flat and
+    raw exactly so later consumers READ them rather than re-measure.
+    """
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        row = await (
+            await conn.execute(
+                "SELECT detail FROM audit_event"
+                " WHERE action = %s AND user_id = %s"
+                " ORDER BY id DESC LIMIT 1", (action, user_id),
+            )
+        ).fetchone()
+    return row[0] if row else None
+
+
 async def recent(limit: int = 200) -> list[dict]:
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
         rows = await (

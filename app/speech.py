@@ -88,6 +88,34 @@ SPEECH_MAX_UTTERANCE_S = float(os.getenv("SPEECH_MAX_UTTERANCE_S", "20"))
 SPEECH_EXCLUSION_TAIL_MS = int(os.getenv("SPEECH_EXCLUSION_TAIL_MS", "200"))
 SPEECH_CACHE_DIR = Path(os.getenv("SPEECH_CACHE_DIR", "data/speech_cache"))
 
+# --- barge-in (Phase 7a session 3; PHASE_7A_SPEC.md build item 5, Part 9 D5)
+#
+# SHIPS FALSE. Hard mute is this design with the detector off (spec §1.2),
+# and the flag flips only when scripts/calibrate_barge_in.py shows BOTH
+# sides of the D5 target met in the real room — false stops ≤ 1% of
+# utterances AND ≥ 90% of true interruptions caught within 300 ms.
+# Flipping it is the OWNER'S act, not a code change.
+#
+# This is a COMFORT parameter, not a safety parameter (D5): exclusion is
+# structural, so no threshold here can corrupt a transcript. A false stop
+# costs a re-tap; a miss behaves exactly like hard mute.
+BARGE_IN_ENABLED = os.getenv("BARGE_IN_ENABLED", "false").lower() == "true"
+BARGE_IN_MIN_MS = int(os.getenv("BARGE_IN_MIN_MS", "150"))
+# Mic energy must exceed the PREDICTED residual echo — the measured
+# loopback level scaled by the playback envelope — by this factor before
+# it counts as an interruption. An uncalibrated first guess, stated as
+# such like the sound-check ratios below; the calibration script reports
+# what the recorded measurements actually support.
+BARGE_IN_MARGIN = float(os.getenv("BARGE_IN_MARGIN", "2.0"))
+# Absolute floor: below this, mic energy is never an interruption however
+# quiet our playback is at that moment. The default is an UNCALIBRATED
+# GUESS placed between this project's own measurements (HANDOVER,
+# consultation 445): ordinary room noise read 0.008–0.011 RMS and real
+# speech 0.056–0.153, so 0.02 sits above the former with headroom under
+# the latter. Env-tunable so the owner sets it from his room.
+_BARGE_IN_FLOOR_RAW = os.getenv("BARGE_IN_RMS_THRESHOLD", "").strip()
+BARGE_IN_RMS_THRESHOLD = float(_BARGE_IN_FLOOR_RAW) if _BARGE_IN_FLOOR_RAW else 0.02
+
 # Pre-synthesis guard on the hard cap. Fast speech tops out around 25
 # characters per second, so this refuses a pathological string before
 # spending CPU on it. The real bound is the post-synthesis duration check
@@ -459,6 +487,53 @@ def cache_key(text: str, voice: str) -> str:
 def wav_duration_ms(wav_bytes: bytes) -> int:
     with wave.open(io.BytesIO(wav_bytes), "rb") as w:
         return round(1000 * w.getnframes() / w.getframerate())
+
+
+# --- playback envelope (Phase 7a session 3, barge-in) -----------------------
+
+ENVELOPE_WINDOW_MS = 100
+
+
+def playback_envelope(wav_bytes: bytes,
+                      window_ms: int = ENVELOPE_WINDOW_MS) -> list[float]:
+    """Normalised RMS envelope of a synthesised utterance: one value per
+    window, 0..1 against the utterance's own loudest window.
+
+    The barge-in threshold is ENVELOPE-PROPORTIONAL (spec Part 9, D5): the
+    client knows exactly what waveform it is rendering, so the residual
+    echo it should expect at any moment is proportional to how loud the
+    playback is at that moment. The client scales the measured loopback
+    level — read from the `speech.sound_check` audit rows, never
+    re-measured — by this envelope and requires mic energy to exceed that
+    prediction by a margin, which attacks the dominant false-trigger cause
+    (our own voice) directly.
+
+    Computed server-side from the same bytes the client will play, so
+    there is no second envelope implementation in JavaScript to drift.
+    Pure; raises `wave.Error`/`ValueError` on malformed audio — the caller
+    degrades to no envelope (absolute-floor detection), never to silence.
+    """
+    with wave.open(io.BytesIO(wav_bytes), "rb") as w:
+        if w.getsampwidth() != 2:
+            raise ValueError(f"expected 16-bit PCM, got {w.getsampwidth() * 8}-bit")
+        channels = w.getnchannels()
+        rate = w.getframerate()
+        frames = w.readframes(w.getnframes())
+    samples = memoryview(frames).cast("h")
+    if channels > 1:                     # Piper is mono; be safe anyway
+        samples = samples[::channels]
+    per_window = max(1, int(rate * window_ms / 1000))
+    windows: list[float] = []
+    for start in range(0, len(samples), per_window):
+        chunk = samples[start:start + per_window]
+        acc = 0
+        for value in chunk:
+            acc += value * value
+        windows.append(math.sqrt(acc / len(chunk)) / 32768.0)
+    peak = max(windows, default=0.0)
+    if peak <= 0:
+        return [0.0] * len(windows)
+    return [round(v / peak, 4) for v in windows]
 
 
 class SpeechService:

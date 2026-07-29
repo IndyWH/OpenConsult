@@ -1540,10 +1540,32 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     # (it holds the mic analyser and sees the transcript stream), so it is
     # told the server's settings — env lives server-side only. The SERVER
     # still enforces the cage regardless of what the client does.
+    #
+    # 7a session 3: the barge-in detector is configured the same way. Its
+    # loopback level is read from the newest `speech.sound_check` audit
+    # row for THIS doctor — measured once in the room, never re-measured
+    # here (spec Part 10.5: that reuse is why the rows store raw numbers).
+    # No row means no envelope prediction; the client falls back to its
+    # absolute floor. The detector is a comfort feature (D5): whatever the
+    # client does with this config, exclusion stays structural.
+    loopback = None
+    if speech.BARGE_IN_ENABLED:
+        try:
+            loopback = await audit.latest_detail("speech.sound_check", user["id"])
+        except Exception as exc:  # noqa: BLE001 - config, not the consultation
+            logger.warning("Could not read sound-check rows for barge-in: %s", exc)
     await websocket.send_json({
         "type": "speech_config",
         "silence_nudge_enabled": SILENCE_NUDGE_ENABLED,
         "silence_nudge_s": SILENCE_NUDGE_S,
+        "barge_in": {
+            "enabled": speech.BARGE_IN_ENABLED,
+            "min_ms": speech.BARGE_IN_MIN_MS,
+            "margin": speech.BARGE_IN_MARGIN,
+            "abs_floor": speech.BARGE_IN_RMS_THRESHOLD,
+            "loopback_peak_rms": (loopback or {}).get("peak_rms"),
+            "loopback_device": (loopback or {}).get("device_label"),
+        },
     })
 
     session: LiveSession = entry["session"]
@@ -1743,7 +1765,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          # calibration data for SILENCE_NUDGE_S.
                          **({"quiet_s": round(float(quiet_s), 1)}
                             if quiet_s is not None else {})})
-        await websocket.send_json({
+        ready = {
             "type": "speak_ready", "utterance_id": utterance.utterance_id,
             "ref_id": utterance.ref_detail.get("id"),
             "duration_ms": utterance.duration_ms,
@@ -1753,7 +1775,21 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # (2026-07-25 room test). This is the server TELLING the
             # client; it remains impossible for the client to supply text.
             "text": utterance.text,
-            "url": f"/api/speech/{utterance.utterance_id}.wav"})
+            "url": f"/api/speech/{utterance.utterance_id}.wav"}
+        if speech.BARGE_IN_ENABLED:
+            # 7a session 3: the normalised playback envelope rides along so
+            # the detector's threshold can follow what is actually being
+            # rendered. Only when the flag is up — the shipped (off)
+            # protocol is byte-identical to session 2's. A failure here
+            # must not stop the system speaking: no envelope simply means
+            # absolute-floor detection.
+            try:
+                ready["envelope"] = speech.playback_envelope(utterance.wav)
+                ready["envelope_window_ms"] = speech.ENVELOPE_WINDOW_MS
+            except Exception as exc:  # noqa: BLE001 - comfort, not speech
+                logger.warning("No playback envelope for %s: %s",
+                               utterance.utterance_id, exc)
+        await websocket.send_json(ready)
 
     def record_utterance(utterance, span: dict | None, end_reason: str,
                          cut_latency_ms: int | None = None) -> None:

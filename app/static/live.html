@@ -1245,13 +1245,152 @@ setInterval(() => {
                {via: 'silence_nudge', quiet_s: Math.round(quiet * 10) / 10});
 }, 250);
 
-function stopSpeaking(reason) {
+// ==================================== Phase 7a session 3: barge-in detector
+//
+// PHASE_7A_SPEC.md build item 5 / Part 9 D5 — gate-and-cut, the detection
+// half. While a system utterance plays, a SECOND capture stream feeds a
+// voice-activity decision and nothing else; on detection the utterance is
+// cut through the SAME path the Stop button uses (stopSpeaking), with
+// end_reason 'barge_in' so the server audits it apart from a manual stop.
+// Nothing is ever queued behind an utterance (queue depth zero,
+// server-enforced), so cutting the current one cancels everything: a
+// barged disclosure does not chain the invitation (reason !== complete).
+//
+// THE SECOND STREAM'S ONE JOB IS ONE BOOLEAN. It is echo-cancelled — the
+// transcript path needs no AEC because exclusion is structural (spec
+// §1.4), but the detector listens WHILE we play audio, so playback echo
+// is its dominant false-trigger cause. It is never transmitted, never
+// recorded, and NEVER wired to the level meter or the transcript: the
+// meter's invariant is one capture (the stream the transcriber consumes),
+// and a meter on this stream would describe audio the server never hears.
+//
+// The threshold is ENVELOPE-PROPORTIONAL: the server sends each
+// utterance's normalised playback envelope with speak_ready, and the
+// expected residual echo is the measured loopback level — the newest
+// speech.sound_check audit row, measured in the room, never re-measured
+// here — scaled by that envelope. Mic energy must exceed the prediction
+// by a margin, sustained for min_ms, before the cut fires.
+//
+// SHIPS OFF (BARGE_IN_ENABLED=false, server-side): with the detector off
+// this design IS hard mute. The flag flips only when
+// scripts/calibrate_barge_in.py shows both sides of the D5 target met —
+// the owner's act. This is a COMFORT feature: no threshold here can
+// corrupt a transcript, because exclusion never depends on detection.
+const bargeIn = {
+  enabled: false,       // from the server's speech_config; ships false
+  minMs: 150,           // sustained energy before a cut (BARGE_IN_MIN_MS)
+  margin: 2.0,          // required excess over predicted echo
+  absFloor: 0.02,       // below this RMS, never an interruption
+  loopbackPeak: null,   // measured mic RMS of our own playback (audit rows)
+  envelope: null,       // normalised playback envelope of the utterance
+  windowMs: 100,
+  startedAt: 0,
+  onsetAt: null,        // when energy first crossed the threshold
+  configure(cfg) {
+    this.enabled = cfg.enabled === true;
+    if (cfg.min_ms > 0) this.minMs = Number(cfg.min_ms);
+    if (cfg.margin > 0) this.margin = Number(cfg.margin);
+    if (cfg.abs_floor > 0) this.absFloor = Number(cfg.abs_floor);
+    this.loopbackPeak = cfg.loopback_peak_rms > 0
+      ? Number(cfg.loopback_peak_rms) : null;
+  },
+  begin(envelope, windowMs, now) {
+    this.envelope = Array.isArray(envelope) && envelope.length ? envelope : null;
+    if (windowMs > 0) this.windowMs = Number(windowMs);
+    this.startedAt = now;
+    this.onsetAt = null;
+  },
+  end() { this.envelope = null; this.onsetAt = null; },
+  threshold(now) {
+    // Envelope-proportional when we can predict the echo; the absolute
+    // floor always applies (a near-silent moment in the playback must not
+    // make breathing count as an interruption).
+    let t = this.absFloor;
+    if (this.envelope && this.loopbackPeak) {
+      const i = Math.min(this.envelope.length - 1,
+                         Math.max(0, Math.floor((now - this.startedAt) / this.windowMs)));
+      t = Math.max(t, this.margin * this.loopbackPeak * this.envelope[i]);
+    }
+    return t;
+  },
+  sample(rms, now) {
+    // Returns the detection latency (ms since onset) when the cut should
+    // fire, else null. Sustain requirement: energy must stay above the
+    // threshold for minMs — a door slam is a spike, speech is a run.
+    if (rms < this.threshold(now)) { this.onsetAt = null; return null; }
+    if (this.onsetAt === null) this.onsetAt = now;
+    const sustained = now - this.onsetAt;
+    if (sustained < this.minMs) return null;
+    this.onsetAt = null;
+    return sustained;
+  },
+};
+
+let bargeStream = null, bargeSource = null, bargeAnalyser = null,
+    bargeTimer = null, bargeBuf = null, bargeStarting = false;
+
+async function startBargeDetector() {
+  if (!bargeIn.enabled || bargeTimer !== null || bargeStarting) return;
+  bargeStarting = true;
+  try {
+    // A separate, echo-cancelled capture. AGC off: automatic gain would
+    // amplify quiet passages and break the envelope proportionality.
+    bargeStream = await navigator.mediaDevices.getUserMedia({
+      audio: {channelCount: 1, echoCancellation: true,
+              noiseSuppression: true, autoGainControl: false}});
+  } catch (err) {
+    // No detector is the documented safe fallback: hard mute, per
+    // utterance (spec §1.2's failure table). Say so rather than nothing.
+    console.warn('barge-in detector unavailable — hard mute applies:', err);
+    setStatus('listening — speak normally (barge-in detector unavailable: '
+      + err.message + ')');
+    bargeStarting = false;
+    return;
+  }
+  bargeStarting = false;
+  bargeAnalyser = audioCtx.createAnalyser();
+  bargeAnalyser.fftSize = 512;   // one boolean needs no resolution
+  bargeSource = audioCtx.createMediaStreamSource(bargeStream);
+  // ...and NOTHING else: not the meter, not the worklet, not the
+  // destination. One boolean, one sink. (tests/test_barge_in_constraints.py
+  // fails if this stream ever gains another connection.)
+  bargeSource.connect(bargeAnalyser);
+  bargeBuf = new Float32Array(bargeAnalyser.fftSize);
+  bargeTimer = setInterval(() => {
+    // Detection runs ONLY while a system utterance is playing.
+    if (!speaking || !bargeAnalyser || audioCtx.state !== 'running') {
+      bargeIn.onsetAt = null;
+      return;
+    }
+    bargeAnalyser.getFloatTimeDomainData(bargeBuf);
+    let sum = 0;
+    for (let i = 0; i < bargeBuf.length; i++) sum += bargeBuf[i] * bargeBuf[i];
+    const latency = bargeIn.sample(Math.sqrt(sum / bargeBuf.length),
+                                   performance.now());
+    if (latency !== null) stopSpeaking('barge_in', latency);
+  }, 50);
+}
+
+function stopBargeDetector() {
+  if (bargeTimer !== null) { clearInterval(bargeTimer); bargeTimer = null; }
+  if (bargeSource) { bargeSource.disconnect(); bargeSource = null; }
+  if (bargeStream) { bargeStream.getTracks().forEach(t => t.stop()); bargeStream = null; }
+  bargeAnalyser = null;
+  bargeIn.end();
+}
+
+function stopSpeaking(reason, cutLatencyMs) {
   if (!speaking) return;
   const {utterance_id, audio, refId} = speaking;
   try { audio.pause(); } catch (e) { /* already ended */ }
+  // Cut means restart, never resume (D5): the paused audio is discarded,
+  // and a cut question is re-offered on its chip as '↻ Again'.
   ws.send(JSON.stringify({type: 'speak_ended', utterance_id: utterance_id,
-                          seq: seq + 1, reason: reason}));
+                          seq: seq + 1, reason: reason,
+                          ...(cutLatencyMs != null
+                              ? {cut_latency_ms: Math.round(cutLatencyMs)} : {})}));
   speaking = null;
+  bargeIn.end();
   setSpeakingUI(false, '');
   // The silence-nudge window opens ONLY when the invitation played
   // through; any other end of playback merely counts as activity.
@@ -1291,6 +1430,10 @@ async function onSpeakReady(msg) {
   markAskedQuestions();
   speaking = {utterance_id: msg.utterance_id, audio: audio,
               text: msg.text || label, refId: msg.ref_id || null};
+  // Arm the barge-in threshold for THIS utterance's playback envelope
+  // (absent when the flag is down or the envelope could not be computed —
+  // the detector then falls back to its absolute floor).
+  bargeIn.begin(msg.envelope, msg.envelope_window_ms, performance.now());
   ws.send(JSON.stringify({type: 'speak_started', utterance_id: msg.utterance_id,
                           seq: seq + 1}));
   setSpeakingUI(true, label);
@@ -1818,6 +1961,13 @@ function onWsMessage(event) {
   else if (msg.type === 'speech_config') {
     nudge.enabled = msg.silence_nudge_enabled !== false;
     nudge.windowS = Number(msg.silence_nudge_s) || nudge.windowS;
+    if (msg.barge_in) {
+      bargeIn.configure(msg.barge_in);
+      // The config can arrive before or after start() flips `recording`
+      // (both call sites guard against double-start), so whichever comes
+      // second actually opens the detector stream.
+      if (recording) startBargeDetector();
+    }
   }
   else if (msg.type === 'cds') { renderCDS(msg.assessment); }
   else if (msg.type === 'guidelines') { renderGuidelines(msg); }
@@ -2005,11 +2155,13 @@ async function start() {
   refreshMicPickerState();
   showSoundCheckOffer();     // passive: it never intercepts a tap
   setStatus('listening — speak normally');
+  startBargeDetector();      // no-op unless the server enabled barge-in
 }
 
 async function stop() {
   recording = false;
   stopSpeaking('doctor_stop');   // never leave a window open across Stop
+  stopBargeDetector();           // the second stream lives only while recording
   refreshSpeechControls();
   refreshMicPickerState();
   btn.disabled = true;

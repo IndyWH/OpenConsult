@@ -1002,7 +1002,17 @@ def test_the_control_is_labelled_and_is_not_a_cogwheel():
 
 def test_the_check_measures_from_the_existing_capture_stream():
     """The mic-cluster invariant stands (spec 10.3): one capture, so the
-    meter cannot disagree with what the server hears. No second stream."""
+    meter cannot disagree with what the server hears. No second stream
+    FOR THE SOUND CHECK.
+
+    AMENDED for 7a session 3, not weakened: this used to assert exactly
+    one getUserMedia in the whole page, which was true until the barge-in
+    detector landed — the spec (§1.4) requires the detector to open its
+    own echo-cancelled stream. The sharper invariant is that the second
+    call is the detector's and ONLY the detector's: the sound check and
+    the meter still read the shared capture, and any third stream is a
+    regression. The detector-vs-meter separation itself is enforced in
+    tests/test_barge_in_constraints.py."""
     from pathlib import Path
 
     html = Path("app/static/live.html").read_text()
@@ -1010,7 +1020,12 @@ def test_the_check_measures_from_the_existing_capture_stream():
         "NOT open a second stream" in html
     # It reads the shared analyser rather than calling getUserMedia again.
     assert "analyser.getFloatTimeDomainData" in html
-    assert html.count("navigator.mediaDevices.getUserMedia") == 1
+    calls = html.count("navigator.mediaDevices.getUserMedia")
+    assert calls == 2, f"expected the capture + the detector, found {calls}"
+    # The second call is inside the detector, nowhere else.
+    detector = html[html.index("async function startBargeDetector"):
+                    html.index("function stopBargeDetector")]
+    assert detector.count("navigator.mediaDevices.getUserMedia") == 1
 
 
 def test_the_offer_never_intercepts_a_tap():
