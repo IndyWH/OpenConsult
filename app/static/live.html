@@ -1357,15 +1357,24 @@ const bargeIn = {
 let bargeStream = null, bargeSource = null, bargeAnalyser = null,
     bargeTimer = null, bargeBuf = null, bargeStarting = false;
 
+// The echo-cancelled capture, acquired in exactly ONE place. Two
+// consumers, identical constraints: the detector's own stream (below),
+// and the sound check's residual measurement (spec Part 10 amendment,
+// 2026-07-30), which opens a short-lived stream through this function
+// and closes it when the check ends. AGC off: automatic gain would
+// amplify quiet passages and break the envelope proportionality.
+// Neither consumer may wire this stream to the meter or the transcript.
+function openDetectorStream() {
+  return navigator.mediaDevices.getUserMedia({
+    audio: {channelCount: 1, echoCancellation: true,
+            noiseSuppression: true, autoGainControl: false}});
+}
+
 async function startBargeDetector() {
   if (!bargeIn.enabled || bargeTimer !== null || bargeStarting) return;
   bargeStarting = true;
   try {
-    // A separate, echo-cancelled capture. AGC off: automatic gain would
-    // amplify quiet passages and break the envelope proportionality.
-    bargeStream = await navigator.mediaDevices.getUserMedia({
-      audio: {channelCount: 1, echoCancellation: true,
-              noiseSuppression: true, autoGainControl: false}});
+    bargeStream = await openDetectorStream();
   } catch (err) {
     // No detector is the documented safe fallback: hard mute, per
     // utterance (spec §1.2's failure table). Say so rather than nothing.
@@ -1524,6 +1533,77 @@ function sampleRms(ms) {
   });
 }
 
+// ---- residual measurement (spec Part 10 amendment, 2026-07-30) ----
+//
+// During the sound check's playback we ALSO measure the barge-in
+// detector's echo-cancelled stream: what its canceller leaves of our own
+// voice is the RESIDUAL the barge-in threshold must be proportional to —
+// the raw loopback towers over quiet speech (0.30–0.58 vs 0.056 RMS,
+// measured), so a raw-derived threshold can never catch a soft
+// interruption. The residual is MACHINERY DATA: it goes into the audit
+// row and never into the doctor-facing message, which keeps reporting
+// the room's acoustics from the main stream. The mic meter keeps reading
+// the main stream only.
+//
+// The stream is opened BEFORE playback starts, deliberately: the first
+// window — the unconverged canceller — is the false-stop risk the
+// sustain requirement must cover, and it is exactly the sample that
+// would be lost by opening late.
+const RESIDUAL_WINDOW_MS = 250;
+
+async function openResidualMeasurement() {
+  try {
+    const stream = await openDetectorStream();
+    const source = audioCtx.createMediaStreamSource(stream);
+    const analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 512;         // one number per tick, no resolution needed
+    source.connect(analyser);       // ...and nothing else, same rule as the detector
+    return {stream: stream, source: source, analyser: analyser, unavailable: null};
+  } catch (err) {
+    // A missing residual must be visible, not a silent zero: the reason
+    // travels with the reading.
+    return {stream: null, source: null, analyser: null,
+            unavailable: err.message || String(err)};
+  }
+}
+
+function sampleResidual(measure, ms) {
+  // 50 ms samples aggregated into coarse windows: enough to plot the
+  // canceller's convergence as a curve rather than a point.
+  return new Promise(resolve => {
+    const samples = [];
+    const buf = new Float32Array(measure.analyser.fftSize);
+    const id = setInterval(() => {
+      if (audioCtx.state !== 'running') return;
+      measure.analyser.getFloatTimeDomainData(buf);
+      let sum = 0;
+      for (let i = 0; i < buf.length; i++) sum += buf[i] * buf[i];
+      samples.push(Math.sqrt(sum / buf.length));
+    }, 50);
+    setTimeout(() => {
+      clearInterval(id);
+      if (!samples.length) return resolve(null);
+      const per = Math.max(1, Math.round(RESIDUAL_WINDOW_MS / 50));
+      const series = [];
+      for (let s = 0; s < samples.length; s += per) {
+        const chunk = samples.slice(s, s + per);
+        series.push(Number((chunk.reduce((a, b) => a + b, 0) / chunk.length)
+                    .toFixed(6)));
+      }
+      resolve({
+        peak: Math.max(...samples),
+        mean: samples.reduce((a, b) => a + b, 0) / samples.length,
+        series: series,
+      });
+    }, ms);
+  });
+}
+
+function closeResidualMeasurement(measure) {
+  if (measure.source) measure.source.disconnect();
+  if (measure.stream) measure.stream.getTracks().forEach(t => t.stop());
+}
+
 function askHeard() {
   // One tap. The human answer is authoritative (spec 10.2) — the acoustic
   // measurement corroborates it and produces the number.
@@ -1607,6 +1687,7 @@ async function runSoundCheck() {
   scOffer.classList.remove('on');
   scResult.className = 'scresult on';
   scResultWhat.textContent = 'Measuring the room…';
+  let residualMeasure = null;
   try {
     // Noise floor first: the room as it is, before we make any sound.
     const floor = await sampleRms(400);
@@ -1623,7 +1704,12 @@ async function runSoundCheck() {
 
     scResultWhat.textContent = 'Playing: \u201c' + utterance.text + '\u201d';
     const audio = new Audio(utterance.url);
+    // The residual stream opens BEFORE playback so the first (unconverged)
+    // window is captured \u2014 see the residual-measurement block above.
+    residualMeasure = await openResidualMeasurement();
     const playing = sampleRms(utterance.duration_ms + 250);
+    const residualPlaying = residualMeasure.analyser
+      ? sampleResidual(residualMeasure, utterance.duration_ms + 250) : null;
     try {
       await audio.play();
     } catch (err) {
@@ -1633,6 +1719,7 @@ async function runSoundCheck() {
       return;
     }
     const heard = await playing;
+    const residual = residualPlaying ? await residualPlaying : null;
 
     const answer = await askHeard();
     const result = await fetch('/api/speech/sound-check/result', {
@@ -1649,6 +1736,15 @@ async function runSoundCheck() {
         // device-label lesson), and the calibration report refuses to
         // pool them.
         chain: CAPTURE_CHAIN,
+        // The detector-stream residual (Part 10 amendment): machinery
+        // data for the barge-in threshold, never shown to the doctor.
+        // When it could not be measured, the REASON is stored — a
+        // missing residual must be visible, not a silent zero.
+        residual: residual ? {peak_rms: residual.peak, mean_rms: residual.mean,
+                              series: residual.series,
+                              window_ms: RESIDUAL_WINDOW_MS} : null,
+        ...(residual ? {} : {residual_unavailable:
+              residualMeasure.unavailable || 'no samples during playback'}),
       })
     });
     const verdict = await result.json();
@@ -1658,6 +1754,9 @@ async function runSoundCheck() {
     scResult.className = 'scresult on bad';
     scResultWhat.textContent = 'Sound check failed: ' + err.message;
   } finally {
+    // The residual stream is short-lived by design: it exists for the
+    // duration of one check, on every exit path.
+    if (residualMeasure) { closeResidualMeasurement(residualMeasure); residualMeasure = null; }
     soundCheckBusy = false;
     soundCheckBtn.disabled = recording;
   }

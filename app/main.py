@@ -294,6 +294,14 @@ class SoundCheckResultBody(BaseModel):
     # different chains must never pool. Absent on rows from before
     # 2026-07-30, which the calibration report marks incomparable.
     chain: dict[str, bool] | None = None
+    # The detector-stream residual (spec Part 10 amendment, 2026-07-30):
+    # peak_rms / mean_rms / series (coarse windows across the utterance,
+    # the canceller's convergence curve) / window_ms. Machinery data for
+    # the barge-in threshold — the doctor-facing result stays raw-only.
+    # When absent, residual_unavailable carries WHY: a missing residual
+    # must be visible in the row, never a silent zero.
+    residual: dict | None = None
+    residual_unavailable: str | None = None
 
 
 def _user_is_recording(user_id: int) -> bool:
@@ -361,6 +369,10 @@ async def sound_check_result(
                      "discrepancy": verdict["discrepancy"],
                      "device_label": body.device_label,
                      **({"chain": body.chain} if body.chain else {}),
+                     # Residual or the reason there is none — never silence.
+                     **({"residual": body.residual} if body.residual
+                        else {"residual_unavailable":
+                              body.residual_unavailable or "not measured"}),
                      **verdict["level"]})
     logger.info("Sound check by %s: %s (ratio %.2f, answer %s, output %s)",
                 user["username"], verdict["result"],

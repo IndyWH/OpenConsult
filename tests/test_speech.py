@@ -1055,8 +1055,11 @@ def test_the_check_measures_from_the_existing_capture_stream():
     assert "analyser.getFloatTimeDomainData" in html
     calls = html.count("navigator.mediaDevices.getUserMedia")
     assert calls == 2, f"expected the capture + the detector, found {calls}"
-    # The second call is inside the detector, nowhere else.
-    detector = html[html.index("async function startBargeDetector"):
+    # The second call is inside the detector section, nowhere else. Since
+    # the Part 10 amendment (2026-07-30) it lives in openDetectorStream —
+    # the ONE acquisition point shared by the detector and the sound
+    # check's residual measurement, so a third stream is still impossible.
+    detector = html[html.index("function openDetectorStream"):
                     html.index("function stopBargeDetector")]
     assert detector.count("navigator.mediaDevices.getUserMedia") == 1
 

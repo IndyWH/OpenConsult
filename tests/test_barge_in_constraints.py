@@ -110,9 +110,14 @@ def test_the_main_capture_chain_is_explicit_ec_off_ns_on_agc_on():
 def test_the_detector_streams_constraints_are_untouched_by_the_chain_change():
     """The detector deliberately KEEPS echo cancellation (it listens while
     we play audio; playback echo is its dominant false-trigger cause) and
-    AGC off. The 2026-07-30 decision covers the main stream only."""
+    AGC off. The 2026-07-30 decision covers the main stream only.
+    (Amended for the Part 10 amendment: the literal moved into
+    openDetectorStream, the single acquisition point both the detector
+    and the sound check's residual measurement use — same constraints,
+    unchanged values.)"""
     assert ("audio: {channelCount: 1, echoCancellation: true,\n"
-            "              noiseSuppression: true, autoGainControl: false}") in LIVE
+            "            noiseSuppression: true, autoGainControl: false}") in LIVE
+    assert "function openDetectorStream()" in LIVE
 
 
 # --- constraint 2: the disclosure gains no interruption line ----------------
