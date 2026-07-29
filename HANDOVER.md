@@ -1698,6 +1698,19 @@ Investigated for `RAW_TRANSCRIPT_VIEW_SPEC.md` (approved, not yet in the
 repo). **The decision on building it is the owner's; nothing was
 changed.**
 
+> **Owner decision, 2026-07-29 — the persistence point is BEFORE the
+> silence invariant.** The stored set is `result["segments"]` (the
+> report's "one line earlier" option), with the segments the invariant
+> drops **flagged in the stored set** rather than absent from it. The
+> reason is the deciding argument, so it is recorded with the decision:
+> the silence invariant is itself a layer that has eaten transcript —
+> 445 lost six minutes to it — and the raw-transcript view exists
+> precisely to make such layers visible. A view that only showed what
+> survived the invariant would be blind to the one failure mode it was
+> commissioned after. **Not built yet; the decision is banked** so the
+> build, whenever it happens, starts from this point rather than
+> re-litigating it.
+
 - **What finalisation persists today:** `transcript_turn` rows only —
   post-merge, post-role (idx, role, start_s, end_s, text, confidence) —
   plus `quality_signals`, the single-voice flag, `system_utterance`
