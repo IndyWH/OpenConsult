@@ -2436,6 +2436,12 @@ skipped. Raw numbers in `evals/asr_stack_results.json`. The reading:
   `word_timestamps=True` first (the middle path this experiment did not
   run) and budget the S2 recalibration.
 
+> **CLOSED — owner decision, 2026-07-30: WhisperX stays for v1.** The
+> experiment's record (`evals/asr_stack_results.json` and the reading
+> above) stands as the evidence. If the question is ever reopened,
+> `word_timestamps=True` is the first thing to test, per the
+> recommendation. Nothing about this stack is pending.
+
 ## Session 2026-07-31 (owner away): flag tier, S1/S3 re-calibration, retrieval report
 
 Decision-complete work, built conservatively ahead of Friday's external
@@ -2514,6 +2520,13 @@ corpus/embedding state. Recommend keeping production and re-running
 this harness after any corpus change; the harness is the deliverable.
 The decision is the owner's.** Raw numbers in
 `evals/retrieval_composition_results.json`.
+
+> **CLOSED — owner decision, 2026-07-30: production retrieval stays as
+> it is, and docket item 12 closes with a standing convention:
+> `scripts/evaluate_retrieval_composition.py` is re-run after ANY
+> corpus change**, alongside the existing RAG eval — composition drift
+> is exactly the class of change the 450 finding showed a corpus
+> update can cause and un-cause silently.
 
 ## Shared schema module (2026-07-25)
 
@@ -3306,6 +3319,13 @@ docket item 5.
    or having the CDS name conditions more specifically, since *"iron deficiency
    anaemia"* retrieves visibly better than *"anaemia"* and that is a CDS-side
    change, not a retrieval one.
+
+   > **CLOSED — owner decision, 2026-07-30.** All three options were built
+   > and measured in `scripts/evaluate_retrieval_composition.py`
+   > (2026-07-31 session): every strategy holds the RAG eval at 9/9, and
+   > the misbehaviour above does not reproduce on the current corpus.
+   > **Production retrieval stays as it is; the composition harness is
+   > the standing check, re-run after any corpus change.**
 
 ## Phase 5 — CLOSED with a negative result (2026-07-25)
 
