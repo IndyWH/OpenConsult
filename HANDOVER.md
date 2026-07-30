@@ -2007,10 +2007,12 @@ touched for a 3–4 s gain). Three commits ("Phase 7b s5 1/3 … 3/3").
   section's "reloaded between phases" finding is now resolved.
 - **`PHASE_7C_EVAL_PREREG.md` is committed and FROZEN** — approved by
   the owner at the end of the 2026-07-28 working session; changes from
-  now on are logged amendments. One TODO it creates is deliberately not
-  done and is **pending, assigned to the owner + Claude Cowork**: the
-  one-page open/closed question-classification rule (metric 5), to be
-  written before the first 7c run.
+  now on are logged amendments. One TODO it created was assigned to the
+  owner + Claude Cowork: the one-page open/closed question-classification
+  rule (metric 5). **DISCHARGED 2026-07-30** — the rule was drafted by
+  Cowork + owner, approved by the owner 2026-07-30, and is committed
+  FROZEN at the repo root as `OPEN_CLOSED_RULE.md`, an annex to the
+  pre-registration; changes from now on are logged amendments.
 
 ## Phase 7a — session 3 (2026-07-29): the barge-in detector, built and OFF
 
