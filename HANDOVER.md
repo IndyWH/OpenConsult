@@ -2436,6 +2436,85 @@ skipped. Raw numbers in `evals/asr_stack_results.json`. The reading:
   `word_timestamps=True` first (the middle path this experiment did not
   run) and budget the S2 recalibration.
 
+## Session 2026-07-31 (owner away): flag tier, S1/S3 re-calibration, retrieval report
+
+Decision-complete work, built conservatively ahead of Friday's external
+collaborator session. Four commits; no dependency changes.
+
+**1. The transcript-quality gate's FLAG tier is LIVE** (spec §11's
+deferred follow-up; thresholds are the owner's recorded 2026-07-25
+numbers — S2 < 0.70, S4 gap > 10 s — wired, not invented). A flagged
+(not refused) transcript still gets its draft; approval 409s until the
+amber acknowledge-gated banner on the review page is acknowledged
+(`quality_ack_at`, audited `quality.acknowledged`) — the urgency-banner
+pattern exactly, and the flag's reason joins Approve's disabled state
+through `refreshApproveGate`, the SINGLE writer, with a structural test
+on that property. Semantics pinned by test: refusal is never also a
+flag; measured missing speech still refuses (the 2026-07-28 rule is
+about refusal and stands); a long SILENT tail now reads amber instead of
+nothing; the four good calibration recordings do not flag. Needs the
+restart (schema: `quality_ack_at`).
+
+**2. S1 multi-window and S3 within-segment are built, shared, and
+MEASURE-ONLY** — the §11 redesigns, with the standing collapse
+requirement discharged: `s1_language_windows` and `s3_repetition` in
+`app/transcript_quality.py` are the ONLY implementations; `finalize.py`
+and the calibration harness inject their model call and share every
+decision (the last two-path signal is gone; pinned by test). A terrible
+S1 fraction or a saturated S3 share still passes — acting waits on the
+owner's thresholds. The re-calibration ran across ALL stored
+consultations with turns (66–70 + nineteen 7a-era rows; full table in
+`evals/transcript_quality_calibration.json` and the run log). **The
+findings, numbers first:**
+
+- **S1's designed metric — the expected-language FRACTION — is DEAD on
+  this data: 1.00 everywhere, including #70.** Every 30 s window of the
+  code-switched recording detects as English; the consultation is
+  code-switched throughout, not just at its opening, so no window is
+  majority-Sinhala. The §11 prediction ("English in a minority of
+  windows") is falsified — recorded plainly, not tuned away.
+- **What DOES separate is the MEDIAN WINDOW PROBABILITY**: the scripted
+  good four sit at 0.992; #70's ten windows are all ≤ 0.926, median
+  0.902; the healthiest unscripted rows sit 0.943–0.989; and the only
+  rows below #70 are 445 (0.792) and 449 (0.783) — both already refused
+  by the acting signals. **Candidate threshold for the owner: median
+  window probability < 0.93** — catches #70, co-fires only on
+  already-refused wrecks, clears every healthy row with a 0.013 margin
+  to 457's 0.943. That margin is thin and the sample is one room;
+  measure-only remains right.
+- **S3's raw within-segment share saturates**: seven healthy recordings
+  hit 1.00 through segments of a few tokens ("thank you thank you" as a
+  parting). **With a ≥12-token floor it separates cleanly: #70 = 0.727
+  against ≤ 0.333 for every other row** — a 2.2× corridor. The floored
+  variant (`max_within_segment_share_floored`,
+  `TRANSCRIPT_S3_MIN_SEGMENT_TOKENS=12`) is now measured and stored on
+  every consultation alongside the raw figure. **Candidate threshold
+  for the owner: floored within-segment share > 0.5.**
+- Neither candidate acts. Both accumulate on every consultation from
+  now on, so the next calibration has real-world rows for free.
+
+**3. Retrieval composition (docket item 12) — measured, nothing ships.**
+`scripts/evaluate_retrieval_composition.py` built the three recorded
+candidate fixes as harness-only strategies (production's selection
+mirrored as the baseline; `app/rag.py` untouched, pinned by test) and
+ran all four against the full RAG eval set plus the 450 anaemia case.
+Numbers: **every strategy holds 9/9** on the eval set. On the anaemia
+case, **the 2026-07-28 misbehaviour does not reproduce on the current
+corpus**: the bare "Anaemia" query now tops the CKS iron-deficiency
+topic even under production (2 iron + 2 NG203); slot_budget and
+citation_diversity both deepen iron to 4+2; specific naming ("Iron
+deficiency anaemia") changes nothing further. Two structural
+observations worth more than the headline: production's per-source cap
+leaves slots EMPTY when few sources retrieve (asthma got 2 of 6
+passages; both alternatives fill all six from the same guideline), and
+citation_diversity is the safest single change if one is ever wanted
+(9/9, equal-or-wider source sets, full slots). **Reading: no change is
+needed now — the trigger finding has evaporated under the current
+corpus/embedding state. Recommend keeping production and re-running
+this harness after any corpus change; the harness is the deliverable.
+The decision is the owner's.** Raw numbers in
+`evals/retrieval_composition_results.json`.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
