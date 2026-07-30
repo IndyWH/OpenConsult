@@ -1,0 +1,965 @@
+{
+ "note": "REPORT ONLY \u2014 strategies exist in this harness only; app/rag.py is untouched and nothing ships. The owner chooses.",
+ "strategies": {
+  "production": {
+   "eval_pass_rate": "9/9",
+   "cases": [
+    {
+     "case": "chest pain (script 01)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Stable Angina",
+      "Acute Coronary Syndrome (ACS)"
+     ],
+     "slots": [
+      [
+       "Stable angina: management (CG126)",
+       2
+      ],
+      [
+       "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)",
+       2
+      ]
+     ],
+     "top_cited": "Stable angina: management (CG126)"
+    },
+    {
+     "case": "dyspepsia (script 05)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Peptic ulcer disease",
+      "NSAID-related gastritis"
+     ],
+     "slots": [
+      [
+       "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)",
+       2
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Gout: diagnosis and management (NG219)",
+       1
+      ]
+     ],
+     "top_cited": "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)"
+    },
+    {
+     "case": "dengue child (script 02)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Dengue fever",
+      "Viral fever"
+     ],
+     "slots": [
+      [
+       "Dengue and severe dengue \u2014 fact sheet",
+       2
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       2
+      ],
+      [
+       "Fever in under 5s: assessment and initial management (NG143)",
+       2
+      ]
+     ],
+     "top_cited": "Dengue and severe dengue \u2014 fact sheet"
+    },
+    {
+     "case": "asthma (script 04)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Poorly controlled asthma"
+     ],
+     "slots": [
+      [
+       "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)",
+       2
+      ]
+     ],
+     "top_cited": "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)"
+    },
+    {
+     "case": "diabetes (script 03)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Diabetic Peripheral Neuropathy",
+      "Poorly Controlled Diabetes Mellitus"
+     ],
+     "slots": [
+      [
+       "Type 2 diabetes in adults: management (NG28)",
+       2
+      ],
+      [
+       "Neuropathic pain in adults: pharmacological management in non-specialist settings (CG173)",
+       1
+      ]
+     ],
+     "top_cited": "Type 2 diabetes in adults: management (NG28)"
+    },
+    {
+     "case": "TIA (script 06)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Transient ischaemic attack",
+      "Atrial fibrillation"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       2
+      ],
+      [
+       "Chronic heart failure in adults: diagnosis and management (NG106)",
+       1
+      ]
+     ],
+     "top_cited": "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)"
+    },
+    {
+     "case": "torsion (script 10)",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Testicular torsion"
+     ],
+     "slots": [
+      [
+       "Thyroid disease: assessment and management (NG145)",
+       2
+      ],
+      [
+       "Urinary tract infection (lower): antimicrobial prescribing (NG109)",
+       2
+      ],
+      [
+       "Headaches in over 12s: diagnosis and management (CG150)",
+       1
+      ],
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "unrelated specialty",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Postpartum haemorrhage"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Menopause: identification and management (NG23)",
+       1
+      ],
+      [
+       "Anaemia \u2014 iron deficiency (NICE CKS)",
+       1
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       1
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "non-medical",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Cricket batting technique"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Stable angina: management (CG126)",
+       1
+      ],
+      [
+       "Depression in adults: treatment and management (NG222)",
+       1
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Low back pain and sciatica in over 16s: assessment and management (NG59)",
+       1
+      ]
+     ]
+    }
+   ],
+   "anaemia_450": {
+    "case": "anaemia (450 composition)",
+    "kind": "composition",
+    "queried": [
+     "Anaemia"
+    ],
+    "covered": true,
+    "slots": [
+     [
+      "Anaemia \u2014 iron deficiency (NICE CKS)",
+      2
+     ],
+     [
+      "Chronic kidney disease: assessment and management (NG203)",
+      2
+     ]
+    ],
+    "top_cited": "Anaemia \u2014 iron deficiency (NICE CKS)"
+   }
+  },
+  "slot_budget": {
+   "eval_pass_rate": "9/9",
+   "cases": [
+    {
+     "case": "chest pain (script 01)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Stable Angina",
+      "Acute Coronary Syndrome (ACS)"
+     ],
+     "slots": [
+      [
+       "Stable angina: management (CG126)",
+       4
+      ],
+      [
+       "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)",
+       2
+      ]
+     ],
+     "top_cited": "Stable angina: management (CG126)"
+    },
+    {
+     "case": "dyspepsia (script 05)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Peptic ulcer disease",
+      "NSAID-related gastritis"
+     ],
+     "slots": [
+      [
+       "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)",
+       5
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ]
+     ],
+     "top_cited": "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)"
+    },
+    {
+     "case": "dengue child (script 02)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Dengue fever",
+      "Viral fever"
+     ],
+     "slots": [
+      [
+       "Dengue and severe dengue \u2014 fact sheet",
+       3
+      ],
+      [
+       "Fever in under 5s: assessment and initial management (NG143)",
+       2
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       1
+      ]
+     ],
+     "top_cited": "Dengue and severe dengue \u2014 fact sheet"
+    },
+    {
+     "case": "asthma (script 04)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Poorly controlled asthma"
+     ],
+     "slots": [
+      [
+       "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)",
+       6
+      ]
+     ],
+     "top_cited": "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)"
+    },
+    {
+     "case": "diabetes (script 03)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Diabetic Peripheral Neuropathy",
+      "Poorly Controlled Diabetes Mellitus"
+     ],
+     "slots": [
+      [
+       "Type 2 diabetes in adults: management (NG28)",
+       5
+      ],
+      [
+       "Neuropathic pain in adults: pharmacological management in non-specialist settings (CG173)",
+       1
+      ]
+     ],
+     "top_cited": "Type 2 diabetes in adults: management (NG28)"
+    },
+    {
+     "case": "TIA (script 06)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Transient ischaemic attack",
+      "Atrial fibrillation"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       3
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       2
+      ],
+      [
+       "Chronic heart failure in adults: diagnosis and management (NG106)",
+       1
+      ]
+     ],
+     "top_cited": "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)"
+    },
+    {
+     "case": "torsion (script 10)",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Testicular torsion"
+     ],
+     "slots": [
+      [
+       "Thyroid disease: assessment and management (NG145)",
+       2
+      ],
+      [
+       "Urinary tract infection (lower): antimicrobial prescribing (NG109)",
+       2
+      ],
+      [
+       "Headaches in over 12s: diagnosis and management (CG150)",
+       1
+      ],
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "unrelated specialty",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Postpartum haemorrhage"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Menopause: identification and management (NG23)",
+       1
+      ],
+      [
+       "Anaemia \u2014 iron deficiency (NICE CKS)",
+       1
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       1
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "non-medical",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Cricket batting technique"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Stable angina: management (CG126)",
+       1
+      ],
+      [
+       "Depression in adults: treatment and management (NG222)",
+       1
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Low back pain and sciatica in over 16s: assessment and management (NG59)",
+       1
+      ]
+     ]
+    }
+   ],
+   "anaemia_450": {
+    "case": "anaemia (450 composition)",
+    "kind": "composition",
+    "queried": [
+     "Anaemia"
+    ],
+    "covered": true,
+    "slots": [
+     [
+      "Anaemia \u2014 iron deficiency (NICE CKS)",
+      4
+     ],
+     [
+      "Chronic kidney disease: assessment and management (NG203)",
+      2
+     ]
+    ],
+    "top_cited": "Anaemia \u2014 iron deficiency (NICE CKS)"
+   }
+  },
+  "citation_diversity": {
+   "eval_pass_rate": "9/9",
+   "cases": [
+    {
+     "case": "chest pain (script 01)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Stable Angina",
+      "Acute Coronary Syndrome (ACS)"
+     ],
+     "slots": [
+      [
+       "Stable angina: management (CG126)",
+       5
+      ],
+      [
+       "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)",
+       1
+      ]
+     ],
+     "top_cited": "Stable angina: management (CG126)"
+    },
+    {
+     "case": "dyspepsia (script 05)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Peptic ulcer disease",
+      "NSAID-related gastritis"
+     ],
+     "slots": [
+      [
+       "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)",
+       4
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Gout: diagnosis and management (NG219)",
+       1
+      ]
+     ],
+     "top_cited": "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)"
+    },
+    {
+     "case": "dengue child (script 02)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Dengue fever",
+      "Viral fever"
+     ],
+     "slots": [
+      [
+       "Dengue and severe dengue \u2014 fact sheet",
+       4
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       1
+      ],
+      [
+       "Fever in under 5s: assessment and initial management (NG143)",
+       1
+      ]
+     ],
+     "top_cited": "Dengue and severe dengue \u2014 fact sheet"
+    },
+    {
+     "case": "asthma (script 04)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Poorly controlled asthma"
+     ],
+     "slots": [
+      [
+       "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)",
+       6
+      ]
+     ],
+     "top_cited": "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)"
+    },
+    {
+     "case": "diabetes (script 03)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Diabetic Peripheral Neuropathy",
+      "Poorly Controlled Diabetes Mellitus"
+     ],
+     "slots": [
+      [
+       "Type 2 diabetes in adults: management (NG28)",
+       5
+      ],
+      [
+       "Neuropathic pain in adults: pharmacological management in non-specialist settings (CG173)",
+       1
+      ]
+     ],
+     "top_cited": "Type 2 diabetes in adults: management (NG28)"
+    },
+    {
+     "case": "TIA (script 06)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Transient ischaemic attack",
+      "Atrial fibrillation"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       3
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       2
+      ],
+      [
+       "Chronic heart failure in adults: diagnosis and management (NG106)",
+       1
+      ]
+     ],
+     "top_cited": "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)"
+    },
+    {
+     "case": "torsion (script 10)",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Testicular torsion"
+     ],
+     "slots": [
+      [
+       "Thyroid disease: assessment and management (NG145)",
+       1
+      ],
+      [
+       "Headaches in over 12s: diagnosis and management (CG150)",
+       1
+      ],
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       1
+      ],
+      [
+       "Urinary tract infection (lower): antimicrobial prescribing (NG109)",
+       1
+      ],
+      [
+       "Low back pain and sciatica in over 16s: assessment and management (NG59)",
+       1
+      ],
+      [
+       "Otitis media (acute): antimicrobial prescribing (NG91)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "unrelated specialty",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Postpartum haemorrhage"
+     ],
+     "slots": [
+      [
+       "Menopause: identification and management (NG23)",
+       1
+      ],
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       1
+      ],
+      [
+       "Anaemia \u2014 iron deficiency (NICE CKS)",
+       1
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       1
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       1
+      ],
+      [
+       "Dengue and severe dengue \u2014 fact sheet",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "non-medical",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Cricket batting technique"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       1
+      ],
+      [
+       "Stable angina: management (CG126)",
+       1
+      ],
+      [
+       "Depression in adults: treatment and management (NG222)",
+       1
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Low back pain and sciatica in over 16s: assessment and management (NG59)",
+       1
+      ],
+      [
+       "Menopause: identification and management (NG23)",
+       1
+      ]
+     ]
+    }
+   ],
+   "anaemia_450": {
+    "case": "anaemia (450 composition)",
+    "kind": "composition",
+    "queried": [
+     "Anaemia"
+    ],
+    "covered": true,
+    "slots": [
+     [
+      "Anaemia \u2014 iron deficiency (NICE CKS)",
+      4
+     ],
+     [
+      "Chronic kidney disease: assessment and management (NG203)",
+      2
+     ]
+    ],
+    "top_cited": "Anaemia \u2014 iron deficiency (NICE CKS)"
+   }
+  },
+  "specific_naming": {
+   "eval_pass_rate": "9/9",
+   "cases": [
+    {
+     "case": "chest pain (script 01)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Stable Angina",
+      "Acute Coronary Syndrome (ACS)"
+     ],
+     "slots": [
+      [
+       "Stable angina: management (CG126)",
+       2
+      ],
+      [
+       "Recent-onset chest pain of suspected cardiac origin: assessment and diagnosis (CG95)",
+       2
+      ]
+     ],
+     "top_cited": "Stable angina: management (CG126)"
+    },
+    {
+     "case": "dyspepsia (script 05)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Peptic ulcer disease",
+      "NSAID-related gastritis"
+     ],
+     "slots": [
+      [
+       "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)",
+       2
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Gout: diagnosis and management (NG219)",
+       1
+      ]
+     ],
+     "top_cited": "Gastro-oesophageal reflux disease and dyspepsia in adults: investigation and management (CG184)"
+    },
+    {
+     "case": "dengue child (script 02)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Dengue fever",
+      "Viral fever"
+     ],
+     "slots": [
+      [
+       "Dengue and severe dengue \u2014 fact sheet",
+       2
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       2
+      ],
+      [
+       "Fever in under 5s: assessment and initial management (NG143)",
+       2
+      ]
+     ],
+     "top_cited": "Dengue and severe dengue \u2014 fact sheet"
+    },
+    {
+     "case": "asthma (script 04)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Poorly controlled asthma"
+     ],
+     "slots": [
+      [
+       "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)",
+       2
+      ]
+     ],
+     "top_cited": "Asthma: diagnosis, monitoring and chronic asthma management (BTS, NICE, SIGN) (NG245)"
+    },
+    {
+     "case": "diabetes (script 03)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Diabetic Peripheral Neuropathy",
+      "Poorly Controlled Diabetes Mellitus"
+     ],
+     "slots": [
+      [
+       "Type 2 diabetes in adults: management (NG28)",
+       2
+      ],
+      [
+       "Neuropathic pain in adults: pharmacological management in non-specialist settings (CG173)",
+       1
+      ]
+     ],
+     "top_cited": "Type 2 diabetes in adults: management (NG28)"
+    },
+    {
+     "case": "TIA (script 06)",
+     "kind": "in-corpus",
+     "pass": true,
+     "queried": [
+      "Transient ischaemic attack",
+      "Atrial fibrillation"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       2
+      ],
+      [
+       "Chronic heart failure in adults: diagnosis and management (NG106)",
+       1
+      ]
+     ],
+     "top_cited": "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)"
+    },
+    {
+     "case": "torsion (script 10)",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Testicular torsion"
+     ],
+     "slots": [
+      [
+       "Thyroid disease: assessment and management (NG145)",
+       2
+      ],
+      [
+       "Urinary tract infection (lower): antimicrobial prescribing (NG109)",
+       2
+      ],
+      [
+       "Headaches in over 12s: diagnosis and management (CG150)",
+       1
+      ],
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "unrelated specialty",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Postpartum haemorrhage"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Menopause: identification and management (NG23)",
+       1
+      ],
+      [
+       "Anaemia \u2014 iron deficiency (NICE CKS)",
+       1
+      ],
+      [
+       "Atrial fibrillation: diagnosis and management (NG196)",
+       1
+      ],
+      [
+       "Clinical Care of Dengue (healthcare providers)",
+       1
+      ]
+     ]
+    },
+    {
+     "case": "non-medical",
+     "kind": "out-of-corpus",
+     "pass": true,
+     "queried": [
+      "Cricket batting technique"
+     ],
+     "slots": [
+      [
+       "Stroke and transient ischaemic attack in over 16s: diagnosis and initial management (NG128)",
+       2
+      ],
+      [
+       "Stable angina: management (CG126)",
+       1
+      ],
+      [
+       "Depression in adults: treatment and management (NG222)",
+       1
+      ],
+      [
+       "Osteoarthritis in over 16s: diagnosis and management (NG226)",
+       1
+      ],
+      [
+       "Low back pain and sciatica in over 16s: assessment and management (NG59)",
+       1
+      ]
+     ]
+    }
+   ],
+   "anaemia_450": {
+    "case": "anaemia (450 composition)",
+    "kind": "composition",
+    "queried": [
+     "Iron deficiency anaemia"
+    ],
+    "covered": true,
+    "slots": [
+     [
+      "Anaemia \u2014 iron deficiency (NICE CKS)",
+      2
+     ],
+     [
+      "Chronic kidney disease: assessment and management (NG203)",
+      2
+     ]
+    ],
+    "top_cited": "Anaemia \u2014 iron deficiency (NICE CKS)"
+   }
+  }
+ }
+}
