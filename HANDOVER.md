@@ -2347,6 +2347,95 @@ recording through live→Stop→review on the new EC-free capture, read the
 transcript and note. Until that is done, the new chain has never
 produced a consultation.
 
+## Session 2026-07-30 (owner away): rule frozen, raw view built, ASR experiment
+
+Three pieces of owner-input-free work, all decisions previously made and
+recorded. Four commits; no dependency changes.
+
+**1. `OPEN_CLOSED_RULE.md` is committed FROZEN** at the repo root —
+copied byte-for-byte from the owner's draft with exactly one edit (the
+status blockquote: DRAFT → FROZEN, approved by the owner 2026-07-30).
+It is the annex to `PHASE_7C_EVAL_PREREG.md` metric 5; changes from now
+on are logged amendments. The prereg's pending TODO is discharged (see
+the 7b session 5 section).
+
+**2. The raw-transcript view is BUILT** (`RAW_TRANSCRIPT_VIEW_SPEC.md`,
+approved 2026-07-28 with all four decisions; the owner's 2026-07-30
+persistence decision supersedes spec §2's out-of-scope for
+invariant-dropped segments — they are stored FLAGGED and shown struck
+through, because the invariant has eaten transcript before and the view
+exists to make such layers visible):
+
+- **New table `raw_segment`** (`app/raw_segments.py`, in
+  `schema.ensure_all()`'s ordering; cascades on purge): every
+  pre-invariant WhisperX segment, cluster and confidence derived exactly
+  as the merge derives them, written beside `save_turns` and BEFORE the
+  quality gate — a refused consultation's raw layer is stored too.
+  Written once: a re-run of finalisation cannot overwrite the first
+  record. ~sentence-sized rows, tens of KB per consultation.
+- **Read from STORAGE, never rebuilt** — the endpoint
+  (`GET /api/consultations/{cid}/raw-transcript`, same scoping as the
+  transcript, available on approved consultations per D3) works with no
+  transcriber installed at all, asserted by test. WhisperX is not
+  deterministic; a rebuilt view would show a consultation that never
+  existed. **Consultations finalised before 2026-07-30 have no stored
+  segments and the view says so plainly** — it never falls back to
+  re-running anything.
+- **Opening is AUDITED** (`transcript.raw_viewed`, once per open,
+  including opens that find nothing) — the research signal is whether
+  checking happens; together with citation-open records it feeds
+  research question 1. The client fetches once per page visit; toggling
+  back and forth re-uses that fetch.
+- **The review-page toggle** ("Show what was heard" / "Show diarised
+  transcript") sits above the transcript pane it acts on (D1), diarised
+  by default (D2), not on the live page (D4). The rendering groups raw
+  segments under the diarised turn that absorbed them, so a merge that
+  joined minutes into one turn shows as one bordered block — the 445/66
+  shape at a glance. Display only: no turn numbers, no citation
+  targets, no edit path; corrections stay on the diarised view. All
+  pinned in `tests/test_raw_transcript.py`.
+
+**3. The ASR-stack experiment** (owner-approved question, parked
+2026-07-28): could the final pass run on faster-whisper large-v3 alone,
+dropping WhisperX, now the project is English-only?
+`scripts/evaluate_asr_stack.py` (offline, read-only, MedGemma unloaded
+first, arms strictly sequential) ran both stacks on 16 recordings —
+66–70 plus eleven 7a-era WAVs; the four FLAC-archived ones named as
+skipped. Raw numbers in `evals/asr_stack_results.json`. The reading:
+
+- **Recognition is competitive.** Scripted-English WER: WhisperX
+  0.037/0.048/0.099/0.039 vs faster-whisper 0.161/0.061/0.118/0.035 —
+  within ~2 pp on three of four, one 4× outlier (66). 70 (code-switched
+  Sinhala) is known-bad in both arms symmetrically (0.96/0.95).
+- **The losses are structural, not recognition.** (1) UNDER-SEGMENTATION:
+  without the alignment pass, faster-whisper's segment-level timestamps
+  merge into coarser turns (13 vs 22 stored on 66, 11 vs 19 on 67) —
+  citation granularity, which the note depends on, degrades. (2)
+  BOUNDARY DRIFT: 0.4–3.2 s on scripted audio, 5–53 s on 7a-era room
+  audio. (3) **THE S2 GATE BREAKS**: arm (b)'s exp(avg_logprob)
+  confidence is a different measure that collapses on real room audio —
+  448 reads 0.519 and 449 reads 0.499 against the calibrated 0.60
+  refuse threshold, so consultations that passed in production would be
+  refused. Adopting arm (b) means recalibrating S2 (and the flag tier)
+  from scratch on new data.
+- **Honest caveats.** Arm (a)'s near-perfect drift/agreement against the
+  stored turns is partly CIRCULAR — the stored turns came from the same
+  stack. And on 451/454/458/459 BOTH arms fail to reproduce the stored
+  record (turn counts 12→4/13, 14→3/2, 18→2/2, 7→2/2; role agreement
+  0.03–0.17) — WhisperX non-determinism plus owner corrections, which
+  is fresh evidence for the raw view's read-from-storage rule and
+  weakens those rows as arbitration between arms.
+- **The dependency win is partial.** pyannote — the scarrier dependency
+  (the 3.4 pin, the weights_only monkeypatch) — stays in both arms;
+  dropping WhisperX removes only its own pins (the ctranslate2
+  override's motivation, the torchcodec exclusion).
+- **Recommendation (the decision is the owner's): keep WhisperX for
+  v1.** The measured costs — coarser citations, boundary drift, an
+  invalidated safety-gate calibration — outweigh a partial dependency
+  win. If it is ever revisited, test faster-whisper with
+  `word_timestamps=True` first (the middle path this experiment did not
+  run) and budget the S2 recalibration.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase

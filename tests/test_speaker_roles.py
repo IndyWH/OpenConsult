@@ -740,7 +740,9 @@ def test_both_role_banners_sit_above_the_transcript():
     html = _review_html()
     single = html.index('id="singleVoiceBanner"')
     labels = html.index('id="labelsBanner"')
-    transcript = html.index('<h2>Diarised transcript</h2>')
+    # The h2 gained id="transcriptTitle" with the raw-transcript view
+    # (2026-07-30) — the toggle retitles the pane; position logic unchanged.
+    transcript = html.index('<h2 id="transcriptTitle">Diarised transcript</h2>')
     assert single < transcript and labels < transcript
 
 
