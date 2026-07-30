@@ -125,42 +125,22 @@ def unweighted_mean_confidence(turns: list[dict]) -> float | None:
 def max_ngram_share(turns: list[dict], n: int = NGRAM_N) -> tuple[float, str | None]:
     """Largest share of total tokens accounted for by any single n-gram.
 
-    A transcript looping "the pain in the chest the pain in the chest"
-    concentrates a large fraction of its tokens in one n-gram; clean
-    speech does not.  Share is (occurrences * n) / total tokens, so it is
-    the proportion of the transcript that one repeated phrase explains.
-    Returns (share, the n-gram) — share 0.0 when the text is too short.
+    **Delegates to the pipeline's shared S3** (2026-07-31 — the same
+    collapse as S2/S4 above; two copies of the arithmetic and the
+    calibration stops describing the pipeline).
     """
-    tokens: list[str] = []
-    for turn in turns:
-        tokens.extend(tokenise(turn["text"]))
-    if len(tokens) < n:
-        return 0.0, None
-    grams = Counter(
-        " ".join(tokens[i:i + n]) for i in range(len(tokens) - n + 1)
-    )
-    gram, count = grams.most_common(1)[0]
-    return (count * n) / len(tokens), gram
+    from app.transcript_quality import s3_repetition
+
+    s3 = s3_repetition(turns)
+    return s3["max_ngram_share"], s3["max_ngram"]
 
 
 def max_consecutive_repeats(turns: list[dict]) -> int:
     """Longest run of consecutive segments with identical text.
+    Delegates, as above."""
+    from app.transcript_quality import s3_repetition
 
-    Counts segments, not repeats: three identical segments in a row
-    returns 3.  Empty input returns 0, a single segment returns 1.
-    """
-    best = 0
-    run = 0
-    previous: str | None = None
-    for turn in turns:
-        normalised = " ".join(tokenise(turn["text"]))
-        if previous is not None and normalised == previous:
-            run += 1
-        else:
-            run = 1
-        previous = normalised
-        best = max(best, run)
-    return best
+    return s3_repetition(turns)["max_consecutive_identical"]
 
 
 def truncation_gap(turns: list[dict], audio_duration: float | None,
@@ -346,25 +326,33 @@ class LanguageDetector:
             print(f"  ! language detection unavailable: {exc}", file=sys.stderr)
             self._failed = True
 
-    def detect(self, path: Path | None) -> tuple[str | None, float | None]:
+    def detect_windows(self, path: Path | None) -> dict | None:
+        """Multi-window S1 through the ONE shared implementation
+        (2026-07-31 — the collapse of the LAST two-path signal): window
+        placement and the expected-language fraction are decided in
+        `app/transcript_quality.py`; only the model call is supplied
+        here, exactly as `app/finalize.py` supplies its own."""
         if path is None:
-            return None, None
+            return None
         self._ensure()
         if self._model is None:
-            return None, None
+            return None
         try:
             import soundfile
+            from app.transcript_quality import s1_language_windows
             audio, sample_rate = soundfile.read(str(path), dtype="float32")
             if getattr(audio, "ndim", 1) > 1:
                 audio = audio.mean(axis=1)
-            # detect_language reads a single 30 s window; no transcription.
-            language, probability, _ = self._model.detect_language(
-                audio=audio, language_detection_segments=1
-            )
-            return language, float(probability)
+
+            def _detect(window):
+                language, probability, _ = self._model.detect_language(
+                    audio=window, language_detection_segments=1)
+                return language, float(probability)
+
+            return s1_language_windows(audio, sample_rate, _detect)
         except Exception as exc:  # pragma: no cover - environment dependent
             print(f"  ! language detection failed: {exc}", file=sys.stderr)
-            return None, None
+            return None
 
     def close(self) -> None:
         """Release the model rather than leaving it resident."""
@@ -387,14 +375,21 @@ class LanguageDetector:
 # ---------------------------------------------------------------------------
 
 def measure(turns: list[dict], audio_duration: float | None) -> dict:
-    share, gram = max_ngram_share(turns)
+    from app.transcript_quality import s3_repetition
+
+    s3 = s3_repetition(turns)
     return {
         "segments": len(turns),
         "s2_confidence_weighted": weighted_mean_confidence(turns),
         "s2_confidence_unweighted": unweighted_mean_confidence(turns),
-        "s3_max_4gram_share": share,
-        "s3_max_4gram": gram,
-        "s3_max_consecutive_identical": max_consecutive_repeats(turns),
+        "s3_max_4gram_share": s3["max_ngram_share"],
+        "s3_max_4gram": s3["max_ngram"],
+        # §11 redesign (2026-07-31): repetition measured WITHIN segments —
+        # the axis #70's loops actually live on. Measure-only.
+        "s3_within_segment_share": s3["max_within_segment_share"],
+        "s3_within_segment_share_floored": s3["max_within_segment_share_floored"],
+        "s3_within_segment_ngram": s3["max_within_segment_ngram"],
+        "s3_max_consecutive_identical": s3["max_consecutive_identical"],
         "s4_truncation_gap_s": truncation_gap(turns, audio_duration),
     }
 
@@ -404,15 +399,18 @@ def _fmt(value, spec: str = ".3f") -> str:
 
 
 def build_rows(data: dict[int, dict], detector: LanguageDetector,
-               overrides: dict[int, float]) -> list[dict]:
+               overrides: dict[int, float],
+               consultations_map: dict[int, str] | None = None) -> list[dict]:
     rows: list[dict] = []
-    for cid, script in CONSULTATIONS.items():
+    for cid, script in (consultations_map or CONSULTATIONS).items():
         record = data.get(cid, {"present": False})
         entry: dict = {
             "consultation": cid,
             "script": script,
             "expected": "known-bad (Sinhala via English-forced pipeline)"
-                        if cid == KNOWN_BAD else "known-good English",
+                        if cid == KNOWN_BAD
+                        else ("known-good English" if cid in CONSULTATIONS
+                              else "unscripted room consultation"),
         }
         if not record.get("present"):
             entry["available"] = False
@@ -445,9 +443,14 @@ def build_rows(data: dict[int, dict], detector: LanguageDetector,
             rows.append(entry)
             continue
 
-        language, probability = detector.detect(audio)
-        entry["s1_language"] = language
-        entry["s1_language_probability"] = probability
+        windows = detector.detect_windows(audio)
+        entry["s1_multi_window"] = windows
+        # First-window fields survive for row continuity — they are what
+        # the single-window S1 always was.
+        first = (windows or {}).get("windows") or [{}]
+        entry["s1_language"] = first[0].get("language")
+        entry["s1_language_probability"] = first[0].get("probability")
+        entry["s1_expected_fraction"] = (windows or {}).get("expected_fraction")
 
         entry["full"] = measure(turns, duration)
 
@@ -500,22 +503,23 @@ def print_table(rows: list[dict]) -> None:
           "the\ndoctor saw), never from re-transcription. S1 reads the audio "
           "in one window.")
     print()
-    header = ("| Cid | Script | Window | Segs | S1 lang (p) | S2 wtd | "
-              "S2 unwtd | S3 4-gram | S3 run | S4 gap s |")
+    header = ("| Cid | Script | Window | Segs | S1 lang (p) | S1 en-frac | "
+              "S2 wtd | S2 unwtd | S3 4-gram | S3 within | S3 run | S4 gap s |")
     print(header)
-    print("|---|---|---|---|---|---|---|---|---|---|")
+    print("|---|---|---|---|---|---|---|---|---|---|---|---|")
     for row in rows:
         if not row.get("available"):
-            print(f"| {row['consultation']} | {row['script']} | — | — | — | "
-                  f"— | — | — | — | — |  <!-- {row.get('note','')} -->")
+            print(f"| {row['consultation']} | {row['script']} | — | — | — | — | "
+                  f"— | — | — | — | — | — |  <!-- {row.get('note','')} -->")
             continue
         if "full" not in row:
-            print(f"| {row['consultation']} | {row['script']} | — | 0 | — | — "
-                  f"| — | — | — | — |  <!-- {row.get('turns_note','')} -->")
+            print(f"| {row['consultation']} | {row['script']} | — | 0 | — | — | — "
+                  f"| — | — | — | — | — |  <!-- {row.get('turns_note','')} -->")
             continue
         language = row.get("s1_language")
         probability = row.get("s1_language_probability")
         lang_cell = "—" if language is None else f"{language} ({_fmt(probability,'.2f')})"
+        frac_cell = _fmt(row.get("s1_expected_fraction"), ".2f")
         windows = [("full", row["full"])]
         if "truncated" in row:
             windows.append(("to scripted close", row["truncated"]))
@@ -523,9 +527,11 @@ def print_table(rows: list[dict]) -> None:
             print(
                 f"| {row['consultation']} | {row['script']} | {label} | "
                 f"{m['segments']} | {lang_cell if label == 'full' else '↑'} | "
+                f"{frac_cell if label == 'full' else '↑'} | "
                 f"{_fmt(m['s2_confidence_weighted'])} | "
                 f"{_fmt(m['s2_confidence_unweighted'])} | "
                 f"{_fmt(m['s3_max_4gram_share'])} | "
+                f"{_fmt(m.get('s3_within_segment_share'))} | "
                 f"{m['s3_max_consecutive_identical']} | "
                 f"{_fmt(m['s4_truncation_gap_s'], '.1f')} |"
             )
@@ -566,6 +572,10 @@ def main(argv: list[str] | None = None) -> int:
                         help="skip S1 (no model load)")
     parser.add_argument("--close", action="append", metavar="CID=SECONDS",
                         help="override the detected scripted close")
+    parser.add_argument("--all-stored", action="store_true",
+                        help="measure 66-70 AND every later consultation "
+                             "with turns and audio on disk (the 2026-07-31 "
+                             "S1/S3 re-calibration scope)")
     parser.add_argument("--out", type=Path, default=OUT_PATH)
     args = parser.parse_args(argv)
 
@@ -577,8 +587,25 @@ def main(argv: list[str] | None = None) -> int:
 
     schema.ensure_all()
 
+    consultations_map = dict(CONSULTATIONS)
+    if args.all_stored:
+        # Everything since the scripted five that still has audio on disk:
+        # the wider distribution the S1/S3 candidate thresholds need. The
+        # per-cid rows say when audio or turns are missing, so absence is
+        # visible rather than silent.
+        import psycopg
+        with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SET TRANSACTION READ ONLY")
+                cur.execute(
+                    "SELECT DISTINCT c.id FROM consultation c"
+                    " JOIN transcript_turn t ON t.consultation_id = c.id"
+                    " WHERE c.id > %s ORDER BY c.id", (max(CONSULTATIONS),))
+                for (cid,) in cur.fetchall():
+                    consultations_map.setdefault(cid, "(7a-era, unscripted)")
+
     try:
-        data = fetch_consultations(list(CONSULTATIONS))
+        data = fetch_consultations(list(consultations_map))
     except Exception as exc:
         print(f"Database unavailable: {exc}", file=sys.stderr)
         return 1
@@ -587,7 +614,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.skip_language:
         detector._failed = True  # never loads a model
     try:
-        rows = build_rows(data, detector, parse_overrides(args.close))
+        rows = build_rows(data, detector, parse_overrides(args.close),
+                          consultations_map)
     finally:
         detector.close()
 

@@ -394,13 +394,28 @@ def transcribe_and_diarise(wav_path: str,
         asr_options={"initial_prompt": CLINICAL_INITIAL_PROMPT},
     )
     # S1 for the transcript-quality gate, taken here because the model is
-    # already loaded — one window, no extra load, and it must happen
-    # BEFORE the forced-English transcribe below. Measured only: it does
-    # not act (spec §11 — it returns English at p=0.90 for #70).
-    detected_language, language_probability = None, None
+    # already loaded, BEFORE the forced-English transcribe below. Since
+    # 2026-07-31 this is the §11 MULTI-WINDOW redesign, through the ONE
+    # shared implementation in app/transcript_quality.py — the model call
+    # is injected, everything that decides lives there, and the
+    # calibration harness calls the same function. Measured only: no
+    # threshold exists until the owner sets one from the re-calibration.
+    # Runs on the MUTED copy, deliberately — the machine's own English
+    # voice must not vote for English.
+    detected_language, language_probability, language_windows = None, None, None
     try:
-        detected_language, language_probability, _ = model.model.detect_language(
-            audio=audio, language_detection_segments=1)
+        def _detect(window):
+            language, probability, _ = model.model.detect_language(
+                audio=window, language_detection_segments=1)
+            return language, float(probability)
+
+        language_windows = transcript_quality.s1_language_windows(
+            audio, SAMPLE_RATE, _detect)
+        first = (language_windows.get("windows") or [{}])[0]
+        # The single-window fields survive for row continuity — they are
+        # the first window, which is what they always were.
+        detected_language = first.get("language")
+        language_probability = first.get("probability")
     except Exception:  # pragma: no cover - never block finalisation on a measurement
         logger.warning("Language detection unavailable; S1 recorded as unknown")
 
@@ -494,6 +509,7 @@ def transcribe_and_diarise(wav_path: str,
     return {"turns": turns, "audio_duration_s": audio_duration_s,
             "detected_language": detected_language,
             "language_probability": language_probability,
+            "language_windows": language_windows,
             "excluded_spans_s": excluded_s,
             "hallucinated_segments": hallucinated,
             "exclusion_anomalies": limits["anomalies"],
@@ -716,6 +732,7 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
             audio_duration_s=transcription.get("audio_duration_s"),
             detected_language=transcription.get("detected_language"),
             language_probability=transcription.get("language_probability"),
+            language_windows=transcription.get("language_windows"),
             # Spec §2.4: the gate must be TOLD about the exclusions. A
             # system utterance at the end of a recording would otherwise
             # look like dropped audio to S4.

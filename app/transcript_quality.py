@@ -134,6 +134,24 @@ TRUNCATION_FLAG_S = float(os.getenv("TRANSCRIPT_TRUNCATION_FLAG_S", "10"))
 # self-describing; changing them changes no behaviour.
 EXPECTED_LANGUAGE = os.getenv("TRANSCRIPT_EXPECTED_LANGUAGE", "en")
 
+# S1 multi-window (spec §11 redesign, built 2026-07-31, MEASURE-ONLY):
+# language is detected on windows spread evenly across the audio and the
+# reported figure is the FRACTION detected as the expected language —
+# single-window detection returned English at p=0.90 for #70 because the
+# script opens at its most English-looking. Neither parameter has a
+# calibrated threshold yet; nothing here acts until the owner sets one
+# from the re-calibration run.
+S1_WINDOW_S = float(os.getenv("TRANSCRIPT_S1_WINDOW_S", "30"))
+S1_MAX_WINDOWS = int(os.getenv("TRANSCRIPT_S1_MAX_WINDOWS", "10"))
+
+# S3's within-segment share saturates at 1.0 on SHORT segments — measured
+# on the 2026-07-31 re-calibration: seven healthy recordings hit 1.0
+# through segments of a few tokens, while #70's genuine loops sit at
+# 0.727 among segments of ≥12 tokens against ≤0.333 everywhere else. The
+# floored variant is therefore measured alongside the raw one; neither
+# acts until the owner sets a threshold.
+S3_MIN_SEGMENT_TOKENS = int(os.getenv("TRANSCRIPT_S3_MIN_SEGMENT_TOKENS", "12"))
+
 NGRAM_N = 4
 
 OUTCOME_PASS = "pass"
@@ -159,19 +177,48 @@ def s2_weighted_confidence(turns: list[dict]) -> float | None:
     return (total / weight) if weight > 0 else None
 
 
+def _ngram_share(tokens: list[str]) -> tuple[float, str | None]:
+    """Largest share of tokens taken by one repeated 4-gram. The same
+    formula everywhere it is used, so figures are comparable."""
+    if len(tokens) < NGRAM_N:
+        return 0.0, None
+    grams = Counter(" ".join(tokens[i:i + NGRAM_N])
+                    for i in range(len(tokens) - NGRAM_N + 1))
+    gram, count = grams.most_common(1)[0]
+    return (count * NGRAM_N) / len(tokens), gram
+
+
 def s3_repetition(turns: list[dict]) -> dict:
-    """Measured only. Largest share of tokens taken by one 4-gram, plus the
-    longest run of identical consecutive segments (which the calibration
-    showed is dead at 1 everywhere — retained because it costs nothing)."""
+    """MEASURED ONLY — the SHARED S3 implementation (pipeline and
+    calibration harness both call this; two copies would diverge).
+
+    Three figures:
+    - `max_ngram_share`: the original whole-transcript 4-gram share.
+    - `max_within_segment_share` (§11 redesign, 2026-07-31): the same
+      measure computed INSIDE each segment's text, maximum across
+      segments — the calibration showed #70's repetition lives within
+      segments, so the whole-transcript figure dilutes exactly the
+      signal it is meant to catch. No threshold exists yet; it acts on
+      nothing until re-calibrated.
+    - `max_consecutive_identical`: the dead cross-segment run length
+      (1 everywhere measured), retained as a reported value because it
+      costs nothing — but never thresholded (§11).
+    """
     tokens: list[str] = []
     for turn in turns:
         tokens.extend(_tokenise(turn.get("text", "")))
-    share, gram = 0.0, None
-    if len(tokens) >= NGRAM_N:
-        grams = Counter(" ".join(tokens[i:i + NGRAM_N])
-                        for i in range(len(tokens) - NGRAM_N + 1))
-        gram, count = grams.most_common(1)[0]
-        share = (count * NGRAM_N) / len(tokens)
+    share, gram = _ngram_share(tokens)
+
+    within_share, within_gram, within_idx = 0.0, None, None
+    floored_share = 0.0
+    for i, turn in enumerate(turns):
+        turn_tokens = _tokenise(turn.get("text", ""))
+        turn_share, turn_gram = _ngram_share(turn_tokens)
+        if turn_share > within_share:
+            within_share, within_gram, within_idx = turn_share, turn_gram, i
+        if len(turn_tokens) >= S3_MIN_SEGMENT_TOKENS:
+            floored_share = max(floored_share, turn_share)
+
     best = run = 0
     previous = None
     for turn in turns:
@@ -180,7 +227,68 @@ def s3_repetition(turns: list[dict]) -> dict:
         previous = normalised
         best = max(best, run)
     return {"max_ngram_share": round(share, 4), "max_ngram": gram,
+            "max_within_segment_share": round(within_share, 4),
+            "max_within_segment_ngram": within_gram,
+            "max_within_segment_idx": within_idx,
+            "max_within_segment_share_floored": round(floored_share, 4),
+            "min_segment_tokens": S3_MIN_SEGMENT_TOKENS,
             "max_consecutive_identical": best}
+
+
+# --- S1 multi-window (spec §11 redesign; shared, measure-only) --------------
+
+def s1_window_starts(duration_s: float, window_s: float = S1_WINDOW_S,
+                     max_windows: int = S1_MAX_WINDOWS) -> list[float]:
+    """Evenly-spread window start times across the audio. Pure, and the
+    ONLY place window placement is decided — the pipeline and the
+    calibration harness must sample the same audio the same way."""
+    if duration_s <= window_s:
+        return [0.0]
+    count = max(1, min(max_windows, int(duration_s // window_s)))
+    if count == 1:
+        return [0.0]
+    span = duration_s - window_s
+    return [round(i * span / (count - 1), 3) for i in range(count)]
+
+
+def s1_language_windows(samples, sample_rate: int, detect, *,
+                        expected: str = EXPECTED_LANGUAGE,
+                        window_s: float = S1_WINDOW_S,
+                        max_windows: int = S1_MAX_WINDOWS) -> dict:
+    """The SHARED S1 implementation (the standing requirement: ONE
+    function, or the calibration stops describing what the pipeline
+    does). `detect` is caller-supplied — callable(window_samples) ->
+    (language, probability) — because the pipeline and the harness hold
+    different loaded models; everything that DECIDES (window placement,
+    the expected-language fraction) lives here and only here.
+
+    MEASURE-ONLY: the returned figures act on nothing. #70's prediction
+    (spec §11): English in a minority of windows, where the single
+    window said English at p=0.90. A window whose detection fails is
+    recorded with language None and excluded from the fraction — an
+    unmeasured window is not evidence either way.
+    """
+    duration_s = len(samples) / sample_rate if sample_rate > 0 else 0.0
+    windows: list[dict] = []
+    for start in s1_window_starts(duration_s, window_s, max_windows):
+        lo = int(start * sample_rate)
+        hi = min(len(samples), lo + int(window_s * sample_rate))
+        language, probability = None, None
+        try:
+            language, probability = detect(samples[lo:hi])
+        except Exception:  # noqa: BLE001 - a measurement must not raise
+            logger.warning("S1 window at %.1fs: language detection failed", start)
+        windows.append({
+            "start_s": round(start, 1), "language": language,
+            "probability": round(float(probability), 3)
+            if probability is not None else None})
+    detected = [w for w in windows if w["language"] is not None]
+    fraction = (sum(1 for w in detected if w["language"] == expected)
+                / len(detected)) if detected else None
+    return {"windows": windows, "n_windows": len(windows),
+            "n_detected": len(detected), "expected": expected,
+            "expected_fraction": round(fraction, 3) if fraction is not None else None,
+            "window_s": window_s}
 
 
 def _window_rms(samples, sample_rate: int, window_s: float):
@@ -334,7 +442,8 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
                     detected_language: str | None = None,
                     language_probability: float | None = None,
                     excluded_spans_s: list[tuple[float, float]] | None = None,
-                    trailing_speech: dict | None = None) -> dict:
+                    trailing_speech: dict | None = None,
+                    language_windows: dict | None = None) -> dict:
     """All four signals. Always computed, always stored (spec §3, §7).
 
     `excluded_spans_s` are the Phase 7a speaking windows in seconds. Only
@@ -348,6 +457,10 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
             "detected": detected_language,
             "probability": language_probability,
             "expected": EXPECTED_LANGUAGE,
+            # The §11 redesign's multi-window measurement (2026-07-31),
+            # stored on every consultation so calibration data
+            # accumulates for free. MEASURE-ONLY like the rest of S1.
+            "multi_window": language_windows,
             "acts": False,   # see module docstring / spec §11
         },
         "s2_confidence": {

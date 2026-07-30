@@ -494,3 +494,122 @@ def test_review_page_shows_a_red_banner_and_hides_approve():
     # Reuses the urgency treatment — no new colour semantics (spec §7).
     assert 'id="qualityBanner"' in page and 'class="urgency"' in page
     assert "state.quality_outcome === 'refused'" in page
+
+
+# --- S1 multi-window + S3 within-segment (spec §11 redesigns, 2026-07-31) ---
+#
+# MEASURE-ONLY, and the tests enforce it: neither signal may refuse, flag
+# or banner anything in this build. Acting waits on the re-calibration and
+# the owner's thresholds.
+
+def test_s1_windows_are_spread_evenly_and_capped():
+    assert tq.s1_window_starts(20.0) == [0.0]
+    assert tq.s1_window_starts(45.0) == [0.0]
+    assert tq.s1_window_starts(90.0) == [0.0, 30.0, 60.0]
+    starts = tq.s1_window_starts(300.0)
+    assert len(starts) == 10
+    assert starts[0] == 0.0 and starts[-1] == 270.0
+    # A very long recording still gets at most max_windows.
+    assert len(tq.s1_window_starts(4000.0)) == tq.S1_MAX_WINDOWS
+
+
+def test_s1_fraction_is_over_detected_windows_only():
+    """#70's shape: an English-looking opening, non-English elsewhere.
+    The fraction is what separates it — and a window whose detection
+    FAILS is excluded, never counted as evidence either way."""
+    import numpy as np
+
+    samples = np.zeros(16000 * 90, dtype="float32")   # 90 s -> 3 windows
+    answers = iter([("en", 0.9), ("si", 0.8), RuntimeError("no cuda")])
+
+    def detect(window):
+        answer = next(answers)
+        if isinstance(answer, Exception):
+            raise answer
+        return answer
+
+    result = tq.s1_language_windows(samples, 16000, detect)
+    assert result["n_windows"] == 3 and result["n_detected"] == 2
+    assert result["expected_fraction"] == 0.5
+    assert result["windows"][2]["language"] is None
+
+
+def test_s1_with_no_detected_windows_reports_none_not_zero():
+    import numpy as np
+
+    def detect(window):
+        raise RuntimeError("model unavailable")
+
+    result = tq.s1_language_windows(np.zeros(16000 * 40, dtype="float32"),
+                                    16000, detect)
+    assert result["expected_fraction"] is None
+
+
+def test_s3_within_segment_catches_what_the_whole_transcript_dilutes():
+    """The calibration's finding: #70's loops live INSIDE segments, where
+    the whole-transcript share dilutes them and the cross-segment run
+    stays 1. The within-segment maximum is the axis that separates."""
+    loop = "thank you " * 12
+    turns = [turn(0, 0.0, 30.0, "a perfectly ordinary clinical sentence about "
+                                "chest pain and breathlessness today", 0.8),
+             turn(1, 30.0, 40.0, loop, 0.8),
+             turn(2, 40.0, 60.0, "another ordinary closing sentence with no "
+                                 "repetition in it at all thanks", 0.8)]
+    s3 = tq.s3_repetition(turns)
+    assert s3["max_consecutive_identical"] == 1, "the dead axis stays dead"
+    assert s3["max_within_segment_share"] > s3["max_ngram_share"], (
+        "the within-segment maximum must not be diluted by the rest")
+    assert s3["max_within_segment_share"] > 0.5
+    assert s3["max_within_segment_idx"] == 1
+    # The loop turn is 24 tokens, so the floored variant sees it too.
+    assert s3["max_within_segment_share_floored"] > 0.5
+
+
+def test_s3_floored_variant_ignores_short_saturating_segments():
+    """The re-calibration's finding: a segment of a few tokens saturates
+    the raw within-share at 1.0 on perfectly healthy speech ("thank you
+    thank you" as a parting). The floored variant only consults segments
+    of >= S3_MIN_SEGMENT_TOKENS, which is where #70's genuine loops live
+    (0.727 there, vs <= 0.333 for everything healthy). Measure-only."""
+    turns = [turn(0, 0.0, 5.0, "thank you thank you", 0.9),   # 4 tokens
+             turn(1, 5.0, 60.0, "a perfectly ordinary consultation sentence "
+                                "with plenty of distinct words in it and no "
+                                "repetition anywhere at all today", 0.9)]
+    s3 = tq.s3_repetition(turns)
+    assert s3["max_within_segment_share"] == 1.0, "the raw variant saturates"
+    assert s3["max_within_segment_share_floored"] < 0.3, (
+        "the floored variant must not be moved by a 4-token segment")
+    assert s3["min_segment_tokens"] == tq.S3_MIN_SEGMENT_TOKENS
+
+
+def test_s1_and_s3_still_act_on_nothing():
+    """The HARD CONSTRAINT of the redesign session: terrible S1 and S3
+    values with healthy S2/S4 produce a clean pass — no refusal, no flag.
+    Acting waits on the owner's thresholds."""
+    turns = [turn(0, 0.0, 100.0, "thank you " * 50, 0.9)]
+    signals = tq.compute_signals(
+        turns, audio_duration_s=100.0,
+        trailing_speech={"measured": True, "has_speech": False},
+        language_windows={"windows": [], "n_windows": 10, "n_detected": 10,
+                          "expected": "en", "expected_fraction": 0.1,
+                          "window_s": 30.0})
+    assert signals["s1_language"]["multi_window"]["expected_fraction"] == 0.1
+    assert signals["s1_language"]["acts"] is False
+    assert signals["s3_repetition"]["acts"] is False
+    assert signals["s3_repetition"]["max_within_segment_share"] > 0.9
+    verdict = tq.evaluate(signals)
+    assert verdict["outcome"] == tq.OUTCOME_PASS
+    assert verdict["fired"] == [] and verdict["flags"] == []
+
+
+def test_the_last_two_path_signal_is_collapsed():
+    """S1's two code paths — finalize.py and the calibration harness —
+    must both go through the ONE shared implementation, or the
+    calibration stops describing what the pipeline does. S3 likewise."""
+    from pathlib import Path
+    finalize_src = (Path(__file__).parent.parent / "app" / "finalize.py").read_text()
+    harness_src = (Path(__file__).parent.parent / "scripts"
+                   / "calibrate_transcript_quality.py").read_text()
+    assert "transcript_quality.s1_language_windows" in finalize_src
+    assert "s1_language_windows" in harness_src
+    assert "s3_repetition" in harness_src

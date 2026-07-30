@@ -171,8 +171,8 @@ def test_harness_sets_no_thresholds():
 
 def test_missing_consultation_row_degrades_cleanly():
     class NoDetector:
-        def detect(self, path):
-            return None, None
+        def detect_windows(self, path):   # renamed with the multi-window S1
+            return None
 
     rows = calib.build_rows({cid: {"present": False} for cid in calib.CONSULTATIONS},
                             NoDetector(), {})
@@ -184,8 +184,8 @@ def test_missing_consultation_row_degrades_cleanly():
 def test_absent_audio_is_reported_not_fabricated():
     """#70 is voided and voided consultations are purge-eligible."""
     class NoDetector:
-        def detect(self, path):
-            return None, None
+        def detect_windows(self, path):   # renamed with the multi-window S1
+            return None
 
     data = {70: {"present": True, "audio_path": "/nonexistent/70.wav",
                  "status": "approved", "voided": True,
