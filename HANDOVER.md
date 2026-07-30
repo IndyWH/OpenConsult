@@ -2528,6 +2528,33 @@ The decision is the owner's.** Raw numbers in
 > is exactly the class of change the 450 finding showed a corpus
 > update can cause and un-cause silently.
 
+## Session 2026-08-01: three owner decisions banked, S3 flags
+
+Deliberately small ahead of Friday's collaborator session; lands with
+Thursday evening's restart, leaving Friday deployment-free. Three
+commits; no schema change; no dependency changes.
+
+- **Two closures recorded as owner decisions, 2026-07-30** (blockquotes
+  at their sections): the ASR stack stays WhisperX for v1 (experiment
+  closed, record stands, `word_timestamps=True` first if ever reopened),
+  and production retrieval stays as it is — docket item 12 closes with
+  the standing convention that `evaluate_retrieval_composition.py`
+  re-runs after any corpus change.
+- **The floored S3 share now ACTS at the flag tier**
+  (`TRANSCRIPT_S3_WITHIN_FLAG=0.5`, owner decision 2026-07-30 from the
+  measured 2.2× corridor): a within-segment repetition share over 0.5
+  among ≥12-token segments flags — amber acknowledge-gated banner, the
+  single-writer Approve gate, no new machinery — and never refuses.
+  Pinned by test with the re-calibration's real numbers: #70's 0.727
+  flags, the good four's 0.267–0.333 do not.
+- **S1 stays MEASURE-ONLY, deliberately** — the same day's decision: the
+  median-window-probability corridor is 0.013 wide (#70 at 0.902 vs
+  0.943 for the closest healthy row), too thin to act on. The reasoning
+  and its revisit condition (more stored consultations widening or
+  collapsing the corridor) live as a comment at the thresholds in
+  `app/transcript_quality.py`; every consultation keeps storing the
+  windows and the calibration harness keeps reporting the median.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
