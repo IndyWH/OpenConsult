@@ -158,7 +158,13 @@ def _quiet(seconds, amplitude=0.001, sample_rate=16000):
 
 def test_s4_ignores_a_long_silence_however_long_it_is():
     """449's shape. 300 s of quiet room after the last transcribed word must
-    NOT refuse — the old tolerance refused it at 15x over."""
+    NOT refuse — the old tolerance refused it at 15x over.
+
+    AMENDED for the flag tier (2026-07-31): the owner's rule — silence is
+    ignored however long it is — is a rule about REFUSAL, and it still
+    holds: nothing fires, the note is drafted. The §11 flag tier now
+    additionally marks a >10 s untranscribed tail amber for the doctor's
+    attention; a 300 s one certainly qualifies. Flagged, never refused."""
     import numpy as np
 
     audio = np.concatenate([_tone(30, 0.2), _quiet(300)])
@@ -170,8 +176,10 @@ def test_s4_ignores_a_long_silence_however_long_it_is():
                                  trailing_speech=trailing)
     assert signals["s4_truncation"]["gap_s"] == pytest.approx(300.0, abs=0.5)
     verdict = tq.evaluate(signals)
-    assert verdict["outcome"] == tq.OUTCOME_PASS, (
+    assert verdict["fired"] == [], (
         "a silent trailing region must not refuse, whatever its length")
+    assert verdict["outcome"] == tq.OUTCOME_FLAGGED
+    assert verdict["flags"][0]["signal"] == "S4"
 
 
 def test_s4_refuses_short_untranscribed_speech():
@@ -407,22 +415,19 @@ def test_signals_are_stored_whether_or_not_anything_fires():
     assert save < refusal_branch, "signals must be saved before the refusal branch"
 
 
-def test_flag_tier_is_not_implemented():
-    """Guard against the flag tier arriving without its calibration."""
-    source = tq.__doc__ or ""
-    assert "flag tier" in source.lower()
-    assert not hasattr(tq, "OUTCOME_FLAGGED")
-    assert "MIN_AVG_CONFIDENCE_FLAG" not in dir(tq)
-
-
-def test_flag_config_keys_exist_but_are_unused():
+def test_flag_tier_uses_the_recorded_thresholds_not_invented_ones():
+    """AMENDED 2026-07-31: this used to guard against the flag tier
+    arriving without its calibration. The tier has now arrived — built to
+    §11's owner-set 2026-07-25 numbers, which is exactly the arrival the
+    guard was protecting: wired, not invented. The guard's new job is
+    that the wired values ARE the recorded ones."""
+    assert tq.OUTCOME_FLAGGED == "flagged"
+    assert tq.MIN_AVG_CONFIDENCE_FLAG == 0.70
+    assert tq.TRUNCATION_FLAG_S == 10.0
     from pathlib import Path
     env = (Path(__file__).parent.parent / ".env.example").read_text()
     assert "TRANSCRIPT_MIN_AVG_CONFIDENCE_FLAG=0.70" in env
     assert "TRANSCRIPT_TRUNCATION_FLAG_S=10" in env
-    module = (Path(__file__).parent.parent / "app" / "transcript_quality.py").read_text()
-    assert "TRANSCRIPT_MIN_AVG_CONFIDENCE_FLAG" not in module
-    assert "TRANSCRIPT_TRUNCATION_FLAG_S" not in module
 
 
 def _db_ready() -> bool:

@@ -983,6 +983,19 @@ async def approve(
             content={"error": "This transcript was refused by the quality gate and"
                      " cannot be approved. No note was drafted from it."},
         )
+    # Flag tier (spec §11): a flagged transcript HAS a draft, and signing
+    # it is allowed — after the doctor acknowledges the amber banner.
+    # Blocked server-side like every acknowledge gate: a disabled button
+    # can be re-enabled from the console, a refusal cannot.
+    if (consultation and consultation["quality_outcome"] == transcript_quality.OUTCOME_FLAGGED
+            and not consultation["quality_ack_at"]):
+        return JSONResponse(
+            status_code=409,
+            content={"error": "The transcript-quality gate flagged this"
+                     " transcript (marginal confidence or a long untranscribed"
+                     " tail). Review the transcript with care and acknowledge"
+                     " the notice first."},
+        )
     note = await consultations.latest_note(cid)
     if note is None or note["content"].get("refusal"):
         return JSONResponse(
@@ -1006,6 +1019,20 @@ async def acknowledge_urgent(
         return blocked
     acked_at = await consultations.acknowledge_urgent(cid)
     await audit.log(user["id"], "urgent.acknowledged", "consultation", cid,
+                    {"acknowledged_at": acked_at})
+    return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
+
+
+@app.post("/api/consultations/{cid}/acknowledge-quality")
+async def acknowledge_quality(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """Flag tier (spec §11): the doctor confirms they have reviewed a
+    flagged transcript with care. Audited like every acknowledgement."""
+    if (blocked := await _scoped(cid, user)) is not None:
+        return blocked
+    acked_at = await consultations.acknowledge_quality(cid)
+    await audit.log(user["id"], "quality.acknowledged", "consultation", cid,
                     {"acknowledged_at": acked_at})
     return JSONResponse(content={"ok": True, "acknowledged_at": acked_at})
 

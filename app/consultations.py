@@ -61,10 +61,14 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS connection_lost boolean NOT NU
 -- Transcript-quality gate (2026-07-25, TRANSCRIPT_QUALITY_GATE_SPEC.md §7).
 -- quality_signals holds all four measured signals on EVERY consultation,
 -- whether or not anything fired — that is how calibration data for the
--- S1/S3 redesign accumulates for free. quality_outcome is 'pass' or
--- 'refused' ('flagged' is reserved for the follow-up flag tier).
+-- S1/S3 redesign accumulates for free. quality_outcome is 'pass',
+-- 'refused' or (since 2026-07-31, the §11 flag tier) 'flagged'.
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_signals jsonb;
 ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_outcome text;
+-- Flag tier (spec §11): a flagged (not refused) transcript still gets a
+-- draft, but approval is blocked until the doctor acknowledges the amber
+-- banner — the urgency-banner pattern exactly.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS quality_ack_at timestamptz;
 -- Diarisation honesty (2026-07-28). single_voice_detected: the audio gave
 -- only ONE speaker cluster, so the Doctor/Patient labels are a default and
 -- not a measurement. Acknowledge-gated on review, like the urgency banner:
@@ -266,7 +270,7 @@ async def get_consultation(cid: int) -> dict | None:
                 " c.voided_at, c.void_reason, c.doctor_id, c.connection_lost,"
                 " c.quality_signals, c.quality_outcome,"
                 " c.single_voice_detected, c.single_voice_ack_at,"
-                " c.declared_speakers, c.speakers_used"
+                " c.declared_speakers, c.speakers_used, c.quality_ack_at"
                 " FROM consultation c LEFT JOIN patient p ON p.id = c.patient_id"
                 " WHERE c.id = %s", (cid,),
             )
@@ -303,6 +307,7 @@ async def get_consultation(cid: int) -> dict | None:
         # carries it, and it feeds the same acknowledge gate as single_voice.
         "declaration_ignored": (row[17] is not None and row[18] is not None
                                 and row[17] != row[18]),
+        "quality_ack_at": str(row[19]) if row[19] else None,
     }
 
 
@@ -345,6 +350,27 @@ async def acknowledge_urgent(cid: int) -> str:
             row = await (
                 await conn.execute(
                     "SELECT urgent_ack_at FROM consultation WHERE id = %s", (cid,)
+                )
+            ).fetchone()
+    return str(row[0])
+
+
+async def acknowledge_quality(cid: int) -> str:
+    """Record the doctor's acknowledgement of the flag-tier banner
+    (spec §11). Same idempotency as acknowledge_urgent: the FIRST
+    acknowledgement's timestamp is the record."""
+    async with await _conn() as conn:
+        row = await (
+            await conn.execute(
+                "UPDATE consultation SET quality_ack_at = now()"
+                " WHERE id = %s AND quality_ack_at IS NULL"
+                " RETURNING quality_ack_at", (cid,),
+            )
+        ).fetchone()
+        if row is None:  # already acknowledged: keep the original timestamp
+            row = await (
+                await conn.execute(
+                    "SELECT quality_ack_at FROM consultation WHERE id = %s", (cid,)
                 )
             ).fetchone()
     return str(row[0])

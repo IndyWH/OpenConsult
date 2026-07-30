@@ -31,10 +31,12 @@ The two acting signals fire INDEPENDENTLY — either alone refuses. There
 is no co-occurrence rule; #70 trips both, so requiring both would only
 weaken the guard.
 
-The flag tier (amber banner, approval blocked until acknowledged) is
-deliberately not implemented here. Its thresholds are recorded in the
-spec and its config keys exist unused in `.env.example`, so the
-follow-up sets behaviour rather than inventing numbers.
+The FLAG tier (spec §11) is live since 2026-07-31: S2 in [0.60, 0.70)
+or a trailing gap over 10 s that did not refuse produces outcome
+`flagged` — the draft note proceeds, and approval is blocked behind an
+amber acknowledge-gated banner on the review page (the urgency-banner
+pattern; `quality_ack_at` on the consultation). The thresholds are the
+owner-set numbers recorded in §11 on 2026-07-25, wired not invented.
 
 Refusal means: no draft note generated, status `unreliable_transcript`,
 review page shows the diarised transcript under a red banner. Transcript
@@ -114,6 +116,20 @@ TRAILING_REFERENCE_PERCENTILE = float(os.getenv("TRANSCRIPT_TRAILING_REF_PCT", "
 # a recording, still passes.
 TRAILING_MIN_RUN_S = float(os.getenv("TRANSCRIPT_TRAILING_MIN_RUN_S", "3.0"))
 
+# Flag tier (spec §11, built 2026-07-31 — the follow-up the v1 build
+# scope deferred). Thresholds are the OWNER-SET numbers recorded in §11
+# on 2026-07-25; this commit wires them, it does not invent them.
+# A flagged transcript still gets a draft note; approval is blocked
+# behind an amber acknowledge-gated banner (the urgency pattern).
+MIN_AVG_CONFIDENCE_FLAG = float(os.getenv("TRANSCRIPT_MIN_AVG_CONFIDENCE_FLAG", "0.70"))
+# S4's flag keeps the RECORDED duration semantics: a trailing gap over
+# 10 s that did NOT refuse (its content measured as non-speech, or it
+# was unmeasurable but under the 20 s fallback) is exactly the amber
+# case — a sizeable untranscribed tail worth a human eye, not a refusal.
+# Measured missing SPEECH refuses regardless (the 2026-07-28 rule); the
+# flag never overrides that.
+TRUNCATION_FLAG_S = float(os.getenv("TRANSCRIPT_TRUNCATION_FLAG_S", "10"))
+
 # Measured, not acted on. Kept here so the stored signals are
 # self-describing; changing them changes no behaviour.
 EXPECTED_LANGUAGE = os.getenv("TRANSCRIPT_EXPECTED_LANGUAGE", "en")
@@ -121,6 +137,7 @@ EXPECTED_LANGUAGE = os.getenv("TRANSCRIPT_EXPECTED_LANGUAGE", "en")
 NGRAM_N = 4
 
 OUTCOME_PASS = "pass"
+OUTCOME_FLAGGED = "flagged"
 OUTCOME_REFUSED = "refused"
 STATUS_UNRELIABLE = "unreliable_transcript"
 
@@ -336,6 +353,7 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
         "s2_confidence": {
             "weighted_mean": s2_weighted_confidence(turns),
             "refuse_below": MIN_AVG_CONFIDENCE_REFUSE,
+            "flag_below": MIN_AVG_CONFIDENCE_FLAG,
             "acts": True,
         },
         "s3_repetition": {**s3_repetition(turns), "acts": False},
@@ -348,6 +366,7 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
             "audio_duration_s": audio_duration_s,
             "excluded_s": round(sum(e - s for s, e in (excluded_spans_s or [])), 2),
             "refuse_above_s": TRUNCATION_REFUSE_S,
+            "flag_above_s": TRUNCATION_FLAG_S,
             "trailing_speech": trailing_speech or {"measured": False,
                                                    "has_speech": None},
             "acts": True,
@@ -364,6 +383,11 @@ def evaluate(signals: dict) -> dict:
     Only S2 and S4 are consulted. They fire independently: either alone
     refuses. A signal that could not be measured (None) never refuses —
     an unmeasurable signal is not evidence of a bad transcript.
+
+    Two tiers (spec §11): REFUSE (no draft, status unreliable_transcript)
+    and FLAG (draft proceeds; approval blocked behind an acknowledged
+    amber banner). A refusal is never also a flag — the flag tier only
+    describes transcripts that survived refusal.
     """
     fired: list[dict] = []
 
@@ -418,6 +442,38 @@ def evaluate(signals: dict) -> dict:
                        f"{TRUNCATION_REFUSE_S:.0f}s"),
         })
 
+    # The FLAG tier (spec §11), evaluated only when nothing refused: a
+    # refusal already blocks harder than a flag could, and stacking an
+    # acknowledgement on top of "no note exists" would gate nothing.
+    flags: list[dict] = []
+    if not fired:
+        if (confidence is not None
+                and MIN_AVG_CONFIDENCE_REFUSE <= confidence < MIN_AVG_CONFIDENCE_FLAG):
+            flags.append({
+                "signal": "S2",
+                "name": "marginal average confidence",
+                "value": round(confidence, 3),
+                "threshold": MIN_AVG_CONFIDENCE_FLAG,
+                "detail": (f"duration-weighted mean ASR confidence "
+                           f"{confidence:.3f} is below {MIN_AVG_CONFIDENCE_FLAG} "
+                           f"(refusal starts at {MIN_AVG_CONFIDENCE_REFUSE})"),
+            })
+        if gap is not None and gap > TRUNCATION_FLAG_S:
+            # The recorded §11 semantics: a sizeable untranscribed tail
+            # that did NOT refuse — measured as non-speech, or
+            # unmeasurable but under the 20 s fallback — is amber.
+            measured = " (no speech detected in it)" if trailing.get("measured") \
+                else " (its content could not be checked)"
+            flags.append({
+                "signal": "S4",
+                "name": "long untranscribed tail",
+                "value": round(gap, 1),
+                "threshold": TRUNCATION_FLAG_S,
+                "detail": (f"{gap:.1f}s of audio after the last transcribed "
+                           f"segment{measured}; flagged above "
+                           f"{TRUNCATION_FLAG_S:.0f}s"),
+            })
+
     if not GATE_ENABLED:
         # Break-glass switch, not a demo convenience — say so loudly.
         if fired:
@@ -429,11 +485,14 @@ def evaluate(signals: dict) -> dict:
         else:
             logger.warning("TRANSCRIPT_GATE_ENABLED=false — transcript-quality "
                            "gate disabled; signals measured but not enforced")
-        return {"outcome": OUTCOME_PASS, "fired": [], "enabled": False,
-                "would_have_fired": fired}
+        return {"outcome": OUTCOME_PASS, "fired": [], "flags": [],
+                "enabled": False, "would_have_fired": fired,
+                "would_have_flagged": flags}
 
-    return {"outcome": OUTCOME_REFUSED if fired else OUTCOME_PASS,
-            "fired": fired, "enabled": True}
+    outcome = (OUTCOME_REFUSED if fired
+               else OUTCOME_FLAGGED if flags else OUTCOME_PASS)
+    return {"outcome": outcome, "fired": fired, "flags": flags,
+            "enabled": True}
 
 
 def refusal_summary(fired: list[dict]) -> str:

@@ -742,6 +742,18 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
                            transcript_quality.refusal_summary(verdict["fired"]))
             return
 
+        if verdict["outcome"] == transcript_quality.OUTCOME_FLAGGED:
+            # Flag tier (spec §11): the draft PROCEEDS — the flag is a
+            # review instruction, not a refusal — and approval is blocked
+            # server-side until the amber banner is acknowledged.
+            await audit.log(None, "consultation.quality_flagged", "consultation",
+                            cid, {"flags": verdict["flags"],
+                                  "summary": transcript_quality.refusal_summary(
+                                      verdict["flags"])})
+            logger.warning("Consultation %d flagged by the transcript-quality "
+                           "gate: %s", cid,
+                           transcript_quality.refusal_summary(verdict["flags"]))
+
         note = await draft_note(await consultations.get_turns(cid))
         await consultations.save_note(cid, note)
         await consultations.set_status(cid, "awaiting_review")

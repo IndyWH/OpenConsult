@@ -21,6 +21,9 @@
   .urgency li { font-weight: 600; margin-bottom: .2rem; }
   .urgency .why { display: block; font-weight: 400; color: var(--ink-soft); font-size: .84rem; }
   .urgency .ack { margin-left: auto; flex: none; align-self: center; }
+  /* Flag tier: AMBER, deliberately — red stays urgency-only (the design
+     system's rule). Same layout, same acknowledge gate, different tier. */
+  .urgency.flagged .icon, .urgency.flagged h3 { color: var(--amber-ink, #8a6d1a); }
 
   /* SOAP note */
   .soap h3 { font-family: var(--serif); font-size: 1.02rem; margin: 1rem 0 .35rem; }
@@ -862,6 +865,7 @@ function applyReadOnly() {
 
 function renderQualityBanner() {
   const banner = document.getElementById('qualityBanner');
+  if (state.quality_outcome === 'flagged') { renderQualityFlagBanner(banner); return; }
   if (state.quality_outcome !== 'refused') { banner.style.display = 'none'; return; }
   banner.style.display = '';
   banner.className = 'urgency';
@@ -888,6 +892,48 @@ function renderQualityBanner() {
     'The recording and transcript are kept as evidence; an administrator can void ' +
     'this consultation.'));
   banner.appendChild(box);
+}
+
+// Flag tier (TRANSCRIPT_QUALITY_GATE_SPEC §11): amber, acknowledge-gated,
+// the urgency banner's exact pattern. A flagged transcript HAS a draft —
+// the flag is a review instruction, not a refusal — and Approve waits on
+// the acknowledgement via refreshApproveGate (the single writer; this
+// renderer touches no button, per the rule below ackButton).
+function renderQualityFlagBanner(banner) {
+  const acked = !!state.quality_ack_at;
+  banner.style.display = '';
+  banner.className = 'urgency flagged' + (acked ? ' acked' : '');
+  banner.innerHTML = '';
+  banner.appendChild(el('span', 'icon', acked ? '✓' : '⚠'));
+  const box = el('div');
+  box.appendChild(el('h3', null, acked
+    ? 'Transcript-quality notice acknowledged'
+    : 'Review this transcript with particular care'));
+  const signals = (state.quality_signals || {});
+  const reasons = [];
+  const conf = (signals.s2_confidence || {});
+  if (conf.weighted_mean != null && conf.flag_below != null
+      && conf.weighted_mean < conf.flag_below)
+    reasons.push(`average speech-recognition confidence ${conf.weighted_mean.toFixed(3)}` +
+                 ` is marginal (flagged below ${conf.flag_below})`);
+  const trunc = (signals.s4_truncation || {});
+  if (trunc.gap_s != null && trunc.flag_above_s != null
+      && trunc.gap_s > trunc.flag_above_s)
+    reasons.push(`${trunc.gap_s.toFixed(1)}s of audio after the last transcribed` +
+                 ` segment was not transcribed (flagged above ${trunc.flag_above_s}s)`);
+  const ul = el('ul');
+  for (const r of reasons) ul.appendChild(el('li', null, r));
+  box.appendChild(ul);
+  box.appendChild(el('p', null,
+    'A draft note was generated, but the transcript it rests on is '
+    + 'borderline. Check the transcript against what was actually said — '
+    + 'especially numbers, drugs and the end of the consultation — before '
+    + 'approving.'));
+  box.appendChild(el('p', 'when',
+    'Measured by the transcript-quality gate. Clinical judgement remains yours.'
+    + (acked ? ` · acknowledged ${state.quality_ack_at.slice(0,16)}` : '')));
+  banner.appendChild(box);
+  if (!acked) banner.appendChild(ackButton('acknowledge-quality'));
 }
 
 function renderUrgentBanner() {
@@ -1051,6 +1097,9 @@ function refreshApproveGate() {
   }
   if (labels.stale && !labels.acknowledged) {
     reasons.push('the labels changed after this note was drafted — regenerate or acknowledge');
+  }
+  if (state.quality_outcome === 'flagged' && !state.quality_ack_at) {
+    reasons.push('the transcript-quality gate flagged this transcript — review it with care and acknowledge');
   }
   approveBtn.disabled = reasons.length > 0;
   // Standing rule: the reason goes ON the control, not only in the banner.
