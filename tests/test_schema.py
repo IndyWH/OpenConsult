@@ -34,8 +34,10 @@ def test_ensure_all_covers_every_module_in_one_order():
     """The point of the module: one ordering, not five call sites."""
     names = [name for name, _ in schema.statements()]
     assert names == list(schema.MODULE_NAMES)
+    # raw_segments added 2026-07-30 (the raw-transcript view); it sits
+    # after consultations because its table references consultation(id).
     assert set(names) == {"auth", "frontdesk", "consultations", "letters",
-                          "system_utterances", "audit"}
+                          "system_utterances", "raw_segments", "audit"}
 
 
 def test_ensure_all_is_idempotent():

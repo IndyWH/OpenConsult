@@ -52,6 +52,37 @@
   #transcript .turn.said .ts { margin-right: .5rem; }
   #transcript .turn.said .endreason { font-size: .78rem; }
 
+  /* Raw-transcript view (RAW_TRANSCRIPT_VIEW_SPEC): a display-only lens
+     on the pre-merge segments. No number column, no citation hooks, no
+     edit affordance — the diarised view stays the record. The bordered
+     group is the point: it shows where the merge joined segments into
+     one turn, which is what would have shown 445 and 66 at a glance. */
+  .rawnote {
+    font-size: .78rem; color: var(--ink-faint); padding: .3rem 0 .6rem;
+  }
+  .rawgroup {
+    border: 1px solid var(--line); border-radius: 6px;
+    padding: .3rem .5rem; margin: .45rem 0;
+  }
+  .rawjoin {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--ink-faint); margin-bottom: .2rem;
+  }
+  #transcript .turn.raw {
+    background: transparent; border-left: 2px solid var(--line);
+    padding: .25rem 0 .25rem .7rem; margin: .2rem 0;
+  }
+  #transcript .turn.raw .cluster {
+    font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--ink-faint);
+  }
+  #transcript .turn.raw.droppedseg .rawtext {
+    text-decoration: line-through; color: var(--ink-faint);
+  }
+  #transcript .turn.raw .droplabel {
+    font-size: .75rem; color: var(--amber-ink, #8a6d1a); font-style: italic;
+  }
+
   /* transcript turns: theme classes + editing affordance */
   #transcript { max-height: 75vh; overflow-y: auto; }
   .turn .ttext[contenteditable="true"]:focus { background: #F3EDE6; outline: none; }
@@ -172,11 +203,16 @@
     <div class="urgency" id="singleVoiceBanner" style="display:none"></div>
     <div class="urgency" id="labelsBanner" style="display:none"></div>
     <div class="pane">
-      <div class="pane-head"><h2>Diarised transcript</h2>
+      <div class="pane-head"><h2 id="transcriptTitle">Diarised transcript</h2>
         <div class="tools">
           <span>click a citation chip in the note to highlight its source turn ·
           double-click a line to correct it, then Regenerate ·
           click a speaker label to change it for that line alone</span>
+          <!-- Raw-transcript view toggle (RAW_TRANSCRIPT_VIEW_SPEC D1):
+               above the transcript pane, because it acts on that pane
+               only. A labelled control that says what it does in words —
+               not an icon. -->
+          <button id="rawToggle" class="small">Show what was heard</button>
           <button id="swap" class="small">Swap Doctor/Patient</button>
         </div>
       </div>
@@ -333,8 +369,143 @@ function interleaved() {
   return items.sort((a, b) => a.at - b.at);
 }
 
+// ======================= raw-transcript view (RAW_TRANSCRIPT_VIEW_SPEC)
+//
+// A display-only lens on the WhisperX segments AS THEY WERE before the
+// speaker merge and role assignment, read from STORAGE — never rebuilt,
+// because WhisperX is not deterministic and a rebuilt view would show a
+// consultation that never existed (spec §3). The diarised view stays
+// the record: every correction happens there; nothing here is editable,
+// numbered, or citable. Opening the view is audited server-side on the
+// fetch (spec §6) — the point is to measure whether checking happens.
+// Segments the silence invariant dropped are stored FLAGGED and shown
+// struck through (owner decision 2026-07-30): the invariant has eaten
+// transcript before (445), and this view exists to make that visible.
+const rawToggle = document.getElementById('rawToggle');
+let rawShown = false;
+let rawData = null;   // fetched once per page visit — that fetch is the
+                      // audited "open"; toggling back and forth re-uses it
+
+function groupRawSegments(segments, turns) {
+  // Pure (executed under Node in tests). Walks segments in order;
+  // consecutive segments whose midpoints fall inside the same diarised
+  // turn form one group, so a merge that joined minutes into one turn
+  // renders as one bordered block — seeing the join is the whole point
+  // (spec §4: it is what would have shown 445 and 66 at a glance).
+  // Dropped segments never group under a turn: the invariant removed
+  // them before the merge ever saw them.
+  const containing = (s) => {
+    const mid = (s.start_s + s.end_s) / 2;
+    const i = (turns || []).findIndex(t =>
+      mid >= (t.start_s ?? t.start ?? 0) && mid <= (t.end_s ?? t.end ?? 0));
+    return i === -1 ? null : i;
+  };
+  const groups = [];
+  for (const s of segments) {
+    const i = s.dropped ? null : containing(s);
+    const last = groups[groups.length - 1];
+    if (last && i !== null && last.turnIdx === i) {
+      last.segments.push(s);
+    } else {
+      groups.push({
+        turnIdx: i,
+        turnLabel: i === null ? null
+          : ((turns[i].idx ?? i) + ' (' + (turns[i].role || '?') + ')'),
+        segments: [s],
+      });
+    }
+  }
+  return groups;
+}
+
+function rawNode(s) {
+  // No turn number, no anchor id, no role button, no editing affordance:
+  // a raw segment is not a citation target and not an edit surface.
+  const div = el('div', 'turn raw' + (s.dropped ? ' droppedseg' : ''));
+  const who = el('span', 'who');
+  who.appendChild(el('span', 'cluster', s.cluster || 'no cluster'));
+  who.appendChild(document.createElement('br'));
+  who.appendChild(el('span', 'ts', fmt(s.start_s) + '–' + fmt(s.end_s)));
+  div.appendChild(who);
+  div.appendChild(el('span', 'rawtext', s.text));
+  if (s.dropped) {
+    div.appendChild(el('span', 'droplabel',
+      ' removed by the silence invariant — not in the transcript'));
+  }
+  return div;
+}
+
+function renderRawTranscript() {
+  if (!rawData || !rawData.available) {
+    // History, handled honestly: nothing stored means the view SAYS so —
+    // it never falls back to re-running the pipeline.
+    transcriptEl.appendChild(el('div', 'rawnote',
+      (rawData && rawData.reason) || 'Loading…'));
+    return;
+  }
+  transcriptEl.appendChild(el('div', 'rawnote',
+    'Recorded at finalisation and read from storage — never '
+    + 're-transcribed. Display only: corrections happen on the diarised '
+    + 'transcript. Boxes show segments the merge joined into one turn.'));
+  for (const group of groupRawSegments(rawData.segments, state.turns)) {
+    if (group.turnIdx === null) {
+      for (const s of group.segments) transcriptEl.appendChild(rawNode(s));
+      continue;
+    }
+    const box = el('div', 'rawgroup');
+    box.appendChild(el('div', 'rawjoin',
+      group.segments.length > 1
+        ? group.segments.length + ' segments → merged into turn '
+          + group.turnLabel
+        : 'became turn ' + group.turnLabel));
+    for (const s of group.segments) box.appendChild(rawNode(s));
+    transcriptEl.appendChild(box);
+  }
+}
+
+async function toggleRawView() {
+  if (!rawShown && rawData === null) {
+    rawToggle.disabled = true;
+    try {
+      const response = await fetch(`/api/consultations/${cid}/raw-transcript`);
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      rawData = await response.json();
+      rawToggle.classList.remove('rejected');
+      rawToggle.title = '';
+    } catch (err) {
+      // Rule 1: the tap must not vanish — the failure lands on the
+      // control that was pressed, and the view does not flip.
+      rawToggle.title = 'Could not load the raw view: ' + err.message;
+      rawToggle.classList.add('rejected');
+      rawToggle.disabled = false;
+      return;
+    }
+    rawToggle.disabled = false;
+  }
+  rawShown = !rawShown;
+  renderTranscript();
+}
+rawToggle.addEventListener('click', toggleRawView);
+
 function renderTranscript() {
   transcriptEl.innerHTML = '';
+  const title = document.getElementById('transcriptTitle');
+  const swap = document.getElementById('swap');
+  if (rawShown) {
+    title.textContent = 'What was heard — raw segments';
+    rawToggle.textContent = 'Show diarised transcript';
+    // Swap acts on the diarised view, which is not on screen: disabled
+    // with the reason on the control (rule 1), not hidden mid-toggle.
+    swap.disabled = true;
+    swap.title = 'Switch back to the diarised transcript to change '
+      + 'speaker labels — the raw view is a lens, not a second record';
+    renderRawTranscript();
+    return;
+  }
+  title.textContent = 'Diarised transcript';
+  rawToggle.textContent = 'Show what was heard';
+  swap.disabled = false;
+  swap.title = '';
   for (const item of interleaved()) {
     if (item.spoken) { transcriptEl.appendChild(spokenNode(item.spoken)); continue; }
     renderTurn(item.turn);

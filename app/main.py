@@ -23,7 +23,8 @@ from fastapi import Depends
 from pydantic import BaseModel
 
 from app import (audit, auth, consultations, face, frontdesk, letters, monitor,
-                 ratelimit, retention, schema, speech, system_utterances)
+                 ratelimit, raw_segments, retention, schema, speech,
+                 system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
 from app.finalize import (expect_declaration, finalize_consultation,
@@ -882,6 +883,46 @@ async def consultation_state(
                  "letters": letter_rows, "system_utterances": spoken,
                  "labels": labels}
     )
+
+
+@app.get("/api/consultations/{cid}/raw-transcript")
+async def raw_transcript(
+    cid: int, user: dict = Depends(api_user(*CLINICAL_ROLES))
+) -> JSONResponse:
+    """The raw-transcript view (RAW_TRANSCRIPT_VIEW_SPEC.md): pre-merge
+    ASR segments, read from STORAGE only — never rebuilt, because
+    WhisperX is not deterministic and a rebuilt view would show a
+    consultation that never existed (spec §3). Available on approved
+    consultations too (D3: an audit trail's value is that it survives
+    approval); same scoping as the transcript itself.
+
+    Opening the view is AUDITED (spec §6) — the point is to measure
+    whether checking happens, not to be able to say checking was
+    possible. Audited also when nothing is stored: an attempt to check
+    is the behaviour being measured.
+
+    History is handled honestly: consultations finalised before this
+    feature (2026-07-30) have no stored segments, and the payload says
+    so plainly rather than falling back to re-running anything.
+    """
+    consultation = await consultations.get_consultation(cid)
+    if consultation is None:
+        return JSONResponse(status_code=404, content={"error": "not found"})
+    if consultation["voided_at"] and user["role"] != "admin":
+        return JSONResponse(status_code=410, content={"error": "consultation voided"})
+    if (blocked := _foreign_consultation(consultation, user)) is not None:
+        return blocked
+    segments = await raw_segments.for_consultation(cid)
+    await audit.log(user["id"], "transcript.raw_viewed", "consultation", cid,
+                    {"segments": len(segments), "available": bool(segments)})
+    return JSONResponse(content={
+        "available": bool(segments),
+        "segments": segments,
+        "reason": None if segments else (
+            "No raw segments are stored for this consultation — it was "
+            "finalised before raw-segment storage existed (2026-07-30). "
+            "The raw view is read from storage and is never rebuilt by "
+            "re-running the pipeline.")})
 
 
 class ApproveBody(BaseModel):

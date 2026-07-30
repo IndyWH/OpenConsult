@@ -37,6 +37,9 @@ import time
 import httpx
 
 from app import audit, consultations, speech, system_utterances, transcript_quality
+# Aliased: transcribe_and_diarise's local `raw_segments` (the
+# post-invariant list) predates this module and keeps its name.
+from app import raw_segments as raw_segments_store
 from app.notes import draft_note
 
 logger = logging.getLogger(__name__)
@@ -458,6 +461,15 @@ def transcribe_and_diarise(wav_path: str,
     raw_segments, hallucinated = drop_segments_in_excluded_spans(
         result["segments"], excluded_s)
 
+    # The raw-transcript view's stored set (RAW_TRANSCRIPT_VIEW_SPEC.md +
+    # the owner's 2026-07-30 persistence decision): EVERY pre-invariant
+    # segment, with the ones the invariant just removed FLAGGED rather
+    # than absent — the invariant has eaten transcript before (445), and
+    # the view exists to make such layers visible. Built here because
+    # this is the last moment the segments exist; persisted by
+    # finalize_consultation, which has the database.
+    raw_view = raw_segment_records(result["segments"], hallucinated)
+
     turns = merge_into_turns(raw_segments)
 
     # S4's content check, measured here because this is where both the original
@@ -486,7 +498,41 @@ def transcribe_and_diarise(wav_path: str,
             "hallucinated_segments": hallucinated,
             "exclusion_anomalies": limits["anomalies"],
             "excluded_fraction": limits["fraction"],
-            "trailing_speech": trailing_speech}
+            "trailing_speech": trailing_speech,
+            "raw_segments": raw_view}
+
+
+def raw_segment_records(segments: list[dict], dropped: list[dict]) -> list[dict]:
+    """The raw-transcript view's rows, from the PRE-invariant segment set.
+
+    Cluster and confidence are derived exactly as `merge_into_turns`
+    derives them (majority word-speaker; mean word score), so the raw
+    view and the diarised transcript describe the same measurements —
+    only the merge and the role rule separate them. Empty-text segments
+    are skipped, as the merge skips them: there is nothing to show.
+
+    `dropped` is the silence invariant's removals — the SAME dicts, so
+    identity is the honest membership test. They are flagged, not
+    omitted (owner decision 2026-07-30): the view must show what the
+    layer ate, which is the 445 failure shape made visible.
+    """
+    dropped_ids = {id(seg) for seg in dropped}
+    records: list[dict] = []
+    for seg in segments:
+        text = (seg.get("text") or "").strip()
+        if not text:
+            continue
+        words = seg.get("words", [])
+        speakers = [w.get("speaker") for w in words if w.get("speaker")]
+        cluster = max(set(speakers), key=speakers.count) if speakers else None
+        scores = [w["score"] for w in words if "score" in w]
+        confidence = round(sum(scores) / len(scores), 3) if scores else None
+        records.append({"idx": len(records), "cluster": cluster,
+                        "start": round(float(seg["start"]), 3),
+                        "end": round(float(seg["end"]), 3),
+                        "text": text, "confidence": confidence,
+                        "dropped": id(seg) in dropped_ids})
+    return records
 
 
 def merge_into_turns(raw_segments: list[dict]) -> list[dict]:
@@ -647,6 +693,11 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         for i, turn in enumerate(turns):
             turn["idx"] = i
         await consultations.save_turns(cid, turns)
+        # The raw view's rows, beside the turns they became — BEFORE the
+        # quality gate, deliberately: a refused (unreliable_transcript)
+        # consultation is exactly the kind whose raw layer needs seeing.
+        await raw_segments_store.save(
+            cid, transcription.get("raw_segments") or [])
         # Recorded on the consultation, not left in a log line: one voice
         # means the roles are a default rather than a measurement, and the
         # review page must say so before anything is signed.
