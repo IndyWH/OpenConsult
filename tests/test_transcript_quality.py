@@ -73,22 +73,27 @@ def test_consultation_70_refuses_on_its_real_measured_signals():
     assert {f["signal"] for f in verdict["fired"]} == {"S2", "S4"}
 
 
-def test_s1_and_s3_do_not_act():
-    """#70's S1 is English at p=0.90 and its S3 run length is 1 — both
-    would PASS. Asserting otherwise would hide the calibration finding
-    that caused the acting signals to swap (spec §11)."""
+def test_s1_does_not_act_and_s3_flags_but_never_refuses():
+    """AMENDED 2026-07-31 (owner decisions of 2026-07-30): S1 stays inert
+    — its median-probability corridor is 0.013 wide, too thin to act on —
+    while S3 now ACTS at the FLAG tier only, on the floored
+    within-segment share the re-calibration validated. A blatant loop
+    therefore FLAGS (amber, acknowledge-gated) and must never refuse."""
     # Wrong language, at high confidence: still passes, because S1 is inert.
     verdict = tq.evaluate(signals_for(0.95, 0.0, language="si", probability=0.99))
     assert verdict["outcome"] == tq.OUTCOME_PASS
 
-    # A blatant repetition loop: still passes, because S3 is inert.
+    # A blatant repetition loop inside a long segment: flags, never refuses.
     looped = [turn(0, 0.0, 60.0, " ".join(["the pain in the"] * 40), 0.95)]
     signals = tq.compute_signals(looped, audio_duration_s=60.0)
-    assert signals["s3_repetition"]["max_ngram_share"] > 0.9
-    assert tq.evaluate(signals)["outcome"] == tq.OUTCOME_PASS
+    assert signals["s3_repetition"]["max_within_segment_share_floored"] > 0.9
+    verdict = tq.evaluate(signals)
+    assert verdict["outcome"] == tq.OUTCOME_FLAGGED
+    assert verdict["fired"] == [], "S3 must never refuse"
+    assert [f["signal"] for f in verdict["flags"]] == ["S3"]
 
     assert tq.compute_signals([])["s1_language"]["acts"] is False
-    assert tq.compute_signals([])["s3_repetition"]["acts"] is False
+    assert tq.compute_signals([])["s3_repetition"]["acts"] is True
 
 
 @pytest.mark.parametrize("cid", [66, 67, 68, 69])
@@ -582,11 +587,13 @@ def test_s3_floored_variant_ignores_short_saturating_segments():
     assert s3["min_segment_tokens"] == tq.S3_MIN_SEGMENT_TOKENS
 
 
-def test_s1_and_s3_still_act_on_nothing():
-    """The HARD CONSTRAINT of the redesign session: terrible S1 and S3
-    values with healthy S2/S4 produce a clean pass — no refusal, no flag.
-    Acting waits on the owner's thresholds."""
-    turns = [turn(0, 0.0, 100.0, "thank you " * 50, 0.9)]
+def test_s1_still_acts_on_nothing_however_bad_its_measurement():
+    """AMENDED 2026-07-31: the redesign session's hard constraint held
+    for one day for S3 — the owner then set its flag threshold from the
+    measured corridor — but it STANDS for S1, whose corridor is too thin.
+    A terrible S1 measurement with healthy everything-else passes clean."""
+    turns = [turn(0, 0.0, 100.0,
+                  " ".join(f"word{i}" for i in range(60)), 0.9)]
     signals = tq.compute_signals(
         turns, audio_duration_s=100.0,
         trailing_speech={"measured": True, "has_speech": False},
@@ -595,8 +602,6 @@ def test_s1_and_s3_still_act_on_nothing():
                           "window_s": 30.0})
     assert signals["s1_language"]["multi_window"]["expected_fraction"] == 0.1
     assert signals["s1_language"]["acts"] is False
-    assert signals["s3_repetition"]["acts"] is False
-    assert signals["s3_repetition"]["max_within_segment_share"] > 0.9
     verdict = tq.evaluate(signals)
     assert verdict["outcome"] == tq.OUTCOME_PASS
     assert verdict["fired"] == [] and verdict["flags"] == []

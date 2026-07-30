@@ -992,9 +992,9 @@ async def approve(
         return JSONResponse(
             status_code=409,
             content={"error": "The transcript-quality gate flagged this"
-                     " transcript (marginal confidence or a long untranscribed"
-                     " tail). Review the transcript with care and acknowledge"
-                     " the notice first."},
+                     " transcript (marginal confidence, a long untranscribed"
+                     " tail, or a repetition loop). Review the transcript with"
+                     " care and acknowledge the notice first."},
         )
     note = await consultations.latest_note(cid)
     if note is None or note["content"].get("refusal"):

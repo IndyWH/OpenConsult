@@ -15,17 +15,18 @@ Four signals are measured on EVERY consultation and stored whether or
 not anything fires, so calibration data for the follow-up accumulates
 for free. **Only two act:**
 
-    S2  duration-weighted mean confidence   refuse below 0.60   ACTS
-    S4  truncation gap (seconds)            refuse above 20 s   ACTS
-    S1  language detection                  measured only       DOES NOT ACT
-    S3  repetition                          measured only       DOES NOT ACT
+    S2  duration-weighted mean confidence   refuse < 0.60, flag < 0.70   ACTS
+    S4  truncation gap / trailing content   refuse (content), flag >10s  ACTS
+    S3  repetition (floored within-segment) flag > 0.5, never refuses    ACTS (flag only, 2026-07-30)
+    S1  language (median window prob.)      measured only                DOES NOT ACT
 
-S1 and S3 do not act because the calibration showed they cannot yet:
-single-window language detection returns English at p=0.90 for #70 (the
-script opens with an English-heavy greeting), and S3's cross-segment run
-length is 1 in all five recordings. Both need a redesign and their own
-calibration run before they are trusted — spec §11, "S1 and S3 redesign".
-Do not wire them into the decision here without that.
+S1 does not act, deliberately (owner decision 2026-07-30): the
+re-calibration killed the designed fraction metric (1.00 everywhere,
+#70 included — the recording is code-switched throughout) and the
+surviving candidate, median window probability, has a corridor only
+0.013 wide. Too thin to act on; see the comment at the thresholds. S3
+acts at the FLAG tier only, on the ≥12-token-floored within-segment
+share the same re-calibration validated (2.2× corridor).
 
 The two acting signals fire INDEPENDENTLY — either alone refuses. There
 is no co-occurrence rule; #70 trips both, so requiring both would only
@@ -147,10 +148,22 @@ S1_MAX_WINDOWS = int(os.getenv("TRANSCRIPT_S1_MAX_WINDOWS", "10"))
 # S3's within-segment share saturates at 1.0 on SHORT segments — measured
 # on the 2026-07-31 re-calibration: seven healthy recordings hit 1.0
 # through segments of a few tokens, while #70's genuine loops sit at
-# 0.727 among segments of ≥12 tokens against ≤0.333 everywhere else. The
-# floored variant is therefore measured alongside the raw one; neither
-# acts until the owner sets a threshold.
+# 0.727 among segments of ≥12 tokens against ≤0.333 everywhere else.
 S3_MIN_SEGMENT_TOKENS = int(os.getenv("TRANSCRIPT_S3_MIN_SEGMENT_TOKENS", "12"))
+# ACTS at the FLAG tier since 2026-07-30 (owner decision, from the
+# measured 2.2x corridor above): a floored within-segment share over
+# this flags — amber banner, acknowledge-gated approval — never refuses.
+S3_WITHIN_FLAG = float(os.getenv("TRANSCRIPT_S3_WITHIN_FLAG", "0.5"))
+
+# S1 (median window probability) stays MEASURE-ONLY, deliberately — the
+# owner's 2026-07-30 decision alongside the S3 one. Its corridor is
+# 0.013 wide (#70's median 0.902 against 0.943 for the closest healthy
+# consultation, 457), which is too thin to act on: one quiet room or one
+# soft-spoken patient could cross it. What would change this: more
+# stored consultations widening the corridor (act) or collapsing it
+# (redesign again). Every consultation stores the windows, and the
+# calibration harness keeps reporting the median, so the data
+# accumulates without further work.
 
 NGRAM_N = 4
 
@@ -469,7 +482,12 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
             "flag_below": MIN_AVG_CONFIDENCE_FLAG,
             "acts": True,
         },
-        "s3_repetition": {**s3_repetition(turns), "acts": False},
+        # S3 ACTS at the flag tier only (owner decision 2026-07-30): the
+        # floored within-segment share flags above S3_WITHIN_FLAG. It
+        # never refuses. The raw share and the run length stay reported.
+        "s3_repetition": {**s3_repetition(turns),
+                          "flag_above_floored": S3_WITHIN_FLAG,
+                          "acts": True},
         # S4 measures the gap as before — it is useful context and it is the
         # fallback — but it DECIDES on `trailing_speech`. A duration cannot tell
         # missed speech from an empty room, which is the only reason a tolerance
@@ -585,6 +603,23 @@ def evaluate(signals: dict) -> dict:
                 "detail": (f"{gap:.1f}s of audio after the last transcribed "
                            f"segment{measured}; flagged above "
                            f"{TRUNCATION_FLAG_S:.0f}s"),
+            })
+        # S3, flag tier only (owner decision 2026-07-30, from the
+        # measured corridor: #70 at 0.727 vs <= 0.333 everywhere else).
+        s3 = signals.get("s3_repetition", {})
+        floored = s3.get("max_within_segment_share_floored")
+        if floored is not None and floored > S3_WITHIN_FLAG:
+            flags.append({
+                "signal": "S3",
+                "name": "repetition loop inside a segment",
+                "value": round(floored, 3),
+                "threshold": S3_WITHIN_FLAG,
+                "detail": (f"one repeated phrase accounts for {floored:.0%} of "
+                           f"a segment of at least "
+                           f"{s3.get('min_segment_tokens', S3_MIN_SEGMENT_TOKENS)} "
+                           f"words (flagged above {S3_WITHIN_FLAG:.0%}) — the "
+                           f"transcriber may have looped rather than "
+                           f"transcribed"),
             })
 
     if not GATE_ENABLED:

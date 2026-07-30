@@ -42,7 +42,10 @@ needs_db = pytest.mark.skipif(not _db_ready(), reason="PostgreSQL not available"
 
 def _signals(confidence: float, *, gap_s: float = 0.0,
              trailing: dict | None = None) -> dict:
-    turns = [{"start": 0.0, "end": 100.0, "text": "words " * 50,
+    # Distinct words, deliberately: repeated filler would trip the S3
+    # flag (live since 2026-07-30) and muddy every S2/S4 assertion here.
+    turns = [{"start": 0.0, "end": 100.0,
+              "text": " ".join(f"word{i}" for i in range(50)),
               "confidence": confidence}]
     return tq.compute_signals(
         turns, audio_duration_s=100.0 + gap_s,
@@ -140,6 +143,54 @@ def test_signals_carry_the_flag_thresholds_for_the_banner():
     signals = _signals(0.80)
     assert signals["s2_confidence"]["flag_below"] == tq.MIN_AVG_CONFIDENCE_FLAG
     assert signals["s4_truncation"]["flag_above_s"] == tq.TRUNCATION_FLAG_S
+    assert signals["s3_repetition"]["flag_above_floored"] == tq.S3_WITHIN_FLAG
+
+
+# --- S3 joins the flag tier (owner decision 2026-07-30) ---------------------
+
+def _with_floored_s3(value: float) -> dict:
+    """Healthy S2/S4, with the floored S3 share pinned to a measured
+    value — the signals_for convention, applied to S3."""
+    signals = _signals(0.80)
+    signals["s3_repetition"]["max_within_segment_share_floored"] = value
+    return signals
+
+
+def test_70s_stored_floored_share_flags_at_the_owners_threshold():
+    """#70's re-calibrated number, 0.727, against the owner's 0.5: flags
+    through the same amber path, never refuses. (In reality #70 refuses
+    on S2 and S4 first — this isolates the S3 tier with those healthy.)"""
+    verdict = tq.evaluate(_with_floored_s3(0.727))
+    assert verdict["outcome"] == tq.OUTCOME_FLAGGED
+    assert verdict["fired"] == []
+    assert [f["signal"] for f in verdict["flags"]] == ["S3"]
+    assert verdict["flags"][0]["value"] == 0.727
+    assert "looped" in verdict["flags"][0]["detail"]
+
+
+def test_the_four_good_recordings_floored_shares_do_not_flag():
+    """The re-calibration's measured values for 66-69 at the >=12-token
+    floor: 0.286 / 0.333 / 0.267 / 0.333 — all clear of 0.5 with the
+    corridor the owner decided on."""
+    for value in (0.286, 0.333, 0.267, 0.333):
+        verdict = tq.evaluate(_with_floored_s3(value))
+        assert verdict["outcome"] == tq.OUTCOME_PASS, value
+
+
+def test_s3_flag_threshold_is_the_owners_recorded_value():
+    assert tq.S3_WITHIN_FLAG == 0.5
+    assert "TRANSCRIPT_S3_WITHIN_FLAG=0.5" in Path(".env.example").read_text()
+
+
+def test_the_s3_reason_reaches_the_banner_and_only_the_single_writer_gates():
+    """The banner lists the S3 reason; the Approve gate is untouched —
+    the generic flagged reason already joins through refreshApproveGate,
+    the single writer, and nothing new writes the button."""
+    banner = REVIEW[REVIEW.index("function renderQualityFlagBanner"):
+                    REVIEW.index("function renderUrgentBanner")]
+    assert "max_within_segment_share_floored" in banner
+    assert "flag_above_floored" in banner
+    assert REVIEW.count("approveBtn.disabled =") == 1
 
 
 # --- the approve gate and the acknowledgement (endpoints) -------------------

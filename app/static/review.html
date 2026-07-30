@@ -921,6 +921,13 @@ function renderQualityFlagBanner(banner) {
       && trunc.gap_s > trunc.flag_above_s)
     reasons.push(`${trunc.gap_s.toFixed(1)}s of audio after the last transcribed` +
                  ` segment was not transcribed (flagged above ${trunc.flag_above_s}s)`);
+  const rep = (signals.s3_repetition || {});
+  if (rep.max_within_segment_share_floored != null && rep.flag_above_floored != null
+      && rep.max_within_segment_share_floored > rep.flag_above_floored)
+    reasons.push('one repeated phrase accounts for '
+      + Math.round(rep.max_within_segment_share_floored * 100)
+      + '% of a transcribed segment — the transcriber may have looped'
+      + ' (flagged above ' + Math.round(rep.flag_above_floored * 100) + '%)');
   const ul = el('ul');
   for (const r of reasons) ul.appendChild(el('li', null, r));
   box.appendChild(ul);
