@@ -1,0 +1,542 @@
+{
+ "note": "REPORT ONLY \u2014 offline comparison, nothing written to the database. Arm (a) is the production path verbatim; arm (b) is faster-whisper large-v3 + pyannote with the same merge. Stored turns (owner-corrected where applicable) are the role/boundary reference; frozen scripts the WER reference. 70 is code-switched Sinhala on English ASR \u2014 its WER is a known-bad case in both arms, kept for symmetry.",
+ "speakers": 2,
+ "skipped": [
+  "cid 453: FLAC archive \u2014 skipped (harness reads the 16 kHz WAVs the pipeline wrote)",
+  "cid 457: FLAC archive \u2014 skipped (harness reads the 16 kHz WAVs the pipeline wrote)",
+  "cid 455: FLAC archive \u2014 skipped (harness reads the 16 kHz WAVs the pipeline wrote)",
+  "cid 450: FLAC archive \u2014 skipped (harness reads the 16 kHz WAVs the pipeline wrote)"
+ ],
+ "stored_turn_counts": {
+  "66": 22,
+  "67": 19,
+  "68": 27,
+  "69": 25,
+  "70": 29,
+  "445": 4,
+  "446": 2,
+  "447": 6,
+  "448": 3,
+  "449": 1,
+  "451": 12,
+  "452": 4,
+  "454": 14,
+  "456": 1,
+  "458": 18,
+  "459": 7
+ },
+ "results": {
+  "66": {
+   "whisperx": {
+    "turns": 22,
+    "wer": 0.037,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 0.994,
+    "confidence": {
+     "n": 22,
+     "min": 0.696,
+     "p25": 0.763,
+     "median": 0.782,
+     "p75": 0.823,
+     "max": 0.89,
+     "s2_weighted_mean": 0.799
+    }
+   },
+   "faster_whisper": {
+    "turns": 13,
+    "wer": 0.161,
+    "boundary_drift_s": 3.17,
+    "role_agreement": 0.916,
+    "confidence": {
+     "n": 13,
+     "min": 0.539,
+     "p25": 0.763,
+     "median": 0.795,
+     "p75": 0.824,
+     "max": 0.86,
+     "s2_weighted_mean": 0.782
+    }
+   }
+  },
+  "67": {
+   "whisperx": {
+    "turns": 21,
+    "wer": 0.048,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 0.993,
+    "confidence": {
+     "n": 21,
+     "min": 0.582,
+     "p25": 0.748,
+     "median": 0.801,
+     "p75": 0.81,
+     "max": 0.896,
+     "s2_weighted_mean": 0.803
+    }
+   },
+   "faster_whisper": {
+    "turns": 11,
+    "wer": 0.061,
+    "boundary_drift_s": 1.71,
+    "role_agreement": 0.956,
+    "confidence": {
+     "n": 11,
+     "min": 0.763,
+     "p25": 0.769,
+     "median": 0.782,
+     "p75": 0.818,
+     "max": 0.856,
+     "s2_weighted_mean": 0.797
+    }
+   }
+  },
+  "68": {
+   "whisperx": {
+    "turns": 27,
+    "wer": 0.099,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 0.997,
+    "confidence": {
+     "n": 27,
+     "min": 0.309,
+     "p25": 0.758,
+     "median": 0.8,
+     "p75": 0.839,
+     "max": 0.912,
+     "s2_weighted_mean": 0.812
+    }
+   },
+   "faster_whisper": {
+    "turns": 29,
+    "wer": 0.118,
+    "boundary_drift_s": 0.56,
+    "role_agreement": 0.989,
+    "confidence": {
+     "n": 29,
+     "min": 0.747,
+     "p25": 0.856,
+     "median": 0.879,
+     "p75": 0.89,
+     "max": 0.898,
+     "s2_weighted_mean": 0.86
+    }
+   }
+  },
+  "69": {
+   "whisperx": {
+    "turns": 30,
+    "wer": 0.039,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 0.989,
+    "confidence": {
+     "n": 30,
+     "min": 0.442,
+     "p25": 0.718,
+     "median": 0.781,
+     "p75": 0.825,
+     "max": 0.882,
+     "s2_weighted_mean": 0.785
+    }
+   },
+   "faster_whisper": {
+    "turns": 30,
+    "wer": 0.035,
+    "boundary_drift_s": 0.4,
+    "role_agreement": 0.99,
+    "confidence": {
+     "n": 30,
+     "min": 0.769,
+     "p25": 0.828,
+     "median": 0.87,
+     "p75": 0.884,
+     "max": 0.903,
+     "s2_weighted_mean": 0.863
+    }
+   }
+  },
+  "70": {
+   "whisperx": {
+    "turns": 27,
+    "wer": 0.962,
+    "boundary_drift_s": 0.94,
+    "role_agreement": 0.924,
+    "confidence": {
+     "n": 27,
+     "min": 0.174,
+     "p25": 0.372,
+     "median": 0.501,
+     "p75": 0.521,
+     "max": 0.65,
+     "s2_weighted_mean": 0.491
+    }
+   },
+   "faster_whisper": {
+    "turns": 40,
+    "wer": 0.949,
+    "boundary_drift_s": 0.91,
+    "role_agreement": 0.906,
+    "confidence": {
+     "n": 40,
+     "min": 0.146,
+     "p25": 0.369,
+     "median": 0.432,
+     "p75": 0.591,
+     "max": 0.633,
+     "s2_weighted_mean": 0.439
+    }
+   }
+  },
+  "445": {
+   "whisperx": {
+    "turns": 5,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 1.0,
+    "confidence": {
+     "n": 5,
+     "min": 0.775,
+     "p25": 0.786,
+     "median": 0.787,
+     "p75": 0.8,
+     "max": 0.825,
+     "s2_weighted_mean": 0.797
+    }
+   },
+   "faster_whisper": {
+    "turns": 13,
+    "wer": null,
+    "boundary_drift_s": 5.38,
+    "role_agreement": 0.283,
+    "confidence": {
+     "n": 13,
+     "min": 0.26,
+     "p25": 0.642,
+     "median": 0.711,
+     "p75": 0.75,
+     "max": 0.856,
+     "s2_weighted_mean": 0.655
+    }
+   }
+  },
+  "446": {
+   "whisperx": {
+    "turns": 2,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 1.0,
+    "confidence": {
+     "n": 2,
+     "min": 0.766,
+     "p25": 0.766,
+     "median": 0.79,
+     "p75": 0.79,
+     "max": 0.79,
+     "s2_weighted_mean": 0.789
+    }
+   },
+   "faster_whisper": {
+    "turns": 5,
+    "wer": null,
+    "boundary_drift_s": 9.28,
+    "role_agreement": 0.961,
+    "confidence": {
+     "n": 5,
+     "min": 0.6,
+     "p25": 0.693,
+     "median": 0.719,
+     "p75": 0.799,
+     "max": 0.799,
+     "s2_weighted_mean": 0.729
+    }
+   }
+  },
+  "447": {
+   "whisperx": {
+    "turns": 6,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 1.0,
+    "confidence": {
+     "n": 6,
+     "min": 0.274,
+     "p25": 0.765,
+     "median": 0.782,
+     "p75": 0.794,
+     "max": 0.967,
+     "s2_weighted_mean": 0.777
+    }
+   },
+   "faster_whisper": {
+    "turns": 6,
+    "wer": null,
+    "boundary_drift_s": 10.7,
+    "role_agreement": 0.948,
+    "confidence": {
+     "n": 6,
+     "min": 0.46,
+     "p25": 0.467,
+     "median": 0.685,
+     "p75": 0.685,
+     "max": 0.77,
+     "s2_weighted_mean": 0.636
+    }
+   }
+  },
+  "448": {
+   "whisperx": {
+    "turns": 3,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 1.0,
+    "confidence": {
+     "n": 3,
+     "min": 0.685,
+     "p25": 0.685,
+     "median": 0.752,
+     "p75": 0.802,
+     "max": 0.802,
+     "s2_weighted_mean": 0.742
+    }
+   },
+   "faster_whisper": {
+    "turns": 5,
+    "wer": null,
+    "boundary_drift_s": 0.77,
+    "role_agreement": 0.976,
+    "confidence": {
+     "n": 5,
+     "min": 0.228,
+     "p25": 0.607,
+     "median": 0.632,
+     "p75": 0.636,
+     "max": 0.642,
+     "s2_weighted_mean": 0.519
+    }
+   }
+  },
+  "449": {
+   "whisperx": {
+    "turns": 1,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 1.0,
+    "confidence": {
+     "n": 1,
+     "min": 0.779,
+     "p25": 0.779,
+     "median": 0.779,
+     "p75": 0.779,
+     "max": 0.779,
+     "s2_weighted_mean": 0.779
+    }
+   },
+   "faster_whisper": {
+    "turns": 4,
+    "wer": null,
+    "boundary_drift_s": 53.39,
+    "role_agreement": 0.008,
+    "confidence": {
+     "n": 4,
+     "min": 0.2,
+     "p25": 0.451,
+     "median": 0.594,
+     "p75": 0.62,
+     "max": 0.62,
+     "s2_weighted_mean": 0.499
+    }
+   }
+  },
+  "451": {
+   "whisperx": {
+    "turns": 4,
+    "wer": null,
+    "boundary_drift_s": 9.32,
+    "role_agreement": 0.029,
+    "confidence": {
+     "n": 4,
+     "min": 0.268,
+     "p25": 0.756,
+     "median": 0.827,
+     "p75": 0.883,
+     "max": 0.883,
+     "s2_weighted_mean": 0.788
+    }
+   },
+   "faster_whisper": {
+    "turns": 7,
+    "wer": null,
+    "boundary_drift_s": 7.25,
+    "role_agreement": 0.063,
+    "confidence": {
+     "n": 7,
+     "min": 0.404,
+     "p25": 0.416,
+     "median": 0.641,
+     "p75": 0.741,
+     "max": 0.764,
+     "s2_weighted_mean": 0.633
+    }
+   }
+  },
+  "452": {
+   "whisperx": {
+    "turns": 4,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 0.976,
+    "confidence": {
+     "n": 4,
+     "min": 0.446,
+     "p25": 0.787,
+     "median": 0.792,
+     "p75": 0.907,
+     "max": 0.907,
+     "s2_weighted_mean": 0.787
+    }
+   },
+   "faster_whisper": {
+    "turns": 8,
+    "wer": null,
+    "boundary_drift_s": 12.34,
+    "role_agreement": 0.214,
+    "confidence": {
+     "n": 8,
+     "min": 0.425,
+     "p25": 0.621,
+     "median": 0.73,
+     "p75": 0.967,
+     "max": 0.967,
+     "s2_weighted_mean": 0.643
+    }
+   }
+  },
+  "454": {
+   "whisperx": {
+    "turns": 3,
+    "wer": null,
+    "boundary_drift_s": 15.52,
+    "role_agreement": 0.078,
+    "confidence": {
+     "n": 3,
+     "min": 0.685,
+     "p25": 0.685,
+     "median": 0.733,
+     "p75": 0.76,
+     "max": 0.76,
+     "s2_weighted_mean": 0.716
+    }
+   },
+   "faster_whisper": {
+    "turns": 2,
+    "wer": null,
+    "boundary_drift_s": 34.89,
+    "role_agreement": 0.167,
+    "confidence": {
+     "n": 2,
+     "min": 0.433,
+     "p25": 0.433,
+     "median": 0.777,
+     "p75": 0.777,
+     "max": 0.777,
+     "s2_weighted_mean": 0.622
+    }
+   }
+  },
+  "456": {
+   "whisperx": {
+    "turns": 1,
+    "wer": null,
+    "boundary_drift_s": 0.0,
+    "role_agreement": 1.0,
+    "confidence": {
+     "n": 1,
+     "min": 0.868,
+     "p25": 0.868,
+     "median": 0.868,
+     "p75": 0.868,
+     "max": 0.868,
+     "s2_weighted_mean": 0.868
+    }
+   },
+   "faster_whisper": {
+    "turns": 1,
+    "wer": null,
+    "boundary_drift_s": 13.88,
+    "role_agreement": null,
+    "confidence": {
+     "n": 1,
+     "min": 0.838,
+     "p25": 0.838,
+     "median": 0.838,
+     "p75": 0.838,
+     "max": 0.838,
+     "s2_weighted_mean": 0.838
+    }
+   }
+  },
+  "458": {
+   "whisperx": {
+    "turns": 2,
+    "wer": null,
+    "boundary_drift_s": 23.19,
+    "role_agreement": 0.032,
+    "confidence": {
+     "n": 2,
+     "min": 0.418,
+     "p25": 0.418,
+     "median": 0.7,
+     "p75": 0.7,
+     "max": 0.7,
+     "s2_weighted_mean": 0.667
+    }
+   },
+   "faster_whisper": {
+    "turns": 2,
+    "wer": null,
+    "boundary_drift_s": 21.15,
+    "role_agreement": 0.032,
+    "confidence": {
+     "n": 2,
+     "min": 0.562,
+     "p25": 0.562,
+     "median": 0.824,
+     "p75": 0.824,
+     "max": 0.824,
+     "s2_weighted_mean": 0.724
+    }
+   }
+  },
+  "459": {
+   "whisperx": {
+    "turns": 2,
+    "wer": null,
+    "boundary_drift_s": 9.56,
+    "role_agreement": 0.115,
+    "confidence": {
+     "n": 2,
+     "min": 0.76,
+     "p25": 0.76,
+     "median": 0.824,
+     "p75": 0.824,
+     "max": 0.824,
+     "s2_weighted_mean": 0.772
+    }
+   },
+   "faster_whisper": {
+    "turns": 2,
+    "wer": null,
+    "boundary_drift_s": 16.04,
+    "role_agreement": 0.115,
+    "confidence": {
+     "n": 2,
+     "min": 0.638,
+     "p25": 0.638,
+     "median": 0.642,
+     "p75": 0.642,
+     "max": 0.642,
+     "s2_weighted_mean": 0.639
+    }
+   }
+  }
+ }
+}
