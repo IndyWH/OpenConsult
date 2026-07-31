@@ -2555,6 +2555,16 @@ commits; no schema change; no dependency changes.
   `app/transcript_quality.py`; every consultation keeps storing the
   windows and the calibration harness keeps reporting the median.
 
+## Help series (2026-07-31): reader-facing docs in `help/`
+
+A reader-facing help series now lives in `help/`, written by Claude
+Cowork in owner-approved verbatim text. Division of labour: **help
+explains, HANDOVER records** — those pages are for readers; this
+document remains the engineering record. The help files are copied
+byte-for-byte from the owner's Documents folder and **must not be
+edited in the repo without owner approval**; new articles arrive the
+same way.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
