@@ -32,6 +32,8 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 
 See PROJECT_PLAN.md for the full plan.
 
+> **New to the project?** Start with the [help series](help/00-introduction.md) — a short, diagram-led tour of what the app does, how it's built, and why it works the way it does (including what an independent security audit found). It's written for reading, not installing.
+
 ## Getting started (Phase 0)
 
 Requirements: Linux, [uv](https://docs.astral.sh/uv/) (installs its own Python 3.12), PostgreSQL 18 with pgvector.
