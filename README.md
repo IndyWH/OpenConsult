@@ -1,8 +1,8 @@
 # Consultation AI — Project Plan
 
-**A research/educational prototype for AI-assisted medical consultations in Sinhala and English.**
+**A research/educational prototype for AI-assisted medical consultations — fully local, human-in-the-loop, English-only in v1.**
 
-Transcribes a doctor–patient consultation live, offers real-time clinical decision support (differentials, questions to ask, signs to elicit), then produces a diarised bilingual transcript, a concise doctor-style note, suggested investigations, and evidence-grounded guideline summaries — all running locally on consumer hardware.
+Transcribes a doctor–patient consultation live, offers real-time clinical decision support (differentials, questions to ask, signs to elicit), then produces a diarised transcript, a concise doctor-style note with every claim cited to the transcript, referral letters, and evidence-grounded guideline summaries — all running locally on consumer hardware.
 
 > ⚠️ **Status & intent:** This is an experimental prototype for research, education, and demonstration purposes only. It is **not** a medical device, has not undergone any regulatory assessment, and must never be used with real patients or real patient data. All development and demos use synthetic (scripted/acted) consultations.
 
@@ -10,7 +10,7 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 
 ## 1. Why this project
 
-- **Low-resource language clinical NLP.** Sinhala medical speech recognition is almost untouched territory. Sri Lankan consultations are conducted in Sinhala (heavily code-switched with English medical terms) while notes and prescriptions are written in English. This project models that exact workflow: *listen in Sinhala, document in English*.
+- **Low-resource language clinical NLP — closed with a published negative result.** This project began with Sri Lanka's real workflow in mind: consultations in Sinhala, heavily code-switched with English medical terms, documented in English. A pre-registered evaluation then showed that no available model transcribes code-switched clinical Sinhala safely — drug names and key numbers did not survive in any candidate — so v1 is English-only by explicit decision, and the evaluation records in `evals/` are kept as a standalone research contribution. Sinhala is out of scope, not postponed.
 - **Local-first, privacy-first.** Everything — speech recognition, translation, clinical reasoning — runs on a single local machine. No consultation audio or text leaves the premises. This mirrors real-world data-protection constraints in healthcare.
 - **Human-in-the-loop by design.** Every AI output is a *draft*. Nothing enters the record until the doctor reviews, edits, and approves it.
 
@@ -22,13 +22,12 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 3. A side panel updates periodically with: a working differential diagnosis, suggested questions to ask, and clinical signs to look for — helping narrow the differential in real time.
 
 **After the consultation (a background job, takes a minute or two):**
-4. The full recording is re-transcribed at higher quality and **diarised** (labelled *Doctor:* / *Patient:*).
-5. The Sinhala transcript is translated into English; both versions are kept.
-6. A concise SOAP-style note is drafted, plus a suggested investigations list (bloods, imaging) and a guideline summary grounded in retrieved guideline text (not the model's memory).
-7. The doctor reviews, edits, and signs off the note. Only then is it saved as final.
+4. The full recording is re-transcribed at higher quality and **diarised** (labelled *Doctor:* / *Patient:*), with quality gates that refuse to draft from an untrustworthy transcript.
+5. A concise SOAP-style note is drafted — every claim citing the transcript turns it came from — plus a guideline summary grounded in retrieved guideline text (not the model's memory).
+6. The doctor reviews, edits, and signs off the note. Only then is it final — and only from a signed note can referral letters be drafted.
 
 **Around the edges:**
-- User accounts with roles (doctor, admin, observer) — role provides context and controls access.
+- User accounts with roles (doctor, receptionist, admin) — enforced server-side; the receptionist manages the queue and can never open clinical content.
 - A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
 
 See PROJECT_PLAN.md for the full plan.
@@ -107,6 +106,24 @@ ollama pull embeddinggemma          # one-time: the embedding model
 uv run python scripts/ingest_guidelines.py   # fetch + chunk + embed into pgvector
 ```
 
+**Speaker diarisation (one-time setup):** the finalisation pipeline uses
+`pyannote/speaker-diarization-3.1`, which is licence-gated on Hugging
+Face. Create a free account, accept the model's terms on its model page,
+and authenticate with `hf auth login` — do this before your first Stop,
+not after.
+
+**The voice (Phase 7a):** the app speaks through Piper, installed
+deliberately outside the app's environment (see NOTICE for why):
+
+```bash
+uv tool install piper-tts
+# download voice en_GB-alba-medium (.onnx + .json) to ~/.local/share/piper-voices/
+```
+
+Point `TTS_COMMAND` and `TTS_MODEL_PATH` at it in `.env` (absolute
+paths — see `.env.example`). The sound-check button beside Start
+confirms the room can hear it.
+
 **Post-consultation note (Phase 2):** pressing Stop triggers the
 finalisation pipeline — WhisperX re-transcription, pyannote speaker
 diarisation, Doctor/Patient role attribution — and lands you on a review
@@ -125,3 +142,8 @@ Run the tests with:
 ```bash
 uv run pytest
 ```
+
+For running everything as system services that survive a reboot
+(PostgreSQL, Ollama, the app), and for the after-reboot checklist and
+known failure modes, see `HANDOVER.md` — the engineering record. The
+reader-facing tour lives in `help/`.
