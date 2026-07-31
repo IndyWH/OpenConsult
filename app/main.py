@@ -55,6 +55,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 DATABASE_URL = os.getenv("DATABASE_URL", "")
+# Session cookies carry `Secure` (2026-07-31 audit, Finding 6): this app is
+# reached over HTTPS (Tailscale Funnel terminates TLS), and a session cookie
+# must never travel in clear. Gated only so a plaintext-HTTP development
+# host can drop it — and gated with the SECURE DEFAULT, so forgetting the
+# variable fails safe rather than silently unprotected. The test suite
+# drives the app over http://testserver and sets it false in
+# tests/conftest.py; that is the only place it is turned off.
+SESSION_COOKIE_SECURE = os.getenv("SESSION_COOKIE_SECURE", "true").lower() != "false"
 STATIC_DIR = Path(__file__).parent / "static"
 RECORDINGS_DIR = Path(os.getenv("RECORDINGS_DIR", "data/recordings"))
 
@@ -263,7 +271,8 @@ async def register(body: RegisterBody, request: Request) -> JSONResponse:
         {"role": user["role"], "ip": ip},
     )
     response = JSONResponse(content={"ok": True, "pending": False, "user": user})
-    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
+    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True,
+                        samesite="lax", secure=SESSION_COOKIE_SECURE)
     return response
 
 
@@ -291,14 +300,18 @@ async def login(body: LoginBody, request: Request) -> JSONResponse:
         return JSONResponse(status_code=401, content={"error": "invalid credentials"})
     await audit.log(user["id"], "user.login", "user", user["id"], {"ip": ip})
     response = JSONResponse(content={"ok": True, "user": user})
-    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True, samesite="lax")
+    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True,
+                        samesite="lax", secure=SESSION_COOKIE_SECURE)
     return response
 
 
 @app.post("/api/logout")
 async def logout() -> JSONResponse:
     response = JSONResponse(content={"ok": True})
-    response.delete_cookie(COOKIE_NAME)
+    # The attributes must match the ones it was set with, or the browser
+    # keeps the original cookie and the sign-out does nothing visible.
+    response.delete_cookie(COOKIE_NAME, httponly=True, samesite="lax",
+                           secure=SESSION_COOKIE_SECURE)
     return response
 
 

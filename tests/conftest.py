@@ -34,6 +34,13 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+# The suite drives the app over http://testserver, and a `Secure` cookie is
+# not sent over plaintext HTTP — so with the production default every
+# authenticated test would lose its session. Turned off HERE and only here;
+# app/main.py defaults it to secure, so a forgotten variable in production
+# fails safe (2026-07-31 audit, Finding 6). Set before any app import.
+os.environ.setdefault("SESSION_COOKIE_SECURE", "false")
+
 TEST_DB_NAME = "consultation_ai_test"
 
 _ONE_TIME_HELP = (

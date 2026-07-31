@@ -234,3 +234,70 @@ def test_register_endpoint_refuses_markup_display_name_with_400():
         assert conn.execute(
             "SELECT count(*) FROM app_user WHERE username = %s", (username,)
         ).fetchone()[0] == 0
+
+
+# ------------------------------------- session cookie Secure (2026-07-31)
+
+def test_secure_flag_defaults_to_secure():
+    """The gate must fail SAFE: a missing SESSION_COOKIE_SECURE means the
+    cookie is Secure, not that protection quietly drops off."""
+    from pathlib import Path
+
+    source = Path("app/main.py").read_text()
+    assert 'os.getenv("SESSION_COOKIE_SECURE", "true")' in source
+
+
+@needs_db
+def test_login_cookie_carries_secure_httponly_and_samesite():
+    """Asserted on the raw Set-Cookie header, with the production flag on.
+
+    The suite itself runs with the flag off (tests/conftest.py) because
+    http://testserver cannot carry a Secure cookie — so the production
+    behaviour is exercised by putting the flag back for one request.
+    """
+    import app.main as main
+
+    client = TestClient(main.app)
+    username = f"sec_{secrets.token_hex(4)}"
+    assert client.post(
+        "/api/register",
+        json={"username": username, "password": PASSWORD,
+              "display_name": "Sec", "role": "doctor"},
+    ).status_code == 200
+
+    from conftest import approve_account
+
+    approve_account(username)
+
+    original = main.SESSION_COOKIE_SECURE
+    main.SESSION_COOKIE_SECURE = True
+    try:
+        response = client.post(
+            "/api/login", json={"username": username, "password": PASSWORD})
+    finally:
+        main.SESSION_COOKIE_SECURE = original
+    assert response.status_code == 200
+    cookie = response.headers["set-cookie"].lower()
+    assert "secure" in cookie
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
+
+
+@needs_db
+def test_logout_clears_the_cookie_with_matching_attributes():
+    """A delete whose attributes differ from the set is a no-op in the
+    browser — the user would appear signed out and still be signed in."""
+    import app.main as main
+
+    client = TestClient(main.app)
+    original = main.SESSION_COOKIE_SECURE
+    main.SESSION_COOKIE_SECURE = True
+    try:
+        response = client.post("/api/logout")
+    finally:
+        main.SESSION_COOKIE_SECURE = original
+    assert response.status_code == 200
+    cookie = response.headers["set-cookie"].lower()
+    assert "secure" in cookie
+    assert "httponly" in cookie
+    assert "samesite=lax" in cookie
