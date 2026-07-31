@@ -153,3 +153,84 @@ def test_auth_audit_events_carry_source_ip():
     assert registered_ip == "testclient"
     assert login_ip == "testclient"
     assert failed == ("testclient", "bad_credentials")
+
+
+# ------------------------------------ registration input bounds (2026-07-31)
+#
+# Defence at the source for the Critical XSS finding: registration is
+# public, so display_name and username are where an unauthenticated
+# stranger writes text that later renders in an administrator's browser.
+# The escaping (tests/test_xss_escaping.py) is the other, independent half.
+
+def test_display_name_with_markup_is_refused_not_stored():
+    from app import auth
+
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_display_name('<img src=x onerror=alert(1)>')
+    # The payload from the audit's Finding 1, in the form it was reported.
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_display_name('Ada<script>alert(1)</script>')
+    # Control characters too — a newline in a spoken name is not a name.
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_display_name("Ada\nBad")
+
+
+def test_over_long_display_name_and_username_are_refused():
+    from app import auth
+
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_display_name("A" * (auth.DISPLAY_NAME_MAX + 1))
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_username("a" * (auth.USERNAME_MAX + 1))
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_username("ab")            # under the minimum
+
+
+def test_blank_display_name_is_refused_it_is_spoken_aloud():
+    from app import auth
+
+    with pytest.raises(auth.InvalidUserInput):
+        auth.validate_display_name("   ")
+
+
+def test_legitimate_names_still_pass():
+    """The bound must not reject real people. Apostrophes, hyphens and
+    non-Latin scripts are somebody's actual name — the sink escapes them."""
+    from app import auth
+
+    for name in ("Wajira Herath", "O'Brien", "Anne-Marie", "Dr Vicky",
+                 " Næss", "Herath  ", "李伟"):
+        assert auth.validate_display_name(name) == name.strip()
+    for username in ("doctor", "someone_else", "rl_9f3a2b1c", "a.b-c"):
+        assert auth.validate_username(username) == username
+
+
+def test_username_rejects_characters_outside_the_identifier_set():
+    from app import auth
+
+    for bad in ("has space", "<script>", "quote\"mark", "semi;colon"):
+        with pytest.raises(auth.InvalidUserInput):
+            auth.validate_username(bad)
+
+
+@needs_db
+def test_register_endpoint_refuses_markup_display_name_with_400():
+    """End to end: the public form cannot store the payload, and says why
+    rather than reporting the generic "username already taken"."""
+    from app.main import app
+
+    client = TestClient(app)
+    username = f"xss_{secrets.token_hex(4)}"
+    response = client.post(
+        "/api/register",
+        json={"username": username, "password": PASSWORD,
+              "display_name": "<img src=x onerror=alert(1)>", "role": "doctor"},
+    )
+    assert response.status_code == 400
+    assert "markup" in response.json()["error"]
+
+    # Nothing was written: the account does not exist to be approved.
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        assert conn.execute(
+            "SELECT count(*) FROM app_user WHERE username = %s", (username,)
+        ).fetchone()[0] == 0

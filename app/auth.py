@@ -15,6 +15,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import os
+import re
 import secrets
 import time
 
@@ -54,6 +55,78 @@ ALTER TABLE app_user ADD COLUMN IF NOT EXISTS pending_approval boolean NOT NULL 
 def ensure_schema() -> None:
     with psycopg.connect(DATABASE_URL) as conn:
         conn.execute(SCHEMA_SQL)
+
+
+# ------------------------------------------------- registration input bounds
+#
+# Defence at the SOURCE, beside the escaping at the sink (app/static/nav.js).
+# Registration is PUBLIC, so `username` and `display_name` are the one place
+# an unauthenticated stranger writes text that later renders in an
+# administrator's browser (2026-07-31 audit, Finding 1).
+#
+# Bounds, not sanitising. A value outside them is REFUSED and the caller is
+# told why; nothing is silently cleaned. A cleaned payload is a filter, and
+# a filter that misses once stores the thing it was meant to stop — the same
+# reasoning that keeps the speak channel reference-only (app/speech.py).
+#
+# These are NOT the XSS defence. The escaping is. This exists so a payload
+# is never stored in the first place, and so the two layers fail
+# independently.
+
+USERNAME_MIN = 3
+USERNAME_MAX = 64
+DISPLAY_NAME_MAX = 80
+
+# An identifier, deliberately narrow: letters, digits, dot, underscore,
+# hyphen. Every account this project has ever created fits it.
+_USERNAME_RE = re.compile(r"^[A-Za-z0-9._-]+$")
+
+# Markup delimiters and control characters (including newlines). Everything
+# else — apostrophes, hyphens, accents, non-Latin scripts — is a legitimate
+# part of somebody's name and stays allowed, because the sink escapes it.
+# Forbidding `<` and `>` here means a stored value can never *look* like an
+# element even if a future sink forgets to escape.
+_DISPLAY_NAME_FORBIDDEN = re.compile(r"[<>\x00-\x1f\x7f]")
+
+
+class InvalidUserInput(ValueError):
+    """A username or display name outside its bounds.
+
+    A ValueError subclass so existing `raises(ValueError)` contracts still
+    hold; caught by name in the register endpoint so the caller gets 400
+    and the real reason rather than the generic "username already taken".
+    """
+
+
+def validate_username(username: str) -> str:
+    """The trimmed username, or raise. Case and content are the caller's."""
+    username = (username or "").strip()
+    if len(username) < USERNAME_MIN or len(username) > USERNAME_MAX:
+        raise InvalidUserInput(
+            f"username must be {USERNAME_MIN}-{USERNAME_MAX} characters")
+    if not _USERNAME_RE.match(username):
+        raise InvalidUserInput(
+            "username may contain only letters, digits, dot, underscore "
+            "and hyphen")
+    return username
+
+
+def validate_display_name(display_name: str) -> str:
+    """The trimmed display name, or raise.
+
+    Blank is refused because this value is SPOKEN ALOUD — the disclosure
+    interpolates it, and an empty name would have the room hear "Dr ".
+    """
+    display_name = (display_name or "").strip()
+    if not display_name:
+        raise InvalidUserInput("display name cannot be blank")
+    if len(display_name) > DISPLAY_NAME_MAX:
+        raise InvalidUserInput(
+            f"display name must be at most {DISPLAY_NAME_MAX} characters")
+    if _DISPLAY_NAME_FORBIDDEN.search(display_name):
+        raise InvalidUserInput(
+            "display name may not contain markup or control characters")
+    return display_name
 
 
 # ---------------------------------------------------------------- passwords
@@ -168,6 +241,10 @@ async def create_user(
     keep the default and get an active account."""
     if role not in ROLES:
         raise ValueError(f"invalid role {role!r}")
+    # Bounded here rather than at the HTTP layer, so the CLI path
+    # (scripts/manage_users.py) cannot store what registration refuses.
+    username = validate_username(username)
+    display_name = validate_display_name(display_name)
     async with await _conn() as conn:
         count = (await (await conn.execute("SELECT count(*) FROM app_user")).fetchone())[0]
         if count == 0:
@@ -269,9 +346,9 @@ async def set_display_name(username: str, display_name: str) -> dict | None:
     Trimmed, and refused if empty: a blank name would make the disclosure say
     "Dr " and a name is not the place to discover that.
     """
-    display_name = display_name.strip()
-    if not display_name:
-        raise ValueError("display name cannot be blank")
+    # Same bounds as registration: this writes the field registration
+    # validates, and it is the value spoken to a patient.
+    display_name = validate_display_name(display_name)
     async with await _conn() as conn:
         # The old name comes from a CTE rather than a sub-SELECT in
         # RETURNING: a sub-SELECT there reads the statement's own snapshot

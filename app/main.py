@@ -201,6 +201,11 @@ async def register(body: RegisterBody, request: Request) -> JSONResponse:
         user = await auth.create_user(
             body.username, body.password, body.display_name, body.role, pending=True
         )
+    except auth.InvalidUserInput as exc:
+        # Refused, never sanitised — and the caller is told which bound it
+        # broke, because answering "username already taken" to a rejected
+        # display name would be a lie that costs somebody an afternoon.
+        return JSONResponse(status_code=400, content={"error": str(exc)})
     except Exception:
         return JSONResponse(status_code=409, content={"error": "username already taken"})
     if user["pending_approval"]:
