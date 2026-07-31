@@ -83,6 +83,18 @@ each found a defect no automated test had caught.
 | Wondering about its limits | *Why one consultation at a time* |
 | Interested in what went wrong | *What the room taught us* |
 
-*(Articles appear in this folder as they are written. The engineering
-record lives in [`HANDOVER.md`](../HANDOVER.md); these pages explain, that
-document records.)*
+---
+
+## Where to go next
+
+New here? The tour reads well in this order:
+[A consultation's journey](01-a-consultations-journey.md) →
+[The architecture](04-the-architecture.md) →
+[Why one consultation at a time](05-why-one-consultation-at-a-time.md) →
+[Safety by construction](06-safety-by-construction.md) →
+[What the room taught us](07-what-the-room-taught-us.md) →
+[Is AI-written code safe?](08-security.md). Ready to run it yourself?
+[Installing and running it](03-installing-and-running.md).
+
+*The engineering record lives in [`HANDOVER.md`](../HANDOVER.md); these
+pages explain, that document records.*

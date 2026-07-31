@@ -99,6 +99,12 @@ it points at a database row, not a recollection.
 
 ---
 
-*Full forensics of every run — with the measured numbers — are in
-[`HANDOVER.md`](../HANDOVER.md). The design philosophy the room kept
-vindicating is* Safety by construction.
+## Where to go next
+
+- **Continue the tour →** [Is AI-written code safe?](08-security.md) — the
+  same honesty turned on the project's own security.
+- **Read it again with fresh eyes →** [Safety by construction](06-safety-by-construction.md)
+  — the philosophy every room run kept vindicating.
+- **Pull a thread →** [The architecture](04-the-architecture.md).
+
+*Full forensics of every run, with the measured numbers, are in [`HANDOVER.md`](../HANDOVER.md).*

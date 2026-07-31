@@ -128,7 +128,13 @@ entirely: the letter presents evidence; the specialist draws conclusions.
 
 ---
 
-*Deeper reading: the engineering record of every mechanism above, including
-the incidents that shaped them, is in [`HANDOVER.md`](../HANDOVER.md).
-The limits of this pipeline — and why it serves one room at a time — are
-the subject of* Why one consultation at a time.
+## Where to go next
+
+- **Continue the tour →** [The architecture](04-the-architecture.md) — how
+  five AI models share one machine to do everything you just followed.
+- **Pull a thread →** [Safety by construction](06-safety-by-construction.md)
+  — why the machine's own voice can never reach the transcript.
+- **Pull a thread →** [Why one consultation at a time](05-why-one-consultation-at-a-time.md)
+  — the promise behind that single-room limit.
+
+*The engineering record of every mechanism above is in [`HANDOVER.md`](../HANDOVER.md).*

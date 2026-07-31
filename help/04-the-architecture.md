@@ -91,7 +91,13 @@ point at the row.
 
 ---
 
-*Model versions, exact memory figures and the dependency battle scars are
-recorded in [`HANDOVER.md`](../HANDOVER.md). What these components refuse
-to do — and why refusal is a feature — is the subject of* Safety by
-construction.
+## Where to go next
+
+- **Continue the tour →** [Why one consultation at a time](05-why-one-consultation-at-a-time.md)
+  — the limit this one machine sets, and what more would take.
+- **The soul of it →** [Safety by construction](06-safety-by-construction.md)
+  — what these components refuse to do, and why refusal is the feature.
+- **Pull a thread →** [Is AI-written code safe?](08-security.md) — how the
+  same machine is defended on the network.
+
+*Model versions and exact memory figures are in [`HANDOVER.md`](../HANDOVER.md).*

@@ -94,6 +94,13 @@ for the things that must be true.
 
 ---
 
-*Each mechanism here has its full engineering account — including the
-incidents that motivated it — in [`HANDOVER.md`](../HANDOVER.md). How the
-defects were actually found is the subject of* What the room taught us.
+## Where to go next
+
+- **Continue the tour →** [What the room taught us](07-what-the-room-taught-us.md)
+  — how the defects were actually found, one real room at a time.
+- **The web-security counterpart →** [Is AI-written code safe?](08-security.md)
+  — the same "guilty until audited" habit, applied to attackers.
+- **Pull a thread →** [A consultation's journey](01-a-consultations-journey.md)
+  — these guarantees in the flow of a real consultation.
+
+*Each mechanism's full account is in [`HANDOVER.md`](../HANDOVER.md).*

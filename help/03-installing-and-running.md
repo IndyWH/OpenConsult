@@ -92,7 +92,14 @@ which provides certificates without exposing anything to the internet.
 
 ---
 
-*Exact commands, versions, systemd units and the full troubleshooting
-list — including every dependency battle scar — are in the repository's
-README and [`HANDOVER.md`](../HANDOVER.md). What you'll see once it runs
-is the subject of* The features.
+## Where to go next
+
+- **See what you'll get →** [A consultation's journey](01-a-consultations-journey.md)
+  — the whole flow, from first word to signed note.
+- **Before you expose it →** [Is AI-written code safe?](08-security.md) —
+  the security posture, and what a self-hoster should set first.
+- **Pull a thread →** [Why one consultation at a time](05-why-one-consultation-at-a-time.md)
+  — the one hardware limit with no workaround.
+
+*Exact commands and the full troubleshooting list live in the repository's
+README and [`HANDOVER.md`](../HANDOVER.md).*

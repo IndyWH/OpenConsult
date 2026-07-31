@@ -77,6 +77,12 @@ it likely arrives there first.
 
 ---
 
-*The measured workload figures, hardware tiers and costings behind this
-article are in the project's scaling brief; the capacity rules themselves
-are recorded in [`HANDOVER.md`](../HANDOVER.md).*
+## Where to go next
+
+- **Continue the tour →** [Safety by construction](06-safety-by-construction.md)
+  — the design philosophy that makes the single-room rule a promise, not a limit.
+- **Pull a thread →** [The architecture](04-the-architecture.md) — the
+  five-model machine behind the constraint, if you skipped it.
+
+*The measured workload and hardware costings behind this article are in the
+project's scaling brief; the capacity rules are in [`HANDOVER.md`](../HANDOVER.md).*
