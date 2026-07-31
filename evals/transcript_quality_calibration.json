@@ -16,14 +16,71 @@
       "audio_present": true,
       "audio_duration_s": 299.5,
       "stored_turns": 22,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.987
+          },
+          {
+            "start_s": 33.7,
+            "language": "en",
+            "probability": 0.988
+          },
+          {
+            "start_s": 67.4,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 101.1,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 134.8,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 168.4,
+            "language": "en",
+            "probability": 0.993
+          },
+          {
+            "start_s": 202.1,
+            "language": "en",
+            "probability": 0.995
+          },
+          {
+            "start_s": 235.8,
+            "language": "en",
+            "probability": 0.996
+          },
+          {
+            "start_s": 269.5,
+            "language": "en",
+            "probability": 0.989
+          }
+        ],
+        "n_windows": 9,
+        "n_detected": 9,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
       "s1_language": "en",
-      "s1_language_probability": 0.98681640625,
+      "s1_language_probability": 0.987,
+      "s1_expected_fraction": 1.0,
       "full": {
         "segments": 22,
         "s2_confidence_weighted": 0.7978783122161475,
         "s2_confidence_unweighted": 0.7784545454545455,
-        "s3_max_4gram_share": 0.011379800853485065,
+        "s3_max_4gram_share": 0.0114,
         "s3_max_4gram": "straight to the hospital",
+        "s3_within_segment_share": 0.8,
+        "s3_within_segment_ngram": "how long does it",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 0.14100000000001955
       },
@@ -38,8 +95,10 @@
         "segments": 21,
         "s2_confidence_weighted": 0.7981910077688231,
         "s2_confidence_unweighted": 0.7812857142857143,
-        "s3_max_4gram_share": 0.011428571428571429,
+        "s3_max_4gram_share": 0.0114,
         "s3_max_4gram": "straight to the hospital",
+        "s3_within_segment_share": 0.8,
+        "s3_within_segment_ngram": "how long does it",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 0.0,
         "dropped_segments": 1
@@ -56,14 +115,76 @@
       "audio_present": true,
       "audio_duration_s": 329.0,
       "stored_turns": 19,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.983
+          },
+          {
+            "start_s": 33.2,
+            "language": "en",
+            "probability": 0.988
+          },
+          {
+            "start_s": 66.4,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 99.7,
+            "language": "en",
+            "probability": 0.991
+          },
+          {
+            "start_s": 132.9,
+            "language": "en",
+            "probability": 0.996
+          },
+          {
+            "start_s": 166.1,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 199.3,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 232.6,
+            "language": "en",
+            "probability": 0.989
+          },
+          {
+            "start_s": 265.8,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 299.0,
+            "language": "en",
+            "probability": 0.989
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
       "s1_language": "en",
-      "s1_language_probability": 0.9833984375,
+      "s1_language_probability": 0.983,
+      "s1_expected_fraction": 1.0,
       "full": {
         "segments": 19,
         "s2_confidence_weighted": 0.8042276584622929,
         "s2_confidence_unweighted": 0.7747894736842106,
-        "s3_max_4gram_share": 0.011577424023154847,
+        "s3_max_4gram_share": 0.0116,
         "s3_max_4gram": "let me look at",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "clearly paracetamol yes doctor",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 1.3220000000000027
       }
@@ -79,14 +200,76 @@
       "audio_present": true,
       "audio_duration_s": 408.0,
       "stored_turns": 27,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.981
+          },
+          {
+            "start_s": 42.0,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 84.0,
+            "language": "en",
+            "probability": 0.991
+          },
+          {
+            "start_s": 126.0,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 168.0,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 210.0,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 252.0,
+            "language": "en",
+            "probability": 0.996
+          },
+          {
+            "start_s": 294.0,
+            "language": "en",
+            "probability": 0.991
+          },
+          {
+            "start_s": 336.0,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 378.0,
+            "language": "en",
+            "probability": 0.994
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
       "s1_language": "en",
-      "s1_language_probability": 0.9814453125,
+      "s1_language_probability": 0.981,
+      "s1_expected_fraction": 1.0,
       "full": {
         "segments": 27,
         "s2_confidence_weighted": 0.8102254499132697,
         "s2_confidence_unweighted": 0.7844814814814816,
-        "s3_max_4gram_share": 0.010416666666666666,
+        "s3_max_4gram_share": 0.0104,
         "s3_max_4gram": "in the morning and",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "no nothing like that",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 4.350000000000023
       },
@@ -101,8 +284,10 @@
         "segments": 27,
         "s2_confidence_weighted": 0.8102254499132697,
         "s2_confidence_unweighted": 0.7844814814814816,
-        "s3_max_4gram_share": 0.010416666666666666,
+        "s3_max_4gram_share": 0.0104,
         "s3_max_4gram": "in the morning and",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "no nothing like that",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 0.0,
         "dropped_segments": 0,
@@ -120,14 +305,76 @@
       "audio_present": true,
       "audio_duration_s": 342.25,
       "stored_turns": 25,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.983
+          },
+          {
+            "start_s": 34.7,
+            "language": "en",
+            "probability": 0.987
+          },
+          {
+            "start_s": 69.4,
+            "language": "en",
+            "probability": 0.988
+          },
+          {
+            "start_s": 104.1,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 138.8,
+            "language": "en",
+            "probability": 0.992
+          },
+          {
+            "start_s": 173.5,
+            "language": "en",
+            "probability": 0.993
+          },
+          {
+            "start_s": 208.2,
+            "language": "en",
+            "probability": 0.99
+          },
+          {
+            "start_s": 242.9,
+            "language": "en",
+            "probability": 0.995
+          },
+          {
+            "start_s": 277.6,
+            "language": "en",
+            "probability": 0.994
+          },
+          {
+            "start_s": 312.2,
+            "language": "en",
+            "probability": 0.993
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
       "s1_language": "en",
-      "s1_language_probability": 0.9833984375,
+      "s1_language_probability": 0.983,
+      "s1_expected_fraction": 1.0,
       "full": {
         "segments": 25,
         "s2_confidence_weighted": 0.784712619578898,
         "s2_confidence_unweighted": 0.75088,
-        "s3_max_4gram_share": 0.011461318051575931,
+        "s3_max_4gram_share": 0.0115,
         "s3_max_4gram": "five times a week",
+        "s3_within_segment_share": 0.6667,
+        "s3_within_segment_ngram": "all right i ll",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 0.6680000000000064
       }
@@ -138,21 +385,1188 @@
       "expected": "known-bad (Sinhala via English-forced pipeline)",
       "available": true,
       "status": "approved",
-      "voided": false,
+      "voided": true,
       "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_70.wav",
       "audio_present": true,
       "audio_duration_s": 450.5,
       "stored_turns": 29,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.895
+          },
+          {
+            "start_s": 46.7,
+            "language": "en",
+            "probability": 0.896
+          },
+          {
+            "start_s": 93.4,
+            "language": "en",
+            "probability": 0.917
+          },
+          {
+            "start_s": 140.2,
+            "language": "en",
+            "probability": 0.904
+          },
+          {
+            "start_s": 186.9,
+            "language": "en",
+            "probability": 0.9
+          },
+          {
+            "start_s": 233.6,
+            "language": "en",
+            "probability": 0.909
+          },
+          {
+            "start_s": 280.3,
+            "language": "en",
+            "probability": 0.926
+          },
+          {
+            "start_s": 327.1,
+            "language": "en",
+            "probability": 0.891
+          },
+          {
+            "start_s": 373.8,
+            "language": "en",
+            "probability": 0.908
+          },
+          {
+            "start_s": 420.5,
+            "language": "en",
+            "probability": 0.875
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
       "s1_language": "en",
-      "s1_language_probability": 0.89501953125,
+      "s1_language_probability": 0.895,
+      "s1_expected_fraction": 1.0,
       "full": {
         "segments": 29,
         "s2_confidence_weighted": 0.504951125762069,
         "s2_confidence_unweighted": 0.49403448275862066,
-        "s3_max_4gram_share": 0.06356413166855845,
+        "s3_max_4gram_share": 0.0636,
         "s3_max_4gram": "every morning and evening",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "how are you usually",
         "s3_max_consecutive_identical": 1,
         "s4_truncation_gap_s": 33.26400000000001
+      }
+    },
+    {
+      "consultation": 78,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_78.wav",
+      "audio_present": true,
+      "audio_duration_s": 10.25,
+      "stored_turns": 1,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.927
+          }
+        ],
+        "n_windows": 1,
+        "n_detected": 1,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.927,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 1,
+        "s2_confidence_weighted": 0.699,
+        "s2_confidence_unweighted": 0.699,
+        "s3_max_4gram_share": 1.0,
+        "s3_max_4gram": "check one two three",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "check one two three",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 4.761
+      }
+    },
+    {
+      "consultation": 79,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_79.wav",
+      "audio_present": true,
+      "audio_duration_s": 4344.5,
+      "stored_turns": 119,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.534
+          },
+          {
+            "start_s": 479.4,
+            "language": "en",
+            "probability": 0.937
+          },
+          {
+            "start_s": 958.8,
+            "language": "en",
+            "probability": 0.995
+          },
+          {
+            "start_s": 1438.2,
+            "language": "en",
+            "probability": 0.961
+          },
+          {
+            "start_s": 1917.6,
+            "language": "en",
+            "probability": 0.953
+          },
+          {
+            "start_s": 2396.9,
+            "language": "en",
+            "probability": 0.982
+          },
+          {
+            "start_s": 2876.3,
+            "language": "en",
+            "probability": 0.984
+          },
+          {
+            "start_s": 3355.7,
+            "language": "en",
+            "probability": 0.91
+          },
+          {
+            "start_s": 3835.1,
+            "language": "en",
+            "probability": 0.962
+          },
+          {
+            "start_s": 4314.5,
+            "language": "en",
+            "probability": 0.79
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.534,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 119,
+        "s2_confidence_weighted": 0.6618100514137435,
+        "s2_confidence_unweighted": 0.6520756302521008,
+        "s3_max_4gram_share": 0.0033,
+        "s3_max_4gram": "i think it is",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "and what is that",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 157.35800000000017
+      }
+    },
+    {
+      "consultation": 161,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_161.wav",
+      "audio_present": true,
+      "audio_duration_s": 158.0,
+      "stored_turns": 16,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.986
+          },
+          {
+            "start_s": 32.0,
+            "language": "en",
+            "probability": 0.987
+          },
+          {
+            "start_s": 64.0,
+            "language": "en",
+            "probability": 0.978
+          },
+          {
+            "start_s": 96.0,
+            "language": "en",
+            "probability": 0.982
+          },
+          {
+            "start_s": 128.0,
+            "language": "en",
+            "probability": 0.98
+          }
+        ],
+        "n_windows": 5,
+        "n_detected": 5,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.986,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 16,
+        "s2_confidence_weighted": 0.7723620482624923,
+        "s2_confidence_unweighted": 0.7609375,
+        "s3_max_4gram_share": 0.0292,
+        "s3_max_4gram": "i m going to",
+        "s3_within_segment_share": 0.8,
+        "s3_within_segment_ngram": "when was your last",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 2.3220000000000027
+      }
+    },
+    {
+      "consultation": 162,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_162.wav",
+      "audio_present": true,
+      "audio_duration_s": 29.25,
+      "stored_turns": 1,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.956
+          }
+        ],
+        "n_windows": 1,
+        "n_detected": 1,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.956,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 1,
+        "s2_confidence_weighted": 0.646,
+        "s2_confidence_unweighted": 0.646,
+        "s3_max_4gram_share": 0.0,
+        "s3_max_4gram": null,
+        "s3_within_segment_share": 0.0,
+        "s3_within_segment_ngram": null,
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 18.628
+      }
+    },
+    {
+      "consultation": 445,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "unreliable_transcript",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_445.wav",
+      "audio_present": true,
+      "audio_duration_s": 669.0,
+      "stored_turns": 4,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.812
+          },
+          {
+            "start_s": 71.0,
+            "language": "en",
+            "probability": 0.716
+          },
+          {
+            "start_s": 142.0,
+            "language": "en",
+            "probability": 0.737
+          },
+          {
+            "start_s": 213.0,
+            "language": "en",
+            "probability": 0.936
+          },
+          {
+            "start_s": 284.0,
+            "language": "en",
+            "probability": 0.984
+          },
+          {
+            "start_s": 355.0,
+            "language": "en",
+            "probability": 0.713
+          },
+          {
+            "start_s": 426.0,
+            "language": "en",
+            "probability": 0.982
+          },
+          {
+            "start_s": 497.0,
+            "language": "en",
+            "probability": 0.757
+          },
+          {
+            "start_s": 568.0,
+            "language": "en",
+            "probability": 0.833
+          },
+          {
+            "start_s": 639.0,
+            "language": "en",
+            "probability": 0.773
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.812,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 4,
+        "s2_confidence_weighted": 0.786708519163763,
+        "s2_confidence_unweighted": 0.79325,
+        "s3_max_4gram_share": 0.0556,
+        "s3_max_4gram": "oh hello my knee",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "no not at all",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 392.566
+      }
+    },
+    {
+      "consultation": 446,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_446.wav",
+      "audio_present": true,
+      "audio_duration_s": 86.5,
+      "stored_turns": 2,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.969
+          },
+          {
+            "start_s": 56.5,
+            "language": "en",
+            "probability": 0.927
+          }
+        ],
+        "n_windows": 2,
+        "n_detected": 2,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.969,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 2,
+        "s2_confidence_weighted": 0.7891863999434511,
+        "s2_confidence_unweighted": 0.7775000000000001,
+        "s3_max_4gram_share": 0.0541,
+        "s3_max_4gram": "oh hi i have",
+        "s3_within_segment_share": 0.6667,
+        "s3_within_segment_ngram": "oh hi i have",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 2.0420000000000016
+      }
+    },
+    {
+      "consultation": 447,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_447.wav",
+      "audio_present": true,
+      "audio_duration_s": 134.75,
+      "stored_turns": 6,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.942
+          },
+          {
+            "start_s": 34.9,
+            "language": "en",
+            "probability": 0.967
+          },
+          {
+            "start_s": 69.8,
+            "language": "en",
+            "probability": 0.983
+          },
+          {
+            "start_s": 104.8,
+            "language": "en",
+            "probability": 0.919
+          }
+        ],
+        "n_windows": 4,
+        "n_detected": 4,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.942,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 6,
+        "s2_confidence_weighted": 0.7766343157894736,
+        "s2_confidence_unweighted": 0.7263333333333334,
+        "s3_max_4gram_share": 0.0317,
+        "s3_max_4gram": "hello i have a",
+        "s3_within_segment_share": 0.4444,
+        "s3_within_segment_ngram": "yeah it s terrible",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 1.7489999999999952
+      }
+    },
+    {
+      "consultation": 448,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_448.wav",
+      "audio_present": true,
+      "audio_duration_s": 213.25,
+      "stored_turns": 3,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.813
+          },
+          {
+            "start_s": 30.5,
+            "language": "en",
+            "probability": 0.877
+          },
+          {
+            "start_s": 61.1,
+            "language": "en",
+            "probability": 0.794
+          },
+          {
+            "start_s": 91.6,
+            "language": "en",
+            "probability": 0.981
+          },
+          {
+            "start_s": 122.2,
+            "language": "en",
+            "probability": 0.958
+          },
+          {
+            "start_s": 152.7,
+            "language": "en",
+            "probability": 0.982
+          },
+          {
+            "start_s": 183.2,
+            "language": "en",
+            "probability": 0.979
+          }
+        ],
+        "n_windows": 7,
+        "n_detected": 7,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.813,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 3,
+        "s2_confidence_weighted": 0.74170194663072,
+        "s2_confidence_unweighted": 0.7463333333333333,
+        "s3_max_4gram_share": 0.046,
+        "s3_max_4gram": "oh hi my friend",
+        "s3_within_segment_share": 0.4444,
+        "s3_within_segment_ngram": "no i don t",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 19.77600000000001
+      }
+    },
+    {
+      "consultation": 449,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "unreliable_transcript",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_449.wav",
+      "audio_present": true,
+      "audio_duration_s": 469.75,
+      "stored_turns": 1,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.782
+          },
+          {
+            "start_s": 48.9,
+            "language": "en",
+            "probability": 0.985
+          },
+          {
+            "start_s": 97.7,
+            "language": "en",
+            "probability": 0.985
+          },
+          {
+            "start_s": 146.6,
+            "language": "en",
+            "probability": 0.792
+          },
+          {
+            "start_s": 195.4,
+            "language": "en",
+            "probability": 0.785
+          },
+          {
+            "start_s": 244.3,
+            "language": "en",
+            "probability": 0.704
+          },
+          {
+            "start_s": 293.2,
+            "language": "en",
+            "probability": 0.749
+          },
+          {
+            "start_s": 342.0,
+            "language": "en",
+            "probability": 0.784
+          },
+          {
+            "start_s": 390.9,
+            "language": "en",
+            "probability": 0.747
+          },
+          {
+            "start_s": 439.8,
+            "language": "en",
+            "probability": 0.612
+          }
+        ],
+        "n_windows": 10,
+        "n_detected": 10,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.782,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 1,
+        "s2_confidence_weighted": 0.7790000000000001,
+        "s2_confidence_unweighted": 0.779,
+        "s3_max_4gram_share": 0.0488,
+        "s3_max_4gram": "oh hi i have",
+        "s3_within_segment_share": 0.0488,
+        "s3_within_segment_ngram": "oh hi i have",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 327.68
+      }
+    },
+    {
+      "consultation": 450,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_450.flac",
+      "audio_present": true,
+      "audio_duration_s": 183.5,
+      "stored_turns": 3,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.983
+          },
+          {
+            "start_s": 30.7,
+            "language": "en",
+            "probability": 0.988
+          },
+          {
+            "start_s": 61.4,
+            "language": "en",
+            "probability": 0.951
+          },
+          {
+            "start_s": 92.1,
+            "language": "en",
+            "probability": 0.789
+          },
+          {
+            "start_s": 122.8,
+            "language": "en",
+            "probability": 0.643
+          },
+          {
+            "start_s": 153.5,
+            "language": "en",
+            "probability": 0.986
+          }
+        ],
+        "n_windows": 6,
+        "n_detected": 6,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.983,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 3,
+        "s2_confidence_weighted": 0.7509248476641842,
+        "s2_confidence_unweighted": 0.7256666666666667,
+        "s3_max_4gram_share": 0.0396,
+        "s3_max_4gram": "oh hi i ve",
+        "s3_within_segment_share": 0.5,
+        "s3_within_segment_ngram": "i have put on",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 6.225999999999999
+      }
+    },
+    {
+      "consultation": 451,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_451.wav",
+      "audio_present": true,
+      "audio_duration_s": 169.5,
+      "stored_turns": 12,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.682
+          },
+          {
+            "start_s": 34.9,
+            "language": "en",
+            "probability": 0.979
+          },
+          {
+            "start_s": 69.8,
+            "language": "en",
+            "probability": 0.978
+          },
+          {
+            "start_s": 104.6,
+            "language": "en",
+            "probability": 0.984
+          },
+          {
+            "start_s": 139.5,
+            "language": "en",
+            "probability": 0.957
+          }
+        ],
+        "n_windows": 5,
+        "n_detected": 5,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.682,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 12,
+        "s2_confidence_weighted": 0.787003927599669,
+        "s2_confidence_unweighted": 0.7475,
+        "s3_max_4gram_share": 0.0408,
+        "s3_max_4gram": "oh hi i m",
+        "s3_within_segment_share": 0.8,
+        "s3_within_segment_ngram": "i try to shy",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 15.912000000000006
+      }
+    },
+    {
+      "consultation": 452,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_452.wav",
+      "audio_present": true,
+      "audio_duration_s": 145.75,
+      "stored_turns": 4,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.961
+          },
+          {
+            "start_s": 38.6,
+            "language": "en",
+            "probability": 0.985
+          },
+          {
+            "start_s": 77.2,
+            "language": "en",
+            "probability": 0.989
+          },
+          {
+            "start_s": 115.8,
+            "language": "en",
+            "probability": 0.95
+          }
+        ],
+        "n_windows": 4,
+        "n_detected": 4,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.961,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 4,
+        "s2_confidence_weighted": 0.7873569690837067,
+        "s2_confidence_unweighted": 0.7332500000000001,
+        "s3_max_4gram_share": 0.043,
+        "s3_max_4gram": "oh hi i m",
+        "s3_within_segment_share": 0.0952,
+        "s3_within_segment_ngram": "i m feeling very",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 9.62100000000001
+      }
+    },
+    {
+      "consultation": 453,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_453.flac",
+      "audio_present": true,
+      "audio_duration_s": 159.25,
+      "stored_turns": 15,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.974
+          },
+          {
+            "start_s": 32.3,
+            "language": "en",
+            "probability": 0.989
+          },
+          {
+            "start_s": 64.6,
+            "language": "en",
+            "probability": 0.98
+          },
+          {
+            "start_s": 96.9,
+            "language": "en",
+            "probability": 0.99
+          },
+          {
+            "start_s": 129.2,
+            "language": "en",
+            "probability": 0.985
+          }
+        ],
+        "n_windows": 5,
+        "n_detected": 5,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.974,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 15,
+        "s2_confidence_weighted": 0.7715542793668427,
+        "s2_confidence_unweighted": 0.7538,
+        "s3_max_4gram_share": 0.0303,
+        "s3_max_4gram": "while i m kind",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "i have a discharge",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 17.00800000000001
+      }
+    },
+    {
+      "consultation": 454,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_454.wav",
+      "audio_present": true,
+      "audio_duration_s": 163.25,
+      "stored_turns": 14,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.972
+          },
+          {
+            "start_s": 33.3,
+            "language": "en",
+            "probability": 0.983
+          },
+          {
+            "start_s": 66.6,
+            "language": "en",
+            "probability": 0.97
+          },
+          {
+            "start_s": 99.9,
+            "language": "en",
+            "probability": 0.797
+          },
+          {
+            "start_s": 133.2,
+            "language": "en",
+            "probability": 0.907
+          }
+        ],
+        "n_windows": 5,
+        "n_detected": 5,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.972,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 14,
+        "s2_confidence_weighted": 0.7533019497400346,
+        "s2_confidence_unweighted": 0.7264285714285714,
+        "s3_max_4gram_share": 0.0342,
+        "s3_max_4gram": "i ve been feeling",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "he s like joe",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 29.903999999999996
+      }
+    },
+    {
+      "consultation": 455,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_455.flac",
+      "audio_present": true,
+      "audio_duration_s": 121.25,
+      "stored_turns": 10,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.873
+          },
+          {
+            "start_s": 30.4,
+            "language": "en",
+            "probability": 0.979
+          },
+          {
+            "start_s": 60.8,
+            "language": "en",
+            "probability": 0.954
+          },
+          {
+            "start_s": 91.2,
+            "language": "en",
+            "probability": 0.977
+          }
+        ],
+        "n_windows": 4,
+        "n_detected": 4,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.873,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 10,
+        "s2_confidence_weighted": 0.7764498919603606,
+        "s2_confidence_unweighted": 0.7781,
+        "s3_max_4gram_share": 0.0471,
+        "s3_max_4gram": "i am arav s",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "he s having constipation",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 9.668000000000006
+      }
+    },
+    {
+      "consultation": 456,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_456.wav",
+      "audio_present": true,
+      "audio_duration_s": 30.25,
+      "stored_turns": 1,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.951
+          }
+        ],
+        "n_windows": 1,
+        "n_detected": 1,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.951,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 1,
+        "s2_confidence_weighted": 0.868,
+        "s2_confidence_unweighted": 0.868,
+        "s3_max_4gram_share": 0.8,
+        "s3_max_4gram": "i have a sotro",
+        "s3_within_segment_share": 0.8,
+        "s3_within_segment_ngram": "i have a sotro",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 12.117
+      }
+    },
+    {
+      "consultation": 457,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "approved",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_457.flac",
+      "audio_present": true,
+      "audio_duration_s": 99.0,
+      "stored_turns": 6,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.964
+          },
+          {
+            "start_s": 34.5,
+            "language": "en",
+            "probability": 0.726
+          },
+          {
+            "start_s": 69.0,
+            "language": "en",
+            "probability": 0.943
+          }
+        ],
+        "n_windows": 3,
+        "n_detected": 3,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.964,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 6,
+        "s2_confidence_weighted": 0.750152824651504,
+        "s2_confidence_unweighted": 0.735,
+        "s3_max_4gram_share": 0.16,
+        "s3_max_4gram": "i have i m",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "it is very bad",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 11.909999999999997
+      }
+    },
+    {
+      "consultation": 458,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_458.wav",
+      "audio_present": true,
+      "audio_duration_s": 92.0,
+      "stored_turns": 18,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.99
+          },
+          {
+            "start_s": 31.0,
+            "language": "en",
+            "probability": 0.987
+          },
+          {
+            "start_s": 62.0,
+            "language": "en",
+            "probability": 0.989
+          }
+        ],
+        "n_windows": 3,
+        "n_detected": 3,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.99,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 18,
+        "s2_confidence_weighted": 0.6940322386328143,
+        "s2_confidence_unweighted": 0.6871111111111111,
+        "s3_max_4gram_share": 0.0303,
+        "s3_max_4gram": "hello dinesh kumar how",
+        "s3_within_segment_share": 0.8,
+        "s3_within_segment_ngram": "do you have any",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 0.46399999999999864
+      }
+    },
+    {
+      "consultation": 459,
+      "script": "(7a-era, unscripted)",
+      "expected": "unscripted room consultation",
+      "available": true,
+      "status": "awaiting_review",
+      "voided": false,
+      "audio_file": "/home/wajir/consultation-ai/data/recordings/consultation_459.wav",
+      "audio_present": true,
+      "audio_duration_s": 86.25,
+      "stored_turns": 7,
+      "s1_multi_window": {
+        "windows": [
+          {
+            "start_s": 0.0,
+            "language": "en",
+            "probability": 0.975
+          },
+          {
+            "start_s": 56.2,
+            "language": "en",
+            "probability": 0.967
+          }
+        ],
+        "n_windows": 2,
+        "n_detected": 2,
+        "expected": "en",
+        "expected_fraction": 1.0,
+        "window_s": 30.0
+      },
+      "s1_language": "en",
+      "s1_language_probability": 0.975,
+      "s1_expected_fraction": 1.0,
+      "full": {
+        "segments": 7,
+        "s2_confidence_weighted": 0.7644440728030928,
+        "s2_confidence_unweighted": 0.7604285714285715,
+        "s3_max_4gram_share": 0.087,
+        "s3_max_4gram": "i m suffering with",
+        "s3_within_segment_share": 1.0,
+        "s3_within_segment_ngram": "i m pre diabetic",
+        "s3_max_consecutive_identical": 1,
+        "s4_truncation_gap_s": 4.647999999999996
       }
     }
   ]
