@@ -146,6 +146,44 @@ async def no_stale_app_code(request, call_next):
     return response
 
 
+# Security headers, on every response (2026-07-31 audit, Finding 5).
+#
+# THE CSP IS DELIBERATELY INCOMPLETE, and that is the load-bearing comment.
+# `default-src 'self'` and `script-src 'self'` are NOT here, because every
+# page carries a large inline <script> — roughly 3,300 lines across seven
+# pages, live.html alone 1,844. A strict script-src would block all of it
+# and the app would serve blank pages. (The audit's own note that the pages
+# "use external .js" was incomplete: they load nav.js AND carry an inline
+# block.)
+#
+# What is here costs nothing today — none of it touches inline script, and
+# each directive closes a real hole:
+#   object-src 'none'       plugin/embed execution
+#   base-uri 'self'         an injected <base> re-pointing relative URLs
+#   form-action 'self'      a form posting credentials off-origin
+#   frame-ancestors 'none'  clickjacking (supersedes X-Frame-Options)
+#
+# `'unsafe-inline'` is NOT used and MUST NOT be added: it would re-permit
+# exactly the injected-script attack the escaping in app/static/nav.js
+# closes, while making the header look like protection. The route to the
+# full policy is to move the inline blocks out to /static/*.js and then add
+# `default-src 'self'; script-src 'self'` — a seven-page refactor that does
+# not belong inside a security fix, and is reported rather than smuggled in.
+#
+# So: the escaping is the XSS defence. This header is not yet a second one.
+CSP = ("object-src 'none'; base-uri 'self'; form-action 'self'; "
+       "frame-ancestors 'none'")
+
+
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """CSP + nosniff on every response, including errors and static files."""
+    response = await call_next(request)
+    response.headers["content-security-policy"] = CSP
+    response.headers["x-content-type-options"] = "nosniff"
+    return response
+
+
 @app.middleware("http")
 async def count_errors(request, call_next):
     """Feed the pulse's errors_last_hour: unhandled exceptions and 5xx
