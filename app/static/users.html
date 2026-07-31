@@ -60,10 +60,14 @@ async function load() {
       : u.pending_approval
         ? '<span class="chip status">awaiting approval</span>'
         : '<span class="chip status failed">inactive</span>';
+    // Every server value goes through esc() (nav.js). display_name and
+    // username are set by PUBLIC registration, and a pending account is
+    // rendered here unconditionally — this row is the admin's to-do list,
+    // so an unescaped payload ran in the admin's own session.
     tr.innerHTML =
-      `<td>${u.id}</td><td>${u.display_name}</td><td>${u.username}</td>` +
-      `<td><span class="chip">${u.role}</span></td>` +
-      `<td>${u.created_at}</td><td>${u.last_login_at || '—'}</td>` +
+      `<td>${u.id}</td><td>${esc(u.display_name)}</td><td>${esc(u.username)}</td>` +
+      `<td><span class="chip">${esc(u.role)}</span></td>` +
+      `<td>${esc(u.created_at)}</td><td>${esc(u.last_login_at || '—')}</td>` +
       `<td>${statusChip}</td>` +
       '<td></td>';
     const cell = tr.lastElementChild;

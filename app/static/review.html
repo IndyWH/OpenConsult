@@ -779,8 +779,11 @@ async function createLetter(specialty, reason) {
   refMenu.classList.remove('open');
   const box = document.getElementById('letters');
   const wait = el('div', 'pane letter');
+  // esc() (nav.js): the specialty arrives either from the doctor's prompt
+  // or from a model-authored suggestion, which derives from the note and
+  // so from the transcript — a spoken payload has a route here.
   wait.innerHTML = '<div class="pane-body"><span class="spinner"></span>' +
-    `Drafting the ${specialty} referral letter from the approved note…</div>`;
+    `Drafting the ${esc(specialty)} referral letter from the approved note…</div>`;
   box.appendChild(wait);
   plusBtn.disabled = true;
   const response = await fetch(`/api/consultations/${cid}/letters`, {

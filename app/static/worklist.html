@@ -206,15 +206,18 @@ async function load() {
     const tr = document.createElement('tr');
     if (c.voided_at) tr.className = 'voided';
     const label = c.status === 'queued' ? 'processing (queued)' : c.status.replace('_',' ');
+    // esc() on every server value (nav.js): patient_name is typed at the
+    // queue form, doctor_name comes from a registered display_name, and
+    // void_reason is free text — all three reach other users' sessions.
     const status = c.voided_at
       ? '<span class="chip status voided">voided</span>'
-      : `<span class="chip status ${c.status}">${label}</span>`;
+      : `<span class="chip status ${esc(c.status)}">${esc(label)}</span>`;
     const reason = c.voided_at
-      ? `<span class="voidreason">voided ${c.voided_at}${c.voided_by ? ' by ' + c.voided_by : ''}: ${c.void_reason}</span>` : '';
+      ? `<span class="voidreason">voided ${esc(c.voided_at)}${c.voided_by ? ' by ' + esc(c.voided_by) : ''}: ${esc(c.void_reason)}</span>` : '';
     tr.innerHTML =
       `<td>${c.id}</td>` +
-      `<td><span class="${c.voided_at ? 'strike' : ''}">${c.patient_name}</span>${reason}</td>` +
-      `<td>${c.doctor_name}</td><td>${c.started_at}</td><td>${status}</td>` +
+      `<td><span class="${c.voided_at ? 'strike' : ''}">${esc(c.patient_name)}</span>${reason}</td>` +
+      `<td>${esc(c.doctor_name)}</td><td>${esc(c.started_at)}</td><td>${status}</td>` +
       (admin ? '<td class="audio"></td>' : '') + '<td></td>';
     if (admin) {
       const audioCell = tr.querySelector('.audio');

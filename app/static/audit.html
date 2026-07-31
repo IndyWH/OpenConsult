@@ -28,10 +28,14 @@ document.addEventListener('me-ready', async () => {
   const tbody = document.getElementById('rows');
   for (const r of rows) {
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${r.at.slice(0, 19)}</td>` +
-      `<td>${r.username || '—'} (${r.role || '—'})</td><td>${r.action}</td>` +
-      `<td>${r.subject_type || ''} ${r.subject_id ?? ''}</td>` +
-      `<td><code>${r.detail ? JSON.stringify(r.detail) : ''}</code></td>`;
+    // esc() on every server value (nav.js). JSON.stringify escapes quotes
+    // and backslashes but NOT `<`, so a payload inside any audited free
+    // text (a void reason, a letter specialty) used to break out of the
+    // <code> element — in the tamper-evident record, of all places.
+    tr.innerHTML = `<td>${esc(r.at.slice(0, 19))}</td>` +
+      `<td>${esc(r.username || '—')} (${esc(r.role || '—')})</td><td>${esc(r.action)}</td>` +
+      `<td>${esc(r.subject_type || '')} ${esc(r.subject_id ?? '')}</td>` +
+      `<td><code>${esc(r.detail ? JSON.stringify(r.detail) : '')}</code></td>`;
     tbody.appendChild(tr);
   }
 });

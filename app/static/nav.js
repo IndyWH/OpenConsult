@@ -3,6 +3,29 @@
 // password / Sign out, and the one-line footer disclaimer.
 // Injects itself at the top of <body>; hides clinical tabs from the
 // receptionist (cosmetic only — the server enforces the boundary).
+
+// The one HTML-escaper for the whole front end.
+//
+// Server-held text is attacker-influenced: registration is public and sets
+// display_name, the patient-name field is typed by a receptionist, and the
+// audit detail carries free-text reasons. Any of it that reaches innerHTML
+// must render as CHARACTERS, never as markup — a stored
+// `<img src=x onerror=…>` in a display name once executed in the admin's
+// session on the Users page (2026-07-31 audit, Finding 1).
+//
+// Lives in nav.js because nav.js loads before every page's inline script,
+// so one definition serves them all. Kept a plain declaration (no `window.`
+// wrapper) so tests can lift it verbatim and execute it under Node.
+//
+// RULE: if you add an innerHTML sink, every interpolated server value goes
+// through esc(). The safer habit is textContent — see the el() helper on
+// the review and live pages, which needs no escaping at all.
+function esc(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[c]));
+}
+
 (async function () {
   const response = await fetch('/api/me');
   if (response.status === 401) { location.href = '/login'; return; }

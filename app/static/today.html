@@ -99,9 +99,12 @@ async function refresh() {
   for (const entry of shown) {
     const tr = document.createElement('tr');
     const demo = [entry.age, entry.sex].filter(Boolean).join(', ');
+    // esc() on every server value (nav.js): entry.name is typed at the
+    // queue form and renders in the doctor's session, and this table
+    // refreshes every 5 s — an unescaped payload re-fired continuously.
     tr.innerHTML = `<td>${isActive(entry) ? ++displayNo : '—'}</td>` +
-      `<td>${entry.name}${demo ? ` <span class="hint">(${demo})</span>` : ''}</td>` +
-      `<td><span class="chip status ${entry.status}">${entry.status.replace('_',' ')}</span></td>`;
+      `<td>${esc(entry.name)}${demo ? ` <span class="hint">(${esc(demo)})</span>` : ''}</td>` +
+      `<td><span class="chip status ${esc(entry.status)}">${esc(entry.status.replace('_',' '))}</span></td>`;
     const actions = document.createElement('td');
     if (canManage && entry.status === 'waiting') {
       for (const [dir, arrow] of [['up','↑'], ['down','↓']]) {
