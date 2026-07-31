@@ -73,15 +73,15 @@ the successes — including a whole language dropped after the evidence said
 no model could transcribe it safely, and five real-room test runs that
 each found a defect no automated test had caught.
 
-## Where to go next
+## Find your way in
 
 | You are… | Start with |
 |---|---|
-| A clinician curious what it does | *A consultation's journey* → *The features* |
-| Someone who wants to run it | *Installing and running it* |
-| A developer or researcher | *The architecture* → *Safety by construction* |
-| Wondering about its limits | *Why one consultation at a time* |
-| Interested in what went wrong | *What the room taught us* |
+| A clinician curious what it does | [A consultation's journey](01-a-consultations-journey.md) → *The features* (coming soon) |
+| Someone who wants to run it | [Installing and running it](03-installing-and-running.md) |
+| A developer or researcher | [The architecture](04-the-architecture.md) → [Safety by construction](06-safety-by-construction.md) |
+| Wondering about its limits | [Why one consultation at a time](05-why-one-consultation-at-a-time.md) |
+| Interested in what went wrong | [What the room taught us](07-what-the-room-taught-us.md) |
 
 ---
 
