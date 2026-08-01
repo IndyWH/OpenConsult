@@ -2014,6 +2014,109 @@ touched for a 3–4 s gain). Three commits ("Phase 7b s5 1/3 … 3/3").
   FROZEN at the repo root as `OPEN_CLOSED_RULE.md`, an annex to the
   pre-registration; changes from now on are logged amendments.
 
+## Phase 7b — the drive rewrite (2026-08-01)
+
+**Consultation 463: the owner watched a curious face at the start turn
+into a smiling face, and it stayed smiling while the patient described
+chest pain and a family history of heart disease.** The drive between
+consultation events and the vendored engine has been replaced. The
+diagnosis, the decisions and every number are in
+`PHASE_7B_FACE_DRIVE_SPEC.md`, committed before the code; this section
+records what a future reader needs to know without re-reading it.
+
+- **The dominant input was a metronome.** `on_patient_audio()` fired from
+  the live frame loop on every PCM frame that arrived while the system
+  was not speaking. There was no voice-activity test and no speaker test
+  on that path, so the call did not mean *the patient is talking* — it
+  meant *the microphone is on*, which is true for the whole
+  consultation. Rate-limited to one injection per 2 s, it was a steady
+  tick for as long as the session ran. **Measured offline against the
+  real driver and the real engine** (spec § 1): dopamine 0.40 → 0.91 over
+  15 simulated minutes, the smile muscle 0.31 → 0.61 — and **0.31 → 0.56
+  with the affect hint disabled entirely**. Roughly five sixths of what
+  the owner watched was the metronome, not the patient. The affect hint
+  could not compete and pointed the wrong way: `distressed` moved the
+  smile by about **+0.008**, upward.
+- **Attention moved from dopamine to adrenaline.** In the vendored
+  `FACE_WEIGHTS` dopamine is the largest term in the smile (0.40 in
+  `lip_corner_pull`, 0.45 in `cheek_raise`); alertness lives in
+  adrenaline (`eyelid_upper_raise` 0.55, `brow_outer_raise` 0.50). Using
+  dopamine for *someone is talking* was the category error, and the
+  consequence was that the longer the consultation ran, the harder the
+  face smiled. The *curious* opening face is the same mechanism in
+  reverse — `brow_inner_raise` reads the dopamine deficit below baseline,
+  which exists only before any has accumulated.
+- **Nothing integrates any more.** Affect is a STATE that sets a target
+  chemistry the driver ramps toward and then holds; attention is a
+  bounded level in [0, 1] with an attack and a release. There is no
+  accumulator, so **no repeating stimulus can push any chemical upward
+  without limit and the face cannot drift with time**. This is
+  structural, not a tuning choice, and it is pinned by acceptance
+  criterion C1 in `tests/test_face_drive.py`: the face at 15 minutes
+  equals the face at 2 minutes to within 0.01 on every muscle, affect
+  held and the room active throughout. The practical consequence is worth
+  knowing: if `FACE_ACTIVITY_RMS` is set wrongly and the room reads as
+  permanently active, the failure is cosmetic — the eyes sit slightly
+  open — not a return of the 463 defect.
+- **Speech activity counts BOTH speakers, and our own voice
+  (owner decision, 2026-08-01).** `on_speech_activity()` replaces
+  `on_patient_audio()` and fires when a frame's RMS clears the activity
+  floor — the same floor `live.html` already uses for the silence
+  nudge's detector, so the two surfaces cannot disagree about when the
+  room is quiet. The face is a listening presence for the patient, and it
+  is at least as relevant while the doctor — or Alba — is talking, which
+  is also what Stage 7c will need. The two `on_system_speech_*` call
+  sites are kept as aliases for speech activity: the face stays attentive
+  during playback even if the microphone is quiet.
+  `on_consultation_started()` is now a no-op and its call site is kept
+  deliberately.
+- **The engine's decay, cross-interactions and saturation are
+  deliberately unused, and that changes what kindalive is in this
+  project.** Their time constants (20 min to 4 h) are an order of
+  magnitude too slow for a 15-minute consultation — the root of the
+  defect, and not tunable away without editing vendored files. What is
+  still used is the `FACE_WEIGHTS` projection, the renderer and the
+  config; the engine is a state holder our layer overwrites each tick.
+  **After this change kindalive supplies the projection, the renderer and
+  the config, and the clinical behaviour lives in our targets, in this
+  repository, where it can be reviewed.** That is a loss of emergent
+  plausibility and a gain in reviewability, and on a clinical surface the
+  trade is the right way round. `vendor/` is untouched at its pinned
+  commit `a29bcf7`; `NOTICE` needs no change.
+- **The jaw is capped at rest in BOTH modes** (`JAW_REST_CAP` 0.08).
+  `face3d.js` draws an open mouth above `jaw_open` 0.10 and layers the
+  syllable-rate speaking flap on top, and kindalive opens the jaw for
+  excitement — so at any real dopamine level a resting face looked about
+  to speak. Not an expression cap: `jaw_open` carries no emotional
+  information the smile and brow do not already carry. Note the clinical
+  arm's own resting jaw is 0.12, above the render threshold, so the cap
+  is what closes the resting mouth there.
+- **`brow_inner_raise` and `lip_corner_depress` move from PINNED to
+  BANDED in the clinical arm, and the band becomes two-sided
+  (`neutral ± band`).** With the drive corrected, the old pin list left
+  that arm able to show warmth but not concern — the original defect in
+  miniature. **OWNER DECISION, and it is one line to revert**: the two
+  muscle names in `BANDED_MUSCLES` in `app/face.py`. It affects the
+  comparison arm only; `full` remains the default and is what runs live.
+- **Every on-toggle now audits `drive` (`FACE_DRIVE_VERSION`) beside
+  `mode`,** in `face.toggled` and through it in the `face.arms` summary,
+  so a mock-patient session can be tied to the drive it ran and not only
+  to the arm. Both drives are "full" as far as `mode` is concerned, which
+  is exactly why this was needed.
+- **Unchanged, and deliberately so:** face OFF is still a first-class
+  state (no driver, no `face_state` traffic, card absent from the DOM —
+  the control arm of the CARE study); **the urgency alarm is still not
+  wired to the face**, guarded by a test over the whole module surface;
+  and the drive is still deterministic — no model call, no randomness, no
+  GPU, injectable clock.
+- **Still open:** the mock-patient feedback round remains the thing that
+  decides whether these expressions read correctly to a person — every
+  number in `AFFECT_TARGETS` is a first calibration against a written
+  brief, not a validated setting. `FACE_ACTIVITY_RMS` wants a real room
+  recording. CDS assessments are still not persisted, so a past
+  consultation cannot be replayed through the face with its real affect
+  timeline (spec § 6).
+
 ## Phase 7a — session 3 (2026-07-29): the barge-in detector, built and OFF
 
 The deliberately-held last 7a item, unblocked by owner decision
