@@ -2117,6 +2117,49 @@ records what a future reader needs to know without re-reading it.
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
 
+### Two new affect values: happy and angry (2026-08-01d)
+
+**Owner decisions, both 2026-08-01.** The enum goes from five values to
+seven — happy, positive, neutral, low, anxious, distressed, angry — in
+`ASSESSMENT_SCHEMA`, in `AFFECT_INSTRUCTION` and in `AFFECT_TARGETS`.
+`FACE_DRIVE_VERSION` is `2026-08-01d`. The five existing chemistries are
+untouched, verified field by field.
+
+- **happy** — the old list named one positive value against three
+  negative ones, and there was nowhere for real delight to go: a patient
+  given the all-clear after a cancer scare, one who has come partly to
+  enjoy the visit, a joke that lands. `positive` stays as the milder step
+  below it. **The happy mouth stays CLOSED like every other state**:
+  `face3d.js` gives arc eyes above a mouth curve of 0.34, and deep curve
+  plus arc eyes reads unmistakably as delight in a dot-matrix face,
+  whereas an open mouth would read as *about to speak* in a room where
+  this assistant can actually speak. `JAW_REST_CAP` is not lifted for it.
+- **angry** — patients are angry often enough (at the wait, at being
+  passed around, at not being believed, at being in pain) that with no
+  token for it the verdict landed as neutral. In the prompt it is judged
+  like every other value, on how the patient FEELS, and explicitly **not**
+  a judgement about whether the anger is justified.
+
+**The design rule the angry face encodes, because it is the clearest case
+of the not-a-mirror principle:** an angry face at an angry patient is the
+worst answer available; **a smile is the second worst, because it reads
+as dismissal**; and a blank face reads as stonewalling. So the face holds
+**neutral's steadiness with the smile removed and the warmth raised** —
+level mouth, open unnarrowed eyes, no brow furrow, more warmth than
+neutral carries.
+
+**`angry` is deliberately OUTSIDE the C2 valence ladder.** Anger is a
+different axis, not a darker sadness, so ordering it against happy →
+distressed would be meaningless. **C13 covers it instead** (mouth flatter
+than neutral, warmth higher, `brow_lower` ≤ 0.05, no eye narrowing, no
+concern brow), and it is inside C6 and C12 like every other value. 14
+criteria, 35 parametrised cases.
+
+**The CDS harness has NOT been re-run against this enum change, and one
+is owed.** It is deliberately deferred until the enum has stopped
+changing, and is being sequenced separately. The last run is the one in
+the section below, against the five-value enum.
+
 ### The affect hint asks the wrong question — 465, and the new one (2026-08-01)
 
 **Consultation 465 proved the plumbing works and the question was

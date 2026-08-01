@@ -225,11 +225,24 @@ from the passing test run; **curve** is what the mouth is drawn from):
 
 | affect | smile | frown | curve | brow inner | eyelid upper | pucker (warmth) | jaw |
 |---|---|---|---|---|---|---|---|
+| happy | 0.77 | 0.00 | +0.77 | 0.00 | 0.20 | 0.28 | 0.08 |
 | positive | 0.57 | 0.02 | +0.55 | 0.03 | 0.24 | 0.25 | 0.08 |
 | neutral | 0.26 | 0.06 | +0.20 | 0.04 | 0.15 | 0.12 | 0.08 |
 | anxious | 0.25 | 0.19 | +0.06 | 0.14 | 0.29 | 0.25 | 0.08 |
 | low | 0.17 | 0.29 | −0.12 | 0.30 | 0.22 | 0.31 | 0.08 |
 | distressed | 0.13 | 0.35 | −0.22 | 0.30 | 0.21 | 0.34 | 0.03 |
+| angry | 0.19 | 0.17 | +0.02 | 0.12 | 0.15 | 0.25 | 0.07 |
+
+**`happy` and `angry` added 2026-08-01d** (owner decisions). One positive
+value stood against three negative ones with nowhere for real delight to
+go; and with no token for anger the verdict landed as neutral. `happy`
+keeps its mouth CLOSED like every other state — `face3d.js` gives arc
+eyes above a curve of 0.34, and deep curve plus arc eyes reads
+unmistakably as delight in a dot face, whereas an open mouth would read
+as about to speak in a room where this assistant can actually speak, so
+`JAW_REST_CAP` is not lifted for it. **`angry` sits outside the valence
+ladder below and outside C2's ordering** — anger is a different axis, not
+a darker sadness — and criterion C13 covers it instead.
 
 The mouth now crosses from up to down between `anxious` and `low`, which
 the smile column alone never showed. Warmth **rises** as the patient's
@@ -246,23 +259,24 @@ what decides whether these read correctly to a person.
 
 ## 4. Acceptance criteria
 
-Written before the numbers were tuned. All thirteen pass.
+Written before the numbers were tuned. All fourteen pass.
 
 | | criterion |
 |---|---|
 | C1 | no drift: the face at 15 min equals the face at 2 min within 0.01, affect held, room active |
-| C2 | the mouth CURVE (`lip_corner_pull` − `lip_corner_depress`) ordered positive > neutral > anxious > low > distressed, each gap ≥ 0.05 |
+| C2 | the mouth CURVE (`lip_corner_pull` − `lip_corner_depress`) ordered happy > positive > neutral > anxious > low > distressed, each gap ≥ 0.05 — `angry` is deliberately OUTSIDE this ladder (see C13) |
 | C3 | distress turns the mouth down by ≥ 0.20 of curve against neutral — the 463 defect, inverted |
 | C4 | the concern brow renders (> 0.28) for distressed and low |
-| C4b | no concern brow (≤ 0.10) when the patient is positive or neutral |
+| C4b | no concern brow (≤ 0.10) when the patient is happy, positive or neutral |
 | C5 | warmth is greatest where most needed, and never below 0.18 in the four authored affects (neutral exempt — see § 3) |
-| C6 | no anger or disgust in any affect: brow_lower ≤ 0.15, nose_wrinkle ≤ 0.15, lip_press ≤ 0.25, eyelid_lower_tighten ≤ 0.20 |
+| C6 | no anger or disgust in any affect, `angry` included: brow_lower ≤ 0.15, nose_wrinkle ≤ 0.15, lip_press ≤ 0.25, eyelid_lower_tighten ≤ 0.20 |
 | C7 | 90% of the way to a new affect within 20 s |
 | C8 | attention lifts the eyelids by 0.03–0.15 between a quiet and an active room |
 | C9 | deterministic: identical input, identical output |
 | C10 | concern, not grief: the mouth curve turns down by no more than 0.25 |
 | C11 | the clinical arm can still order the smile and move the concern brow |
-| C12 | the resting mouth stays closed (jaw_open ≤ 0.10) in every affect |
+| C12 | the resting mouth stays closed (jaw_open ≤ 0.10) in every affect, `happy` and `angry` included |
+| C13 | the angry-patient face ANSWERS and never mirrors: against neutral the mouth is flatter and the warmth higher, with no brow furrow (`brow_lower` ≤ 0.05), no eye narrowing and no concern brow |
 
 ---
 
