@@ -3703,3 +3703,61 @@ DB `consultation_ai` / role `consultation_app` (`.env`), HF token via
 `~/.local/opt/ollama`. GitHub: IndyWH/consultation-ai. The project owner
 is a doctor building this to learn — explain technical decisions in
 plain terms, and treat clinical-judgement questions as theirs to decide.
+
+## Carried task (2026-08-01): SECRET_KEY fail-fast guard — NOT STARTED
+
+Came out of a home-network security review run by Claude Cowork on
+2026-08-01. No code was touched by that review; this note is the only
+change. The task below is queued for a fresh session.
+
+**What was checked and is fine — do not redo this.** The live service reads
+`/home/wajir/consultation-ai/.env`, and the `SECRET_KEY` there is a custom
+64-character value (an `openssl rand -hex 32` output), not the code default
+and not the `.env.example` default. Verified without displaying the value:
+length, hash prefix and verdict only. **No rotation is needed.** Rate
+limiting was also reviewed and is correct for the Funnel case: login 10 per
+60 s, registration 5 per hour, and `client_ip()` trusts `X-Forwarded-For`
+only from a loopback peer and takes the last entry. Nothing to change there.
+
+**What is outstanding.** `app/auth.py` still reads the key as
+`os.getenv("SECRET_KEY", "dev-secret-change-me")` — a silent fallback to a
+value that becomes public knowledge the day the repo does. The unit file
+sets only `WorkingDirectory` and no `EnvironmentFile`, so the key reaches
+the app solely through `load_dotenv()` reading `.env` relative to the
+working directory. A moved, renamed or lost `.env` would therefore not stop
+the service — it would start quietly on the known default. This is a
+robustness gap, not a live exposure, but it should close before the repo
+goes public and it belongs with the other Phase 2 footguns.
+
+**The change, when it is done.** Replace the silent default with an
+import-time fail-fast, after `load_dotenv()`. Refuse to start when the value
+is missing, empty, shorter than 32 characters, or one of the placeholders
+`change-me` / `dev-secret-change-me`. Raise `RuntimeError` naming which
+condition failed and pointing at `openssl rand -hex 32`, never echoing the
+value or any part of it.
+
+Known consequence: the suite will fail wherever `auth.py` is imported
+without a key set. Fix that in `tests/conftest.py` by setting a valid test
+key for the session — **do not weaken the guard to accommodate the tests.**
+Add tests that exercise the real import-time path via `monkeypatch` plus
+`importlib.reload`, covering missing, empty, both placeholders, a
+31-character value and a valid 64-character one, and asserting the error
+message does not contain the rejected value. Update `.env.example` and the
+`.env` part of `help/03-installing-and-running.md` to state that the app
+refuses to start without a real value of at least 32 characters. One commit,
+lockfile untouched, suite green first.
+
+After this lands, a deployment with a missing or misplaced `.env` refuses to
+start rather than starting on a known key. That is the intent — say so in
+the commit message.
+
+**Network-side changes made the same day, for future debugging.** The
+OPNsense router now redirects all port-53 traffic on the WiFi segment
+(192.168.2.0/24) to its own resolver, because two Google Cast devices were
+querying 8.8.8.8 directly and bypassing AdGuard. Tailscale MagicDNS is
+explicitly excluded from that redirect (no-rdr rules for 100.100.100.100 and
+fd7a:115c:a1e0::53), so tailnet name resolution still works from the WiFi
+side. mlrig is on the wired LAN and was not affected by any of it. Note that
+the WiFi-to-LAN isolation rule means a device on WiFi cannot reach mlrig
+directly, so Tailscale between them relays via DERP rather than connecting
+peer-to-peer — working as intended, but it explains any added latency.
