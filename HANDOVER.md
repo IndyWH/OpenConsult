@@ -4110,6 +4110,43 @@ DB `consultation_ai` / role `consultation_app` (`.env`), HF token via
 is a doctor building this to learn — explain technical decisions in
 plain terms, and treat clinical-judgement questions as theirs to decide.
 
+## End of the 2026-08-01 face sessions — what a fresh session needs
+
+Thirty-two commits across the day, all Phase 7b: the face drive rewritten
+after 463, the affect log, the neutral reset, two new affect values, the
+affect call split out of the assessment prompt, and the 467 present-
+moment fix. Suite green at **665**. The phase sections above have the
+detail; this is the short list of what is *not* finished.
+
+- **THE SERVICE HAS NOT BEEN RESTARTED, so none of the day's work is
+  live.** The app runs without `--reload`. Every change since `fd8aec5`
+  — the new drive, the affect log line, the seven values, the three-call
+  CDS engine — reaches a real consultation only after
+  `sudo systemctl restart consultation-ai`, which is the owner's act. The
+  next room check is measuring the OLD build until then.
+- **The CDS harness run is owed**, and the debt now covers three changes:
+  the seven-value enum, the affect call's split out of the assessment
+  prompt, and the 467 prompt/window change. Last run was against the
+  five-value, single-call build (`evals/urgency_results.json`, left at
+  the committed baseline deliberately). `scripts/evaluate_urgency.py`,
+  ~30 minutes of model time; it OVERWRITES that baseline as it runs, so
+  copy it out first.
+- **`AFFECT_RECENT_TURNS = 4` is a guess with nothing measured behind
+  it.** 467's `PATIENT_AFFECT` log is the first material to calibrate
+  against. Note the unit: the live transcript has no speaker labels, so a
+  "turn" is one committed ASR line, not one exchange.
+- **The 467 fix is unverified in a room.** A bench transcript returns
+  `low` both with and without the recency block; the next live
+  consultation with an emotional turn in it is the real check, and the
+  affect log is how to read it.
+- **Three small things flagged and deliberately not done**, each the
+  owner's call: `tests/test_face_clinical.py` still exercises only the
+  original five affect values; `test_cds.py`'s new fail-soft test needs
+  no model but inherits that file's module-level Ollama skip, so it does
+  not run on a machine without MedGemma; and `.env.example`'s
+  `FACE_ACTIVITY_RMS` comment names one of the three surfaces that share
+  its `1e-4` default (the spec § 2.2 names all three).
+
 ## Carried task (2026-08-01): SECRET_KEY fail-fast guard — NOT STARTED
 
 Came out of a home-network security review run by Claude Cowork on
