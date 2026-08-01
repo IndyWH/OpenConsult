@@ -49,7 +49,8 @@ def test_cds_update_returns_valid_assessment():
         "patient_affect",
     }
     assert assessment["patient_affect"] in {
-        "positive", "neutral", "low", "anxious", "distressed"}
+        "happy", "positive", "neutral", "low", "anxious", "distressed",
+        "angry"}
     assert 1 <= len(assessment["differentials"]) <= 5
     conditions = " ".join(d["condition"].lower() for d in assessment["differentials"])
     assert "angina" in conditions or "coronary" in conditions or "cardiac" in conditions

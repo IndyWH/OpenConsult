@@ -257,7 +257,8 @@ def test_a_one_line_first_transcript_produces_a_valid_first_assessment():
         "reasoning", "differentials", "questions_to_ask", "signs_to_check",
         "urgency_check", "urgent_actions", "patient_affect"}
     assert first["patient_affect"] in {
-        "positive", "neutral", "low", "anxious", "distressed"}
+        "happy", "positive", "neutral", "low", "anxious", "distressed",
+        "angry"}
     assert isinstance(first["differentials"], list)
 
     revised = asyncio.run(engine.update(
@@ -267,7 +268,8 @@ def test_a_one_line_first_transcript_produces_a_valid_first_assessment():
         previous=first))
     assert set(revised) == set(first)
     assert revised["patient_affect"] in {
-        "positive", "neutral", "low", "anxious", "distressed"}
+        "happy", "positive", "neutral", "low", "anxious", "distressed",
+        "angry"}
     assert 1 <= len(revised["differentials"]) <= 5
     for d in revised["differentials"]:
         assert d["likelihood"] in {"high", "moderate", "low"}

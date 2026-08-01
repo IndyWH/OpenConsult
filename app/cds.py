@@ -87,9 +87,16 @@ ASSESSMENT_SCHEMA = {
         # verdict were then indistinguishable, both in the PATIENT_AFFECT
         # log and in the face itself, so a model that skipped the question
         # looked exactly like one that answered it "settled".
+        # Seven values since 2026-08-01 (owner decisions): "happy" and
+        # "angry" joined the original five. One positive value stood
+        # against three negative ones with nowhere for real delight to go,
+        # and patients are angry often enough — at the wait, at being
+        # passed around, at not being believed — that with no token for it
+        # the verdict landed as neutral.
         "patient_affect": {
             "type": "string",
-            "enum": ["positive", "neutral", "low", "anxious", "distressed"],
+            "enum": ["happy", "positive", "neutral", "low", "anxious",
+                     "distressed", "angry"],
         },
     },
     "required": ["reasoning", "differentials", "questions_to_ask",
@@ -115,9 +122,15 @@ FEELS right now: the inside, not the outward manner. Read BOTH how they \
 speak and what they are describing — someone can sound perfectly composed \
 and still be frightened, and a patient who volunteers a family history \
 unprompted is usually telling you what they are afraid of. One of \
-"positive", "neutral", "low", "anxious", "distressed". COMMIT to your best \
-inference: "neutral" means a patient who genuinely seems settled, not a \
-patient you are unsure about. Judge the PERSON, not the seriousness of the \
+"happy", "positive", "neutral", "low", "anxious", "distressed", "angry". \
+"happy" is real delight — relief at an all-clear, a worry resolved, \
+laughter, a patient enjoying the visit; "positive" is the milder step \
+below it: pleased, in good spirits. "angry" is a patient angry at the \
+wait, at being passed around, at not being believed, at being in pain — \
+judged like every other value, on how they FEEL, and never a judgement \
+about whether the anger is justified. COMMIT to your best inference: \
+"neutral" means a patient who genuinely seems settled, not a patient you \
+are unsure about. Judge the PERSON, not the seriousness of the \
 diagnosis: a frightening differential in someone who is taking it in their \
 stride is not "distressed".\
 """
