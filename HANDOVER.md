@@ -4118,12 +4118,15 @@ affect call split out of the assessment prompt, and the 467 present-
 moment fix. Suite green at **665**. The phase sections above have the
 detail; this is the short list of what is *not* finished.
 
-- **THE SERVICE HAS NOT BEEN RESTARTED, so none of the day's work is
-  live.** The app runs without `--reload`. Every change since `fd8aec5`
-  — the new drive, the affect log line, the seven values, the three-call
-  CDS engine — reaches a real consultation only after
-  `sudo systemctl restart consultation-ai`, which is the owner's act. The
-  next room check is measuring the OLD build until then.
+- **The service was restarted by the owner at 21:22 on 2026-08-01, so
+  the day's work IS live.** Verified at 21:28: `consultation-ai`,
+  `ollama` and `postgresql@18-main` all active, `/health` ok with
+  pgvector, `scripts/migrate.py --check` reports no drift (nothing today
+  touched the schema), and every change under `app/` was committed by
+  19:59, well before the restart. **The next room check therefore
+  measures the new build**: the rewritten drive, the `PATIENT_AFFECT` log
+  line, the seven affect values, and the three-call CDS engine with the
+  present-moment affect prompt.
 - **The CDS harness run is owed**, and the debt now covers three changes:
   the seven-value enum, the affect call's split out of the assessment
   prompt, and the 467 prompt/window change. Last run was against the
