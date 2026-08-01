@@ -78,6 +78,17 @@ def test_classification_covers_all_twelve_muscles_exactly_once():
 
 
 def test_pinned_muscles_stay_at_neutral_under_maximum_anger_and_disgust():
+    """HALF OF THE GUARANTEE — this one holds the PAYLOAD POLICY: whatever
+    chemistry the engine is holding, including anger and disgust forced
+    straight into the state, nothing angry leaves payload() in the
+    clinical arm.
+
+    The other half is test_face_drive.py::test_c6_the_face_is_never_angry
+    _or_disgusted, which holds the DRIVE: no affect this project can
+    select ever asks the projection for anger or disgust in the first
+    place. Together they cover it; separately each is half. Do not remove
+    either believing the other covers it.
+    """
     # Keyed to clinical mode: since 2026-07-28 the caps are one arm of the
     # owner's evaluation-first comparison, not the default behaviour.
     driver = FaceDriver(clock=ManualClock(), mode="clinical")

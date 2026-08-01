@@ -106,6 +106,16 @@ def test_c5_warmth_is_greatest_where_it_is_most_needed(steady):
     ("brow_lower", 0.15), ("nose_wrinkle", 0.15),
     ("lip_press", 0.25), ("eyelid_lower_tighten", 0.20)])
 def test_c6_the_face_is_never_angry_or_disgusted(steady, muscle, cap):
+    """HALF OF THE GUARANTEE — this one holds the DRIVE: no affect this
+    project can select ever asks the projection for anger or disgust.
+
+    The other half is
+    test_face_driver.py::test_pinned_muscles_stay_at_neutral_under_maximum_anger_and_disgust,
+    which holds the PAYLOAD POLICY: even with the chemistry forced to
+    anger and disgust directly, bypassing AFFECT_TARGETS entirely, the
+    clinical arm emits neutral. Together they cover it; separately each is
+    half. Do not remove either believing the other covers it.
+    """
     for affect in AFFECTS:
         assert steady[affect][muscle] <= cap, affect
 
