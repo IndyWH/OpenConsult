@@ -273,6 +273,36 @@ enjoying the visit
 Judge the person, not how serious their illness is.\
 """
 
+# How many turns at the end of the transcript count as "right now".
+# A FIRST GUESS, NOT A TUNED VALUE: four is a plausible present moment for
+# a live transcript that commits roughly sentence-sized turns, and nothing
+# has been measured. It wants calibrating against real consultations —
+# against the PATIENT_AFFECT log of a consultation whose emotional turn is
+# known, which is what 467 provided for the first time.
+AFFECT_RECENT_TURNS = 4
+
+
+def affect_message(transcript: str) -> str:
+    """The affect call's user message.
+
+    The whole transcript first, for context, and then the most recent
+    turns in a labelled block at the END — the end of the message is what
+    the model attends to most, so the thing being judged goes last. This
+    is the second half of the consultation-467 fix: the prompt asks a NOW
+    question (see AFFECT_PROMPT) and this puts the now in front of it.
+
+    A transcript shorter than AFFECT_RECENT_TURNS turns IS the recent
+    turns, so it is sent once rather than repeated twice.
+    """
+    turns = [line for line in transcript.splitlines() if line.strip()]
+    full = f"LIVE TRANSCRIPT SO FAR:\n{transcript}"
+    if len(turns) <= AFFECT_RECENT_TURNS:
+        return full
+    recent = "\n".join(turns[-AFFECT_RECENT_TURNS:])
+    return (f"{full}\n\n"
+            f"THE MOST RECENT TURNS (this is the moment you are judging):\n"
+            f"{recent}")
+
 
 class CDSEngine:
     """Stateless client: callers hold the assessment and pass it back in."""
@@ -339,15 +369,19 @@ class CDSEngine:
 
         # Third call, LAST and FAIL-SOFT. It sees the transcript and
         # nothing else — no previous answer to anchor on, no differentials,
-        # no urgency verdict; a fresh judgement of the whole consultation
-        # every pass, with nothing clinical in its context.
+        # no urgency verdict; a fresh judgement every pass, with nothing
+        # clinical in its context. Since 2026-08-01 the transcript arrives
+        # with the most recent turns repeated in a labelled block at the
+        # end (affect_message): the question is about the present moment,
+        # so the present moment goes where the model attends most.
         #
         # An affect failure must NEVER cost the doctor the differentials,
         # the questions or the alarm: the face is a comfort feature and the
         # rest of this pass is the clinical output. So it is wrapped, and a
         # failure falls back to neutral with a warning.
         try:
-            affect = await self._chat(AFFECT_PROMPT, transcript_text, AFFECT_SCHEMA)
+            affect = await self._chat(
+                AFFECT_PROMPT, affect_message(transcript), AFFECT_SCHEMA)
             assessment["patient_affect"] = affect["patient_affect"]
         except Exception as exc:  # noqa: BLE001 - the clinical pass survives
             logger.warning("Affect call failed, falling back to neutral: %s", exc)
