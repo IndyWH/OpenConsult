@@ -2086,6 +2086,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                   "via": via}
         if driver is not None:
             toggle["mode"] = driver.mode
+            # ...and the drive version alongside it, so a mock-patient
+            # session can always be tied to the drive it ran, not just to
+            # the arm. The 463 drive and its replacement are both "full".
+            toggle["drive"] = face.FACE_DRIVE_VERSION
         entry["face_toggles"].append(toggle)
         # The consultation row does not exist until Stop, so this row
         # carries the session; _complete_session writes the
@@ -2117,12 +2121,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                            session_id, entry["last_seq"], seq)
                         session.append_pcm16(data[4:])
                         entry["last_seq"] = seq
-                        # Phase 7b: mild attention while the patient talks.
-                        # The live path already knows when audio arrives —
-                        # no new detection. Frames inside a speaking window
-                        # are mostly our own playback, so they don't count.
-                        if entry["face"] is not None and not session.speaking:
-                            entry["face"].on_patient_audio()
+                        # Phase 7b (rewritten 2026-08-01): attention while
+                        # the room is audible. The frame's RMS is the test —
+                        # "a frame arrived" only meant the microphone was
+                        # on, which was the 463 metronome. Every speaker
+                        # counts, including our own voice (owner decision
+                        # 2026-08-01): the face is a listening presence, and
+                        # it is at least as relevant while the doctor — or
+                        # Alba — is the one talking.
+                        if entry["face"] is not None and face.frame_is_active(data[4:]):
+                            entry["face"].on_speech_activity()
                 elif (text_message := message.get("text")) == "stop":
                     entry["stopped"] = True
                     break
