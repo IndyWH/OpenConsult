@@ -73,7 +73,7 @@ app/letters.py         referral letters: suggest/draft calls + grounding gate
 app/schema.py          one entry point + ordering for the whole DB schema
 app/speech.py          Phase 7a: TTS subprocess adapter, phrases, ref resolution
 app/system_utterances.py  what the system said, and its exclusion spans
-app/face.py            Phase 7b: event→impulse layer + per-muscle hard caps
+app/face.py            Phase 7b: affect/attention drive + per-muscle policy
 vendor/kindalive/      vendored face engine, pinned commit (see NOTICE)
 app/monitor.py         public monitoring pulse: aggregate counts, 10 s cache
 app/ratelimit.py       per-IP auth rate limits + proxy-aware client_ip
