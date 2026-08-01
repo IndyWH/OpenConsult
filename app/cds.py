@@ -243,9 +243,23 @@ AFFECT_SCHEMA = {
 # pass, including one where the pain radiated to the jaw. The field was
 # item 4 of a six-hundred-word clinical prompt that spends most of its
 # words asking for conservatism. This prompt asks one plain question.
+#
+# It asks a NOW question, and it says so twice over, after consultation
+# 467: a patient who opened with an all-clear after cancer surgery and
+# turned sad about his wife's illness was still read as "happy" on a
+# transcript that contained "I'm sad about that". The call sees the whole
+# consultation, so without this it summarises a document instead of
+# reporting a moment — and the sadness being about someone else was the
+# second half of the miss.
 AFFECT_PROMPT = """\
 You are reading the transcript of a doctor's consultation.
-Decide how the PATIENT is feeling, from what they have said.
+Decide how the PATIENT is feeling RIGHT NOW, in what they have just \
+said — not across the consultation as a whole.
+Earlier parts of the transcript are context only. A patient can arrive \
+delighted and turn sad, or arrive frightened and be reassured: report the \
+present moment, not the balance of the conversation.
+Feelings about other people count. A patient who is sad about a family \
+member's illness is sad.
 Answer with exactly one of: happy, positive, neutral, low, anxious, \
 distressed, angry.
   happy       delight or relief: an all-clear, a worry lifted, laughter, \
