@@ -162,10 +162,39 @@ the vendored `FACE_WEIGHTS`, to a written brief for each affect, with
 hard caps on the anger and disgust muscles. The brief came first; the
 numbers were fitted to it.
 
+### Amended 2026-08-01b — the resting face is kindalive's own
+
+**Owner decision, 2026-08-01.** `neutral` is no longer a resting
+expression that was designed here. It is now the vendored
+`SPECIES_DEFAULTS` from `vendor/kindalive/engine/chemicals.py`,
+untouched, and `PRESET_BASELINES` is set to the same values so the
+deficit-driven muscles measure from kindalive's own resting point rather
+than from an invented one. **Most of a consultation sits at neutral, and
+that state should be borrowed, not designed.** The other four affects
+moved only as far as keeping the ladder ordered around the new neutral
+required. `FACE_DRIVE_VERSION` is `2026-08-01b`, so the audit rows
+separate the two builds.
+
+Two consequences, both recorded honestly:
+
+- **C2 and C3 now test the MOUTH CURVE** — `lip_corner_pull` minus
+  `lip_corner_depress` — rather than the smile muscle alone. That is what
+  `face3d.js` draws the mouth from, so it is what a person actually sees;
+  a smile muscle read on its own can fall while a deepening frown makes
+  the visible mouth worse than the number suggests. **This is a stricter
+  and more faithful criterion, not a looser one:** the ordered gap rose
+  from 0.03 to 0.05 and the distress requirement from 0.12 to 0.20.
+- **C5's warmth floor now EXEMPTS neutral, and that is a relaxation.**
+  The floor of 0.18 was written here, and neutral's warmth is now
+  whatever kindalive rests at (0.12, from oxytocin 0.20). The floor still
+  binds on the four states this project authors. It was relaxed because
+  the requirement changed — the resting face is borrowed now — and not
+  because the code failed to meet it.
+
 | affect | the face it is asked to make |
 |---|---|
 | positive | warm open smile, relaxed brow |
-| neutral | attentive, faint pleasantness — a listening face |
+| neutral | kindalive's own resting chemistry, untouched — borrowed, not designed |
 | anxious | alert and steady: eyes a little wider, smile mostly gone |
 | low | gentle concern: inner brows up, mouth soft, warmth high |
 | distressed | clear concern: brows up over the render threshold, mouth gently down, warmth highest of all |
@@ -182,19 +211,23 @@ Two things the fit had to respect that are not in the weights matrix:
   `brow_outer_raise > 0.4`. A concern face below 0.28 is invisible, so
   `distressed` and `low` are calibrated above it deliberately.
 
-Resulting steady states, `full` mode, room active:
+Resulting steady states, `full` mode, room active (measured 2026-08-01b
+from the passing test run; **curve** is what the mouth is drawn from):
 
-| affect | smile | frown | brow inner | eyelid upper | pucker (warmth) | jaw |
-|---|---|---|---|---|---|---|
-| positive | 0.57 | 0.02 | 0.03 | 0.24 | 0.25 | 0.08 |
-| neutral | 0.30 | 0.07 | 0.07 | 0.23 | 0.20 | 0.08 |
-| anxious | 0.25 | 0.19 | 0.14 | 0.29 | 0.25 | 0.08 |
-| low | 0.18 | 0.29 | 0.30 | 0.24 | 0.32 | 0.08 |
-| distressed | 0.14 | 0.34 | 0.29 | 0.24 | 0.35 | 0.07 |
+| affect | smile | frown | curve | brow inner | eyelid upper | pucker (warmth) | jaw |
+|---|---|---|---|---|---|---|---|
+| positive | 0.57 | 0.02 | +0.55 | 0.03 | 0.24 | 0.25 | 0.08 |
+| neutral | 0.26 | 0.06 | +0.20 | 0.04 | 0.15 | 0.12 | 0.08 |
+| anxious | 0.25 | 0.19 | +0.06 | 0.14 | 0.29 | 0.25 | 0.08 |
+| low | 0.17 | 0.29 | −0.12 | 0.30 | 0.22 | 0.31 | 0.08 |
+| distressed | 0.13 | 0.35 | −0.22 | 0.30 | 0.21 | 0.34 | 0.03 |
 
-Warmth **rises** as the patient's state worsens. That is the listener's
+The mouth now crosses from up to down between `anxious` and `low`, which
+the smile column alone never showed. Warmth **rises** as the patient's
+state worsens across the four authored affects. That is the listener's
 response the original mapping was reaching for, now actually implemented:
-the face leans in, it does not fall apart.
+the face leans in, it does not fall apart. Neutral sits below them at the
+vendored resting warmth, by the amendment above.
 
 Every number in `AFFECT_TARGETS` is a first calibration against a written
 brief, not a validated setting. The mock-patient feedback round is still
@@ -209,16 +242,16 @@ Written before the numbers were tuned. All thirteen pass.
 | | criterion |
 |---|---|
 | C1 | no drift: the face at 15 min equals the face at 2 min within 0.01, affect held, room active |
-| C2 | smile ordered positive > neutral > anxious > low > distressed, each gap ≥ 0.03 |
-| C3 | distress lowers the smile by ≥ 0.12 against neutral — the 463 defect, inverted |
+| C2 | the mouth CURVE (`lip_corner_pull` − `lip_corner_depress`) ordered positive > neutral > anxious > low > distressed, each gap ≥ 0.05 |
+| C3 | distress turns the mouth down by ≥ 0.20 of curve against neutral — the 463 defect, inverted |
 | C4 | the concern brow renders (> 0.28) for distressed and low |
 | C4b | no concern brow (≤ 0.10) when the patient is positive or neutral |
-| C5 | warmth is greatest where most needed, and never below 0.18 |
+| C5 | warmth is greatest where most needed, and never below 0.18 in the four authored affects (neutral exempt — see § 3) |
 | C6 | no anger or disgust in any affect: brow_lower ≤ 0.15, nose_wrinkle ≤ 0.15, lip_press ≤ 0.25, eyelid_lower_tighten ≤ 0.20 |
 | C7 | 90% of the way to a new affect within 20 s |
 | C8 | attention lifts the eyelids by 0.03–0.15 between a quiet and an active room |
 | C9 | deterministic: identical input, identical output |
-| C10 | concern, not grief: the mouth downturn stays ≤ 0.25 |
+| C10 | concern, not grief: the mouth curve turns down by no more than 0.25 |
 | C11 | the clinical arm can still order the smile and move the concern brow |
 | C12 | the resting mouth stays closed (jaw_open ≤ 0.10) in every affect |
 

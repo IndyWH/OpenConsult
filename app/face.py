@@ -94,7 +94,7 @@ AFFECT_VALUES = ("positive", "neutral", "low", "anxious", "distressed")
 
 # Stamped into every face.toggled audit row alongside the mode, so a
 # mock-patient session can always be tied to the drive it ran.
-FACE_DRIVE_VERSION = "2026-08-01"
+FACE_DRIVE_VERSION = "2026-08-01b"
 
 # Room audio above this RMS, as a fraction of full scale, counts as
 # activity. Same floor the silence-nudge activity detector uses in
@@ -142,11 +142,16 @@ AFFECT_TARGETS: dict[str, dict[Chemical, float]] = {
         Chemical.OXYTOCIN: 0.35, Chemical.TESTOSTERONE: 0.05,
         Chemical.CORTISOL: 0.21, Chemical.ADRENALINE: 0.20,
         Chemical.ENDORPHINS: 0.47, Chemical.GABA: 0.53},
+    # NEUTRAL IS KINDALIVE'S OWN RESTING CHEMISTRY, UNTOUCHED (owner
+    # decision 2026-08-01). These are SPECIES_DEFAULTS from the vendored
+    # chemicals.py, copied here so the reference is explicit rather than
+    # implied. Most of a consultation will sit here, so it is the state
+    # that should be borrowed rather than invented.
     "neutral": {
-        Chemical.DOPAMINE: 0.30, Chemical.SEROTONIN: 0.55,
-        Chemical.OXYTOCIN: 0.34, Chemical.TESTOSTERONE: 0.05,
-        Chemical.CORTISOL: 0.25, Chemical.ADRENALINE: 0.20,
-        Chemical.ENDORPHINS: 0.28, Chemical.GABA: 0.35},
+        Chemical.DOPAMINE: 0.30, Chemical.SEROTONIN: 0.50,
+        Chemical.OXYTOCIN: 0.20, Chemical.TESTOSTERONE: 0.30,
+        Chemical.CORTISOL: 0.20, Chemical.ADRENALINE: 0.10,
+        Chemical.ENDORPHINS: 0.20, Chemical.GABA: 0.40},
     "anxious": {
         Chemical.DOPAMINE: 0.38, Chemical.SEROTONIN: 0.55,
         Chemical.OXYTOCIN: 0.56, Chemical.TESTOSTERONE: 0.05,
@@ -155,12 +160,12 @@ AFFECT_TARGETS: dict[str, dict[Chemical, float]] = {
     "low": {
         Chemical.DOPAMINE: 0.04, Chemical.SEROTONIN: 0.30,
         Chemical.OXYTOCIN: 0.54, Chemical.TESTOSTERONE: 0.05,
-        Chemical.CORTISOL: 0.45, Chemical.ADRENALINE: 0.20,
+        Chemical.CORTISOL: 0.49, Chemical.ADRENALINE: 0.14,
         Chemical.ENDORPHINS: 0.46, Chemical.GABA: 0.35},
     "distressed": {
         Chemical.DOPAMINE: 0.11, Chemical.SEROTONIN: 0.30,
         Chemical.OXYTOCIN: 0.72, Chemical.TESTOSTERONE: 0.05,
-        Chemical.CORTISOL: 0.54, Chemical.ADRENALINE: 0.20,
+        Chemical.CORTISOL: 0.58, Chemical.ADRENALINE: 0.12,
         Chemical.ENDORPHINS: 0.21, Chemical.GABA: 0.50},
 }
 
@@ -169,9 +174,9 @@ AFFECT_TARGETS: dict[str, dict[Chemical, float]] = {
 # serotonin fall below the resting level), so the baselines are part of
 # the calibration and must match what the fit assumed.
 PRESET_BASELINES = {
-    "dopamine": 0.30, "serotonin": 0.55, "oxytocin": 0.30,
-    "testosterone": 0.05, "cortisol": 0.15, "adrenaline": 0.10,
-    "endorphins": 0.25, "gaba": 0.55,
+    "dopamine": 0.30, "serotonin": 0.50, "oxytocin": 0.20,
+    "testosterone": 0.30, "cortisol": 0.20, "adrenaline": 0.10,
+    "endorphins": 0.20, "gaba": 0.40,
 }
 
 BANDED_MUSCLES = frozenset({

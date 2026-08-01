@@ -22,6 +22,12 @@ RENDER_BROW_THRESHOLD = 0.28
 RENDER_JAW_THRESHOLD = 0.10
 
 
+def curve(muscles):
+    """What face3d.js actually draws the mouth from. The smile muscle on
+    its own is not what a person sees."""
+    return muscles["lip_corner_pull"] - muscles["lip_corner_depress"]
+
+
 def settle(affect, seconds=90.0, active=True, mode="full"):
     """Run the driver to steady state on a manual clock."""
     clock = ManualClock()
@@ -63,17 +69,15 @@ def test_c1_the_face_does_not_drift_with_time():
     assert max(abs(at15[m] - at2[m]) for m in at2) <= 0.01
 
 
-def test_c2_the_smile_is_ordered_by_how_the_patient_seems(steady):
-    smiles = [steady[a]["lip_corner_pull"] for a in AFFECTS]
-    for higher, lower in zip(smiles, smiles[1:]):
-        assert higher - lower >= 0.03
+def test_c2_the_mouth_curve_is_ordered_by_how_the_patient_seems(steady):
+    curves = [curve(steady[a]) for a in AFFECTS]
+    for higher, lower in zip(curves, curves[1:]):
+        assert higher - lower >= 0.05
 
 
-def test_c3_distress_lowers_the_smile(steady):
-    """Inverted, this is the 463 defect: distress used to raise it."""
-    drop = (steady["neutral"]["lip_corner_pull"]
-            - steady["distressed"]["lip_corner_pull"])
-    assert drop >= 0.12
+def test_c3_distress_turns_the_mouth_down(steady):
+    """Inverted, this is the 463 defect: distress used to turn it up."""
+    assert curve(steady["neutral"]) - curve(steady["distressed"]) >= 0.20
 
 
 @pytest.mark.parametrize("affect", ["distressed", "low"])
@@ -90,7 +94,12 @@ def test_c5_warmth_is_greatest_where_it_is_most_needed(steady):
     """A listener's response, not a mirror: the face leans in."""
     warm = {a: steady[a]["lip_pucker"] for a in AFFECTS}
     assert warm["distressed"] >= warm["low"] >= warm["anxious"] >= warm["neutral"]
-    assert min(warm.values()) >= 0.18
+    # NEUTRAL IS EXEMPT from the floor by owner decision 2026-08-01: it is
+    # kindalive's own untouched resting chemistry, so its warmth is
+    # whatever that rests at. The floor applies to the four states we
+    # author. Relaxed because the requirement changed, not because the
+    # code failed to meet it.
+    assert min(warm[a] for a in AFFECTS if a != "neutral") >= 0.18
 
 
 @pytest.mark.parametrize("muscle,cap", [
@@ -109,8 +118,8 @@ def test_c7_the_face_keeps_up_with_the_room(steady):
         d.on_speech_activity()
         clock.advance(TICK)
         d.advance()
-    start = d.payload()["muscles"]["lip_corner_pull"]
-    end = steady["distressed"]["lip_corner_pull"]
+    start = curve(d.payload()["muscles"])
+    end = curve(steady["distressed"])
     d.on_affect("distressed")
     t = 0.0
     while t < 20.0:
@@ -118,7 +127,7 @@ def test_c7_the_face_keeps_up_with_the_room(steady):
         clock.advance(TICK)
         d.advance()
         t += TICK
-    now = d.payload()["muscles"]["lip_corner_pull"]
+    now = curve(d.payload()["muscles"])
     assert abs(now - start) / abs(end - start) >= 0.90
 
 
@@ -134,9 +143,7 @@ def test_c9_the_drive_is_deterministic():
 
 
 def test_c10_concern_not_grief(steady):
-    downturn = (steady["distressed"]["lip_corner_depress"]
-                - steady["distressed"]["lip_corner_pull"])
-    assert downturn <= 0.25
+    assert -curve(steady["distressed"]) <= 0.25
 
 
 def test_c11_the_clinical_arm_can_still_express_concern():

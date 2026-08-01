@@ -2117,6 +2117,47 @@ records what a future reader needs to know without re-reading it.
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
 
+### The affect log, and the neutral reset (2026-08-01b)
+
+**The affect verdict is now logged, one line per assessment.** Nothing
+anywhere recorded what MedGemma sends in `patient_affect` — not
+persisted, not audited, not logged — so **consultation 464 could not be
+explained**, and neither could the next one. `app/main.py` now emits, at
+the point a completed assessment is read:
+
+```
+PATIENT_AFFECT session=<id> at=<audio_s>s value=<affect|ABSENT> changed=<first|yes|no>
+```
+
+Three properties are deliberate. It sits **outside the
+`entry["face"] is not None` guard**, because face-off is a study arm and
+the affect stream is wanted from it too. It logs **every** assessment,
+not only changes — a repeated verdict is evidence. And it writes the
+literal word **`ABSENT`** when the key is missing, because
+`patient_affect` is optional and not in the CDS schema's `required`
+list, so a model that omits it otherwise looks identical to one that
+judges the patient neutral; that distinction is the whole reason the log
+exists. **It is a debugging instrument** — no table, no migration, no
+audit row. The durable version (affect persisted with the assessment, so
+a consultation can be replayed through the face) is still the separate
+job in spec § 6.
+
+**Neutral is now kindalive's own resting chemistry (owner decision,
+2026-08-01).** `AFFECT_TARGETS["neutral"]` is the vendored
+`SPECIES_DEFAULTS`, untouched, and `PRESET_BASELINES` matches it, so the
+deficit-driven muscles measure from kindalive's resting point instead of
+one invented here. The reasoning is worth keeping: **most of a
+consultation sits at neutral, and that state should be borrowed rather
+than designed.** The other four affects moved only as far as keeping the
+ladder ordered around it. `FACE_DRIVE_VERSION` is `2026-08-01b`, so the
+`face.toggled` and `face.arms` rows separate the two builds. Two
+criteria changed with it, both recorded in the spec's § 3 amendment:
+C2/C3 now test the **mouth curve** (`lip_corner_pull` minus
+`lip_corner_depress`, which is what `face3d.js` actually draws) and are
+stricter for it, while C5's warmth floor now **exempts neutral** — an
+honest relaxation, because the resting face is borrowed now, not because
+the code failed to meet it.
+
 ## Phase 7a — session 3 (2026-07-29): the barge-in detector, built and OFF
 
 The deliberately-held last 7a item, unblocked by owner decision
