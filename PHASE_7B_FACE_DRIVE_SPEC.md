@@ -219,6 +219,16 @@ Two things the fit had to respect that are not in the weights matrix:
   `brow_lower > 0.18` or `brow_inner_raise > 0.28` or
   `brow_outer_raise > 0.4`. A concern face below 0.28 is invisible, so
   `distressed` and `low` are calibrated above it deliberately.
+  **The consequence, which this note originally stopped short of and a
+  room check then found (consultation 468): only those two clear any
+  threshold, so the other five affects — `happy`, `positive`, `neutral`,
+  `anxious`, `angry` — render NO BROW AT ALL.** The brow is a
+  concern-only feature today, and `neutral`, where most of a consultation
+  sits, is a browless face with the narrowest eyes of any state. The
+  `brow_lower` route is closed by design (C6 caps it at 0.15, below the
+  0.18 the renderer wants), so anything that changes this has to come
+  through `brow_outer_raise` or the targets themselves. Not changed:
+  calibration, and the owner's call.
 
 Resulting steady states, `full` mode, room active (measured 2026-08-01b
 from the passing test run; **curve** is what the mouth is drawn from):

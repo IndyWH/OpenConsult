@@ -2116,6 +2116,15 @@ records what a future reader needs to know without re-reading it.
   recording. CDS assessments are still not persisted, so a past
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
+- **THE BROW IS EFFECTIVELY CONCERN-ONLY: five of the seven affects draw
+  no eyebrows at all**, `neutral` among them. `face3d.js` needs
+  `brow_lower` > 0.18, `brow_inner_raise` > 0.28 or `brow_outer_raise` >
+  0.4 before it draws the bar, and only `low` and `distressed` clear any
+  of those. C6's anger cap holds `brow_lower` at ≤ 0.15, so that route is
+  closed by design and the two constraints pull against each other.
+  Found by chasing a room report that the face "looked confused" —
+  **the table and the reasoning are in the consultation 468 section
+  below**, and it is calibration, so it is the owner's call.
 
 ### Consultation 468: BBC News in the room — the gate refused, and the face read as confused
 
