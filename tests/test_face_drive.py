@@ -13,7 +13,11 @@ from app.face import FaceDriver
 from vendor.kindalive.engine.clock import ManualClock
 
 TICK = 0.2
-AFFECTS = ["positive", "neutral", "anxious", "low", "distressed"]
+# The valence ladder. ANGRY IS DELIBERATELY NOT IN IT: anger is a
+# different axis, not a darker sadness, so ordering it against the others
+# would be meaningless. It has its own test, C13.
+AFFECTS = ["happy", "positive", "neutral", "anxious", "low", "distressed"]
+ALL_AFFECTS = AFFECTS + ["angry"]
 
 # face3d.js drawMask() only draws the brow bar above this value, so a
 # concern face below it is computed, sent, and invisible.
@@ -45,7 +49,7 @@ def settle(affect, seconds=90.0, active=True, mode="full"):
 
 @pytest.fixture(scope="module")
 def steady():
-    return {a: settle(a) for a in AFFECTS}
+    return {a: settle(a) for a in ALL_AFFECTS}
 
 
 def test_c1_the_face_does_not_drift_with_time():
@@ -85,7 +89,7 @@ def test_c4_the_concern_brow_actually_renders(steady, affect):
     assert steady[affect]["brow_inner_raise"] > RENDER_BROW_THRESHOLD
 
 
-@pytest.mark.parametrize("affect", ["neutral", "positive"])
+@pytest.mark.parametrize("affect", ["happy", "positive", "neutral"])
 def test_c4b_no_concern_brow_when_the_patient_is_fine(steady, affect):
     assert steady[affect]["brow_inner_raise"] <= 0.10
 
@@ -108,6 +112,8 @@ def test_c5_warmth_is_greatest_where_it_is_most_needed(steady):
 def test_c6_the_face_is_never_angry_or_disgusted(steady, muscle, cap):
     """HALF OF THE GUARANTEE — this one holds the DRIVE: no affect this
     project can select ever asks the projection for anger or disgust.
+    That now includes "angry" itself: the face answers an angry patient,
+    it never mirrors one (see C13).
 
     The other half is
     test_face_driver.py::test_pinned_muscles_stay_at_neutral_under_maximum_anger_and_disgust,
@@ -116,7 +122,7 @@ def test_c6_the_face_is_never_angry_or_disgusted(steady, muscle, cap):
     clinical arm emits neutral. Together they cover it; separately each is
     half. Do not remove either believing the other covers it.
     """
-    for affect in AFFECTS:
+    for affect in ALL_AFFECTS:
         assert steady[affect][muscle] <= cap, affect
 
 
@@ -166,7 +172,7 @@ def test_c11_the_clinical_arm_can_still_express_concern():
             > cl["neutral"]["brow_inner_raise"])
 
 
-@pytest.mark.parametrize("affect", AFFECTS)
+@pytest.mark.parametrize("affect", ALL_AFFECTS)
 @pytest.mark.parametrize("mode", ["full", "clinical"])
 def test_c12_the_resting_mouth_stays_closed(affect, mode):
     """An open mouth must mean the assistant is speaking. face3d.js
@@ -181,6 +187,19 @@ def test_urgency_is_still_not_an_event():
     surface = {n for n in dir(face.FaceDriver) if n.startswith("on_")}
     assert not any("urgen" in n or "alarm" in n for n in surface)
     assert not any("urgen" in k or "alarm" in k for k in face.AFFECT_TARGETS)
+
+
+def test_c13_the_angry_patient_face_answers_and_never_mirrors(steady):
+    """The clearest case of the not-a-mirror rule. An angry face at an
+    angry patient is the worst answer available; a smile is the second
+    worst, because it reads as dismissal; a blank face reads as
+    stonewalling. So: neutral's steadiness, smile removed, warmth up."""
+    ang, neu = steady["angry"], steady["neutral"]
+    assert curve(ang) < curve(neu)
+    assert ang["lip_pucker"] > neu["lip_pucker"]
+    assert ang["brow_lower"] <= 0.05
+    assert ang["eyelid_lower_tighten"] <= neu["eyelid_lower_tighten"] + 0.02
+    assert ang["brow_inner_raise"] <= RENDER_BROW_THRESHOLD
 
 
 def test_activity_floor_ignores_digital_silence():

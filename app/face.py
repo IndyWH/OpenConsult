@@ -90,11 +90,12 @@ ACTIVITY_HOLD_S = 1.2
 # emotional information the smile and brow do not already carry.
 JAW_REST_CAP = 0.08
 
-AFFECT_VALUES = ("positive", "neutral", "low", "anxious", "distressed")
+AFFECT_VALUES = ("happy", "positive", "neutral", "low", "anxious",
+                 "distressed", "angry")
 
 # Stamped into every face.toggled audit row alongside the mode, so a
 # mock-patient session can always be tied to the drive it ran.
-FACE_DRIVE_VERSION = "2026-08-01b"
+FACE_DRIVE_VERSION = "2026-08-01d"
 
 # Room audio above this RMS, as a fraction of full scale, counts as
 # activity. Same floor the silence-nudge activity detector uses in
@@ -137,6 +138,19 @@ def frame_is_active(pcm16: bytes) -> bool:
 # concern") RISES as the patient's state worsens. That is the listener's
 # response, not a mirror: the face leans in, it does not fall apart.
 AFFECT_TARGETS: dict[str, dict[Chemical, float]] = {
+    # Real delight — the all-clear after a cancer scare, a patient who
+    # came partly to enjoy the visit, a joke landing. Answering that with
+    # the mild "positive" smile reads as cold, which is worse than
+    # reading as nothing. Owner decision 2026-08-01.
+    # The mouth stays CLOSED even here: face3d.js gives arc eyes above a
+    # curve of 0.34, and deep-curve plus arc eyes reads unmistakably as
+    # delight in a dot face. An open mouth would read as about to speak,
+    # in a room where this assistant can actually speak.
+    "happy": {
+        Chemical.DOPAMINE: 0.85, Chemical.SEROTONIN: 0.80,
+        Chemical.OXYTOCIN: 0.25, Chemical.TESTOSTERONE: 0.05,
+        Chemical.CORTISOL: 0.03, Chemical.ADRENALINE: 0.15,
+        Chemical.ENDORPHINS: 0.80, Chemical.GABA: 0.50},
     "positive": {
         Chemical.DOPAMINE: 0.65, Chemical.SEROTONIN: 0.85,
         Chemical.OXYTOCIN: 0.35, Chemical.TESTOSTERONE: 0.05,
@@ -162,6 +176,20 @@ AFFECT_TARGETS: dict[str, dict[Chemical, float]] = {
         Chemical.OXYTOCIN: 0.54, Chemical.TESTOSTERONE: 0.05,
         Chemical.CORTISOL: 0.49, Chemical.ADRENALINE: 0.14,
         Chemical.ENDORPHINS: 0.46, Chemical.GABA: 0.35},
+    # ANGER IS THE CLEAREST CASE OF THE NOT-A-MIRROR RULE (owner
+    # decision 2026-08-01). An angry face at an angry patient is the
+    # worst answer available; a smiling one is the second worst, because
+    # it reads as dismissal. A blank one reads as stonewalling. So this
+    # is neutral's steadiness with the smile taken out and the warmth
+    # turned up: level mouth, open unnarrowed eyes, NO brow furrow, more
+    # warmth than neutral carries. It sits outside the happy-to-distressed
+    # valence ladder — anger is a different axis, not a darker sadness —
+    # so it is excluded from the C2 ordering and has its own criterion.
+    "angry": {
+        Chemical.DOPAMINE: 0.12, Chemical.SEROTONIN: 0.48,
+        Chemical.OXYTOCIN: 0.50, Chemical.TESTOSTERONE: 0.05,
+        Chemical.CORTISOL: 0.26, Chemical.ADRENALINE: 0.18,
+        Chemical.ENDORPHINS: 0.12, Chemical.GABA: 0.55},
     "distressed": {
         Chemical.DOPAMINE: 0.11, Chemical.SEROTONIN: 0.30,
         Chemical.OXYTOCIN: 0.72, Chemical.TESTOSTERONE: 0.05,
