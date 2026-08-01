@@ -2117,6 +2117,66 @@ records what a future reader needs to know without re-reading it.
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
 
+### Consultation 467: a NOW question asked of a WHOLE-CONSULTATION document
+
+**The patient opened with good news — an all-clear after colon cancer
+surgery — and turned sad halfway through**, talking about his wife's
+rheumatoid arthritis, her pain, and whether she needed antidepressants.
+His words: *there's a bit of sadness in the story*, *she's quite
+miserable*, *I'm sad about that*.
+
+**The verdicts were: happy at 34 s, neutral at 55 s, happy at 89 s, happy
+at 116 s, happy at 160 s.** The last of those was judged on a transcript
+that already contained "I'm sad about that". (Visible at all because of
+the `PATIENT_AFFECT` log — this is the second consultation the log has
+explained.)
+
+**Two causes, both addressed:**
+
+1. **The call receives the whole transcript from zero seconds and has no
+   reason to weight the last minute above the first**, so it summarised a
+   document dominated by the cancer all-clear instead of reporting the
+   present moment. Splitting the call out (section below) fixed *which
+   prompt* asks the question; it did not make the question about *now*.
+2. **The sadness was about his wife.** A model asked how the PATIENT
+   feels can reason that the patient's own news is good — which is
+   defensible, and wrong for this purpose.
+
+**The fix, in two halves.**
+
+- **`AFFECT_PROMPT` asks a present-moment question.** How the patient
+  feels RIGHT NOW, in what they have just said, not across the
+  consultation as a whole; earlier parts are context only, because a
+  patient can arrive delighted and turn sad or arrive frightened and be
+  reassured; and **feelings about other people count — a patient sad
+  about a family member's illness is sad**. The seven values and their
+  one-line descriptions are unchanged, and the guard (*judge the person,
+  not how serious their illness is*) stays verbatim and stays last.
+- **The user message carries a recency window** (`affect_message` in
+  `app/cds.py`): the whole transcript first, as before, then the last
+  `AFFECT_RECENT_TURNS` turns repeated in a labelled block **at the
+  end**, because the end of the message is what the model attends to
+  most, so the thing being judged goes last. Turns come from the
+  transcript's own line structure, not a character count. A transcript
+  shorter than the window is sent once rather than repeated twice.
+  Nothing else about the call changed: no previous assessment, nothing
+  clinical in its context, still fail-soft to neutral.
+
+**`AFFECT_RECENT_TURNS = 4` IS A GUESS.** Nothing has been measured. Four
+is a plausible present moment for a transcript that commits roughly
+sentence-sized turns, and it wants calibrating against real
+consultations — 467 is the first one with a known emotional turn to
+calibrate against, and its `PATIENT_AFFECT` log is the material.
+
+**Bench check on a 467-shaped transcript** (the all-clear opening, the
+sad turn about the wife, eight turns): the affect call returns **`low`**,
+with or without the recency block. Both halves of the fix point the same
+way and the prompt rewrite alone was enough on this example — which is
+worth knowing, because it means the window's value is not yet doing
+observable work and is exactly the kind of thing calibration should test.
+A scripted eight-turn transcript is not a room result; the real check is
+the next live consultation with an emotional turn in it.
+
 ### The affect judgement gets its own model call (2026-08-01)
 
 **Three consultations — 464, 465 and 466 — returned `neutral` on every

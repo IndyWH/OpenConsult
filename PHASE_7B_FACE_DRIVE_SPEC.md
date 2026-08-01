@@ -307,6 +307,21 @@ since Phase 3, for the reason the `app/cds.py` module docstring records:
 a judgement folded into the clinical assessment gets corrupted by the
 reasoning around it.
 
+**It asks about the present moment, and it is given one (2026-08-01,
+after consultation 467).** A patient opened with an all-clear after colon
+cancer surgery and turned sad about his wife's illness; the verdicts ran
+happy, neutral, happy, happy, happy — the last on a transcript that
+already contained "I'm sad about that". Two causes: the call sees the
+whole transcript from zero seconds with no reason to weight the last
+minute above the first, so it summarised a document instead of reporting
+a moment; and the sadness was about someone else, so a model asked how
+the PATIENT feels can reason that the patient's own news is good. So the
+prompt now asks how the patient feels RIGHT NOW, says earlier turns are
+context only, and says feelings about other people count — and the user
+message repeats the last `AFFECT_RECENT_TURNS` turns in a labelled block
+at the END, where the model attends most. **That window is a guess (4),
+not a tuned value**, and wants calibrating against real consultations.
+
 The call takes the transcript and nothing else, runs LAST, and is
 **fail-soft** — a failure logs a warning and falls back to `neutral`,
 because an affect failure must never cost the doctor the differentials,
