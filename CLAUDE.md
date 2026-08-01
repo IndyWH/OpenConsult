@@ -84,6 +84,20 @@ tests land with the behaviour they pin. Write the *why* in the message —
 the git history is a coordination channel, and this project's messages
 carry the reasoning, not just the diff.
 
+Subject lines take one of the prefixes the history already uses:
+
+| prefix | for |
+|---|---|
+| `Phase 7b:` | build work in a numbered phase; a multi-commit session numbers within it (`Phase 7b s3 1/5`) |
+| `HANDOVER:` | a change to `HANDOVER.md` alone |
+| `PROJECT_PLAN:` | a change to `PROJECT_PLAN.md` alone |
+| `docs:` | other documentation, naming its target second (`docs: help — …`, `docs: README — …`) |
+| `security:` | a hardening change |
+| `evals:` | an evaluation record or its output |
+
+A change that fits none of them takes a plain descriptive subject line
+saying what it does — the history has many, and they read fine.
+
 ## Where the writing goes
 
 - **`HANDOVER.md` is the record.** Anything a future reader would need
