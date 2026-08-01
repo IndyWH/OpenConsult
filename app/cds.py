@@ -252,6 +252,48 @@ for them return time_critical_possible false and an empty list. \
 Output JSON only.\
 """
 
+# -------------------------------------------------------------------- affect
+
+AFFECT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "patient_affect": {
+            "type": "string",
+            "enum": ["happy", "positive", "neutral", "low", "anxious",
+                     "distressed", "angry"],
+        },
+    },
+    "required": ["patient_affect"],
+}
+
+# THE LAST LINE IS LOAD-BEARING AND MUST SURVIVE ANY LATER EDIT: judge the
+# person, not how serious their illness is. Without it patient_affect
+# becomes a proxy for clinical urgency, which would put the alarm on the
+# face by a back door — and the urgency alarm is deliberately kept OFF the
+# face (see the module docstring in app/face.py). Do not remove it as
+# redundant.
+#
+# Its own call since 2026-08-01 (owner decision), for the reason the
+# urgency check has one: 464, 465 and 466 all returned neutral on every
+# pass, including one where the pain radiated to the jaw. The field was
+# item 4 of a six-hundred-word clinical prompt that spends most of its
+# words asking for conservatism. This prompt asks one plain question.
+AFFECT_PROMPT = """\
+You are reading the transcript of a doctor's consultation.
+Decide how the PATIENT is feeling, from what they have said.
+Answer with exactly one of: happy, positive, neutral, low, anxious, \
+distressed, angry.
+  happy       delight or relief: an all-clear, a worry lifted, laughter, \
+enjoying the visit
+  positive    pleased, in good spirits
+  neutral     settled, taking things in their stride
+  low         flat, sad, downhearted
+  anxious     worried, frightened, uneasy
+  distressed  badly upset, or in real difficulty
+  angry       angry at the wait, at not being believed, at being in pain
+Judge the person, not how serious their illness is.\
+"""
+
 
 class CDSEngine:
     """Stateless client: callers hold the assessment and pass it back in."""
