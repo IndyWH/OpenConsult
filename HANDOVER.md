@@ -2117,6 +2117,74 @@ records what a future reader needs to know without re-reading it.
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
 
+### The affect hint asks the wrong question — 465, and the new one (2026-08-01)
+
+**Consultation 465 proved the plumbing works and the question was
+wrong.** MedGemma emitted `patient_affect` twice and said **neutral both
+times**, while the patient described two weeks of exertional central
+chest pain, 20 cigarettes a day, and a father who had a heart attack in
+his mid-40s. (That the verdicts were visible at all is the
+`PATIENT_AFFECT` log added the same day — see the section below.)
+
+**Neutral was the correct answer to the question that was asked, and that
+is the point.** The old paragraph asked for the patient's *outward
+emotional presentation* — "how they seem right now, their manner, not
+their diagnosis" — and told the model to fall back to `neutral` when
+unsure or when there was too little to go on. **The man sounded
+composed.** A model reporting manner, with a retreat to neutral
+available, had no way to reach any other answer. The fault was in the
+question.
+
+**Owner decision, 2026-08-01: the field is now MedGemma's best inference
+of how the patient FEELS at that point in time** — the inside, not the
+outside. The rewritten paragraph (`AFFECT_INSTRUCTION` in `app/cds.py`,
+lifted into its own constant so the guard below cannot be lost in an
+edit) asks it to read both how the patient speaks *and* what they are
+describing, because someone can sound perfectly composed and still be
+frightened, and **a patient who volunteers a family history unprompted is
+usually telling you what they are afraid of**. The retreat to neutral is
+gone: neutral now means a patient who genuinely seems settled, not one
+the model is unsure about, and it is told to commit to its best
+inference. The five values are unchanged.
+
+- **The guard, and why it is load-bearing: judge the PERSON, not the
+  seriousness of the diagnosis.** Without that sentence the field becomes
+  a proxy for clinical urgency — and **the urgency alarm is deliberately
+  kept off the face** (the reason is in `app/face.py`'s module docstring:
+  an alarmed face would tell the patient something the doctor has not
+  decided yet). A frightening differential in someone taking it in their
+  stride is not "distressed". A comment above the constant says exactly
+  this, so nobody deletes the line as redundant.
+- **`patient_affect` is now REQUIRED** in `ASSESSMENT_SCHEMA`. It was
+  deliberately optional with absent meaning neutral, but that made an
+  absent field and a neutral verdict indistinguishable in the log and in
+  the face alike — a model that skipped the question looked exactly like
+  one that answered "settled". `tests/test_cds.py` and
+  `tests/test_cds_first_call.py` both subtracted the field out of their
+  set assertions; they now require it and check it is one of the five
+  values. Both run against the live model and pass.
+- **`app/face.py` was NOT touched.** The map from patient state to
+  expression is already a listener's response rather than a mirror, and
+  it stays exactly as calibrated. This was a change to the question, not
+  to the answer.
+
+**Harness re-run (`scripts/evaluate_urgency.py`), because this edits the
+prompt that also produces the differentials, questions, signs and urgency
+escalation.** Result: **9/10, unchanged** — the one FAIL is script-02
+dengue, the docket's documented boundary case, which also failed at
+baseline. **Fire/silence, first-fire turn, first-fire actions, cleared-
+at-end and update counts are IDENTICAL to the stored baseline on all ten
+scripts.** What moved is differential stability, both ways
+(01 8/9→9/9, 06 7/9→9/9, 08 4/7→6/7 against 04 7/7→6/7, 09 5/6→4/6,
+10 8/9→7/9; aggregate 70/81→72/81, and 62/72→65/72 on the nine common
+scripts session 4 measured). **One movement is worth an owner's eye: on
+09_septic_child the leading final differential changed from "Sepsis" to
+"Severe Dengue"** — the alarm still fired at turn 4 with "Hospital
+admission" and still cleared, so the safety behaviour is unchanged, but
+the label is not the one the script was written around. Reported, not
+adjusted. `evals/urgency_results.json` was left at the committed
+baseline: whether to re-baseline it is the owner's call.
+
 ### The affect log, and the neutral reset (2026-08-01b)
 
 **The affect verdict is now logged, one line per assessment.** Nothing

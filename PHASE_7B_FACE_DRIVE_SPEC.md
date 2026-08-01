@@ -286,7 +286,19 @@ Written before the numbers were tuned. All thirteen pass.
   default is the `1e-4` the silence-nudge detector, the dead-mic pill and
   `SOUND_CHECK_SILENT_RMS` already share, and it is deliberately free to
   diverge from all three once calibrated (§ 2.2).
-- CDS assessments are still not persisted, so a past consultation cannot
-  be replayed through the face with its real affect timeline. Worth
-  fixing if the replay harness is built — it is a small table and it is
-  also evidence for the paper.
+- CDS assessments are still not persisted — **partly closed 2026-08-01**
+  by the `PATIENT_AFFECT` log line (commit `316cbe4`), which is what made
+  consultation 465 explicable at all.
+  - **Now visible:** every affect verdict, one line per assessment, with
+    the session id, the audio position, the value, and whether it changed
+    — logged whether the face is on or off, and distinguishing an absent
+    field from the value `neutral`. Enough to reconstruct an affect
+    timeline for a consultation from the journal, and enough to see a
+    model that never moves off one verdict.
+  - **Still not:** it is a log, not a record. It is not in the database,
+    not joined to the consultation row, not queryable beside the
+    transcript, and it goes when the journal rotates. The rest of the
+    assessment — differentials, questions, urgency — is still not
+    persisted per revision at all, so a past consultation still cannot be
+    **replayed** through the face with its real timeline. That remains a
+    small table, and it is also evidence for the paper.
