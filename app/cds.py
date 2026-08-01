@@ -91,6 +91,32 @@ ASSESSMENT_SCHEMA = {
     "required": ["reasoning", "differentials", "questions_to_ask", "signs_to_check"],
 }
 
+# The affect hint's question changed on 2026-08-01 (owner decision), after
+# consultation 465: MedGemma said "neutral" twice while the patient
+# described two weeks of exertional central chest pain, 20 cigarettes a
+# day and a father who had a heart attack in his mid-40s. It was not wrong
+# by its instructions — it was asked for the patient's outward MANNER, and
+# the man sounded composed. It is now asked how the patient most likely
+# FEELS.
+#
+# THE LAST SENTENCE IS LOAD-BEARING AND MUST SURVIVE ANY LATER EDIT:
+# judge the PERSON, not the seriousness of the diagnosis. Without it
+# patient_affect becomes a proxy for clinical urgency — and the urgency
+# alarm is deliberately kept OFF the face (see the module docstring in
+# app/face.py). Do not remove it as redundant.
+AFFECT_INSTRUCTION = """\
+4. patient_affect — your best inference of how the patient most likely \
+FEELS right now: the inside, not the outward manner. Read BOTH how they \
+speak and what they are describing — someone can sound perfectly composed \
+and still be frightened, and a patient who volunteers a family history \
+unprompted is usually telling you what they are afraid of. One of \
+"positive", "neutral", "low", "anxious", "distressed". COMMIT to your best \
+inference: "neutral" means a patient who genuinely seems settled, not a \
+patient you are unsure about. Judge the PERSON, not the seriousness of the \
+diagnosis: a frightening differential in someone who is taking it in their \
+stride is not "distressed".\
+"""
+
 ASSESSMENT_PROMPT = f"""\
 You are a clinical decision support assistant quietly observing a live GP \
 consultation in Sri Lanka. {ASR_CAVEAT}
@@ -107,11 +133,7 @@ information changes what matters most — the order is living, not pinned. \
 Remove a question once the transcript shows it was asked or answered.
 3. signs_to_check — up to 4 focused examination findings worth checking. \
 Remove one once the transcript shows it was examined.
-4. patient_affect (optional) — judge the patient's CURRENT emotional \
-presentation from the transcript: how they seem right now — their manner, \
-not their diagnosis. One of "positive", "neutral", "low", "anxious", \
-"distressed". Use "neutral" when unsure or when there is too little to go \
-on.
+{AFFECT_INSTRUCTION}
 
 REVISION RULES — you are REVISING your previous assessment, not writing a \
 new one:
