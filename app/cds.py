@@ -81,14 +81,19 @@ ASSESSMENT_SCHEMA = {
         "signs_to_check": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
         # Phase 7b affect hint (owner decision 2026-07-28, brief decision
         # 2's piggyback option): drives the face's listening response.
-        # OPTIONAL — deliberately not in `required`; absent means neutral.
         # Zero extra model calls: it rides this existing assessment call.
+        # REQUIRED since 2026-08-01. It was deliberately optional, with
+        # absent meaning neutral — but an absent field and a neutral
+        # verdict were then indistinguishable, both in the PATIENT_AFFECT
+        # log and in the face itself, so a model that skipped the question
+        # looked exactly like one that answered it "settled".
         "patient_affect": {
             "type": "string",
             "enum": ["positive", "neutral", "low", "anxious", "distressed"],
         },
     },
-    "required": ["reasoning", "differentials", "questions_to_ask", "signs_to_check"],
+    "required": ["reasoning", "differentials", "questions_to_ask",
+                 "signs_to_check", "patient_affect"],
 }
 
 # The affect hint's question changed on 2026-08-01 (owner decision), after

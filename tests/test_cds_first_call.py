@@ -251,9 +251,13 @@ def test_a_one_line_first_transcript_produces_a_valid_first_assessment():
     erroring on the small starting point)."""
     engine = CDSEngine()
     first = asyncio.run(engine.update("I have a pain in my chest."))
-    assert set(first) - {"patient_affect"} == {
+    # patient_affect is REQUIRED since 2026-08-01 — even on a one-line
+    # transcript the model must commit to a reading rather than omit it.
+    assert set(first) == {
         "reasoning", "differentials", "questions_to_ask", "signs_to_check",
-        "urgency_check", "urgent_actions"}
+        "urgency_check", "urgent_actions", "patient_affect"}
+    assert first["patient_affect"] in {
+        "positive", "neutral", "low", "anxious", "distressed"}
     assert isinstance(first["differentials"], list)
 
     revised = asyncio.run(engine.update(
@@ -261,7 +265,9 @@ def test_a_one_line_first_transcript_produces_a_valid_first_assessment():
         "It comes on when I climb stairs and settles when I rest. "
         "I smoke twenty a day and my father had a heart attack at fifty.",
         previous=first))
-    assert set(revised) - {"patient_affect"} == set(first) - {"patient_affect"}
+    assert set(revised) == set(first)
+    assert revised["patient_affect"] in {
+        "positive", "neutral", "low", "anxious", "distressed"}
     assert 1 <= len(revised["differentials"]) <= 5
     for d in revised["differentials"]:
         assert d["likelihood"] in {"high", "moderate", "low"}

@@ -36,20 +36,20 @@ def test_cds_update_returns_valid_assessment():
     )
     assessment = asyncio.run(engine.update(transcript, previous=None))
 
-    # patient_affect is OPTIONAL by design (Phase 7b affect hint): absent
-    # means neutral, so the exact-set assertion admits it without
-    # requiring it. When present it must be a legal value.
-    assert set(assessment) - {"patient_affect"} == {
+    # patient_affect is REQUIRED since 2026-08-01: an absent field and a
+    # neutral verdict were indistinguishable in the log and in the face,
+    # so the model must now answer the question rather than skip it.
+    assert set(assessment) == {
         "reasoning",
         "differentials",
         "questions_to_ask",
         "signs_to_check",
         "urgency_check",
         "urgent_actions",
+        "patient_affect",
     }
-    if "patient_affect" in assessment:
-        assert assessment["patient_affect"] in {
-            "positive", "neutral", "low", "anxious", "distressed"}
+    assert assessment["patient_affect"] in {
+        "positive", "neutral", "low", "anxious", "distressed"}
     assert 1 <= len(assessment["differentials"]) <= 5
     conditions = " ".join(d["condition"].lower() for d in assessment["differentials"])
     assert "angina" in conditions or "coronary" in conditions or "cardiac" in conditions
