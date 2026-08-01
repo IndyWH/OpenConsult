@@ -49,6 +49,9 @@ CDS_FIRST_CALL_ON_FIRST_TURN = (
     os.getenv("CDS_FIRST_CALL_ON_FIRST_TURN", "true").lower() != "false")
 # Stop trying after this many consecutive failures (e.g. Ollama not running).
 CDS_MAX_FAILURES = 2
+# Sentinel for "no patient_affect has been logged for this session yet",
+# distinct from every string the log can carry — including "ABSENT".
+_AFFECT_UNLOGGED = object()
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -1677,6 +1680,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "face_manual_off": False,
             "invitation_completed": False,
             "nudge_used": False,
+            # The last patient_affect value LOGGED for this session, so the
+            # log line can say whether the verdict changed. Sentinel: no
+            # assessment has been logged yet. Lives in the entry so it
+            # survives a reconnect, like everything else here.
+            "affect_last_logged": _AFFECT_UNLOGGED,
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -1758,9 +1766,38 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await websocket.send_json(
                     {"type": "cds", "assessment": entry["assessment"]}
                 )
-                # Phase 7b: the affect hint rides the assessment (zero
-                # extra model calls). The driver injects only on change;
-                # absent means neutral. Urgency is NOT an input here.
+                # Phase 7b: what the model actually said about the patient,
+                # one line per assessment. Consultation 464 could not be
+                # explained because this verdict was recorded NOWHERE — not
+                # persisted, not audited, not logged.
+                #
+                # OUTSIDE the face guard on purpose: face-off is a study
+                # arm and the affect stream is wanted from it too. EVERY
+                # assessment is logged, not only changes — a repeated
+                # verdict is evidence. And an ABSENT field is distinguished
+                # from the value "neutral": the schema keeps
+                # patient_affect optional, so a model that omits it looks
+                # identical to one that judges the patient neutral, and
+                # that distinction is the whole point of this log. A JSON
+                # null counts as absent.
+                #
+                # A DEBUGGING INSTRUMENT, deliberately: no table, no
+                # migration, no audit row. The durable version — affect
+                # persisted with the assessment, so a past consultation
+                # can be replayed through the face — is a separate job
+                # (PHASE_7B_FACE_DRIVE_SPEC.md § 6).
+                affect_value = entry["assessment"].get("patient_affect")
+                affect_field = affect_value if affect_value else "ABSENT"
+                previous = entry["affect_last_logged"]
+                logger.info(
+                    "PATIENT_AFFECT session=%s at=%.1fs value=%s changed=%s",
+                    session_id, session.audio_seconds, affect_field,
+                    "first" if previous is _AFFECT_UNLOGGED
+                    else ("yes" if affect_field != previous else "no"))
+                entry["affect_last_logged"] = affect_field
+                # The affect hint rides the assessment (zero extra model
+                # calls); absent means neutral to the driver. Urgency is
+                # NOT an input here.
                 if entry["face"] is not None:
                     entry["face"].on_affect(
                         entry["assessment"].get("patient_affect"))
