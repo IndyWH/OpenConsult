@@ -3761,3 +3761,44 @@ side. mlrig is on the wired LAN and was not affected by any of it. Note that
 the WiFi-to-LAN isolation rule means a device on WiFi cannot reach mlrig
 directly, so Tailscale between them relays via DERP rather than connecting
 peer-to-peer — working as intended, but it explains any added latency.
+
+## Resolved (2026-08-01): the stray Windows PostgreSQL was an ONLYOFFICE leftover
+
+This closes the open question in **After-reboot startup sequence** above, where the
+leftover Windows `postgresql-x64-18` service is described as an unexplained cause of
+the 2026-07-10 port-5432 collision. It now has an explanation.
+
+**Where it came from.** An ONLYOFFICE *server* edition install started by mistake on
+2026-06-23 — their website leads to the server download rather than the desktop app.
+The server itself never completed, but its prerequisites installed and stayed behind:
+PostgreSQL 18 (18.1-2), RabbitMQ Server 4.2.1, Erlang OTP 27.3.4.6 and Redis-Windows
+7.4.0, all dated 23/06/2026. The only wanted product was ONLYOFFICE Desktop Editors
+9.4.0, which is self-contained and never used any of them.
+
+**How it surfaced.** A Windows review on 2026-08-01 found RabbitMQ running as
+LocalSystem on every boot with zero client connections, listening on 0.0.0.0 for AMQP
+(5672), Erlang distribution (25672) and epmd (4369). Its own log recorded no client
+had ever authenticated. Nothing was reachable from outside — inbound is blocked by
+default and explicit block rules already existed for all four ports — so this was
+waste rather than exposure.
+
+**Removed 2026-08-01** in dependency order: RabbitMQ, Erlang OTP, Redis-Windows,
+PostgreSQL 18. Program folders sent to the recycle bin. Roughly 1.2 GB reclaimed and
+three services no longer start at boot.
+
+**Consequences worth knowing:**
+
+- `psql.exe` is gone from the Windows side. The WSL client is unaffected — use `psql`
+  inside Ubuntu as normal.
+- Keep the Hyper-V firewall rule `Block external access - PostgreSQL 5432`. That one
+  guards the WSL2 cluster this project actually uses. The RabbitMQ, AMQP and epmd
+  block rules are now vestigial but harmless.
+- The 5432 collision cannot recur from this cause. The check in the startup section
+  still applies if Postgres ever fails to bind, but a Windows PostgreSQL is no longer
+  the likely culprit — look at what else grabbed the port.
+
+**Lesson for the next prerequisite install:** the Windows side of this machine is not
+where this project runs. Anything that installs a database, a broker or a cache on
+Windows is either a mistake or needs a written reason here, because WSL2 mirrored
+networking means the two sides share one port space and a silent Windows service can
+take a port the app expects.
