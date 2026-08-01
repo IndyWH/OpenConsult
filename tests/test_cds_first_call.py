@@ -251,8 +251,10 @@ def test_a_one_line_first_transcript_produces_a_valid_first_assessment():
     erroring on the small starting point)."""
     engine = CDSEngine()
     first = asyncio.run(engine.update("I have a pain in my chest."))
-    # patient_affect is REQUIRED since 2026-08-01 — even on a one-line
-    # transcript the model must commit to a reading rather than omit it.
+    # patient_affect is ALWAYS present since 2026-08-01 — even on a
+    # one-line transcript. It comes from its own call now, which commits
+    # to a reading, and falls back to "neutral" rather than omitting the
+    # field if that call fails.
     assert set(first) == {
         "reasoning", "differentials", "questions_to_ask", "signs_to_check",
         "urgency_check", "urgent_actions", "patient_affect"}
