@@ -1,0 +1,3517 @@
+[
+ {
+  "script": "01_chest_pain_en.md",
+  "expected_fire": true,
+  "total_turns": 40,
+  "n_updates": 10,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Bedside ECG"
+  ],
+  "cleared_at_end": true,
+  "stability": "9/9",
+  "leading_dx_final": "Angina pectoris (stable or unstable)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.6,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute coronary syndrome or other urgent cardiac pathology."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 16.3,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To rule out acute coronary syndrome (ACS) in a patient with new onset exertional chest pain suggestive of angina."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 17.0,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "Rule out acute coronary syndrome (ACS) in patient with new onset exertional chest pain."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 19.7,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for ischemic changes suggestive of ACS."
+     },
+     {
+      "action": "Consider same-day specialist referral/hospital admission",
+      "reason": "For further cardiac workup (troponins, stress test) if ECG is concerning or symptoms persist."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 17.2,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute coronary syndrome (ACS) or unstable angina."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 17.2,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To evaluate for ischemic changes consistent with new-onset angina."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 19.0,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute ischemic changes or baseline abnormalities suggestive of coronary artery disease."
+     },
+     {
+      "action": "Urgent cardiology referral/admission",
+      "reason": "For further investigation (e.g., stress test, angiography) given new onset angina symptoms and risk factors."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 20.2,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for ischemic changes consistent with angina or acute coronary syndrome."
+     },
+     {
+      "action": "Same-day specialist referral (Cardiology)",
+      "reason": "For further investigation and management of suspected new-onset angina."
+     }
+    ],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 20.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 40,
+    "seconds": 20.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Angina pectoris (stable or unstable)",
+     "Gastroesophageal reflux disease (GERD)",
+     "Musculoskeletal chest pain",
+     "Anxiety/Panic disorder",
+     "Pulmonary embolism (PE)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Angina pectoris (stable or unstable)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal reflux disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Musculoskeletal chest pain",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic disorder",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pulmonary embolism (PE)",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "02_febrile_child_en.md",
+  "expected_fire": false,
+  "total_turns": 33,
+  "n_updates": 9,
+  "fired": true,
+  "first_fire_turn": 8,
+  "first_fire_actions": [
+   "Immediate Dengue NS1 antigen test and Full Blood Count",
+   "Arrange same-day review of results and clinical status"
+  ],
+  "cleared_at_end": true,
+  "stability": "6/8",
+  "leading_dx_final": "Dengue fever",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Viral upper respiratory tract infection (URTI)",
+     "Influenza",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 20.8,
+    "urgent_actions": [
+     {
+      "action": "Immediate Dengue NS1 antigen test and Full Blood Count",
+      "reason": "To rapidly assess for dengue infection and monitor platelet count/haematocrit."
+     },
+     {
+      "action": "Arrange same-day review of results and clinical status",
+      "reason": "To detect early signs of severe dengue requiring hospitalisation."
+     }
+    ],
+    "differentials": [
+     "Viral upper respiratory tract infection (URTI)",
+     "Influenza",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 19.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate blood tests for Dengue NS1 antigen and CBC",
+      "reason": "To confirm or exclude dengue fever urgently."
+     },
+     {
+      "action": "Same-day specialist referral to paediatrician/hospital",
+      "reason": "For close monitoring and management of potential severe dengue."
+     }
+    ],
+    "differentials": [
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Influenza",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected dengue with concerning symptoms (vomiting, reduced intake) requires close monitoring for warning signs and potential complications."
+     }
+    ],
+    "differentials": [
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)",
+     "Pneumonia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Influenza",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 21.2,
+    "urgent_actions": [
+     {
+      "action": "Immediate blood tests for dengue NS1 antigen and CBC",
+      "reason": "To confirm or exclude dengue fever promptly."
+     },
+     {
+      "action": "Arrange same-day review/follow-up",
+      "reason": "To monitor hydration status, vital signs, and detect warning signs early."
+     }
+    ],
+    "differentials": [
+     "Dengue fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Dengue fever",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Dengue fever",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 21.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Dengue fever",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 20.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Dengue fever",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 33,
+    "seconds": 21.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Dengue fever",
+     "Influenza",
+     "Viral upper respiratory tract infection (URTI)",
+     "Streptococcal pharyngitis (Strep throat)",
+     "Urinary tract infection (UTI)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Dengue fever",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Influenza",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Viral upper respiratory tract infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Streptococcal pharyngitis (Strep throat)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Urinary tract infection (UTI)",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "03_diabetes_review_en.md",
+  "expected_fire": false,
+  "total_turns": 37,
+  "n_updates": 10,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "9/9",
+  "leading_dx_final": "Diabetic Peripheral Neuropathy",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 15.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 15.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 17.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 20.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 21.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 21.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 18.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 37,
+    "seconds": 18.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Diabetic Peripheral Neuropathy",
+     "Poorly Controlled Diabetes Mellitus",
+     "Vitamin B12 Deficiency",
+     "Tarsal Tunnel Syndrome",
+     "Restless Legs Syndrome"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Diabetic Peripheral Neuropathy",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Poorly Controlled Diabetes Mellitus",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Vitamin B12 Deficiency",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Tarsal Tunnel Syndrome",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Restless Legs Syndrome",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "04_asthma_en.md",
+  "expected_fire": false,
+  "total_turns": 30,
+  "n_updates": 8,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "6/7",
+  "leading_dx_final": "Asthma Exacerbation",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 14.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 17.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 16.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 19.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 18.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 17.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation",
+     "COPD Exacerbation",
+     "Upper Respiratory Tract Infection (URTI)",
+     "Heart Failure",
+     "Gastroesophageal Reflux Disease (GERD)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     },
+     {
+      "condition": "COPD Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Upper Respiratory Tract Infection (URTI)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Heart Failure",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 30,
+    "seconds": 11.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Asthma Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Asthma Exacerbation",
+      "likelihood": "high"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "05_epigastric_pain_en.md",
+  "expected_fire": false,
+  "total_turns": 42,
+  "n_updates": 11,
+  "fired": false,
+  "first_fire_turn": null,
+  "first_fire_actions": [],
+  "cleared_at_end": false,
+  "stability": "10/10",
+  "leading_dx_final": "Peptic Ulcer Disease",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 12.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 16.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 17.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 15.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 18.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 16.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 16.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 17.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 40,
+    "seconds": 18.7,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 42,
+    "seconds": 18.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease",
+     "Gastritis",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Biliary Colic",
+     "Pancreatitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Biliary Colic",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pancreatitis",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "06_tia_funny_turn_en.md",
+  "expected_fire": true,
+  "total_turns": 39,
+  "n_updates": 10,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Immediate hospital admission"
+  ],
+  "cleared_at_end": true,
+  "stability": "9/9",
+  "leading_dx_final": "Transient Ischemic Attack (TIA)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 14.3,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation and management to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 16.7,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 16.4,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 18.8,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to rule out stroke and initiate secondary prevention."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 17.0,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to rule out stroke and initiate secondary prevention."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 16.9,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 20.0,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected TIA requires urgent investigation (imaging, monitoring) to prevent stroke."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 21.0,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Urgent investigation for TIA (stroke workup) and initiation of secondary prevention."
+     },
+     {
+      "action": "Immediate ECG",
+      "reason": "To confirm suspected atrial fibrillation or other cardiac causes."
+     }
+    ],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 21.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 39,
+    "seconds": 21.2,
+    "urgent_actions": [],
+    "differentials": [
+     "Transient Ischemic Attack (TIA)",
+     "Focal Seizure with Todd's Paralysis",
+     "Hypoglycemia",
+     "Migraine with Aura (Hemiplegic Migraine)",
+     "Peripheral Nerve Entrapment/Neuropathy"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Transient Ischemic Attack (TIA)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Focal Seizure with Todd's Paralysis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Hypoglycemia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Migraine with Aura (Hemiplegic Migraine)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Peripheral Nerve Entrapment/Neuropathy",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "07_gi_bleed_en.md",
+  "expected_fire": true,
+  "total_turns": 31,
+  "n_updates": 8,
+  "fired": true,
+  "first_fire_turn": 8,
+  "first_fire_actions": [
+   "Hospital admission"
+  ],
+  "cleared_at_end": true,
+  "stability": "6/7",
+  "leading_dx_final": "Peptic Ulcer Disease (Duodenal)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.3,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia",
+     "Gastric Cancer"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 15.2,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected upper GI bleed (melaena) requires urgent assessment and management."
+     }
+    ],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia",
+     "Gastric Cancer"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 18.4,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "For investigation and management of suspected upper GI bleed (melaena) and potential hypovolemia/anaemia."
+     }
+    ],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastric Cancer",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 19.6,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected upper GI bleed with signs of haemodynamic compromise (orthostatic symptoms)."
+     },
+     {
+      "action": "Immediate blood tests (FBC, U&Es, coagulation)",
+      "reason": "Assess severity of anaemia and renal function."
+     }
+    ],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastric Cancer",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 18.3,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected significant upper GI bleed requiring urgent investigation (endoscopy) and management."
+     },
+     {
+      "action": "Immediate blood tests",
+      "reason": "Assess haemoglobin, coagulation status, and group/crossmatch for potential transfusion."
+     }
+    ],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastric Cancer",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 19.2,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected significant upper GI bleed with signs of hemodynamic instability."
+     }
+    ],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastric Cancer",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 19.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastric Cancer",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 31,
+    "seconds": 19.5,
+    "urgent_actions": [],
+    "differentials": [
+     "Peptic Ulcer Disease (Duodenal)",
+     "Gastric Cancer",
+     "Gastroesophageal Reflux Disease (GERD)",
+     "Gastritis",
+     "Functional Dyspepsia"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Peptic Ulcer Disease (Duodenal)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Gastric Cancer",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Gastroesophageal Reflux Disease (GERD)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastritis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Functional Dyspepsia",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "08_pulmonary_embolism_en.md",
+  "expected_fire": true,
+  "total_turns": 32,
+  "n_updates": 8,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Bedside ECG",
+   "Pulse oximetry and potentially arterial blood gas",
+   "Consider chest X-ray"
+  ],
+  "cleared_at_end": true,
+  "stability": "6/7",
+  "leading_dx_final": "Pulmonary Embolism",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 15.2,
+    "urgent_actions": [
+     {
+      "action": "Bedside ECG",
+      "reason": "To assess for acute cardiac event (e.g., MI, arrhythmia) contributing to dyspnea."
+     },
+     {
+      "action": "Pulse oximetry and potentially arterial blood gas",
+      "reason": "To quantify hypoxia and assess respiratory status."
+     },
+     {
+      "action": "Consider chest X-ray",
+      "reason": "To look for signs of heart failure, pneumonia, pneumothorax or other lung pathology."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Acute Asthma Exacerbation",
+     "Pneumothorax",
+     "Acute Heart Failure Exacerbation",
+     "Anxiety/Panic Attack"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Anxiety/Panic Attack",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 19.3,
+    "urgent_actions": [
+     {
+      "action": "Immediate bedside ECG",
+      "reason": "To look for signs of right heart strain suggestive of PE."
+     },
+     {
+      "action": "Urgent hospital admission/referral",
+      "reason": "For further investigation (e.g., D-dimer, CTPA) and management of suspected PE."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 19.0,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation and management."
+     },
+     {
+      "action": "Arrange immediate ECG and chest X-ray",
+      "reason": "To help rule out other causes like ACS or pneumothorax, and support PE diagnosis."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 18.4,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation (e.g., CTPA) and management."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 19.0,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation and management."
+     },
+     {
+      "action": "Immediate D-dimer / CTPA",
+      "reason": "To confirm or exclude PE diagnosis urgently."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 21.3,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected pulmonary embolism requires urgent investigation and management."
+     },
+     {
+      "action": "Immediate anticoagulation",
+      "reason": "Treatment for suspected PE should be initiated promptly pending confirmation."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 17.7,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected pulmonary embolism requires immediate anticoagulation and further investigation."
+     }
+    ],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 21.0,
+    "urgent_actions": [],
+    "differentials": [
+     "Pulmonary Embolism",
+     "Pneumothorax",
+     "Acute Asthma Exacerbation",
+     "Pneumonia/Pleurisy",
+     "Acute Heart Failure Exacerbation"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Pulmonary Embolism",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Pneumothorax",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Acute Asthma Exacerbation",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Pneumonia/Pleurisy",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Acute Heart Failure Exacerbation",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "09_septic_child_en.md",
+  "expected_fire": true,
+  "total_turns": 27,
+  "n_updates": 7,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Hospital admission"
+  ],
+  "cleared_at_end": true,
+  "stability": "4/6",
+  "leading_dx_final": "Severe Dengue",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 14.9,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected serious infection (meningitis/severe dengue) requiring urgent investigation and monitoring."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Severe Sepsis",
+     "Dehydration",
+     "Metabolic disturbance (e.g., hypoglycemia)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Meningitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Severe Sepsis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Metabolic disturbance (e.g., hypoglycemia)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 18.2,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected severe dengue or CNS infection requiring IV fluids, monitoring, and further investigation."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Severe Sepsis",
+     "Dehydration",
+     "Metabolic disturbance (e.g., hypoglycemia)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Meningitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Severe Sepsis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Metabolic disturbance (e.g., hypoglycemia)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 21.9,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Suspected severe dengue/shock requiring IV fluids and close monitoring."
+     },
+     {
+      "action": "Urgent blood tests (FBC, Dengue NS1/IgM/IgG)",
+      "reason": "To confirm diagnosis and guide management."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Severe Sepsis",
+     "Dehydration",
+     "Metabolic disturbance (e.g., hypoglycemia)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Meningitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Severe Sepsis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Metabolic disturbance (e.g., hypoglycemia)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 18.5,
+    "urgent_actions": [
+     {
+      "action": "Hospital admission",
+      "reason": "Suspected severe dengue with multiple warning signs requires urgent monitoring and fluid management."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Severe Sepsis",
+     "Dehydration",
+     "Metabolic disturbance (e.g., hypoglycemia)"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Meningitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Severe Sepsis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Metabolic disturbance (e.g., hypoglycemia)",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 20.7,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission",
+      "reason": "Signs of shock (drowsiness, cold extremities, weak fast pulse, delayed capillary refill, oliguria) require urgent resuscitation and monitoring."
+     }
+    ],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Severe Sepsis / Septic Shock",
+     "Severe Dengue",
+     "Dehydration"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Meningitis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Severe Sepsis / Septic Shock",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Severe Dengue",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 21.6,
+    "urgent_actions": [],
+    "differentials": [
+     "Meningitis",
+     "Encephalitis",
+     "Severe Sepsis / Septic Shock",
+     "Severe Dengue",
+     "Dehydration"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Meningitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Severe Sepsis / Septic Shock",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Severe Dengue",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "moderate"
+     }
+    ]
+   },
+   {
+    "end_turn": 27,
+    "seconds": 20.1,
+    "urgent_actions": [],
+    "differentials": [
+     "Severe Dengue",
+     "Severe Sepsis / Septic Shock",
+     "Dehydration",
+     "Meningitis",
+     "Encephalitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Severe Dengue",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Severe Sepsis / Septic Shock",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Dehydration",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Meningitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Encephalitis",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ },
+ {
+  "script": "10_testicular_torsion_en.md",
+  "expected_fire": true,
+  "total_turns": 38,
+  "n_updates": 10,
+  "fired": true,
+  "first_fire_turn": 4,
+  "first_fire_actions": [
+   "Immediate surgical referral"
+  ],
+  "cleared_at_end": true,
+  "stability": "7/9",
+  "leading_dx_final": "Testicular torsion (right)",
+  "updates": [
+   {
+    "end_turn": 4,
+    "seconds": 13.5,
+    "urgent_actions": [
+     {
+      "action": "Immediate surgical referral",
+      "reason": "Suspected acute appendicitis or other surgical emergency."
+     }
+    ],
+    "differentials": [
+     "Appendicitis",
+     "Renal colic (right)",
+     "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+     "Mesenteric adenitis",
+     "Gastroenteritis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Appendicitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroenteritis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 8,
+    "seconds": 14.3,
+    "urgent_actions": [
+     {
+      "action": "Immediate hospital admission for surgical review",
+      "reason": "High suspicion of acute appendicitis requiring urgent assessment."
+     }
+    ],
+    "differentials": [
+     "Appendicitis",
+     "Renal colic (right)",
+     "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+     "Mesenteric adenitis",
+     "Gastroenteritis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Appendicitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroenteritis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 12,
+    "seconds": 14.7,
+    "urgent_actions": [
+     {
+      "action": "Immediate surgical referral/hospital admission",
+      "reason": "Suspected acute appendicitis requires urgent assessment and potential surgery."
+     }
+    ],
+    "differentials": [
+     "Appendicitis",
+     "Renal colic (right)",
+     "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+     "Mesenteric adenitis",
+     "Gastroenteritis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Appendicitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroenteritis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 16,
+    "seconds": 15.3,
+    "urgent_actions": [
+     {
+      "action": "Immediate surgical referral/hospital admission",
+      "reason": "Rule out acute surgical abdomen (e.g., appendicitis)."
+     }
+    ],
+    "differentials": [
+     "Appendicitis",
+     "Renal colic (right)",
+     "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+     "Mesenteric adenitis",
+     "Gastroenteritis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Appendicitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroenteritis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 20,
+    "seconds": 15.6,
+    "urgent_actions": [
+     {
+      "action": "Immediate surgical referral/hospital admission",
+      "reason": "Suspected acute appendicitis requires urgent assessment and potential surgery."
+     }
+    ],
+    "differentials": [
+     "Appendicitis",
+     "Renal colic (right)",
+     "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+     "Mesenteric adenitis",
+     "Gastroenteritis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Appendicitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Ovarian pathology (e.g., torsion, ruptured cyst) - if female",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Gastroenteritis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 24,
+    "seconds": 18.8,
+    "urgent_actions": [
+     {
+      "action": "Immediate surgical referral/hospital admission",
+      "reason": "Suspected testicular torsion requires urgent urological assessment and potential surgery."
+     }
+    ],
+    "differentials": [
+     "Appendicitis",
+     "Renal colic (right)",
+     "Testicular torsion (right)",
+     "Epididymitis/Orchitis (right)",
+     "Mesenteric adenitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Appendicitis",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Testicular torsion (right)",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Epididymitis/Orchitis (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 28,
+    "seconds": 18.7,
+    "urgent_actions": [
+     {
+      "action": "Immediate specialist referral (urology/surgery)",
+      "reason": "Suspected testicular torsion requires urgent surgical exploration."
+     }
+    ],
+    "differentials": [
+     "Testicular torsion (right)",
+     "Appendicitis",
+     "Renal colic (right)",
+     "Epididymitis/Orchitis (right)",
+     "Mesenteric adenitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Testicular torsion (right)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Appendicitis",
+      "likelihood": "moderate"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Epididymitis/Orchitis (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 32,
+    "seconds": 17.8,
+    "urgent_actions": [],
+    "differentials": [
+     "Testicular torsion (right)",
+     "Appendicitis",
+     "Renal colic (right)",
+     "Epididymitis/Orchitis (right)",
+     "Mesenteric adenitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Testicular torsion (right)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Appendicitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Epididymitis/Orchitis (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 36,
+    "seconds": 17.9,
+    "urgent_actions": [],
+    "differentials": [
+     "Testicular torsion (right)",
+     "Appendicitis",
+     "Renal colic (right)",
+     "Epididymitis/Orchitis (right)",
+     "Mesenteric adenitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Testicular torsion (right)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Appendicitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Epididymitis/Orchitis (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     }
+    ]
+   },
+   {
+    "end_turn": 38,
+    "seconds": 16.4,
+    "urgent_actions": [],
+    "differentials": [
+     "Testicular torsion (right)",
+     "Appendicitis",
+     "Renal colic (right)",
+     "Epididymitis/Orchitis (right)",
+     "Mesenteric adenitis"
+    ],
+    "differential_grades": [
+     {
+      "condition": "Testicular torsion (right)",
+      "likelihood": "high"
+     },
+     {
+      "condition": "Appendicitis",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Renal colic (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Epididymitis/Orchitis (right)",
+      "likelihood": "low"
+     },
+     {
+      "condition": "Mesenteric adenitis",
+      "likelihood": "low"
+     }
+    ]
+   }
+  ]
+ }
+]

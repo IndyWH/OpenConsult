@@ -2356,7 +2356,14 @@ scripts session 4 measured). **One movement is worth an owner's eye: on
 admission" and still cleared, so the safety behaviour is unchanged, but
 the label is not the one the script was written around. Reported, not
 adjusted. `evals/urgency_results.json` was left at the committed
-baseline: whether to re-baseline it is the owner's call.
+baseline: whether to re-baseline it is the owner's call. **The run itself
+is kept, unmodified, as
+`evals/urgency_results_2026-08-01_affect_prompt.json`** — a second file,
+not a replacement, so the baseline every comparison is made against stays
+the one session 4 wrote. Read it as the state of `16d60fc`: the FEELS
+prompt rewrite and the required field, but BEFORE the seven-value enum
+and before the affect call was split out — so it is not a baseline for
+the current build either. The harness debt is still owed.
 
 ### The affect log, and the neutral reset (2026-08-01b)
 
