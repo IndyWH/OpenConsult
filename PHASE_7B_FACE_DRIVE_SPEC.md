@@ -108,9 +108,18 @@ will need). Attention raises adrenaline only, by `FACE_ATTENTION_GAIN`,
 which lifts the upper eyelids and outer brows: the face looks up and
 attends. It touches no smile-driving chemical.
 
-The floor is the same one `live.html` already uses for the silence
-nudge's activity detector, so the face and the nudge cannot disagree
-about when the room is quiet.
+**Corrected 2026-08-01b.** The floor's default value, `1e-4`, is the one
+**three** existing surfaces already use, not one: the silence-nudge
+activity detector and the dead-mic pill, both in `app/static/live.html`,
+and `SOUND_CHECK_SILENT_RMS` in `app/speech.py`. Starting there means the
+face and the nudge cannot disagree about when the room is quiet.
+
+`FACE_ACTIVITY_RMS` is nevertheless **deliberately its own setting, and
+it is allowed to diverge from those three**, because it answers a
+different question: the other three ask whether the microphone is alive,
+and the face asks whether anyone is speaking. Without this note a later
+tidy-up will consolidate all four to one constant and quietly change what
+the face does.
 
 ### 2.3 The engine's dynamics are deliberately unused
 
@@ -273,8 +282,10 @@ Written before the numbers were tuned. All thirteen pass.
 
 - The mock-patient feedback round, unchanged as the thing that decides
   whether these expressions read correctly to a person.
-- `FACE_ACTIVITY_RMS` wants calibrating from a real room recording; the
-  default is inherited from the silence-nudge floor.
+- `FACE_ACTIVITY_RMS` wants calibrating from a real room recording; its
+  default is the `1e-4` the silence-nudge detector, the dead-mic pill and
+  `SOUND_CHECK_SILENT_RMS` already share, and it is deliberately free to
+  diverge from all three once calibrated (§ 2.2).
 - CDS assessments are still not persisted, so a past consultation cannot
   be replayed through the face with its real affect timeline. Worth
   fixing if the replay harness is built — it is a small table and it is
