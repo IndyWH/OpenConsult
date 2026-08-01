@@ -2117,6 +2117,92 @@ records what a future reader needs to know without re-reading it.
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
 
+### Consultation 468: BBC News in the room — the gate refused, and the face read as confused
+
+**First room check of the 2026-08-01 build** (restarted 21:22; this ran
+21:23–21:25). The owner recorded a consultation with BBC News playing in
+the background. 99.2 s of audio, face auto-on at the disclosure, drive
+`2026-08-01d`, mode `full`.
+
+**The gate refused, and approval was blocked. That is the safety
+behaviour working.** Duration-weighted mean ASR confidence **0.549**
+against the 0.60 refuse threshold → `quality_outcome = refused`, status
+`unreliable_transcript`, and `POST /api/consultations/468/approve`
+returned **409**. For scale, genuine consultations in this database run
+**0.65–0.84**; the only other refusal, 460, sat at 0.485. Four refusals
+in 24 gated consultations to date.
+
+**Two honest caveats about that win, because it was narrower than it
+looks:**
+
+- **Only S2 fired.** S1 correctly detected English at p=0.96 across all
+  three windows — the audio *was* English, just not a consultation. S3
+  and S4 were clean. So a news bulletin is caught by ASR confidence
+  alone, and the margin was **0.05**. Clearer TV audio, or a quieter
+  room, could plausibly clear 0.60 and be drafted from.
+- **Nothing objected to who was speaking.** The declared speaker count
+  was 2, diarisation used 2, and `single_voice_detected` was false — so
+  two newsreaders were labelled **Doctor** and **Patient**, alternating,
+  and every count-based check was satisfied. The declaration confirms
+  *how many* voices, never *whose*. The turns read: "the Venezuelan
+  government under first Chavez and Nicolás Maduro", "Give us a sense of
+  the drug cartels that now operate in Colombia".
+
+**The face was at `neutral` for the entire consultation** — five affect
+verdicts, `neutral`, `changed=no` throughout. That is the correct answer:
+a news bulletin carries no patient feeling to report, and the affect call
+did not invent one from a garbled transcript. **So what the owner read as
+"confused" is our neutral face itself**, seen in a room for the first
+time since the 2026-08-01b reset to kindalive's species defaults.
+
+**Why it reads that way, measured:**
+
+| | new neutral | old neutral |
+|---|---|---|
+| `eyelid_upper_raise` | 0.152 | 0.230 |
+| `brow_outer_raise` | 0.145 | 0.200 |
+| `lip_pucker` (warmth) | 0.120 | 0.201 |
+| `lip_press` | 0.195 | 0.104 |
+| `nose_wrinkle` | 0.107 | 0.072 |
+
+The borrowed resting chemistry has **lower adrenaline** (0.10 vs 0.20 —
+narrower eyes, flatter outer brow), **less oxytocin** (0.20 vs 0.34 —
+less warmth) and **six times the testosterone** (0.30 vs 0.05, the
+species default), which is what lifts `lip_press` and `nose_wrinkle`.
+Every value is inside its C6 cap; nothing is broken. It is simply a
+flatter, narrower-eyed, more pressed face than the one it replaced.
+
+**And the finding that matters most, which 468 surfaced by accident: the
+face has no eyebrows at all in five of the seven affects.** `face3d.js`
+draws the brow bar only when `brow_lower > 0.18`, `brow_inner_raise >
+0.28` or `brow_outer_raise > 0.4`:
+
+| affect | brow_lower | brow_inner | brow_outer | bar drawn |
+|---|---|---|---|---|
+| happy | 0.000 | 0.000 | 0.270 | no |
+| positive | 0.000 | 0.031 | 0.252 | no |
+| neutral | 0.085 | 0.040 | 0.145 | **no** |
+| anxious | 0.095 | 0.141 | 0.216 | no |
+| low | 0.122 | 0.302 | 0.118 | yes |
+| distressed | 0.116 | 0.298 | 0.107 | yes |
+| angry | 0.004 | 0.117 | 0.134 | no |
+
+**The brow is effectively a concern-only feature**, and `neutral` — where
+most of a consultation sits — is a browless face with the narrowest eyes
+of any state. Browless plus narrow eyes plus a faint mouth curve is a
+fair description of "confused". C6's anger caps and the brow threshold
+are pulling against each other: the caps hold `brow_lower` under 0.15,
+and the renderer wants 0.18 before it draws anything at all.
+
+**All of this is calibration, and it is the owner's call.** Options, none
+taken: raise `neutral`'s adrenaline and oxytocin back toward the old
+values while keeping the rest of the species defaults; lift
+`brow_outer_raise` across the calm states toward the renderer's 0.4; or
+accept it and let the mock-patient round decide, which is what that round
+is for. **`face3d.js` is vendored and must not be edited** — the fix, if
+there is one, is in `AFFECT_TARGETS`. Nothing was changed in response to
+this consultation.
+
 ### Consultation 467: a NOW question asked of a WHOLE-CONSULTATION document
 
 **The patient opened with good news — an all-clear after colon cancer
