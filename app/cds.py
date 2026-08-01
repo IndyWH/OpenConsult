@@ -5,7 +5,7 @@ Feeds the growing consultation transcript to a locally served medical LLM
 diagnoses, questions still worth asking, signs to examine for, and an
 urgency alarm for time-critical presentations.
 
-Architecture: TWO model calls per update, one job each.
+Architecture: THREE model calls per update, one job each.
 
 1. Assessment call — differentials / questions / signs. Receives its own
    previous output and revises it under stability rules (don't churn the
@@ -16,6 +16,17 @@ Architecture: TWO model calls per update, one job each.
    (empty stayed empty), and the alarm competed with the revision task
    (the model wrote "immediate ECG demanded" while emitting an empty
    actions array). Isolated, the same model answers correctly.
+3. Affect call (2026-08-01) — the same lesson, learned twice. The
+   patient_affect hint rode the assessment call from 2026-07-28 and
+   returned "neutral" on every pass of consultations 464, 465 and 466,
+   including one where the pain radiated to the jaw. It was not anchoring
+   (it is never passed back) and not short of transcript (it sees all of
+   it from zero seconds); it was item 4 of a six-hundred-word prompt that
+   spends most of its words asking for conservatism. Now stateless, with
+   one plain question, seeing the transcript and nothing clinical. It runs
+   LAST and FAIL-SOFT: a failure logs a warning and falls back to
+   "neutral", because the face must never cost the doctor the
+   differentials, the questions or the alarm.
 
 Code, not the model, does the bookkeeping: the alarm is cleared
 deterministically when the urgency call reports the step already arranged,
@@ -79,61 +90,16 @@ ASSESSMENT_SCHEMA = {
         },
         "questions_to_ask": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
         "signs_to_check": {"type": "array", "maxItems": 4, "items": {"type": "string"}},
-        # Phase 7b affect hint (owner decision 2026-07-28, brief decision
-        # 2's piggyback option): drives the face's listening response.
-        # Zero extra model calls: it rides this existing assessment call.
-        # REQUIRED since 2026-08-01. It was deliberately optional, with
-        # absent meaning neutral — but an absent field and a neutral
-        # verdict were then indistinguishable, both in the PATIENT_AFFECT
-        # log and in the face itself, so a model that skipped the question
-        # looked exactly like one that answered it "settled".
-        # Seven values since 2026-08-01 (owner decisions): "happy" and
-        # "angry" joined the original five. One positive value stood
-        # against three negative ones with nowhere for real delight to go,
-        # and patients are angry often enough — at the wait, at being
-        # passed around, at not being believed — that with no token for it
-        # the verdict landed as neutral.
-        "patient_affect": {
-            "type": "string",
-            "enum": ["happy", "positive", "neutral", "low", "anxious",
-                     "distressed", "angry"],
-        },
+        # patient_affect is NOT here. It rode this call from 2026-07-28
+        # until 2026-08-01, when it moved to its own call and schema for
+        # the same reason the urgency check has one — see the module
+        # docstring, and AFFECT_PROMPT below. This assessment call must not
+        # mention affect anywhere: the clinical reasoning around it is what
+        # corrupted the judgement.
     },
     "required": ["reasoning", "differentials", "questions_to_ask",
-                 "signs_to_check", "patient_affect"],
+                 "signs_to_check"],
 }
-
-# The affect hint's question changed on 2026-08-01 (owner decision), after
-# consultation 465: MedGemma said "neutral" twice while the patient
-# described two weeks of exertional central chest pain, 20 cigarettes a
-# day and a father who had a heart attack in his mid-40s. It was not wrong
-# by its instructions — it was asked for the patient's outward MANNER, and
-# the man sounded composed. It is now asked how the patient most likely
-# FEELS.
-#
-# THE LAST SENTENCE IS LOAD-BEARING AND MUST SURVIVE ANY LATER EDIT:
-# judge the PERSON, not the seriousness of the diagnosis. Without it
-# patient_affect becomes a proxy for clinical urgency — and the urgency
-# alarm is deliberately kept OFF the face (see the module docstring in
-# app/face.py). Do not remove it as redundant.
-AFFECT_INSTRUCTION = """\
-4. patient_affect — your best inference of how the patient most likely \
-FEELS right now: the inside, not the outward manner. Read BOTH how they \
-speak and what they are describing — someone can sound perfectly composed \
-and still be frightened, and a patient who volunteers a family history \
-unprompted is usually telling you what they are afraid of. One of \
-"happy", "positive", "neutral", "low", "anxious", "distressed", "angry". \
-"happy" is real delight — relief at an all-clear, a worry resolved, \
-laughter, a patient enjoying the visit; "positive" is the milder step \
-below it: pleased, in good spirits. "angry" is a patient angry at the \
-wait, at being passed around, at not being believed, at being in pain — \
-judged like every other value, on how they FEEL, and never a judgement \
-about whether the anger is justified. COMMIT to your best inference: \
-"neutral" means a patient who genuinely seems settled, not a patient you \
-are unsure about. Judge the PERSON, not the seriousness of the \
-diagnosis: a frightening differential in someone who is taking it in their \
-stride is not "distressed".\
-"""
 
 ASSESSMENT_PROMPT = f"""\
 You are a clinical decision support assistant quietly observing a live GP \
@@ -151,7 +117,6 @@ information changes what matters most — the order is living, not pinned. \
 Remove a question once the transcript shows it was asked or answered.
 3. signs_to_check — up to 4 focused examination findings worth checking. \
 Remove one once the transcript shows it was examined.
-{AFFECT_INSTRUCTION}
 
 REVISION RULES — you are REVISING your previous assessment, not writing a \
 new one:
@@ -331,8 +296,12 @@ class CDSEngine:
         """One CDS pass: transcript so far + previous assessment → new assessment.
 
         Returns the assessment fields plus `urgency_check` (the safety
-        officer's booleans and reasoning) and `urgent_actions` (already
-        bookkept: empty when nothing is due or everything is arranged).
+        officer's booleans and reasoning), `urgent_actions` (already
+        bookkept: empty when nothing is due or everything is arranged) and
+        `patient_affect` (its own stateless call since 2026-08-01 — see
+        the module docstring; it is fail-soft and never fails the pass).
+        The returned shape is unchanged by that split: `patient_affect`
+        sits at the top level exactly where it always has.
         """
         if previous:
             stable_fields = {
@@ -353,6 +322,22 @@ class CDSEngine:
             ASSESSMENT_PROMPT, f"{prev_text}\n\n{transcript_text}", ASSESSMENT_SCHEMA
         )
         urgency = await self._chat(URGENCY_PROMPT, transcript_text, URGENCY_SCHEMA)
+
+        # Third call, LAST and FAIL-SOFT. It sees the transcript and
+        # nothing else — no previous answer to anchor on, no differentials,
+        # no urgency verdict; a fresh judgement of the whole consultation
+        # every pass, with nothing clinical in its context.
+        #
+        # An affect failure must NEVER cost the doctor the differentials,
+        # the questions or the alarm: the face is a comfort feature and the
+        # rest of this pass is the clinical output. So it is wrapped, and a
+        # failure falls back to neutral with a warning.
+        try:
+            affect = await self._chat(AFFECT_PROMPT, transcript_text, AFFECT_SCHEMA)
+            assessment["patient_affect"] = affect["patient_affect"]
+        except Exception as exc:  # noqa: BLE001 - the clinical pass survives
+            logger.warning("Affect call failed, falling back to neutral: %s", exc)
+            assessment["patient_affect"] = "neutral"
 
         # Deterministic bookkeeping. "Arranged" latches for the session: once
         # the doctor has committed to the urgent step, the alarm stays
