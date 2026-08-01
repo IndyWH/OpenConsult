@@ -292,10 +292,39 @@ Written before the numbers were tuned. All fourteen pass.
   clock stays injectable and the tests still drive it.
 - **`full` remains the default.**
 
+### 5.1 Where the affect verdict comes from (2026-08-01)
+
+Nothing in this document's drive changed, but its input now arrives by a
+different route, and a reader tracing a face back to a cause needs to
+know it. **`patient_affect` is its own model call.** It rode the CDS
+assessment call from 2026-07-28; consultations 464, 465 and 466 then
+returned `neutral` on every pass, including one where the pain radiated
+to the jaw. It was not anchoring (the field is never passed back) and not
+short of transcript (it sees all of it from zero seconds) — it was item 4
+of a six-hundred-word clinical prompt that spends most of its words
+asking for conservatism. It now has the shape the urgency check has had
+since Phase 3, for the reason the `app/cds.py` module docstring records:
+a judgement folded into the clinical assessment gets corrupted by the
+reasoning around it.
+
+The call takes the transcript and nothing else, runs LAST, and is
+**fail-soft** — a failure logs a warning and falls back to `neutral`,
+because an affect failure must never cost the doctor the differentials,
+the questions or the alarm. It costs **~0.85 s of a ~17 s pass** (single
+enum token; measured over five passes, one warm MedGemma serving all
+three calls). The guard *judge the person, not how serious their illness
+is* is what keeps the field from becoming a proxy for clinical urgency
+and putting the alarm on the face by a back door — which § 5 says is not
+to happen.
+
 ## 6. Still open
 
 - The mock-patient feedback round, unchanged as the thing that decides
   whether these expressions read correctly to a person.
+- **The CDS harness owes a run**, and the debt now stands against two
+  changes: the seven-value enum (`happy` and `angry`) and the affect
+  call's split out of the assessment prompt (§ 5.1). The last run was
+  against the five-value, single-call build.
 - `FACE_ACTIVITY_RMS` wants calibrating from a real room recording; its
   default is the `1e-4` the silence-nudge detector, the dead-mic pill and
   `SOUND_CHECK_SILENT_RMS` already share, and it is deliberately free to

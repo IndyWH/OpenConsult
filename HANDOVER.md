@@ -2117,6 +2117,76 @@ records what a future reader needs to know without re-reading it.
   consultation cannot be replayed through the face with its real affect
   timeline (spec § 6).
 
+### The affect judgement gets its own model call (2026-08-01)
+
+**Three consultations — 464, 465 and 466 — returned `neutral` on every
+pass, including one where the pain radiated to the jaw.** Rewriting the
+question (the section below) was not enough on its own.
+
+**What was ruled out first, both checked in the code and both already
+correct:**
+
+- **Anchoring on its own previous answer.** It cannot: `patient_affect`
+  is never passed back. `CDSEngine.update` builds `prev_text` from
+  `differentials`, `questions_to_ask` and `signs_to_check` only, so the
+  affect judgement starts fresh every pass.
+- **A truncated transcript.** It sees all of it. The user message is the
+  whole transcript from zero seconds on every pass, not a window.
+
+**What it did not have was a question it could answer plainly.** It was
+item 4 of a six-hundred-word clinical prompt that spends most of its
+words telling the model to be conservative, not to churn the list, and to
+prefer a short list over speculation.
+
+**This repository has already learned this lesson once, and the record of
+it is the module docstring of `app/cds.py`:** the urgency check is a
+separate call with its own short prompt and schema because evaluation
+showed the combined call failed *in both directions* — the previous
+assessment anchored the alarm, and the alarm competed with the revision
+task. Affect was the same mistake repeated. **Owner decision 2026-08-01:
+split it out, and make the prompt plain.**
+
+- **`AFFECT_PROMPT` and `AFFECT_SCHEMA`** sit beside the urgency pair and
+  follow its shape: one required property, the seven-value enum, and a
+  short prompt with one job. The last line — *judge the person, not how
+  serious their illness is* — is the guard, with a comment above the
+  constant saying so: without it the field becomes a proxy for clinical
+  urgency and **puts the alarm on the face by a back door**.
+- **It takes the transcript and nothing else.** No previous answer, no
+  differentials, no urgency verdict, nothing clinical in its context — a
+  fresh judgement of the whole consultation every pass.
+- **It runs LAST and it is FAIL-SOFT.** A failure logs a warning and
+  falls back to `neutral`. **An affect failure must never cost the doctor
+  the differentials, the questions or the alarm** — the face is a comfort
+  feature and the rest of the pass is the clinical output. Asserted by
+  `tests/test_cds.py::test_an_affect_failure_cannot_cost_the_clinical_output`.
+- **The returned shape is unchanged.** `patient_affect` merges in at the
+  top level exactly where it sat before, so `app/main.py` and the
+  `PATIENT_AFFECT` log line needed no change at all and were not touched.
+  The old path is gone: the field is out of `ASSESSMENT_SCHEMA` and the
+  assessment prompt no longer mentions affect anywhere.
+
+**Timing, measured on this machine over five passes of
+`01_chest_pain_en` at growing transcript lengths (303 → 1408 chars), one
+warm MedGemma serving all three calls:** assessment **12.22 s** (10.58–
+13.59), urgency **4.19 s** (3.66–5.03), affect **0.85 s** (0.80–0.90),
+whole pass **17.26 s**. **The third call adds under a second — about 5%
+of a pass** — because it emits a single enum token, and its cost does not
+grow with transcript length the way the assessment's does. Not logged in
+the code: nothing in the app times individual calls today (the eval
+harness times whole updates), and this did not seem worth inventing a
+place for.
+
+**And it works on the case that prompted it:** the same chest-pain script
+that produced `neutral` under the old design returned **`anxious` on all
+five passes**. That is a bench measurement on a scripted consultation,
+not a room result — the real check is the next live consultation.
+
+**The CDS harness debt now stands against BOTH the seven-value enum and
+this split.** It has not been re-run since the five-value, single-call
+build. One run is owed, once the enum and the call structure have
+stopped changing.
+
 ### Two new affect values: happy and angry (2026-08-01d)
 
 **Owner decisions, both 2026-08-01.** The enum goes from five values to
