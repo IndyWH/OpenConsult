@@ -110,10 +110,12 @@ saying what it does — the history has many, and they read fine.
   and others). Two are **FROZEN** — `PHASE_7C_EVAL_PREREG.md` and
   `OPEN_CLOSED_RULE.md` — and change only by logged amendment.
 - **`help/` explains; `HANDOVER.md` records.** The help series is
-  reader-facing prose. A behaviour change updates the help series in the
-  same change — but the articles are owner-approved verbatim text, so
-  propose the correction and let the owner approve it rather than
-  rewriting a page on your own initiative.
+  reader-facing prose, and the articles are the owner's verbatim approved
+  text. **Never edit `help/` prose.** A behaviour change that makes an
+  article wrong must flag it — in your report and in `HANDOVER.md`,
+  naming the article and what is now untrue in it. The owner writes the
+  replacement wording (owner decision 2026-08-01, in `HANDOVER.md`
+  § *Help series*).
 
 ## Things that are load-bearing
 

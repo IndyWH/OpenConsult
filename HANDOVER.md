@@ -2709,6 +2709,27 @@ byte-for-byte from the owner's Documents folder and **must not be
 edited in the repo without owner approval**; new articles arrive the
 same way.
 
+### When a change makes a help article wrong (owner decision, 2026-08-01)
+
+**This resolves a contradiction, correctly flagged during the Phase 7b
+drive rewrite.** Two conventions cannot both be followed literally: that
+a behaviour change updates the help series in the same change, and that
+help articles are the owner's verbatim approved text and must not be
+edited without his approval. Under the first, an implementer rewrites the
+page; under the second, they may not.
+
+**The resolution: the implementer FLAGS, the owner WRITES.** A change
+that makes an existing help article wrong must say so in its report *and*
+in `HANDOVER.md`, **naming the article and stating exactly what is now
+untrue in it**. The owner writes the replacement wording himself.
+**Implementers never edit `help/` prose without approval** — the flag is
+the deliverable, not a draft of the new text.
+
+This is the owner's rule and it applies to every future change, not only
+to Phase 7b. **It is one line to change**: if the owner later wants
+implementers to draft replacement wording for approval, that is this
+paragraph, amended.
+
 ## Shared schema module (2026-07-25)
 
 `app/schema.py`; tests `tests/test_schema.py`. Built as commit 0 of Phase
