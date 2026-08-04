@@ -50,7 +50,7 @@ uv sync    # Python env (uv manages Python 3.12)
 | 3 — Live CDS | **Done** | Including urgency escalation, evaluated 8/9 with one documented boundary case (see docket). |
 | 4 — RAG guidelines | **Done; corpus expanded 2026-07-24** | 9/9 eval (re-run after expansion, still 9/9); fidelity spot-check logged. Corpus grew 7 → 38 sources (1301 chunks) to cover common primary-care presentations for the public demo — see the corpus section below. |
 | 5 — Sinhala | **CLOSED 2026-07-25 with a negative result; Sinhala out of scope for v1** | Benchmark (2026-07-10): 9 candidates on two OpenSLR sets, best `seniruk/whisper-small-si` CER 0.035. Pre-registered recordings eval executed on the real `03_diabetes_review_si` recording: every model degrades massively (seniruk 0.035 → 0.504; best overall xlsr-sinhala CTC 0.462) and **every Sinhala fine-tune transliterated or lost all 106 English terms** (mechanical recall 0). Off-the-shelf landscape now exhausted (post-hoc screen of remaining HF repos found only duplicates). **Step 6 adjudication completed 2026-07-25** (owner, binary measure unchanged): seniruk-small recovers clinically usable content for 7 of 12 curated terms vs 0 (rrashmini-large-v2) and 1 (xlsr-sinhala) — **the ranking reverses, seniruk-small over xlsr despite xlsr's better CER**, because clinical survival is what matters here. Four terms — `HbA1c`, `losartan`, `atorvastatin`, `neuropathy` — survive in **no** model. Verdict unchanged: no off-the-shelf model is usable for code-switched clinical Sinhala. **Fine-tune NOT PROCEEDING by owner decision 2026-07-25** (eight sign-offs deliberately not sought); Consultation AI is **English-only for v1** and Sinhala is out of scope, not postponed — see the decision header in `evals/2026-07-17_finetune_plan.md` and PROJECT_PLAN.md §§4, 7. All Sinhala research artifacts are retained deliberately (scripts, recording, reference, harness, eval records) — they are the pre-registered negative result. See `evals/2026-07-12_sinhala_asr_recordings_eval.md` § Step 6. |
-| 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: Docker packaging and demo script AUTHORED 2026-08-04 (slice 5, per DOCKER_DEMO_SPEC.md); what remains is the in-container validation — Docker is not yet installed on the reference machine (see the slice-5 entry in the Phase 2 security section). **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
+| 6 — Users/roles/front desk | **Core built and manually verified** | Auth (scrypt + signed-cookie sessions), three tabs per the agreed structure, walk-in queue, server-side RBAC (receptionist 403s on all clinical content — automated tests pass), audit log, approved-consultations read-only, full loop wired queue→live→review→approve→archive. **Verified 2026-07-10 (project owner, in-browser):** two-role click-through of the full loop, plus adversarial checks — receptionist hitting clinical URLs directly (403 confirmed), doctor attempting queue add/reorder (403 confirmed), edit attempts on an approved consultation (409 / read-only UI confirmed). **Design pass done 2026-07-24** (Heidi-inspired light theme, whole app — see the design-pass section) along with **strict own-consultations doctor scoping** and the new **referral letters** feature. Remaining build work: **NONE — done.** Docker packaging and demo script authored 2026-08-04 (slice 5, per DOCKER_DEMO_SPEC.md) and the in-container validation discharged the same day (slice 6: image builds, in-container suite green forward and reverse, CUDA audio path proven inside the container, §1.7 restart re-enqueue verified — see the slice-6 entry in the Phase 2 security section). **Post-verification additions (2026-07-10, browser-testing findings):** doctor walk-in action (`queue.walk_in_started`); server-sourced patient banner on the live page (wrong-patient prevention — identity never read from URL text); queue-entry lifecycle for abandoned sessions — Resume, Close-without-consultation (`queue.cancelled`, receptionist too), and a concurrency guard so a doctor can't stack a second live consultation over an active one. |
 | 7 — Supervised auto history-taking | **OPEN as of 2026-07-25**; **7a items 0–4 and 7 built the same day — tap-to-ask and the sound check work end to end; barge-in (session 3) built 2026-07-29, `BARGE_IN_ENABLED` false pending calibration** (see "Phase 7a — session 3" below). Two gate items deliberately carried — see "Phase 7 opened". **7b session 1 built 2026-07-28**: kindalive vendored at a pinned commit, [clinical] preset, capped impulse layer, face over the existing WebSocket — default OFF, unstyled (see "Phase 7b — session 1"). **Session 2 the same day**: full expression range by owner decision (evaluation-first; brief decision 3 superseded for this phase, clinical retained as the comparison arm), the CDS affect hint, interim top-of-stack placement, and the lost specs reconstructed and committed (see "Phase 7b — session 2"). **Session 3, also the same day**: sticky top row (urgent LEFT, face RIGHT — supersedes session 2's placement), auto-on at Disclosure, the auto-chained invitation, the caged silence nudge (the only autonomous utterance until 7c), and the sound-check wording fix (see "Phase 7b — session 3"); **room-checked the same evening (452, 454)**. **Session 4**: the Face pill (manual on-path; "manual off is final" amended by the owner), questions_to_ask ordered by clinical priority (harness re-run 9/10, the known script-02 boundary case the only FAIL), and the first-assessment latency report (see "Phase 7b — session 4"). **Session 5**: first CDS call on the first committed turn (~20 s to first questions, was ~50 s), one num_ctx across all MedGemma calls (the 3.9 s reload eliminated, measured), and PHASE_7C_EVAL_PREREG.md committed FROZEN (see "Phase 7b — session 5"). | Owner's concept: in auto mode the AI conducts the history-taking by voice under doctor supervision — questions and acknowledgements only, never advice or diagnosis to the patient; urgency alarm pauses auto mode (resume/take-over is the doctor's call); doctor barge-in always wins. Full spec — hard rules, consultation behaviour policy, staged build (7a tap-to-ask → 7b kindalive face → 7c supervised auto), pre-registered eval design — in `PHASE_7_SPEC.md`. **Gate updated 2026-07-25: the Phase 5 precondition is satisfied by closure** (step 6 adjudication + Phase 5 closed with a negative result, Sinhala out of scope for v1 — not a deferral), and the recordings precondition means `05_epigastric_pain_en` only (`01_chest_pain_si` not being recorded for v1). **Remaining gate, three items: (1) `05_epigastric_pain_en`; (2) Docker Compose packaging + the two-role demo script; (3) the finalisation transcript-quality gate** — load-bearing now the project is English-only, see the pre-Phase-7 build item section. 7a+7b are the recommended first commitment, 7c committed separately. |
 
 Every completed phase has an evaluation record in `evals/` with a
@@ -4540,3 +4540,58 @@ inside the container (a green host suite proves nothing about the
 container's glibc/FFmpeg/CUDA combination); and the §1.7 restart
 re-enqueue check in the packaged environment. The install itself is the
 owner's (sudo); the exact command block is in the slice-5 report.
+(Discharged by slice 6, below, after the owner installed Docker.)
+
+**Slice 6 (2026-08-04): the owed in-container validation — discharged.
+All four checks pass; three defects found and fixed, one commit each.**
+Machine state for the run: Docker 29.7.1 / Compose v5.4.0 / NVIDIA
+container toolkit installed by the owner; host Ollama bound to 0.0.0.0
+(Windows firewall blocks 11434 externally — the 5432 pattern); the
+consultation-ai service stopped by the owner to free the card (~22.7 GB
+free at preflight). Results, in the spec's order:
+
+- **The image builds** (§1.4): 239 s cold, 4.55 GB. Ubuntu 26.04 base as
+  committed.
+- **The in-container suite** (§1.5): green **forward and reverse** — 654
+  passed, 27 skipped, ~2–3 min. The bundled db's init held its contract:
+  conftest created and dropped its disposable test database against the
+  compose Postgres with no refusal. All 27 skips have honest reasons: 20
+  × node absent (client-JS tests; the image ships no Node), 3 × real-TTS
+  piper tests under the deliberate TTS_ENABLED=false, 1 × voice model at
+  a host path the container cannot see, 3 × corpus not ingested (never
+  in the image, §1.2). Ollama-dependent tests did NOT skip — the
+  compose-default OLLAMA_URL reached the host Ollama, so MedGemma tests
+  ran in-container. One transient reverse-run failure (CDS ReadTimeout)
+  occurred only while the host suite was mistakenly run in parallel on
+  the same GPU and vanished solo — §1.6's "effectively exclusive"
+  warning confirmed by accident, not an ordering bug.
+- **The audio path in-container** (§1.4): a fresh-process smoke asserted
+  the ordering the torchcodec incident taught us to distrust —
+  ctranslate2 not imported before `_preload_cuda_libraries()`, the model
+  on **cuda** (full distil-large-v3; the silent CPU fallback explicitly
+  ruled out), pip-wheel cuBLAS/cuDNN mapped in /proc/self/maps, and
+  tests/data/jfk.wav transcribed exactly. Bonus evidence: the real
+  finalisation pipeline ran in-container (MedGemma unload via host
+  Ollama, WhisperX, diarisation start) up to the pyannote HF-token wall,
+  where it failed loudly onto the consultation row — the §1.2
+  documented prerequisite surfacing exactly as designed.
+- **Restart re-enqueue** (§1.7): a consultation left `queued` with audio
+  on the audio volume was re-enqueued by `docker compose restart app`
+  ("Re-enqueued consultation 2 for finalisation"); an `approved` control
+  row was not. `reset_demo.py` then deleted exactly the manifest's rows
+  (3 demo patients, the 1 demo consultation with its audio file, demo
+  account deactivated not deleted) while a deliberately-planted non-demo
+  control patient, consultation and audio file survived — the scoping
+  check was made non-vacuous on purpose.
+
+The three defects, each with its own commit stating the reasoning:
+pg-data must mount at /var/lib/postgresql for the pg18 image (slice 5
+wrote the pg17-era path); tzdata joins the image (the base ships no
+zoneinfo and the uv-managed CPython has no fallback); and test_speech.py
+pins the TTS kill-switch on for its fake-command mechanics tests, with a
+new test giving the kill-switch itself its first coverage. uv.lock and
+pyproject.toml stayed byte-identical throughout. Host suite green
+forward and reverse (681/681) with all fixes. The compose stack was left
+**down**; named volumes persist (pg-data, audio, hf-cache, corpus). The
+§1.4 "re-validate the audio path inside the image" condition is met and
+the packaging is **done**.

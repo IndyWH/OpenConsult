@@ -18,7 +18,8 @@ Two assets this repository cannot provide:
 2. **The choice of pre-recorded urgency consultation** (decision 2): a
    past mock consultation on which the urgency alarm fired and was
    acknowledged — the urgency beat is *shown from its review page*, not
-   performed live.
+   performed live. **Chosen: consultation 454, owner-approved
+   2026-08-04.** Only the clip above remains owner-supplied.
 
 ## Setup (any time before; ~10 minutes + one restart-fresh check)
 
