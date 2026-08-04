@@ -25,7 +25,38 @@ from fastapi import Cookie, HTTPException
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
-SECRET_KEY = os.getenv("SECRET_KEY", "dev-secret-change-me")
+
+# Import-time fail-fast (2026-08-04, going-public hardening). The old code
+# fell back to "dev-secret-change-me" — a value that becomes public
+# knowledge the day the repository does — so a moved, renamed or lost .env
+# did not stop the service; it started quietly on a known key. The unit
+# file sets no EnvironmentFile: the key reaches the app solely through
+# load_dotenv() above, so refusing here is the only thing standing between
+# a misplaced .env and forgeable sessions. The error never echoes the
+# rejected value or any part of it.
+SECRET_KEY_MIN_LENGTH = 32
+SECRET_KEY_PLACEHOLDERS = ("change-me", "dev-secret-change-me")
+
+
+def _require_secret_key() -> str:
+    value = os.getenv("SECRET_KEY")
+    if value is None:
+        problem = "SECRET_KEY is not set"
+    elif value == "":
+        problem = "SECRET_KEY is empty"
+    elif value in SECRET_KEY_PLACEHOLDERS:
+        problem = "SECRET_KEY is a placeholder value"
+    elif len(value) < SECRET_KEY_MIN_LENGTH:
+        problem = f"SECRET_KEY is shorter than {SECRET_KEY_MIN_LENGTH} characters"
+    else:
+        return value
+    raise RuntimeError(
+        f"Refusing to start: {problem}. Set SECRET_KEY in .env to a long"
+        " random value — generate one with: openssl rand -hex 32"
+    )
+
+
+SECRET_KEY = _require_secret_key()
 SESSION_TTL_S = 12 * 3600
 COOKIE_NAME = "session"
 

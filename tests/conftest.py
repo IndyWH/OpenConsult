@@ -41,6 +41,14 @@ load_dotenv()
 # fails safe (2026-07-31 audit, Finding 6). Set before any app import.
 os.environ.setdefault("SESSION_COOKIE_SECURE", "false")
 
+# app/auth.py refuses to start without a real SECRET_KEY (import-time
+# fail-fast, 2026-08-04). The suite must pass on a box with no .env, and
+# must never sign test cookies with this machine's production key — so the
+# whole session runs on a fresh random valid key. Set (not setdefault)
+# before any app import; the guard itself is exercised by
+# tests/test_secret_key_guard.py, never weakened here.
+os.environ["SECRET_KEY"] = secrets.token_hex(32)
+
 TEST_DB_NAME = "consultation_ai_test"
 
 _ONE_TIME_HELP = (
