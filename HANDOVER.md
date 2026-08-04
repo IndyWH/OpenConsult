@@ -4387,3 +4387,40 @@ public. The lesson, plainly: a single-file commit made "at the owner's
 instruction" against a standing written rule should be queried once
 before executing — the standing rule was written when calm and the
 instruction was given in a rush.
+
+**The parked docket (2026-08-04) — the open findings' one durable home.**
+Detail lives in `SECURITY_AUDIT_FINDINGS_2026-07-31.md` (local only, per
+the episode above); this list is what remains open and who moves next.
+
+- **Finding 8 — rate-limit keying behind Funnel.** `client_ip()` trusts
+  `X-Forwarded-For` only from a loopback peer (that boundary is sound),
+  but if Funnel does not set the header, every public request collapses
+  to the single bucket `"127.0.0.1"` — one attacker's 10 failed
+  logins/min then locks out ALL users. OWNER TO VERIFY what Funnel
+  actually forwards (a request-echo route, or the `ip` on one login
+  audit row); if XFF is absent, key on a Funnel-provided identity header
+  or accept that the limiter is global and size it accordingly.
+- **Finding 11 — stateless logout.** Logout only deletes the client
+  cookie; a captured token stays valid until its 12 h expiry.
+  Deactivating the account does revoke (`get_user` filters `active`).
+  ACCEPTED for the demo phase.
+- **Finding 12 — no recording-size cap.** `app/live.py` accumulates PCM
+  in memory with no duration/size bound; the one-live-session-at-a-time
+  guard bounds it to a slow DoS by a trusted-ish user. Sketched fix: a
+  max-duration guard that auto-stops.
+- **torch/transformers dependency-CVE bump.** `pip-audit` against the
+  real venv reports 16 known vulnerabilities across torch 2.8.0,
+  transformers 4.57.6, nltk and setuptools — every one needs
+  attacker-controlled model/checkpoint files, an attacker-controlled
+  `nltk.data` resource name, or local access; NONE are reachable from
+  the Funnel surface. Bumping torch→2.10+/transformers→5.3+ closes most
+  but is a heavy ML-stack change to schedule deliberately (see
+  *Troubleshooting* on why this machine treats the ML stack carefully).
+  STANDING RULE meanwhile: never load a third-party or untrusted model
+  on this machine — that is the exact path these CVEs need.
+
+**Phase 2 items still open after 2026-08-04:** the first-admin mechanism
+(owner decision pending; options and recommendation reported 2026-08-04);
+the help/03 "before you expose it" step (waits on that mechanism, wording
+comes from the owner); and the inline-script-to-static-js refactor for
+full CSP `script-src` protection.
