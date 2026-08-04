@@ -4478,3 +4478,27 @@ the launch checklist.
 this slice. Still open from that review at launch time: the Tailscale
 host rotation (owner), and nothing else — the findings-file gitignore
 and the Phase 2 code items closed in slices 1 and 2 (entries above).
+
+**Slice 4 (2026-08-04): licence, prereg amendment, two 7b debts.**
+The licence is AGPL-3.0-or-later (owner decision 2026-07-31 — the repo
+carried MIT while the paper's Data availability already said AGPL):
+LICENSE is the verbatim GNU text, pyproject carries the SPDX expression,
+README and NOTICE state it, and `vendor/kindalive/` deliberately stays
+MIT — that is upstream's licence, not ours. The Sinhala confound prereg
+no longer names its run trigger (owner decision 2026-08-04, the
+pre-public naming policy): changed by LOGGED AMENDMENT in the document's
+own new Amendments section, no metric, gate or design content moved.
+tests/test_face_clinical.py now covers the seven-value affect enum —
+band and total-range across all seven, the ladder gains happy, angry
+asserted per test_face_drive's C13 framing, with the two clinical-arm
+deviations (band saturation at the ladder top; warmth and furrow pinned
+to the resting face) asserted as the arm's designed properties. And the
+evaluation harnesses no longer overwrite their baselines — dated file by
+default, `--write-baseline` to re-baseline (see the debt-list note).
+
+**Still open on the Phase 7b debt list after this slice:** the CDS
+harness re-run against the seven-value enum and the affect split —
+sequenced separately, the 09_septic_child leading-differential movement
+awaits the owner's adjudication — and the neutral-face calibration
+question from consultation 468 (neutral reads as slightly confused to
+one viewer): the owner's call, or the mock round decides it.
