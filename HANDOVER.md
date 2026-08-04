@@ -4610,3 +4610,17 @@ writes whatever help/ prose actually changes. README needs nothing — its
 help-series mentions don't enumerate articles. **Gap closed in slice 8
 (2026-08-04): the owner approved all four suggested sentences verbatim,
 and they are applied — article 09 is reachable from 00, 03 and 04.**
+
+**Slice 10 (2026-08-04): help article 02 ships — the screenshot
+walkthrough — and the series' numbering gap closes.**
+`help/02-using-it-step-by-step.md` plus eight owner-captured PNGs in
+`help/images/`, all owner-approved verbatim and shipped byte-for-byte
+(nine files, cmp-verified). Screenshot content is synthetic (the
+"Ranjit Perera" acted script) and was checked clean of addresses and
+account names before approval. The four incoming links (00's router
+table and reading order, 01 and 03 go-next bullets) carried the same
+verbatim approval and are applied. Two capture artifacts reported to
+the owner rather than edited (the images are approved assets): a
+Snipping Tool popup overlays the corner of `02-3-cds-working.png`, and
+three shots show the walk-in name variant "Ranjit halfway Perera" from
+a different session than the article's main run.
