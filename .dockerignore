@@ -1,0 +1,34 @@
+# What must never enter the image (DOCKER_DEMO_SPEC.md §1.2), and what
+# would only bloat the build context.
+
+# Secrets — .env is read by Compose from the host, never baked in.
+.env
+
+# The guideline corpus: licensed for local research use only; an image
+# containing it is redistribution. Only the manifest (provenance) ships.
+corpus/*
+!corpus/manifest.yaml
+
+# Models and session data live in named volumes, not layers.
+models/
+data/
+
+# The real two-voice recordings are deliberately not distributed (owner
+# decision 2026-08-04): consent covered recording, not publication.
+mock_consultations/recordings/
+*.wav
+*.mp3
+*.flac
+# ...but the small tracked test fixtures ship — the in-container suite
+# needs them (same carve-out as .gitignore).
+!tests/data/*.wav
+
+# Local build/dev residue.
+.git
+.venv
+.pytest_cache
+__pycache__
+**/__pycache__
+.claude
+.vscode
+.idea
