@@ -67,6 +67,69 @@ def test_client_ip_trusts_forwarding_only_from_loopback():
     assert client_ip(SimpleNamespace(client=None, headers={})) == "unknown"
 
 
+def _req(host, headers=None):
+    return SimpleNamespace(client=SimpleNamespace(host=host), headers=headers or {})
+
+
+def test_trusted_proxy_default_is_loopback_and_nothing_else():
+    """DOCKER_DEMO_SPEC.md §1.1: without TRUSTED_PROXY_CIDRS set, only a
+    loopback peer's X-Forwarded-For is honoured — a Compose bridge peer,
+    a CGNAT peer, anything else is spoofable and ignored."""
+    from app import ratelimit
+
+    for untrusted in ("172.18.0.2", "100.64.1.2", "8.8.8.8"):
+        spoofed = _req(untrusted, {"x-forwarded-for": "203.0.113.9"})
+        assert ratelimit.client_ip(spoofed) == untrusted, untrusted
+    assert ratelimit.client_ip(
+        _req("::1", {"x-forwarded-for": "203.0.113.9"})) == "203.0.113.9"
+
+
+def test_trusted_proxy_cidrs_are_configurable(monkeypatch):
+    """The Compose case: the proxying peer is a bridge-network address.
+    With its subnet trusted, a real X-Forwarded-For is honoured; a
+    spoofed one from OUTSIDE the trusted set is still ignored — and
+    loopback is no longer implicitly in a replaced set."""
+    from app import ratelimit
+
+    monkeypatch.setattr(ratelimit, "TRUSTED_PROXY_CIDRS",
+                        ratelimit._parse_trusted("172.18.0.0/16"))
+    trusted = _req("172.18.0.2", {"x-forwarded-for": "203.0.113.9"})
+    assert ratelimit.client_ip(trusted) == "203.0.113.9"
+    outside = _req("8.8.8.8", {"x-forwarded-for": "1.2.3.4"})
+    assert ratelimit.client_ip(outside) == "8.8.8.8"
+    loopback = _req("127.0.0.1", {"x-forwarded-for": "1.2.3.4"})
+    assert ratelimit.client_ip(loopback) == "127.0.0.1"
+
+
+def test_trusted_proxy_cidrs_env_reaches_the_parser(monkeypatch):
+    """The env plumbing itself, via the real import path — and a bad
+    value refuses at import rather than silently trusting nothing.
+
+    Reloading recreates the module's limiter instances, and other tests
+    in this file patch the ORIGINALS they imported at file level — so
+    the originals are restored into the reloaded module afterwards, the
+    same no-leaked-state discipline the speech-stub incident taught."""
+    import importlib
+
+    from app import ratelimit
+
+    saved_login = ratelimit.login_limiter
+    saved_register = ratelimit.register_limiter
+    monkeypatch.setenv("TRUSTED_PROXY_CIDRS", "10.89.0.0/24, ::1/128")
+    try:
+        importlib.reload(ratelimit)
+        assert ratelimit.client_ip(
+            _req("10.89.0.7", {"x-forwarded-for": "203.0.113.9"})) == "203.0.113.9"
+        monkeypatch.setenv("TRUSTED_PROXY_CIDRS", "not-a-network")
+        with pytest.raises(ValueError):
+            importlib.reload(ratelimit)
+    finally:
+        monkeypatch.delenv("TRUSTED_PROXY_CIDRS")
+        importlib.reload(ratelimit)
+        ratelimit.login_limiter = saved_login
+        ratelimit.register_limiter = saved_register
+
+
 # ------------------------------------------------------------ the endpoints
 
 @needs_db
