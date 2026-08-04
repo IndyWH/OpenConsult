@@ -4595,3 +4595,16 @@ forward and reverse (681/681) with all fixes. The compose stack was left
 **down**; named volumes persist (pg-data, audio, hf-cache, corpus). The
 §1.4 "re-validate the audio path inside the image" condition is met and
 the packaging is **done**.
+
+**Slice 7 (2026-08-04): help article 09 ships — the guideline corpus.**
+`help/09-the-guideline-corpus.md`, owner-approved verbatim (the only way
+help/ changes; shipped byte-for-byte, cmp-verified). The corpus
+explainer for the research-instrument audience: recipe-not-documents
+(licence and staleness), the two ingestion gates and the incidents that
+earned them, reshaping the corpus for another setting, and the standing
+re-run-the-harness rule after any corpus change. **Incoming links are
+owed and deliberately not added**: the natural locations (help/00's
+router table and reading order, help/03's stage 6, help/04's go-next
+block) were reported to the owner with suggested wording, and the owner
+writes whatever help/ prose actually changes. README needs nothing — its
+help-series mentions don't enumerate articles.
