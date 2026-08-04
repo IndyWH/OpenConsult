@@ -4419,8 +4419,36 @@ the episode above); this list is what remains open and who moves next.
   STANDING RULE meanwhile: never load a third-party or untrusted model
   on this machine — that is the exact path these CVEs need.
 
-**Phase 2 items still open after 2026-08-04:** the first-admin mechanism
-(owner decision pending; options and recommendation reported 2026-08-04);
-the help/03 "before you expose it" step (waits on that mechanism, wording
-comes from the owner); and the inline-script-to-static-js refactor for
-full CSP `script-src` protection.
+**Phase 2 items still open after 2026-08-04:** the help/03 "before you
+expose it" step (wording comes from the owner — see the re-flag below);
+and the inline-script-to-static-js refactor for full CSP `script-src`
+protection. The first-admin mechanism, previously on this list, is
+decided and done (next entry).
+
+**First-admin mechanism — DECIDED and closed (owner decision
+2026-08-04).** From the slice-1 options, the owner chose CLI bootstrap
+over refuse-when-exposed and pending-admin-activate: it is the only
+option with no network-reachable path to admin on a fresh deploy, and it
+matches the existing break-glass philosophy. Landed the same day: the
+break-glass CLI gained `create USERNAME ROLE "Display Name"` (554311f —
+getpass password, same validation as registration, active account, shell
+access as the trust boundary, audited `user.created`), and the
+first-registrant-becomes-admin branch in `auth.create_user` is deleted
+entirely (41fd4dd), along with the register endpoint's now-unreachable
+non-pending tail that issued a session cookie at registration. Every
+public registration is now pending with the validated requested role, no
+exception for an empty table — the 2026-07-31 audit's Finding 7
+(fresh-deploy footgun) is closed. A test registers against a genuinely
+empty `app_user` table and pins it. Fresh-deploy bootstrap, verbatim:
+`uv run python scripts/manage_users.py create your-username admin "Your
+Name"` (README quickstart step 5, c38a9db).
+
+**Re-flag for the owner — help/03 is now wrong twice over.**
+`help/03-installing-and-running.md` stage 7 says "Start the server, open
+the browser, create the first admin": untrue since 74d5e0c (the server
+refuses to start until `SECRET_KEY` is set, and the article's stages
+never mention `.env`) and untrue since 41fd4dd (the first admin can no
+longer be created in the browser — only from the server shell). Not
+edited here: help prose is the owner's verbatim text. Owner-approved
+replacement wording is being drafted by Cowork and will arrive verbatim
+in a later prompt.
