@@ -269,7 +269,14 @@ async def create_user(
 ) -> dict:
     """pending=True is the public-registration path: the account is created
     inactive and awaits the admin's approval. Direct callers (CLI, tests)
-    keep the default and get an active account."""
+    keep the default and get an active account.
+
+    There is deliberately NO empty-table exception (owner decision
+    2026-08-04): the first registrant used to become an active admin,
+    which on a fresh public deploy handed admin to whoever raced to the
+    form first. The first admin now comes from the server shell —
+    scripts/manage_users.py create — so no network-reachable path mints
+    an active account."""
     if role not in ROLES:
         raise ValueError(f"invalid role {role!r}")
     # Bounded here rather than at the HTTP layer, so the CLI path
@@ -277,10 +284,6 @@ async def create_user(
     username = validate_username(username)
     display_name = validate_display_name(display_name)
     async with await _conn() as conn:
-        count = (await (await conn.execute("SELECT count(*) FROM app_user")).fetchone())[0]
-        if count == 0:
-            role = "admin"  # bootstrap: the first account administers the rest
-            pending = False  # …so it must be able to log in
         row = await (
             await conn.execute(
                 "INSERT INTO app_user"

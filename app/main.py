@@ -215,7 +215,7 @@ class RegisterBody(BaseModel):
     username: str
     password: str
     display_name: str
-    role: str  # doctor | receptionist (first user becomes admin)
+    role: str  # doctor | receptionist
 
 
 class LoginBody(BaseModel):
@@ -257,26 +257,20 @@ async def register(body: RegisterBody, request: Request) -> JSONResponse:
         return JSONResponse(status_code=400, content={"error": str(exc)})
     except Exception:
         return JSONResponse(status_code=409, content={"error": "username already taken"})
-    if user["pending_approval"]:
-        # Approve-to-activate (public exposure): no session until the
-        # administrator activates the account in the Users view.
-        await audit.log(
-            user["id"], "user.registered_pending", "user", user["id"],
-            {"role": user["role"], "ip": ip},
-        )
-        return JSONResponse(content={
-            "ok": True, "pending": True, "user": user,
-            "message": "Account created — awaiting the administrator's approval."
-        })
-    # First-account bootstrap only: active immediately, session as before.
+    # Approve-to-activate (public exposure): EVERY registration is pending —
+    # no session until the administrator activates the account in the Users
+    # view. No exception for an empty table: the first-registrant-becomes-
+    # admin bootstrap is gone (owner decision 2026-08-04), the first admin
+    # comes from the server shell (scripts/manage_users.py create), and
+    # registration must never mint an active account or a session cookie.
     await audit.log(
-        user["id"], "user.registered", "user", user["id"],
+        user["id"], "user.registered_pending", "user", user["id"],
         {"role": user["role"], "ip": ip},
     )
-    response = JSONResponse(content={"ok": True, "pending": False, "user": user})
-    response.set_cookie(COOKIE_NAME, auth.sign_session(user["id"]), httponly=True,
-                        samesite="lax", secure=SESSION_COOKIE_SECURE)
-    return response
+    return JSONResponse(content={
+        "ok": True, "pending": True, "user": user,
+        "message": "Account created — awaiting the administrator's approval."
+    })
 
 
 @app.post("/api/login")

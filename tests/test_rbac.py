@@ -51,9 +51,9 @@ def clients():
                   "display_name": role.title(), "role": role},
         )
         assert response.status_code == 200
-        # Registration is approve-to-activate; the conftest sentinel admin
-        # also guarantees the first-user-becomes-admin bootstrap never
-        # fires mid-suite, so the requested role always sticks.
+        # Registration is approve-to-activate, and since 2026-08-04 there
+        # is no first-user-becomes-admin bootstrap at all — the requested
+        # role always sticks.
         approve_account(username)
         response = client.post(
             "/api/login", json={"username": username, "password": "test-password-123"}

@@ -15,7 +15,7 @@ import secrets
 import psycopg
 import pytest
 from dotenv import load_dotenv
-from conftest import approve_account
+from conftest import _swap_db, approve_account
 from fastapi.testclient import TestClient
 
 from app import auth, monitor
@@ -183,3 +183,41 @@ def test_pulse_counts_pending_registrations_and_drops_on_approval():
     monitor.invalidate_cache()
     after = TestClient(app).get("/api/monitor/pulse").json()
     assert after["registrations_pending_activation_today"] == before - 1
+
+
+def test_registration_against_empty_database_is_pending_not_admin(monkeypatch):
+    """The first-registrant-becomes-admin branch is deleted (owner
+    decision 2026-08-04). Against an EMPTY app_user table — a fresh
+    deploy, before any CLI bootstrap — create_user called with the
+    registration path's exact arguments (requested role, pending=True)
+    produces a pending, non-admin account. The first admin comes from
+    scripts/manage_users.py create instead. A scratch database, because
+    the session database deliberately always holds the conftest sentinel
+    admin, so its app_user table can never be empty here.
+    """
+    scratch = "consultation_ai_test_bootstrap"
+    scratch_url = _swap_db(os.environ["DATABASE_URL"], scratch)
+    with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as admin_conn:
+        admin_conn.execute(f"DROP DATABASE IF EXISTS {scratch} WITH (FORCE)")
+        admin_conn.execute(f"CREATE DATABASE {scratch}")
+    try:
+        monkeypatch.setattr(auth, "DATABASE_URL", scratch_url)
+        auth.ensure_schema()
+        with psycopg.connect(scratch_url) as conn:
+            # The precondition that used to fire the deleted branch: the
+            # table really is empty when the registration arrives.
+            assert conn.execute("SELECT count(*) FROM app_user").fetchone()[0] == 0
+        user = asyncio.run(auth.create_user(
+            "first_registrant", PASSWORD, "First Registrant", "doctor",
+            pending=True))
+        assert user["role"] == "doctor"          # NOT promoted to admin
+        assert user["pending_approval"] is True  # NOT activated
+        with psycopg.connect(scratch_url) as conn:
+            row = conn.execute(
+                "SELECT role, active, pending_approval FROM app_user"
+                " WHERE username = 'first_registrant'").fetchone()
+        assert row == ("doctor", False, True)
+    finally:
+        monkeypatch.undo()
+        with psycopg.connect(os.environ["DATABASE_URL"], autocommit=True) as admin_conn:
+            admin_conn.execute(f"DROP DATABASE IF EXISTS {scratch} WITH (FORCE)")

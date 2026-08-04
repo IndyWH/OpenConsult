@@ -125,8 +125,11 @@ def _bootstrap_test_database() -> bool:
 
     _copy_corpus_tables()
 
-    # Sentinel admin: with it in place, auth's count==0 bootstrap can never
-    # promote a test registration to admin. Password is random and discarded.
+    # Sentinel admin. Predates the deletion of auth's count==0 auto-admin
+    # bootstrap (2026-08-04) and deliberately kept: the suite's admin
+    # presence stays deterministic rather than resting on collection
+    # order, and if the deleted bootstrap ever came back, it still could
+    # not promote a test registration. Password is random and discarded.
     with psycopg.connect(TEST_URL) as conn:
         conn.execute(
             "INSERT INTO app_user (username, password_hash, display_name, role)"
