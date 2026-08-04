@@ -7,6 +7,7 @@ history.
 
 Usage:
     uv run python scripts/manage_users.py list
+    uv run python scripts/manage_users.py create USERNAME ROLE "Display Name"
     uv run python scripts/manage_users.py reset-password USERNAME
     uv run python scripts/manage_users.py set-role USERNAME ROLE
     uv run python scripts/manage_users.py set-display-name USERNAME "Display Name"
@@ -19,6 +20,8 @@ import asyncio
 import getpass
 import sys
 from pathlib import Path
+
+import psycopg
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -37,6 +40,41 @@ async def cmd_list() -> int:
         print(f"{u['id']:>3}  {u['username']:<20} {u['display_name']:<20}"
               f" {u['role']:<12} {'yes' if u['active'] else 'NO':<8}"
               f" {u['last_login_at'] or '—':<16} {u['created_at']}")
+    return 0
+
+
+async def cmd_create(username: str, role: str, display_name: str) -> int:
+    """The first-admin bootstrap, and break-glass creation generally
+    (owner decision 2026-08-04): public registration can no longer mint an
+    admin — on a fresh deploy the first admin is created HERE, from the
+    server shell, before the app is exposed. The account is active
+    immediately, not pending: shell access is the trust boundary this CLI
+    already stands on. Username and display name go through the same
+    validation as public registration (inside auth.create_user), so this
+    path cannot create an account the web UI could not.
+    """
+    password = getpass.getpass(f"Password for {username!r}: ")
+    if len(password) < 8:
+        print("Refused: password too short (min 8).", file=sys.stderr)
+        return 1
+    if getpass.getpass("Repeat to confirm: ") != password:
+        print("Refused: passwords do not match.", file=sys.stderr)
+        return 1
+    try:
+        user = await auth.create_user(username, password, display_name, role)
+    except auth.InvalidUserInput as err:
+        print(f"Refused: {err}.", file=sys.stderr)
+        return 1
+    except psycopg.errors.UniqueViolation:
+        print(f"Refused: username {username!r} already taken.", file=sys.stderr)
+        return 1
+    await audit.log(None, "user.created", "app_user", user["id"],
+                    {"username": user["username"], "role": user["role"],
+                     "via": "break-glass CLI"})
+    print(f"Created {role} {user['username']!r} (active).")
+    if role == "admin":
+        print("This admin can now log in and approve public registrations"
+              " in the Users view.")
     return 0
 
 
@@ -104,6 +142,13 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("list", help="list all users with roles and status")
+    create = sub.add_parser(
+        "create",
+        help="create an active account (password prompted) — the"
+             " first-admin bootstrap on a fresh deploy")
+    create.add_argument("username")
+    create.add_argument("role", choices=auth.ROLES)
+    create.add_argument("display_name", metavar="DISPLAY_NAME")
     reset = sub.add_parser("reset-password", help="set a new password (prompted)")
     reset.add_argument("username")
     setrole = sub.add_parser("set-role", help="promote/demote a user")
@@ -118,6 +163,8 @@ def main() -> int:
 
     if args.command == "list":
         return asyncio.run(cmd_list())
+    if args.command == "create":
+        return asyncio.run(cmd_create(args.username, args.role, args.display_name))
     if args.command == "reset-password":
         return asyncio.run(cmd_reset_password(args.username))
     if args.command == "set-display-name":
