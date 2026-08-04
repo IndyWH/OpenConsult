@@ -2,7 +2,7 @@
 
 Designed 2026-07-25 by Claude Cowork, for owner approval. **NOT RUN. No data collected.**
 
-Trigger to run: Prof Henry Potts replying with interest, or the owner deciding to write up the
+Trigger to run: the UCL professor replying with interest, or the owner deciding to write up the
 code-switched Sinhala clinical ASR benchmark. Not on the Phase 7 path and not a v1 dependency.
 
 **This experiment cannot change the English-only v1 decision and is not intended to.** That decision
@@ -127,3 +127,13 @@ the Git LFS decision remains open.
 1. Approve or amend this design.
 2. Confirm the 25% substantiality threshold, or set another, **before** any data is collected.
 3. Confirm the model set is the adjudication three and not the full benchmark nine.
+
+---
+
+## Amendments
+
+**2026-08-04 — run trigger generalised.** "Prof Henry Potts" in the
+trigger line becomes "the UCL professor", under the pre-public naming
+policy (real people other than the owner become role labels — owner
+decision 2026-08-04). No metric, gate or design content changed: this
+amendment touches one name in the trigger line and nothing else.
