@@ -1774,12 +1774,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # OUTSIDE the face guard on purpose: face-off is a study
                 # arm and the affect stream is wanted from it too. EVERY
                 # assessment is logged, not only changes — a repeated
-                # verdict is evidence. And an ABSENT field is distinguished
-                # from the value "neutral": the schema keeps
-                # patient_affect optional, so a model that omits it looks
-                # identical to one that judges the patient neutral, and
-                # that distinction is the whole point of this log. A JSON
-                # null counts as absent.
+                # verdict is evidence. Since c526ffc (2026-08-01) the
+                # affect is its own call inside CDSEngine.update, with
+                # patient_affect a REQUIRED field of that call's schema
+                # and a fail-soft to "neutral" when the call fails — so
+                # ABSENT should now be impossible here. It stays in the
+                # log's vocabulary as a tripwire, not a state: a sighting
+                # of ABSENT in PATIENT_AFFECT would itself be a finding
+                # (the merge in app/cds.py not happening), never a
+                # judgement about the patient.
                 #
                 # A DEBUGGING INSTRUMENT, deliberately: no table, no
                 # migration, no audit row. The durable version — affect
@@ -1795,9 +1798,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     "first" if previous is _AFFECT_UNLOGGED
                     else ("yes" if affect_field != previous else "no"))
                 entry["affect_last_logged"] = affect_field
-                # The affect hint rides the assessment (zero extra model
-                # calls); absent means neutral to the driver. Urgency is
-                # NOT an input here.
+                # The affect verdict arrives merged into the assessment
+                # but is its OWN model call since c526ffc — stateless,
+                # transcript-only, fail-soft to "neutral" (app/cds.py).
+                # Urgency is NOT an input here.
                 if entry["face"] is not None:
                     entry["face"].on_affect(
                         entry["assessment"].get("patient_affect"))
