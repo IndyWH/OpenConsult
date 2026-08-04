@@ -110,6 +110,11 @@ without speaking:
 uv run python scripts/simulate_cds.py mock_consultations/01_chest_pain_en.md
 ```
 
+The mock consultations ship as scripts and frozen reference transcripts;
+the real two-voice WAV recordings of them are deliberately not
+distributed — consent covered recording, not publication — so others
+record their own from the scripts.
+
 **Guideline grounding (Phase 4):** the live page shows a guidelines panel —
 a summary grounded ONLY in retrieved guideline passages, each claim cited,
 with a provenance line (corpus name, version, ingestion date). If the local
@@ -163,6 +168,33 @@ For running everything as system services that survive a reboot
 (PostgreSQL, Ollama, the app), and for the after-reboot checklist and
 known failure modes, see `HANDOVER.md` — the engineering record. The
 reader-facing tour lives in `help/`.
+
+## Run it with Docker
+
+`docker-compose.yml` packages the app and its database; see
+`DOCKER_DEMO_SPEC.md` for the design. Prerequisites, honestly stated:
+
+- **NVIDIA Container Toolkit** (its own setup on WSL2) and a GPU with
+  **24 GB VRAM, effectively exclusive** — the finalisation pipeline's
+  model-swap choreography assumes sole ownership of the card; a second
+  GPU workload means OOM, not slowness.
+- **A Hugging Face token**, and the **manual licence acceptance for
+  `pyannote/speaker-diarization-3.1`** on huggingface.co before your
+  first Stop — that step cannot be automated.
+- **Ollama**: a host install is the default path (`OLLAMA_URL` points
+  at it); a bundled service exists behind `--profile ollama`.
+
+```bash
+cp .env.example .env          # then set SECRET_KEY: openssl rand -hex 32
+docker compose up -d --build
+docker compose run --rm app python scripts/ingest_guidelines.py  # first run, validated, re-runnable
+docker compose exec app python scripts/manage_users.py create <user> admin "Your Name"
+```
+
+Then open http://localhost:8000/login — **localhost is the secure
+origin the microphone needs** in a single-machine demo; any other
+address requires TLS. The suite runs in-container on a fresh clone:
+`docker compose run --rm app pytest`.
 
 ## Licence
 
