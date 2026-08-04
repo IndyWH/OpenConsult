@@ -4061,7 +4061,7 @@ dict (11/12/13 → False, 14/15 → True); the restraint metric itself
 ## Remote access (Tailscale, set up 2026-07-10)
 
 The app is reachable from the project owner's other devices over their
-private tailnet at **https://mlrig.tail93fa1d.ts.net** — HTTPS is
+private tailnet at **https://<your-tailnet-host>.ts.net** — HTTPS is
 mandatory for remote microphone access (browsers only allow getUserMedia
 on secure origins). Since 2026-07-24 the app is ALSO reachable from the
 public internet via Tailscale Funnel (owner's decision, external demo) —
@@ -4069,7 +4069,7 @@ see the public-exposure posture section below.
 
 How the pieces fit (each is required):
 
-1. **Tailscale on Windows** (host `mlrig`, 100.94.144.52) — the tailnet
+1. **Tailscale on Windows** (host `mlrig`, tailnet IP `<tailnet-ip>`) — the tailnet
    endpoint. Signed in as wajirah@; other devices must run Tailscale on
    the same account.
 2. **WSL2 mirrored networking** (`C:\Users\wajir\.wslconfig`,
@@ -4083,7 +4083,7 @@ How the pieces fit (each is required):
    startup sequence below.
 4. **Tailscale Serve** (`tailscale.exe serve --bg 8000` on Windows,
    runnable from WSL via the interop path below) — terminates HTTPS with
-   a tailnet certificate at mlrig.tail93fa1d.ts.net and proxies to
+   a tailnet certificate at <your-tailnet-host>.ts.net and proxies to
    port 8000. The config persists across reboots; it needed a one-time
    "enable Serve" approval in the admin console. WebSockets are proxied
    fine; live.html already picks wss:// under https.
@@ -4141,7 +4141,7 @@ activate then did its job and added one:
 
 | | |
 |---|---|
-| the second receptionist account (id 572) | registered 2026-07-25 11:37:27 from **100.94.144.52 — mlrig's own tailnet address**, approved 37 s later by user 10 (the admin account), first login 11:38:17 from the same address |
+| the second receptionist account (id 572) | registered 2026-07-25 11:37:27 from **`<tailnet-ip>` — mlrig's own tailnet address**, approved 37 s later by user 10 (the admin account), first login 11:38:17 from the same address |
 
 That shape — self-registration from the host machine, approved by the
 owner within the minute — reads as the owner exercising the
@@ -4190,7 +4190,7 @@ on Windows is listening on 5432 (`netstat.exe -ano | findstr 5432`).
 
 Note: testing the HTTPS URL with curl *from inside WSL* fails (hairpin
 limitation of mirrored networking) — test from Windows
-(`curl.exe https://mlrig.tail93fa1d.ts.net`) or another tailnet device.
+(`curl.exe https://<your-tailnet-host>.ts.net`) or another tailnet device.
 
 **If the web interface goes unreachable while everything looks healthy**
 (post-mortem of the 2026-07-11 overnight "crash" that wasn't): journals
@@ -4204,7 +4204,7 @@ while `systemctl status consultation-ai` says active, the bridge is the
 culprit — `wsl --shutdown` + reopening a WSL terminal usually rebuilds it
 without a full Windows reboot.
 
-Then from any tailnet device: https://mlrig.tail93fa1d.ts.net
+Then from any tailnet device: https://<your-tailnet-host>.ts.net
 (log in as a doctor; mic permission prompt should appear on the live page).
 
 ## Session/environment facts
@@ -4456,3 +4456,21 @@ day as a byte-for-byte copy of the approved file (the only way help/
 changes): stage 7 now covers the `.env`/SECRET_KEY step and the CLI
 first-admin, and a new "Before you let anyone else reach it" section
 carries the exposure guidance.
+
+**Working-tree sanitisation — people and addresses (2026-08-04).** As of
+this commit the working tree names no real person except the owner —
+account references are role labels (reversible for anyone who later
+agrees to be named — owner decision 2026-08-04, roles now rather than
+waiting on permission) — and the real tailnet hostname and IP are
+placeholders (`https://<your-tailnet-host>.ts.net`, `<tailnet-ip>`); the
+bare machine name `mlrig` deliberately stays. Git HISTORY still contains
+the old names and address, by accepted decision: rewriting published
+history was declined, and the launch-day mitigation is rotating the
+Tailscale host so the address in history goes dead — the owner's task on
+the launch checklist.
+
+**The pre-public repo-contents review (owner's Documents folder,
+2026-07-31) is discharged on its names, usernames and URL items** as of
+this slice. Still open from that review at launch time: the Tailscale
+host rotation (owner), and nothing else — the findings-file gitignore
+and the Phase 2 code items closed in slices 1 and 2 (entries above).
