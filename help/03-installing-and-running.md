@@ -1,6 +1,7 @@
 # Installing and running it — choose your path first
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `904bb1e`).*
+*Part of the Consultation AI help series. True as of the first-admin
+hardening commit it ships with — see the repository history.*
 
 ```mermaid
 flowchart TB
@@ -68,12 +69,34 @@ a guideline website has moved things around. That is the script working,
 not breaking. *Checkpoint: ingestion exits clean; a guideline panel
 appears during a test consultation.*
 
-**7 · Run it.** Start the server, open the browser, create the first
-admin. The database tables create themselves at startup — after any
-update, a restart is what applies new schema, and a check script will
-tell you if the running database has drifted from the code.
-*Checkpoint: log in, run one mock consultation end to end — live
-transcript, Stop, note, approve.*
+**7 · Configure and run it.** Before the first start, copy the example
+settings file to `.env` and set a real `SECRET_KEY` — the README shows
+the one command that generates a strong value. This is not optional:
+the app refuses to start on a missing, short or example key, because a
+guessable key would let anyone forge a login. Then create the first
+administrator from the terminal, with the user-management script — the
+web form never creates administrators, so a fresh install cannot have
+its admin account claimed by whoever finds the page first. Now start
+the server, open the browser and log in. The database tables create
+themselves at startup — after any update, a restart is what applies new
+schema, and a check script will tell you if the running database has
+drifted from the code. *Checkpoint: log in as the admin you created,
+run one mock consultation end to end — live transcript, Stop, note,
+approve.*
+
+## Before you let anyone else reach it
+
+Three habits stand between a private research box and an unpleasant
+surprise, and all three are cheap. Keep the app behind Tailscale, or at
+least off the open internet — it was designed for a private network,
+and nothing about it assumes hostile traffic at scale. Make sure the
+`SECRET_KEY` you set in stage 7 is the generated kind, not something
+memorable. And invite people by creating their accounts yourself rather
+than leaving registration open to strangers: new accounts start
+inactive until you approve them, but approval requests from the whole
+internet are a chore you do not need. The fuller story — what was
+audited, what was found, what was fixed — is
+[Is AI-written code safe?](08-security.md).
 
 ## Running it day to day
 

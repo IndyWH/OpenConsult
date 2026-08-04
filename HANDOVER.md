@@ -4268,7 +4268,9 @@ admin", and the server now refuses to start until `SECRET_KEY` is set —
 nothing in the article's seven stages mentions `.env` or the key. The
 replacement wording comes from the owner, and it belongs with the
 "before you expose it" step that waits on the first-admin decision (see
-the Phase 2 security section at the end of this file).
+the Phase 2 security section at the end of this file). *Resolved
+2026-08-04: the owner-approved rewrite shipped — the Phase 2 section has
+the record.*
 
 **What was checked and is fine — do not redo this.** The live service reads
 `/home/wajir/consultation-ai/.env`, and the `SECRET_KEY` there is a custom
@@ -4419,11 +4421,10 @@ the episode above); this list is what remains open and who moves next.
   STANDING RULE meanwhile: never load a third-party or untrusted model
   on this machine — that is the exact path these CVEs need.
 
-**Phase 2 items still open after 2026-08-04:** the help/03 "before you
-expose it" step (wording comes from the owner — see the re-flag below);
-and the inline-script-to-static-js refactor for full CSP `script-src`
-protection. The first-admin mechanism, previously on this list, is
-decided and done (next entry).
+**Phase 2 items still open after 2026-08-04:** the
+inline-script-to-static-js refactor for full CSP `script-src`
+protection. The first-admin mechanism and the help/03 rewrite, previously
+on this list, are decided and done (entries below).
 
 **First-admin mechanism — DECIDED and closed (owner decision
 2026-08-04).** From the slice-1 options, the owner chose CLI bootstrap
@@ -4443,12 +4444,11 @@ empty `app_user` table and pins it. Fresh-deploy bootstrap, verbatim:
 `uv run python scripts/manage_users.py create your-username admin "Your
 Name"` (README quickstart step 5, c38a9db).
 
-**Re-flag for the owner — help/03 is now wrong twice over.**
-`help/03-installing-and-running.md` stage 7 says "Start the server, open
-the browser, create the first admin": untrue since 74d5e0c (the server
-refuses to start until `SECRET_KEY` is set, and the article's stages
-never mention `.env`) and untrue since 41fd4dd (the first admin can no
-longer be created in the browser — only from the server shell). Not
-edited here: help prose is the owner's verbatim text. Owner-approved
-replacement wording is being drafted by Cowork and will arrive verbatim
-in a later prompt.
+**help/03 flag — RESOLVED 2026-08-04.** The article's stage 7 had become
+wrong twice over ("Start the server, open the browser, create the first
+admin" — untrue since 74d5e0c's SECRET_KEY refusal and 41fd4dd's removal
+of in-browser first admins). The owner-approved rewrite shipped the same
+day as a byte-for-byte copy of the approved file (the only way help/
+changes): stage 7 now covers the `.env`/SECRET_KEY step and the CLI
+first-admin, and a new "Before you let anyone else reach it" section
+carries the exposure guidance.
