@@ -18,10 +18,15 @@
 # ctranslate2 in each fresh process, exactly as on the host.
 FROM ubuntu:26.04
 
+# tzdata: --no-install-recommends leaves the base image without zoneinfo,
+# and the uv-managed CPython has no bundled fallback — ZoneInfo("Europe/
+# London") then fails at import. The host never shows this (a full
+# Ubuntu install ships tzdata); the in-container suite caught it.
 RUN apt-get update && apt-get install -y --no-install-recommends \
         ca-certificates \
         curl \
         ffmpeg \
+        tzdata \
     && rm -rf /var/lib/apt/lists/*
 
 # uv pinned to the version the reference machine runs — the lockfile is
