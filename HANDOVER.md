@@ -575,8 +575,9 @@ the "Dr" lives in the phrase template, not in a transform on the name.
 
 Three things about the live data are the owner's to decide, not to fix
 here: no account carries a title; the display names are inconsistent in
-form (`herath` → "Herath", `vicky` → "Victoria", `JoydeepSinha1988` →
-"Joydeep Sinha"); and the admin account `doctor` has display name
+form (the owner's doctor account carries a bare surname, the second
+doctor account a first name, the invited outside clinician's demo
+account a full name); and the admin account has display name
 "Doctor", so it would speak as **"Dr Doctor"**. Also flagged rather than
 changed: the approved wording's *"you can speak to him"* assumes the
 doctor is male, which is a wording change and therefore the owner's.
@@ -3751,7 +3752,8 @@ docket item 5.
    time — recorded for the owner's decision.) **Queue entry 164 exists and is
    stale**: patient 253
    ("Shivesh"), `queue_date` **2026-07-26**, position 1, created 14:53:24
-   by user 182 (`herath`) via `queue.walk_in_started`. Verified against
+   by user 182 (the owner's doctor account) via `queue.walk_in_started`.
+   Verified against
    the database: it is still `in_consultation`, there is **no consultation
    row for that patient at all**, and its only audit event is the walk-in
    start — no `queue.cancelled`, no completion. A walk-in was opened for
@@ -3943,7 +3945,7 @@ Benchmark stage (plan §7 "benchmark FIRST, train later") completed
   phase stays closed — this is not queued work): a pre-registered
   decomposition of the 0.035 → 0.504 CER confound,
   `evals/2026-07-25_sinhala_confound_prereg.md`, **designed 2026-07-25,
-  NOT RUN, no data collected.** Trigger: Prof Henry Potts replying with
+  NOT RUN, no data collected.** Trigger: the UCL professor replying with
   interest, or the owner deciding to write up the benchmark. It cannot
   change the English-only decision and is not intended to — it refines
   the explanation of the collapse for the paper. Two solo read
@@ -4113,7 +4115,8 @@ defence layers, outermost first:
   (`gh repo view --json visibility`) — an earlier assumption that the
   fixed test password was world-readable was wrong; it is still a
   shared fixed string, hence the sweep below.
-- **`JoydeepSinha1988` (id 570) audits as `user.registered`, not
+- **The invited outside clinician's demo account (id 570) audits as
+  `user.registered`, not
   `user.registered_pending`, because it predates approve-to-activate** — it
   was created 2026-07-24 19:29, before that landing, so it went active
   without an approval step and its audit row carries no `ip`. It is a known
@@ -4126,9 +4129,10 @@ pre-isolation test accounts (`role_8hex` names, shared password
 `test-password-123`, incl. ~131 admins) were bulk-deactivated in one
 audited action — audit row `user.deactivated` `{bulk: true, count: 489}`,
 user_id NULL. With test isolation in place they cannot reaccumulate.
-The active set was five at that point (owner-confirmed): `doctor`
-(admin), `receptionist`, `herath`, `vicky`, and invited demo user
-`JoydeepSinha1988`. Accounts are deactivated, never deleted — the rows
+The active set was five at that point (owner-confirmed): the admin
+account, the receptionist account, the owner's doctor account, the
+second doctor account, and the invited outside clinician's demo account.
+Accounts are deactivated, never deleted — the rows
 keep their names for the audit trail.
 
 **The active set is now six** (verified against `app_user` and the audit
@@ -4137,7 +4141,7 @@ activate then did its job and added one:
 
 | | |
 |---|---|
-| `claudia` (id 572, receptionist) | registered 2026-07-25 11:37:27 from **100.94.144.52 — mlrig's own tailnet address**, approved 37 s later by user 10 (the `doctor` admin account), first login 11:38:17 from the same address |
+| the second receptionist account (id 572) | registered 2026-07-25 11:37:27 from **100.94.144.52 — mlrig's own tailnet address**, approved 37 s later by user 10 (the admin account), first login 11:38:17 from the same address |
 
 That shape — self-registration from the host machine, approved by the
 owner within the minute — reads as the owner exercising the

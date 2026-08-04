@@ -136,7 +136,7 @@ def test_the_doctor_name_falls_back_to_the_username():
     assert speech.doctor_name_for(
         {"display_name": "", "username": "herath"}) == "herath"
     assert speech.doctor_name_for(
-        {"display_name": None, "username": "vicky"}) == "vicky"
+        {"display_name": None, "username": "doc2"}) == "doc2"
 
 
 def test_no_title_is_ever_invented_from_the_account_data():

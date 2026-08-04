@@ -330,7 +330,7 @@ def test_break_glass_set_display_name():
     # Surrounding whitespace is trimmed, and a blank name is refused outright
     # — it would make the disclosure say "Dr " to a patient.
     assert asyncio.run(
-        auth.set_display_name(user["username"], "  Vicky  "))["to"] == "Vicky"
+        auth.set_display_name(user["username"], "  Amara  "))["to"] == "Amara"
     with pytest.raises(ValueError):
         asyncio.run(auth.set_display_name(user["username"], "   "))
 

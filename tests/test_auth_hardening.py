@@ -198,7 +198,7 @@ def test_legitimate_names_still_pass():
     non-Latin scripts are somebody's actual name — the sink escapes them."""
     from app import auth
 
-    for name in ("Wajira Herath", "O'Brien", "Anne-Marie", "Dr Vicky",
+    for name in ("Wajira Herath", "O'Brien", "Anne-Marie", "Dr Amara",
                  " Næss", "Herath  ", "李伟"):
         assert auth.validate_display_name(name) == name.strip()
     for username in ("doctor", "someone_else", "rl_9f3a2b1c", "a.b-c"):
