@@ -66,7 +66,9 @@ this clearly, press yes."*
 is third-party); a manifest and an ingestion script rebuild it locally,
 and the script *validates* what it fetched — expect it to fail loudly if
 a guideline website has moved things around. That is the script working,
-not breaking. *Checkpoint: ingestion exits clean; a guideline panel
+not breaking. [Where the guidelines come from](09-the-guideline-corpus.md)
+explains the validation gates — and how to reshape the corpus for your
+own setting. *Checkpoint: ingestion exits clean; a guideline panel
 appears during a test consultation.*
 
 **7 · Configure and run it.** Before the first start, copy the example

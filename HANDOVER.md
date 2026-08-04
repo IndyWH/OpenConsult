@@ -4607,4 +4607,6 @@ owed and deliberately not added**: the natural locations (help/00's
 router table and reading order, help/03's stage 6, help/04's go-next
 block) were reported to the owner with suggested wording, and the owner
 writes whatever help/ prose actually changes. README needs nothing — its
-help-series mentions don't enumerate articles.
+help-series mentions don't enumerate articles. **Gap closed in slice 8
+(2026-08-04): the owner approved all four suggested sentences verbatim,
+and they are applied — article 09 is reachable from 00, 03 and 04.**

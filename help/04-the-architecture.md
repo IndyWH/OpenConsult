@@ -99,5 +99,7 @@ point at the row.
   — what these components refuse to do, and why refusal is the feature.
 - **Pull a thread →** [Is AI-written code safe?](08-security.md) — how the
   same machine is defended on the network.
+- **What the panel knows →** [Where the guidelines come from](09-the-guideline-corpus.md)
+  — the corpus is built, validated and versioned locally, never shipped.
 
 *Model versions and exact memory figures are in [`HANDOVER.md`](../HANDOVER.md).*

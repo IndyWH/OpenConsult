@@ -82,6 +82,7 @@ each found a defect no automated test had caught.
 | A developer or researcher | [The architecture](04-the-architecture.md) → [Safety by construction](06-safety-by-construction.md) |
 | Wondering about its limits | [Why one consultation at a time](05-why-one-consultation-at-a-time.md) |
 | Interested in what went wrong | [What the room taught us](07-what-the-room-taught-us.md) |
+| Adapting it to your own setting | [Where the guidelines come from](09-the-guideline-corpus.md) — the corpus as a research instrument |
 
 ---
 
@@ -92,6 +93,7 @@ New here? The tour reads well in this order:
 [The architecture](04-the-architecture.md) →
 [Why one consultation at a time](05-why-one-consultation-at-a-time.md) →
 [Safety by construction](06-safety-by-construction.md) →
+[Where the guidelines come from](09-the-guideline-corpus.md) →
 [What the room taught us](07-what-the-room-taught-us.md) →
 [Is AI-written code safe?](08-security.md). Ready to run it yourself?
 [Installing and running it](03-installing-and-running.md).
