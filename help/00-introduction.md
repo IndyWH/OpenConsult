@@ -83,6 +83,7 @@ each found a defect no automated test had caught.
 | Wondering about its limits | [Why one consultation at a time](05-why-one-consultation-at-a-time.md) |
 | Interested in what went wrong | [What the room taught us](07-what-the-room-taught-us.md) |
 | Adapting it to your own setting | [Where the guidelines come from](09-the-guideline-corpus.md) — the corpus as a research instrument |
+| Being shown, not told | [Using it, step by step](02-using-it-step-by-step.md) — one consultation, queue to referral letter, with screenshots |
 
 ---
 
@@ -90,6 +91,7 @@ each found a defect no automated test had caught.
 
 New here? The tour reads well in this order:
 [A consultation's journey](01-a-consultations-journey.md) →
+[Using it, step by step](02-using-it-step-by-step.md) →
 [The architecture](04-the-architecture.md) →
 [Why one consultation at a time](05-why-one-consultation-at-a-time.md) →
 [Safety by construction](06-safety-by-construction.md) →

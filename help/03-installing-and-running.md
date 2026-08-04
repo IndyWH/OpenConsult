@@ -125,6 +125,7 @@ which provides certificates without exposing anything to the internet.
   the security posture, and what a self-hoster should set first.
 - **Pull a thread →** [Why one consultation at a time](05-why-one-consultation-at-a-time.md)
   — the one hardware limit with no workaround.
+- **See what using it looks like →** [Using it, step by step](02-using-it-step-by-step.md) — the screens, from queue to referral letter.
 
 *Exact commands and the full troubleshooting list live in the repository's
 README and [`HANDOVER.md`](../HANDOVER.md).*

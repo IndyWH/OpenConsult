@@ -130,6 +130,7 @@ entirely: the letter presents evidence; the specialist draws conclusions.
 
 ## Where to go next
 
+- **See it on screen →** [Using it, step by step](02-using-it-step-by-step.md) — the same journey as screenshots, one per step.
 - **Continue the tour →** [The architecture](04-the-architecture.md) — how
   five AI models share one machine to do everything you just followed.
 - **Pull a thread →** [Safety by construction](06-safety-by-construction.md)
