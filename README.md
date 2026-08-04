@@ -53,7 +53,11 @@ uv sync
 #    short, or placeholder key
 cp .env.example .env
 
-# 5. Run the app — the production invocation, exactly what the systemd
+# 5. Create the first admin from the server shell (password prompted) —
+#    public registration can never create an admin
+uv run python scripts/manage_users.py create your-username admin "Your Name"
+
+# 6. Run the app — the production invocation, exactly what the systemd
 #    unit on the reference machine runs
 uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -62,8 +66,9 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 never be used for an internet-exposed app.)
 
 Then open http://127.0.0.1:8000/login and register two accounts — one
-receptionist, one doctor (the first account ever registered becomes
-admin). The two-role demo flow, per the plan:
+receptionist, one doctor. Registrations start pending: approve both from
+the admin account you created in step 5 (*Users* view). The two-role demo
+flow, per the plan:
 
 1. **Receptionist** → *Today* tab: add a synthetic patient to the walk-in
    queue (reorder with ↑/↓ while waiting).
