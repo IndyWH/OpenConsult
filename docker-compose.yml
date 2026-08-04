@@ -1,0 +1,123 @@
+# Consultation AI — Compose deployment (DOCKER_DEMO_SPEC.md, signed off
+# 2026-08-04). Three services: db (bundled), app, and ollama behind a
+# profile — the DEFAULT path is a host Ollama install (owner decision 1:
+# a second copy wastes ~17 GB of models).
+#
+# Before first `up`, on the host:
+#   cp .env.example .env       # then set SECRET_KEY (openssl rand -hex 32)
+#   # the app REFUSES to start on a missing/short/placeholder key
+# First-run corpus ingestion is explicit, validated and re-runnable:
+#   docker compose run --rm app python scripts/ingest_guidelines.py
+# First admin (never the web form):
+#   docker compose exec app python scripts/manage_users.py create <user> admin "Name"
+# The suite, in-container (§1.5 — CREATEDB + template1 vector are in the
+# db init scripts precisely so this works on a fresh clone):
+#   docker compose run --rm app pytest
+#
+# Bundled Ollama instead of host: start with `--profile ollama` and set
+# OLLAMA_URL=http://ollama:11434 in .env.
+#
+# TRUSTED_PROXY_CIDRS is deliberately NOT set here: this compose file
+# ships no reverse proxy (spec §1.3 — HTTPS is the operator's problem),
+# so nothing should be trusted to speak X-Forwarded-For. If you add a
+# proxy container, set TRUSTED_PROXY_CIDRS to this network's subnet in
+# .env — otherwise per-IP rate limits silently become global (§1.1).
+
+services:
+  db:
+    image: pgvector/pgvector:pg18
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-superuser-only}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD:-consultation_dev_password}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+    # Not published to the host: the reference machine already runs its
+    # own Postgres on 5432, and nothing outside the compose network needs
+    # this one.
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  app:
+    build: .
+    # .env comes from the host at runtime — never baked into the image.
+    # SECRET_KEY lives there; the app fails fast without a real one.
+    env_file: .env
+    environment:
+      # Overrides of .env values that are host-specific. DATABASE_URL in
+      # a host .env points at localhost; in compose the db service is the
+      # server. Password must match the db service's APP_DB_PASSWORD.
+      DATABASE_URL: postgresql://consultation_app:${APP_DB_PASSWORD:-consultation_dev_password}@db:5432/consultation_ai
+      # Owner decision 1: host Ollama is the default path.
+      # host.docker.internal resolves to the host on Docker Desktop/WSL2
+      # and via the extra_hosts entry on native Linux. The host's Ollama
+      # must listen beyond loopback (OLLAMA_HOST=0.0.0.0 on the host).
+      OLLAMA_URL: ${OLLAMA_URL:-http://host.docker.internal:11434}
+      # The voice is a separate GPL tool installed OUTSIDE the app's
+      # dependencies (owner decision 2026-07-25); it is not in the image,
+      # so the container must not advertise a voice it does not have.
+      TTS_ENABLED: "false"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    # localhost only: the secure-origin path for the microphone in a
+    # single-machine demo (§1.6), and no accidental LAN exposure.
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - audio:/app/data          # recordings + FLAC; must survive `down` (§1.7)
+      - corpus:/app/corpus       # ingested locally, never in the image (§1.2)
+      - hf-cache:/root/.cache/huggingface  # WhisperX/pyannote; token stays the operator's
+    depends_on:
+      db:
+        condition: service_healthy
+    # Unauthenticated by design, aggregate counts only, cached ~10 s so
+    # probing cannot load the database (§1.7).
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/api/monitor/pulse"]
+      interval: 30s
+      timeout: 5s
+      start_period: 60s
+      retries: 3
+    # Finalisation runs WhisperX + pyannote in-process: the app container
+    # needs the GPU, and the real requirement is 24 GB VRAM effectively
+    # exclusive (§1.6) — a second GPU workload causes OOM, not slowness.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  # Bundled Ollama (owner decision 1: supported, NOT the default).
+  #   docker compose --profile ollama up -d
+  # and set OLLAMA_URL=http://ollama:11434 in .env. Models are pulled on
+  # first use into the named volume:
+  #   docker compose exec ollama ollama pull medgemma:27b
+  #   docker compose exec ollama ollama pull embeddinggemma
+  ollama:
+    # Pinned to the version the reference machine runs.
+    image: ollama/ollama:0.31.1
+    profiles: ["ollama"]
+    volumes:
+      - ollama-models:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    restart: unless-stopped
+
+volumes:
+  pg-data:        # Postgres data
+  audio:          # WAV + FLAC — the retention sweep and FLAC-on-approval live here
+  corpus:         # guideline corpus, ingested locally
+  hf-cache:       # HF models (WhisperX, pyannote)
+  ollama-models:  # only used with --profile ollama
