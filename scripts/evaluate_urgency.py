@@ -9,17 +9,21 @@ Success criteria:
 - Where it fires, it should CLEAR once the transcript shows the action
   done or arranged (every emergency script ends with the doctor arranging it)
 
-Writes evals/urgency_results.json and prints a markdown results table.
+Writes a dated evals/urgency_results_<date>.json beside the committed
+baseline and prints a markdown results table; overwriting the baseline
+itself (evals/urgency_results.json) requires --write-baseline.
 
-Usage: uv run python scripts/evaluate_urgency.py
+Usage: uv run python scripts/evaluate_urgency.py [--write-baseline]
 """
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import sys
 import time
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -124,13 +128,27 @@ def verdict(r: dict) -> str:
 
 
 async def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--write-baseline", action="store_true",
+        help="overwrite the committed baseline results file — re-baselines "
+             "every future comparison — instead of writing a dated file "
+             "beside it")
+    args = parser.parse_args()
+    out_path = OUT_PATH if args.write_baseline else OUT_PATH.with_name(
+        f"{OUT_PATH.stem}_{date.today().isoformat()}{OUT_PATH.suffix}")
+
     results = []
     for name in EXPECTATIONS:
         print(f"=== {name}", flush=True)
         results.append(await evaluate_script(name))
 
-    OUT_PATH.parent.mkdir(exist_ok=True)
-    OUT_PATH.write_text(json.dumps(results, indent=1))
+    out_path.parent.mkdir(exist_ok=True)
+    out_path.write_text(json.dumps(results, indent=1))
+    if not args.write_baseline:
+        print(f"\nWrote evals/{out_path.name}; baseline evals/{OUT_PATH.name}"
+              f" untouched. Compare:\n"
+              f"  diff evals/{OUT_PATH.name} evals/{out_path.name}")
 
     print("\n| Script | Expected | Fired | First fired | First action said | Cleared | Dx stability | Verdict |")
     print("|---|---|---|---|---|---|---|---|")

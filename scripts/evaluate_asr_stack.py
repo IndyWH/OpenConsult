@@ -56,6 +56,7 @@ import math
 import statistics
 import sys
 import wave as wave_mod
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -321,6 +322,10 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--cids", default=None,
                         help="comma-separated subset (default: all candidates)")
+    parser.add_argument("--write-baseline", action="store_true",
+                        help="overwrite the committed baseline results file — "
+                             "re-baselines every future comparison — instead "
+                             "of writing a dated file beside it")
     args = parser.parse_args(argv or [])
     requested = ([int(c) for c in args.cids.split(",")]
                  if args.cids else None)
@@ -377,8 +382,13 @@ def main(argv: list[str] | None = None) -> int:
         "stored_turn_counts": {c: len(stored_turns[c]) for c in cids},
         "results": {str(c): results[c] for c in cids},
     }
-    OUT_PATH.write_text(json.dumps(payload, indent=1))
-    print(f"\nWritten: {OUT_PATH}")
+    out_path = OUT_PATH if args.write_baseline else OUT_PATH.with_name(
+        f"{OUT_PATH.stem}_{date.today().isoformat()}{OUT_PATH.suffix}")
+    out_path.write_text(json.dumps(payload, indent=1))
+    print(f"\nWritten: {out_path}")
+    if not args.write_baseline:
+        print(f"Baseline evals/{OUT_PATH.name} untouched. Compare:\n"
+              f"  diff evals/{OUT_PATH.name} evals/{out_path.name}")
 
     print("\n| cid | ref | WER a/b | turns stored/a/b | drift a/b (s) "
           "| roles a/b | S2 a/b |")

@@ -4238,8 +4238,12 @@ detail; this is the short list of what is *not* finished.
   prompt, and the 467 prompt/window change. Last run was against the
   five-value, single-call build (`evals/urgency_results.json`, left at
   the committed baseline deliberately). `scripts/evaluate_urgency.py`,
-  ~30 minutes of model time; it OVERWRITES that baseline as it runs, so
-  copy it out first.
+  ~30 minutes of model time. Since 2026-08-04 a run writes a DATED
+  results file beside the baseline by default and prints the diff hint —
+  overwriting the baseline requires `--write-baseline` (the six
+  in-place-writing harnesses got the same guard;
+  `evaluate_sinhala_asr.py` already takes `--out`), so the
+  copy-it-out-first dance is no longer needed.
 - **`AFFECT_RECENT_TURNS = 4` is a guess with nothing measured behind
   it.** 467's `PATIENT_AFFECT` log is the first material to calibrate
   against. Note the unit: the live transcript has no speaker labels, so a

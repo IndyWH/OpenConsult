@@ -68,9 +68,11 @@ Usage: uv run python scripts/evaluate_cds_restraint.py
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -148,6 +150,16 @@ def breadth_trajectory(updates: list[dict]) -> list[dict]:
 
 
 async def main() -> None:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--write-baseline", action="store_true",
+        help="overwrite the committed baseline results file — re-baselines "
+             "every future comparison — instead of writing a dated file "
+             "beside it")
+    args = parser.parse_args()
+    out_path = OUT_PATH if args.write_baseline else OUT_PATH.with_name(
+        f"{OUT_PATH.stem}_{date.today().isoformat()}{OUT_PATH.suffix}")
+
     results = []
     for name, expected_fire in UK_EXPECTATIONS.items():
         print(f"=== {name}", flush=True)
@@ -163,8 +175,12 @@ async def main() -> None:
         r["urgency_verdict"] = urgency_verdict(r)
         results.append(r)
 
-    OUT_PATH.parent.mkdir(exist_ok=True)
-    OUT_PATH.write_text(json.dumps(results, indent=1))
+    out_path.parent.mkdir(exist_ok=True)
+    out_path.write_text(json.dumps(results, indent=1))
+    if not args.write_baseline:
+        print(f"\nWrote evals/{out_path.name}; baseline evals/{OUT_PATH.name}"
+              f" untouched. Compare:\n"
+              f"  diff evals/{OUT_PATH.name} evals/{out_path.name}")
 
     print("\n### Urgency arm (11/12/13 silent, 14/15 fire)")
     print("| Script | Expected | Fired | First fired | Cleared | Verdict |")

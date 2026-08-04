@@ -50,9 +50,11 @@ Usage: uv run python scripts/evaluate_retrieval_composition.py
 
 from __future__ import annotations
 
+import argparse
 import asyncio
 import json
 import sys
+from datetime import date
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -215,6 +217,16 @@ class HarnessRAG(RAGService):
 
 
 async def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser.add_argument(
+        "--write-baseline", action="store_true",
+        help="overwrite the committed baseline results file — re-baselines "
+             "every future comparison — instead of writing a dated file "
+             "beside it")
+    args = parser.parse_args()
+    out_path = OUT_PATH if args.write_baseline else OUT_PATH.with_name(
+        f"{OUT_PATH.stem}_{date.today().isoformat()}{OUT_PATH.suffix}")
+
     svc = HarnessRAG()
     report: dict = {"note": "REPORT ONLY — strategies exist in this harness "
                             "only; app/rag.py is untouched and nothing ships. "
@@ -261,8 +273,12 @@ async def main() -> int:
             "eval_pass_rate": f"{passes}/{len(IN_CORPUS) + len(OUT_OF_CORPUS)}",
             "cases": rows, "anaemia_450": anaemia}
 
-    OUT_PATH.write_text(json.dumps(report, indent=1))
-    print(f"\nWritten: {OUT_PATH}")
+    out_path.write_text(json.dumps(report, indent=1))
+    print(f"\nWritten: {out_path}")
+    if not args.write_baseline:
+        print(f"\nWrote evals/{out_path.name}; baseline evals/{OUT_PATH.name}"
+              f" untouched. Compare:\n"
+              f"  diff evals/{OUT_PATH.name} evals/{out_path.name}")
 
     print("\n| Strategy | Eval | 450 slots | 450 top cited |")
     print("|---|---|---|---|")
