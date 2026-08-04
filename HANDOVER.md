@@ -4252,11 +4252,23 @@ detail; this is the short list of what is *not* finished.
   `FACE_ACTIVITY_RMS` comment names one of the three surfaces that share
   its `1e-4` default (the spec § 2.2 names all three).
 
-## Carried task (2026-08-01): SECRET_KEY fail-fast guard — NOT STARTED
+## Carried task (2026-08-01): SECRET_KEY fail-fast guard — DONE 2026-08-04
 
 Came out of a home-network security review run by Claude Cowork on
 2026-08-01. No code was touched by that review; this note is the only
 change. The task below is queued for a fresh session.
+
+**Discharged 2026-08-04** in commit 74d5e0c (`security: SECRET_KEY
+refuses to start on a missing or known key`), implemented exactly as
+specified below, with one departure: `help/03-installing-and-running.md`
+was NOT updated — help prose is the owner's verbatim text (owner decision
+2026-08-01, § *Help series*). The article now understates reality: its
+stage 7 says "Start the server, open the browser, create the first
+admin", and the server now refuses to start until `SECRET_KEY` is set —
+nothing in the article's seven stages mentions `.env` or the key. The
+replacement wording comes from the owner, and it belongs with the
+"before you expose it" step that waits on the first-admin decision (see
+the Phase 2 security section at the end of this file).
 
 **What was checked and is fine — do not redo this.** The live service reads
 `/home/wajir/consultation-ai/.env`, and the `SECRET_KEY` there is a custom
@@ -4350,3 +4362,28 @@ where this project runs. Anything that installs a database, a broker or a cache 
 Windows is either a mistake or needs a written reason here, because WSL2 mirrored
 networking means the two sides share one port space and a silent Windows service can
 take a port the app expects.
+
+## Security — Phase 2, the going-public hardening (opened 2026-08-04)
+
+Phase 1 (the 2026-07-31 audit's XSS cluster, registration input bounds,
+CSP + nosniff, the Secure cookie flag) landed 2026-07-31 — commits
+421cde8, 7b24bec, ce9cfc4, 9ba3b52 — and was verified live. Phase 2
+opened 2026-08-04 with the SECRET_KEY fail-fast guard (74d5e0c,
+discharging the carried task above) and the gitignore class-block below.
+The audit's full findings live in `SECURITY_AUDIT_FINDINGS_2026-07-31.md`
+at the repo root, which is deliberately NOT in the repository — that is
+the point of the next paragraph.
+
+**The findings-file episode (recorded 2026-08-04).** The findings file
+was committed at the owner's rushed instruction on 2026-08-01 as a5ded2f
+(`security: commit the 2026-07-31 audit findings (owner decision)`,
+Co-Authored-By: Claude Opus 5). The owner reversed that decision on
+2026-08-04: the commit was removed from history by rebase BEFORE any
+push, so the remote never saw it, and `.gitignore` now blocks the class
+(root-level `*FINDINGS*` / `*REVIEW*` markdown — fb10e05). The file
+itself still exists on this machine, ignored rather than deleted; it may
+name live weaknesses, and this repository's history is destined to be
+public. The lesson, plainly: a single-file commit made "at the owner's
+instruction" against a standing written rule should be queried once
+before executing — the standing rule was written when calm and the
+instruction was given in a rush.
