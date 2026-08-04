@@ -3,6 +3,7 @@ name = "consultation-ai"
 version = "0.1.0"
 description = "AI-assisted medical consultations in Sinhala and English — research/educational prototype"
 readme = "README.md"
+license = "AGPL-3.0-or-later"
 requires-python = ">=3.12,<3.13"
 dependencies = [
     "fastapi>=0.115",

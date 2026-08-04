@@ -163,3 +163,12 @@ For running everything as system services that survive a reboot
 (PostgreSQL, Ollama, the app), and for the after-reboot checklist and
 known failure modes, see `HANDOVER.md` — the engineering record. The
 reader-facing tour lives in `help/`.
+
+## Licence
+
+This project's own code is licensed **AGPL-3.0-or-later** — see
+`LICENSE`. The vendored face engine at `vendor/kindalive/` remains MIT
+under its upstream licence (`vendor/kindalive/LICENSE`); `NOTICE`
+records the full third-party picture, including model and corpus terms.
+The "never real patients" rule at the top of this README is a research-
+scope constraint of the prototype, not a licence term.

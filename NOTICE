@@ -6,6 +6,10 @@ This file records third-party components whose licences ask for
 attribution, or whose relationship to this codebase is worth stating
 precisely.
 
+The project's own code is licensed AGPL-3.0-or-later (see LICENSE). The
+vendored kindalive components under vendor/kindalive/ remain MIT under
+their upstream licence — see the kindalive entry below.
+
 
 Piper (text to speech) — invoked as a separate process, not linked
 ------------------------------------------------------------------
