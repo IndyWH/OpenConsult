@@ -464,6 +464,20 @@ def test_service_reports_unavailable_for_a_missing_command(tmp_path):
     assert "uv tool install" in service.unavailable_reason()
 
 
+def test_the_kill_switch_refuses_regardless_of_a_working_setup(tmp_path, monkeypatch):
+    """TTS_ENABLED=false must win over an otherwise working configuration:
+    it is how a deployment without a synthesiser (the container, where
+    piper is deliberately outside the image) declines to advertise a
+    voice it does not have. Never covered before the in-container suite
+    made the switch's reach visible."""
+    monkeypatch.setattr(speech, "TTS_ENABLED", False)
+    service = service_with(tmp_path, seconds=0.5)
+    assert service.available is False
+    assert service.unavailable_reason() == "TTS_ENABLED=false"
+    with pytest.raises(speech.SpeechUnavailable, match="TTS_ENABLED"):
+        service.synthesise("Any nausea?")
+
+
 # --- prepare(): resolution plus synthesis ----------------------------------
 
 def test_prepare_registers_an_utterance_carrying_its_provenance(tmp_path):
@@ -564,6 +578,22 @@ def _db_ready() -> bool:
 
 
 needs_db = pytest.mark.skipif(not _db_ready(), reason="PostgreSQL not available")
+
+
+@pytest.fixture(autouse=True)
+def tts_enabled(monkeypatch):
+    """Pin the deployment kill-switch ON for this file.
+
+    Everything here drives SpeechService through explicit fake commands
+    and tmp paths, so none of it needs a real synthesiser — but the
+    module-level TTS_ENABLED reads the ambient environment, and a
+    deployment that sets it false (the container deliberately ships
+    without piper) would short-circuit every construction to the same
+    refusal and turn this file's evidence into noise. Found 2026-08-04 by
+    the first in-container run. The switch itself is asserted by
+    test_the_kill_switch_refuses_regardless_of_a_working_setup, which
+    re-patches it off."""
+    monkeypatch.setattr(speech, "TTS_ENABLED", True)
 
 
 @pytest.fixture(autouse=True)
