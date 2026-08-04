@@ -48,9 +48,18 @@ sudo apt update && sudo apt install -y postgresql postgresql-18-pgvector
 # 3. Install project dependencies
 uv sync
 
-# 4. Run the app
-uv run uvicorn app.main:app --reload
+# 4. Configure: copy the template, then set SECRET_KEY to a real value
+#    (`openssl rand -hex 32`) — the app refuses to start on a missing,
+#    short, or placeholder key
+cp .env.example .env
+
+# 5. Run the app — the production invocation, exactly what the systemd
+#    unit on the reference machine runs
+uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
+
+(`--reload` is development-only: it auto-restarts on code edits and must
+never be used for an internet-exposed app.)
 
 Then open http://127.0.0.1:8000/login and register two accounts — one
 receptionist, one doctor (the first account ever registered becomes
