@@ -7,6 +7,12 @@ __pycache__/
 # Environment / secrets — never commit these
 .env
 
+# Security working documents at the repo root (audit findings, review
+# notes) may name live weaknesses and are deliberately kept out of a
+# repository whose history is destined to be public.
+/*FINDINGS*.md
+/*REVIEW*.md
+
 # Test artifacts
 .pytest_cache/
 
