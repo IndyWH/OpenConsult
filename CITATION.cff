@@ -1,0 +1,26 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: "Consultation AI: a fully local, open-source AI consultation assistant"
+abstract: >-
+  A fully local, GDPR-conscious AI consultation assistant, developed by a
+  practising clinician as an open research and education platform (not a
+  medical device; synthetic consultations only). It performs live
+  transcription, speaker diarisation, cited SOAP-note generation, live
+  clinical decision support, and retrieval-grounded guideline summaries,
+  running entirely on a single consumer GPU.
+type: software
+authors:
+  - given-names: "Herath Mudiyanselage Wajira Indika"
+    family-names: "Herath"
+    orcid: "https://orcid.org/0009-0008-6367-1588"
+repository-code: "https://github.com/IndyWH/consultation-ai"
+license: AGPL-3.0-or-later
+keywords:
+  - clinical AI
+  - ambient scribe
+  - speech recognition
+  - clinical decision support
+  - retrieval-augmented generation
+  - local-first
+# version: "1.0.0"        # <- set to the tagged release at launch
+# date-released: "2026-08-XX"   # <- set on release
