@@ -30,7 +30,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-local-superuser-only}
       APP_DB_PASSWORD: ${APP_DB_PASSWORD:-consultation_dev_password}
     volumes:
-      - pg-data:/var/lib/postgresql/data
+      # /var/lib/postgresql, NOT .../data: the Postgres 18 image refuses
+      # a mount at the old path (docker-library/postgres#1259 — data now
+      # lives in a major-version subdirectory so pg_upgrade --link works).
+      - pg-data:/var/lib/postgresql
       - ./docker/db-init:/docker-entrypoint-initdb.d:ro
     # Not published to the host: the reference machine already runs its
     # own Postgres on 5432, and nothing outside the compose network needs
