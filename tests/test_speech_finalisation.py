@@ -37,7 +37,8 @@ import numpy as np
 import psycopg
 import pytest
 
-from app import consultations, finalize, notes, system_utterances, transcript_quality
+from app import (consultations, finalize, notes, speech, system_utterances,
+                 transcript_quality)
 
 SAMPLE_RATE = 16_000
 BYTES_PER_MS = 32
@@ -667,3 +668,108 @@ def test_every_status_the_pipeline_sets_is_either_in_progress_or_lands():
     source = Path("app/finalize.py").read_text() + Path("app/main.py").read_text()
     for status in in_progress | landing:
         assert status in html or status in source, status
+
+
+# --- the final-transcript phrase scan (added 2026-08-04) -------------------
+#
+# An external reviewer's suggested check, adopted because it is the one
+# assertion the rest of this file implies but never states: the pinned
+# phrase table is verbatim, so the FINALISED transcript can be scanned
+# mechanically for every phrase the system can speak. This is the
+# sanctioned use of string comparison named in the module docstring —
+# legitimate as a test assertion, forbidden as a runtime mechanism. The
+# scan asserts the OUTCOME of the whole exclusion chain; it must never
+# be promoted into the pipeline as a filter.
+
+
+def _finalised_turns(segments: list[dict],
+                     spans_s: list[tuple[float, float]]) -> tuple[list, list]:
+    """The shipped post-ASR chain, in transcribe_and_diarise's exact
+    order: invariant -> merge -> roles -> idx. Returns (turns, dropped)."""
+    kept, dropped = finalize.drop_segments_in_excluded_spans(segments, spans_s)
+    turns = finalize.merge_into_turns(kept)
+    for turn in turns:
+        turn.pop("weight", None)
+    turns, _single = finalize.attribute_roles(turns)
+    for i, turn in enumerate(turns):
+        turn["idx"] = i
+    return turns, dropped
+
+
+def _pinned_phrases_in(turns: list[dict]) -> list[str]:
+    """Ids of every pinned phrase whose verbatim text appears in the
+    transcript, normalised for case and whitespace so a re-entry cannot
+    hide behind either."""
+    joined = " ".join(" ".join(t["text"].split()) for t in turns).lower()
+    return [pid for pid, text in speech.PHRASES.items()
+            if " ".join(text.split()).lower() in joined]
+
+
+def _segments_with_phrase_re_entry(phrase: str) -> list[dict]:
+    """A consultation where the system's spoken phrase came back from the
+    ASR as its own segment at 8.0-11.0 s — the acoustic re-entry shape:
+    the microphone heard the speaker, and the words reached transcription."""
+    def words(text: str, speaker: str, start: float, end: float) -> list[dict]:
+        toks = text.split()
+        step = (end - start) / max(len(toks), 1)
+        return [{"word": w, "score": 0.9, "speaker": speaker,
+                 "start": start + i * step, "end": start + (i + 1) * step}
+                for i, w in enumerate(toks)]
+
+    return [
+        {"start": 0.0, "end": 2.0, "text": "Good morning, what brings you in?",
+         "words": words("Good morning, what brings you in?", "SPEAKER_00", 0.0, 2.0)},
+        {"start": 3.0, "end": 7.5, "text": "I have had chest pain since yesterday.",
+         "words": words("I have had chest pain since yesterday.", "SPEAKER_01", 3.0, 7.5)},
+        {"start": 8.0, "end": 11.0, "text": phrase,
+         "words": words(phrase, "SPEAKER_01", 8.0, 11.0)},
+        {"start": 12.0, "end": 14.0, "text": "It gets worse when I climb stairs.",
+         "words": words("It gets worse when I climb stairs.", "SPEAKER_01", 12.0, 14.0)},
+    ]
+
+
+@needs_db
+def test_the_finalised_transcript_contains_none_of_the_pinned_phrases():
+    """The reviewer's scenario end-to-end: the system spoke, the words came
+    back from the ASR inside the speaking window, and the FINAL stored
+    transcript must still contain no pinned phrase — because the window's
+    span drops the segment before the merge. Non-vacuity is asserted both
+    ways: the attack segment really carried the phrase and really was
+    dropped, and the surviving transcript still holds the real content."""
+    phrase = speech.PHRASES["disclosure"]
+    segments = _segments_with_phrase_re_entry(phrase)
+    # The speaking window that produced the utterance: 8.0-11.0 s, plus tail.
+    turns, dropped = _finalised_turns(segments, [(8.0, 11.2)])
+
+    assert len(dropped) == 1 and phrase in dropped[0]["text"], (
+        "the attack must reach the invariant: the phrase segment was "
+        "expected to be present and dropped")
+
+    consultations.ensure_schema()
+    cid = asyncio.run(consultations.create_consultation(None, None))
+    asyncio.run(consultations.save_turns(cid, turns))
+    final = asyncio.run(consultations.get_turns(cid))
+
+    assert final, "the finalised transcript must not be empty"
+    assert "chest pain" in " ".join(t["text"] for t in final).lower()
+    assert _pinned_phrases_in(final) == []
+
+
+@needs_db
+def test_the_phrase_scan_detects_a_deliberate_re_entry():
+    """The same scan must be able to FAIL: with the exclusion span absent
+    (the failed_to_play shape — no window was recorded), the phrase
+    survives the chain and the scan reports it. This is the proof that
+    the previous test's silence means absence, not blindness."""
+    phrase = speech.PHRASES["disclosure"]
+    segments = _segments_with_phrase_re_entry(phrase)
+    turns, dropped = _finalised_turns(segments, [])
+
+    assert dropped == [], "with no spans the invariant must drop nothing"
+
+    consultations.ensure_schema()
+    cid = asyncio.run(consultations.create_consultation(None, None))
+    asyncio.run(consultations.save_turns(cid, turns))
+    final = asyncio.run(consultations.get_turns(cid))
+
+    assert _pinned_phrases_in(final) == ["disclosure"]
