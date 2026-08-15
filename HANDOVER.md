@@ -4718,3 +4718,126 @@ The app itself was **not** started by this session: the launch command
 was blocked by the assistant's permission layer, so the owner starts it
 by hand. Manual line, unchanged from the fallback above:
 `uv run uvicorn app.main:app --host 0.0.0.0 --port 8000`.
+
+## Post-migration operations (2026-08-15) — how the machine runs now
+
+**This section supersedes "After-reboot startup sequence", "Remote
+access (Tailscale, set up 2026-07-10)" and "Public-exposure posture
+(Tailscale Funnel, 2026-07-24)" for day-to-day use.** Those three stay
+in place as the record of the WSL2 era — they describe mirrored
+networking, the Windows PostgreSQL port clash and the `curl.exe` hairpin
+workaround, none of which exist on this machine. Read them as history,
+not as instructions.
+
+The migration is complete and verified: the owner click-tested the full
+loop in the browser on 2026-08-15 — login, history intact from the
+restored database, and a test consultation carried through Stop to note
+synthesis, so finalisation works end to end with the Hugging Face token
+cached again.
+
+### After a reboot, nothing needs doing
+
+Everything starts itself. `postgresql`, `ollama`, `consultation-ai` and
+`tailscaled` are all enabled systemd units, and **the wake-the-VM step
+is gone** — there is no WSL to boot, so no "open a terminal once to
+start the machine" ritual. Verify:
+
+```bash
+systemctl is-active postgresql@18-main ollama consultation-ai tailscaled
+tailscale funnel status
+uv run python scripts/migrate.py --check
+curl http://127.0.0.1:8000/health
+```
+
+One thing that looks alarming and is not: `systemctl is-enabled
+postgresql@18-main` reports **`enabled-runtime`**, not `enabled`. That
+is normal Ubuntu packaging — the instance is pulled in by the
+`postgresql.service` wrapper, which *is* `enabled` and carries
+`Wants=postgresql@18-main.service`. Postgres does start at boot. Check
+the wrapper, not the instance, before concluding otherwise.
+
+### The two unit files
+
+Both live in `/etc/systemd/system/`, both run as `User=indy`, both
+`Restart=on-failure`. `consultation-ai.service` uses an absolute path to
+`uv`, because systemd's default PATH does not include `~/.local/bin` —
+the same reason `.env` holds an absolute path for Piper.
+
+`/etc/systemd/system/ollama.service`:
+
+```ini
+[Unit]
+Description=Ollama (user-space install)
+After=network-online.target
+
+[Service]
+User=indy
+ExecStart=/home/indy/.local/opt/ollama/bin/ollama serve
+Environment=OLLAMA_KEEP_ALIVE=30m
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/systemd/system/consultation-ai.service`:
+
+```ini
+[Unit]
+Description=Consultation AI
+After=network-online.target postgresql.service ollama.service
+Wants=postgresql.service ollama.service
+
+[Service]
+User=indy
+WorkingDirectory=/home/indy/Projects/consultation-ai
+ExecStart=/home/indy/.local/bin/uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+**Builds still go live only after `sudo systemctl restart
+consultation-ai`, and the owner runs it.** The app runs without
+`--reload`, so edited code is inert until that restart. Say when a
+change needs one; do not run it.
+
+### Remote access — native Tailscale, no Windows in the path
+
+Tailscale runs natively on Linux now. The consequences are all
+simplifications: no mirrored networking, no Windows interop path, no
+`tailscale.exe` under `/mnt/c`, and **no curl hairpin limitation — the
+public URL is testable from the machine itself**, which was impossible
+under WSL2 and cost real debugging time.
+
+HTTPS terminates at `https://<your-tailnet-host>.ts.net` via
+`tailscale funnel --bg 8000`, proxying to `127.0.0.1:8000`. **Funnel
+means the public internet, not just the tailnet** — owner decision
+2026-08-15, restoring the posture first taken 2026-07-24. Every existing
+defence layer is unchanged: auth, rate limiting, RBAC, the security
+headers, the SECRET_KEY fail-fast guard and registration approval.
+
+**The address has changed, and that is the point.** The Linux node
+registered under a *new* tailnet hostname, because the old Windows node
+still holds the old one. So the app has a new public address, and when
+the owner deletes the old Windows node from the admin console the old
+address dies with it. That is exactly the launch-day mitigation the
+go-public gate was carrying — rotating the Tailscale host so the address
+embedded in published git history goes dead (see the working-tree
+sanitisation entry, 2026-08-04). **It is therefore discharged early, as
+a side effect of the migration rather than a launch-day task**, with the
+old-node deletion as the one remaining action. The sanitisation rule is
+unaffected and still absolute: the real hostname and IP never enter a
+committed file — `<your-tailnet-host>.ts.net` and `<tailnet-ip>` are the
+placeholders, and the bare machine name `mlrig` stays.
+
+### The suite on this machine
+
+**683 passed, 0 skipped.** The zero matters: on the WSL box a handful of
+client-JS tests skipped for want of Node, and the heavy tests skipped
+whenever Ollama, Postgres or the corpus were absent. Node ships with
+Ubuntu 26.04 (v22.22.1 here), so **the client-JS tests now run wherever
+the suite runs**, and this machine has everything else present too.
+Nothing self-skips. A skip on this box is now a signal worth chasing,
+not background noise.
