@@ -53,6 +53,11 @@ one of three jobs: it separates conditions in the differential; it
 records that a red flag was asked about and was absent; or it saves the
 consultant repeating a test. Every other negative goes.
 
+**Selection cuts negatives, never positives.** Every positive finding
+the note records goes in the letter — a positive left out is work the
+consultant has to repeat (the v2.1 A/B dropped "mild SOB with pain";
+owner decision 2026-08-15).
+
 ## Structure (up to four body paragraphs, never more, in order)
 
 1. **Why you are writing, and the history.** One opening sentence:
@@ -79,8 +84,10 @@ consultant repeating a test. Every other negative goes.
    said: remaining past history, current medication with doses, allergy
    status, and the social or occupational detail that changes what the
    patient needs from treatment — all only as the note records them.
-   Never a fact repeated from an earlier paragraph; nothing remaining,
-   no paragraph. A sentence that the patient knows about and agrees to
+   Before output, every paragraph-4 sentence is checked against
+   paragraphs 1–3: a fact stated anywhere earlier in the letter must not
+   appear again here — the repeat is deleted, and if nothing remains the
+   paragraph is omitted. A sentence that the patient knows about and agrees to
    the referral belongs here ONLY if a note line states that in those
    terms — the Plan recording a referral is not the patient's agreement.
 

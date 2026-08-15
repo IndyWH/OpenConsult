@@ -5011,3 +5011,14 @@ states it in those terms — the Plan recording a referral is not the
 patient's agreement. Prompt-layer only; `REFERRAL_LETTER_STYLE.md`
 Register and Structure follow. Verification is the same #66
 regenerate-and-diff, owed after restart.
+
+**Micro-tuned 2026-08-15 (owner decision after the v2.1 A/B — the final
+tuning iteration; the loop closes here):** v2.1 fixed rhythm and the
+agreement sentence but still doubled smoking/hypertension into paragraph
+4 and dropped a positive finding ("mild SOB with pain"). Two rule
+additions, prompt-layer only: selection cuts negatives, never positives
+— every positive the note records goes in the letter; and the
+paragraph-4 dedup is hardened into an explicit pre-output check of every
+paragraph-4 sentence against paragraphs 1–3, delete the repeat, omit the
+paragraph if nothing remains. `REFERRAL_LETTER_STYLE.md` Selection and
+item 4 follow. Verification is the same #66 regenerate after restart.
