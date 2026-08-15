@@ -35,6 +35,7 @@ models/
 data/
 
 # Guideline corpus: fetched locally, never committed (copyright).
-# The manifest is committed and rebuilds it via scripts/ingest_guidelines.py.
+# The manifest is per-installation and local (like .env); only the example
+# manifest is committed. scripts/ingest_guidelines.py rebuilds the corpus.
 corpus/*
-!corpus/manifest.yaml
+!corpus/manifest.example.yaml

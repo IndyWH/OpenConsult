@@ -7,22 +7,25 @@
 # key refuses at startup with the openssl command to run.
 set -euo pipefail
 
-# Seed the committed corpus manifest into the (possibly empty) corpus
+# Seed the committed EXAMPLE manifest into the (possibly empty) corpus
 # volume. The volume shadows /app/corpus, so the image keeps a reference
-# copy. The manifest is provenance and is version-controlled: a newer
-# image's copy wins, loudly. Corpus CONTENT is never seeded — first-run
-# ingestion is the operator's explicit step:
+# copy; a newer image's example wins. The real manifest is the operator's
+# per-installation file and is never touched here — create it once:
+#   docker compose run --rm app cp corpus/manifest.example.yaml corpus/manifest.yaml
+# then edit it to list the sources you hold licences for. Corpus CONTENT
+# is never seeded — first-run ingestion is the operator's explicit step:
 #   docker compose run --rm app python scripts/ingest_guidelines.py
 # It validates what it fetched and exits non-zero listing every failed
 # source; a partially ingested corpus does not present as ready (§1.2).
+# Without a manifest the app still starts; the guidelines panel reports
+# that no corpus is configured and declines every query.
+if ! cmp -s /opt/corpus-manifest.example.yaml corpus/manifest.example.yaml 2>/dev/null; then
+    cp /opt/corpus-manifest.example.yaml corpus/manifest.example.yaml
+    echo "[entrypoint] seeded corpus/manifest.example.yaml into the corpus volume"
+fi
 if [ ! -f corpus/manifest.yaml ]; then
-    cp /opt/corpus-manifest.yaml corpus/manifest.yaml
-    echo "[entrypoint] seeded corpus/manifest.yaml into the corpus volume"
-elif ! cmp -s /opt/corpus-manifest.yaml corpus/manifest.yaml; then
-    cp /opt/corpus-manifest.yaml corpus/manifest.yaml
-    echo "[entrypoint] corpus/manifest.yaml updated from this image (the" \
-         "committed manifest is authoritative); re-run ingestion if" \
-         "sources changed"
+    echo "[entrypoint] no corpus/manifest.yaml in the corpus volume — the app" \
+         "runs without a corpus; see corpus/manifest.example.yaml to create one"
 fi
 
 echo "[entrypoint] waiting for PostgreSQL (${DATABASE_URL%%\?*})..."

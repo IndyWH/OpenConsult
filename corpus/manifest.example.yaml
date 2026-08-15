@@ -1,0 +1,75 @@
+# Example guideline-corpus manifest.
+#
+# The real manifest is corpus/manifest.yaml — a per-installation file that
+# is NOT committed (like .env). Copy this file to that name and edit it:
+#
+#     cp corpus/manifest.example.yaml corpus/manifest.yaml
+#     uv run python scripts/ingest_guidelines.py
+#
+# The corpus files themselves are never committed. Guideline documents are
+# third-party content: each installation lists only sources its operator
+# holds the right to use this way, and the licence note records that
+# basis. The ingest script fetches each source into corpus/ (gitignored),
+# chunks it, embeds it locally and loads it into PostgreSQL, then validates
+# what it fetched (see the field notes below).
+#
+# Top-level fields:
+#   corpus_name      Human-readable name, shown in the guidelines panel's
+#                    provenance line.
+#   corpus_version   Free-form version string, stored against every source
+#                    at ingestion and shown in the provenance line. Bump it
+#                    when the source list changes.
+#   sources          The list of documents to ingest, one entry each.
+#
+# Per-source fields:
+#   slug             Unique identifier; also names the cached file in
+#                    corpus/ (<slug>.html) and the database row.
+#   title            Document title as it will appear in citations.
+#   publisher        Publisher name as it will appear in citations.
+#   url              Exact URL fetched. (A source spanning several pages
+#                    may give a `urls:` list instead of `url:`.)
+#   format           Document format; only `html` is supported.
+#   expect_title     Substring that must appear (case-insensitive) in every
+#                    fetched page's <title>. A page whose title does not
+#                    match — or a fetch that redirects to a different page —
+#                    fails ingestion for that source, loudly. This catches
+#                    replaced or retired documents at fetch time.
+#   expected_queries Two or three realistic retrieval queries. After
+#                    ingestion each must retrieve a chunk from its own
+#                    source within the global top ranks at similarity above
+#                    the refusal floor; a source that downloads but cannot
+#                    be found again fails validation. Chunk counts alone
+#                    prove nothing about retrievability.
+#   license_note     Your recorded basis for using this source this way.
+#   date_ingested    ISO date the source was fetched; shown in citations
+#                    and the provenance line.
+#
+# The two sources below are a working example: public-health guidance on
+# dengue that ingests and validates as-is.
+
+corpus_name: "Example corpus - dengue clinical guidance (CDC/WHO)"
+corpus_version: "example-1"
+
+sources:
+  - slug: cdc-dengue-clinical-care
+    title: "Clinical Care of Dengue (healthcare providers)"
+    publisher: CDC
+    url: https://www.cdc.gov/dengue/hcp/clinical-care/index.html
+    format: html
+    expect_title: "dengue"
+    expected_queries:
+      - "dengue warning signs and clinical management"
+      - "dengue fever fluid management and monitoring"
+    license_note: "US CDC public-domain content. Fetched for local research/educational use."
+    date_ingested: "2026-07-07"
+
+  - slug: who-dengue-factsheet
+    title: "Dengue and severe dengue — fact sheet"
+    publisher: WHO
+    url: https://www.who.int/news-room/fact-sheets/detail/dengue-and-severe-dengue
+    format: html
+    expect_title: "dengue"
+    expected_queries:
+      - "severe dengue symptoms and warning signs"
+    license_note: "© WHO. Fetched for local research/educational use only; not redistributed."
+    date_ingested: "2026-07-07"

@@ -49,9 +49,11 @@ RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen
 COPY . .
 
 # The corpus volume mounts over /app/corpus and hides the committed
-# manifest, so a reference copy is kept where the entrypoint can seed it
-# into an empty volume (the manifest is provenance, not corpus content).
-RUN cp corpus/manifest.yaml /opt/corpus-manifest.yaml \
+# example manifest, so a reference copy is kept where the entrypoint can
+# seed it into the volume. The real manifest (corpus/manifest.yaml) is a
+# per-installation file the operator creates from the example inside the
+# volume; it is never in the image.
+RUN cp corpus/manifest.example.yaml /opt/corpus-manifest.example.yaml \
     && chmod +x docker/entrypoint.sh
 
 EXPOSE 8000

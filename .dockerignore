@@ -5,9 +5,10 @@
 .env
 
 # The guideline corpus: licensed for local research use only; an image
-# containing it is redistribution. Only the manifest (provenance) ships.
+# containing it is redistribution. The per-installation manifest is local
+# too; only the example manifest ships.
 corpus/*
-!corpus/manifest.yaml
+!corpus/manifest.example.yaml
 
 # Models and session data live in named volumes, not layers.
 models/
