@@ -37,8 +37,10 @@ implement those rather than re-litigating them.
 
 ## Running it
 
-One machine: WSL2 Ubuntu, an RTX 4090 (24 GB), Postgres 18 + pgvector,
-Ollama in user space. Credentials live in `.env`, which is gitignored;
+One machine: native Ubuntu 26.04 (`indy@mlrig`, project at
+`/home/indy/Projects/consultation-ai`), an RTX 4090 (24 GB), Postgres
+18.4 + pgvector, Ollama in user space at `/home/indy/.local/opt/ollama`.
+Credentials live in `.env`, which is gitignored;
 `.env.example` is the template and every new setting belongs there with a
 one-line comment.
 

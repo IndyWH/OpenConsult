@@ -16,7 +16,8 @@ finalisation transcript-quality gate). Read it before the phase table
 below, or the Sinhala rows will read as work in progress rather than as
 a closed question.
 
-One machine (RTX 4090, 24 GB VRAM, WSL2 Ubuntu 26.04), everything local.
+One machine (RTX 4090, 24 GB VRAM, native Ubuntu 26.04 — `indy@mlrig`,
+project at `/home/indy/Projects/consultation-ai`), everything local.
 
 ```bash
 uv sync    # Python env (uv manages Python 3.12)
@@ -32,13 +33,14 @@ uv sync    # Python env (uv manages Python 3.12)
 - Press **Stop** → finalisation pipeline runs → browser lands on
   `/review/{id}`: diarised transcript + cited draft SOAP note + urgency
   banner if the alarm was never resolved.
-- `uv run pytest` — 346 tests; heavy ones self-skip if Ollama/Postgres/
-  corpus are absent. Since 2026-07-24 the suite runs against a disposable
+- `uv run pytest` — 683 tests; heavy ones self-skip if Ollama/Postgres/
+  corpus are absent (none do on this machine — see the post-migration
+  operations section). Since 2026-07-24 the suite runs against a disposable
   `consultation_ai_test` database (created/dropped per session by
   `tests/conftest.py`) and never writes to the live database; needs a
   one-time superuser grant, see Troubleshooting.
-- Postgres 18 + pgvector, database `consultation_ai`, credentials in the
-  gitignored `.env` (see `.env.example`).
+- Postgres 18.4 + pgvector, running natively, database `consultation_ai`,
+  credentials in the gitignored `.env` (see `.env.example`).
 
 ## Phase status vs PROJECT_PLAN.md
 
@@ -4223,12 +4225,15 @@ Then from any tailnet device: https://<your-tailnet-host>.ts.net
 
 ## Session/environment facts
 
-WSL2 Ubuntu 26.04, RTX 4090 (24 GB), Postgres 18 + pgvector on localhost,
-DB `consultation_ai` / role `consultation_app` (`.env`), HF token via
+Native Ubuntu 26.04 on `mlrig`, user `indy`, project at
+`/home/indy/Projects/consultation-ai` (migrated off WSL2 2026-08-15).
+RTX 4090 (24 GB), Postgres 18.4 + pgvector native on localhost, DB
+`consultation_ai` / role `consultation_app` (`.env`), HF token via
 `hf` CLI cache (needed for pyannote), Ollama user-space at
-`~/.local/opt/ollama`. GitHub: IndyWH/consultation-ai. The project owner
-is a doctor building this to learn — explain technical decisions in
-plain terms, and treat clinical-judgement questions as theirs to decide.
+`/home/indy/.local/opt/ollama`. GitHub: IndyWH/consultation-ai. The
+project owner is a doctor building this to learn — explain technical
+decisions in plain terms, and treat clinical-judgement questions as
+theirs to decide.
 
 ## End of the 2026-08-01 face sessions — what a fresh session needs
 
