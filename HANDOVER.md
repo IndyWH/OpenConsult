@@ -4841,3 +4841,107 @@ Ubuntu 26.04 (v22.22.1 here), so **the client-JS tests now run wherever
 the suite runs**, and this machine has everything else present too.
 Nothing self-skips. A skip on this box is now a signal worth chasing,
 not background noise.
+
+## Repo sanitisation — the public repo is content-agnostic (2026-08-15)
+
+**Why.** NICE replied in writing to the licensing enquiry (2026-08-15).
+Three things it settled, and the slice below is their consequence:
+
+- **Individual research use, including publication, is permitted.** The
+  local research instance keeps its full corpus — including the three
+  CKS topics — under individual research use. Nothing about what this
+  machine ingests, retrieves or reports changes.
+- **Shipped software must not instruct NICE-content use.** Software
+  published openly must not carry instructions that refer to NICE
+  content or encourage its use in the system. So every *instruction-
+  class* file in the repository is now publisher-neutral: README, `help/`,
+  `scripts/`, `tests/`, `app/`, the Docker files, `NOTICE`'s manifest
+  sentence and one sentence of `DOCKER_DEMO_SPEC.md`.
+- **Web-scraping nice.org.uk is not permitted.** The ingest script's
+  behaviour is unchanged (it fetches whatever a manifest lists), but the
+  repository ships no manifest that lists nice.org.uk, and the example
+  it does ship is CDC/WHO.
+
+**What deliberately did NOT change — research records keep their source
+names.** `evals/`, the phase specs, the mock-consultation material and
+every existing HANDOVER entry name NICE guidelines, CKS topics and
+guideline codes throughout, and they stay exactly as written. They are
+the research record of what was measured against what, and a record that
+no longer names its sources is not a record. This is the same distinction
+NICE drew: research use (permitted) versus shipped instruction (not).
+Anyone tempted to "tidy" a code out of an eval should read this paragraph
+first.
+
+**The manifest is now a per-installation file** (commits 750c91e →
+846b70b, one per numbered item of the slice, suite green before each):
+
+- `corpus/manifest.yaml` is untracked (`git rm --cached`) and gitignored
+  the way `.env` is; the file on this machine is untouched and the live
+  instance runs from it exactly as before. **`corpus/manifest.example.yaml`
+  is the committed example** — the CDC dengue clinical-care page and the
+  WHO dengue fact sheet, copied verbatim, with a header documenting every
+  field and stating that each installation lists only sources its
+  operator holds the right to use this way, the licence note recording
+  that basis.
+- **Fresh-clone behaviour** (`app/rag.py`, pinned by
+  `tests/test_rag_no_corpus.py`): without a manifest the app starts,
+  `corpus_name` is "no corpus configured", `corpus_version` is "-", and
+  both answer paths return the ordinary refusal shape — covered false, no
+  citations, a one-sentence summary — without embedding, searching or
+  calling the LLM. `scripts/ingest_guidelines.py` exits 1 with the
+  copy-and-edit instruction before touching the database. With a manifest
+  present nothing changed.
+- **Docker moved with it, beyond the literal item list, because the build
+  would otherwise break on a fresh clone**: the Dockerfile copied
+  `corpus/manifest.yaml` into `/opt` for the entrypoint to seed into the
+  corpus volume, and `.dockerignore` now excludes that file. The image
+  carries the example instead; the entrypoint seeds and refreshes
+  `manifest.example.yaml` in the volume, never touches the operator's
+  `manifest.yaml`, and prints a plain line when there is none. The
+  operator's step is `docker compose run --rm app cp
+  corpus/manifest.example.yaml corpus/manifest.yaml`, then edit, then
+  ingest — README says so. Consequently `DOCKER_DEMO_SPEC.md` §1.2's
+  "Ship `corpus/manifest.yaml`" now means the example manifest, and the
+  entrypoint's "committed manifest is authoritative, a newer image's copy
+  wins" rule applies to the example only; the spec sentence was left as
+  written (a signed-off design record — one sentence in it changed, by
+  instruction, and only that one).
+- **Two decisions I made rather than asked, flagged here for the owner
+  to reverse if wrong:** the Docker entrypoint does *not* auto-copy the
+  example into place as `manifest.yaml` (so a Docker first run has no
+  corpus until the operator explicitly opts in — the content-agnostic
+  reading), and NOTICE's manifest sentence was corrected for accuracy
+  while its publisher list ("NICE, CKS, CDC, WHO … fetched for local
+  research use") was left for the owner to rule on, since NOTICE is the
+  attribution file and the item list did not name it. It appears in the
+  sweep list at the end of the slice report.
+
+**Help series.** `help/09-the-guideline-corpus.md` is the owner's
+verbatim approved replacement (2026-08-15) — format not documents, local
+manifest, the two gates, the no-manifest behaviour; it names no
+publisher. `help/03` stage 6 ("a manifest and an ingestion script rebuild
+it locally") remains true; it does not mention the copy-the-example step,
+which the owner may wish to add — flagged, not edited.
+
+**Harness labels.** `tests/test_retrieval_composition.py`'s synthetic
+hits are relabelled "ckd guideline" / "iron topic" / "anaemia guideline"
+— labels only, every assertion pins the same counts and sets — and the
+harness docstring's finding sentence names sizes and topics rather than
+codes. The finding itself, and its evidence, are unchanged and live in
+`evals/` under their original names.
+
+**Access posture: the Funnel demo is closed.** The public-demo framing of
+the Tailscale Funnel exposure (2026-07-24, restored 2026-08-15 above) is
+closed. Access is approve-only, for named research collaborators within
+the study — **not a public service**. Approve-to-activate is the gate, as
+before; what changes is who is approved: study collaborators, by name.
+Read the "Public-exposure posture" and "Remote access" sections above
+with that in mind.
+
+**Suite after the slice: 689 passed, 0 skipped** (683 before; six new
+no-corpus tests, all light). Verified on this machine: the app starts and
+serves the login page with `corpus/manifest.yaml` present, and with the
+manifest renamed away `RAGService` gives the no-corpus refusal — manifest
+restored afterwards. **The running service was not restarted;** the
+`app/rag.py` change is inert in the live process until the owner
+restarts it, and it changes nothing for an instance that has a manifest.
