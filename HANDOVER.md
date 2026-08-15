@@ -4624,3 +4624,78 @@ the owner rather than edited (the images are approved assets): a
 Snipping Tool popup overlays the corner of `02-3-cds-working.png`, and
 three shots show the walk-in name variant "Ranjit halfway Perera" from
 a different session than the article's main run.
+
+## Migration to native Ubuntu (2026-08-15): WSL2 is gone
+
+The project moved off WSL2 on Windows and onto a native Ubuntu 26.04
+install on the same physical machine. **Old:** user `wajir`, home
+`/home/wajir`, WSL2 under Windows. **New:** `indy@mlrig`, project at
+`/home/indy/Projects/consultation-ai`. NVIDIA driver 595.84 with CUDA
+13.2. The owner installed PostgreSQL 18 + pgvector and restored
+`consultation_ai` from the WSL `pg_dump` before this session, with role
+`consultation_app` granted CREATEDB and pgvector in `template1`.
+
+This session brought the app environment up by hand for the first time
+on the new installation. What it did:
+
+- **`uv` reinstalled** (0.12.5, `~/.local/bin`) — it was absent on the
+  fresh box.
+- **Python environment rebuilt from scratch.** The copied-over `.venv`
+  had every path baked to `/home/wajir` and was unusable; deleted and
+  rebuilt with `uv sync` from the committed `uv.lock` (40 s, no change
+  to `pyproject.toml` or the lock). The CUDA audio path verifies in a
+  fresh process — `_preload_cuda_libraries()` then `torch`, the
+  deliberate ordering in Troubleshooting, prints `cuda True`.
+- **`.env` de-WSL'd.** Two stale paths only — `TTS_MODEL_PATH` and
+  `TTS_COMMAND`, both `/home/wajir` → `/home/indy`. Nothing else in that
+  file was touched, and it stays gitignored.
+- **Piper reinstalled outside the app environment** (`uv tool install
+  piper-tts`, 1.6.1), per the 2026-07-25 decision that keeps it out of
+  `pyproject.toml`. The pinned `en_GB-alba-medium` voice was
+  re-downloaded to `~/.local/share/piper-voices/`; smoke test produced a
+  33 KB 22.05 kHz mono WAV.
+- **Ollama reinstalled user-space** at `~/.local/opt/ollama`, matching
+  the old WSL layout. **The documented tarball URL is dead:** upstream
+  stopped shipping `ollama-linux-amd64.tgz` and now ships
+  `ollama-linux-amd64.tar.zst` (v0.32.13), so
+  `https://ollama.com/download/ollama-linux-amd64.tgz` 307s to a GitHub
+  asset that 404s. Took the `.tar.zst` asset instead and verified its
+  SHA-256 against upstream's `sha256sum.txt`. Anyone rebuilding this box
+  should expect the same. Ollama sees the 4090 (CUDA 13.2, 22.3 GiB
+  available, `default_num_ctx=32768`).
+- **Both models re-pulled** — the WSL model store was deliberately not
+  migrated: `hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M` (16 GB) and
+  `embeddinggemma` (621 MB).
+- **Database check:** `scripts/migrate.py --check` reports
+  `consultation_ai: schema matches the code — no drift`. The restore is
+  clean.
+
+**Suite: 683 passed, 0 skipped, 0 failed** (170 s). The prior recorded
+baseline was 681/681 (slice-6 in-container validation); the extra two
+are tests added since by `a6a6dad` and `c564a13`, not new behaviour.
+Note the **zero skips** — nothing self-skipped because Ollama, Postgres,
+the corpus and Node are all present on this box. Node v22.22.1 came with
+the Ubuntu install, so the client-JS tests that were expected to skip
+ran and passed.
+
+Open items, deliberately not attempted here:
+
+- **Hugging Face login.** The HF cache was not migrated. The owner runs
+  `uv run hf auth login` himself. **Until then finalisation will fail at
+  pyannote — do not press Stop or trigger the finalisation pipeline.**
+  The live ASR model `distil-large-v3` (~1.5 GB) is a separate matter:
+  it downloads itself from Hugging Face on first live use and needs no
+  login.
+- **systemd units** for `ollama` and `consultation-ai` — sudo, and the
+  owner's job. Until they exist, both run by hand; Ollama is currently a
+  `nohup ... ollama serve` writing to `/home/indy/ollama.log`.
+- **Tailscale on Linux** — later. The public-exposure posture and
+  after-reboot sections above still describe the WSL/Windows setup
+  (mirrored networking, the Windows PostgreSQL port clash, the
+  `curl.exe` hairpin workaround) and are **stale on this machine**; they
+  are left as the record of what was, not instructions for what is.
+
+The app itself was **not** started by this session: the launch command
+was blocked by the assistant's permission layer, so the owner starts it
+by hand. Manual line, unchanged from the fallback above:
+`uv run uvicorn app.main:app --host 0.0.0.0 --port 8000`.
