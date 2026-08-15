@@ -238,6 +238,18 @@ def validate_source(conn: psycopg.Connection, source: dict) -> list[str]:
 
 
 def main() -> None:
+    if not MANIFEST.exists():
+        # A fresh clone: the manifest is a per-installation file (like
+        # .env) and is never committed. Say what to do, then stop — there
+        # is nothing to ingest, and the app runs without a corpus.
+        print(
+            f"No corpus manifest at {MANIFEST}.\n"
+            "Copy corpus/manifest.example.yaml to corpus/manifest.yaml, edit it "
+            "to list the sources you hold licences to use this way, then re-run "
+            "this script.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
     manifest = yaml.safe_load(MANIFEST.read_text())
     version = manifest["corpus_version"]
     print(f"Corpus: {manifest['corpus_name']} v{version}\n")

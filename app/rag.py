@@ -77,11 +77,38 @@ Output JSON only.\
 """
 
 
+# What the guidelines panel shows, and what answer() says, when the
+# installation has no corpus manifest at all (a fresh clone before the
+# operator has copied corpus/manifest.example.yaml into place).
+NO_CORPUS_NAME = "no corpus configured"
+NO_CORPUS_VERSION = "-"
+NO_CORPUS_SUMMARY = (
+    "No guideline corpus is configured on this installation, so no "
+    "guideline summary can be given."
+)
+
+
 class RAGService:
     def __init__(self) -> None:
-        manifest = yaml.safe_load(_MANIFEST.read_text())
-        self.corpus_name = manifest["corpus_name"]
-        self.corpus_version = manifest["corpus_version"]
+        # The manifest is a per-installation file (like .env). Without it
+        # the service still constructs and the app still starts; every
+        # query is refused with the same honest shape as an uncovered
+        # topic, and the provenance line says why.
+        if _MANIFEST.exists():
+            manifest = yaml.safe_load(_MANIFEST.read_text())
+            self.corpus_name = manifest["corpus_name"]
+            self.corpus_version = manifest["corpus_version"]
+            self.has_corpus = True
+        else:
+            logger.warning(
+                "no corpus manifest at %s — the guidelines panel will refuse "
+                "every query; copy corpus/manifest.example.yaml to that path, "
+                "edit it, and run scripts/ingest_guidelines.py",
+                _MANIFEST,
+            )
+            self.corpus_name = NO_CORPUS_NAME
+            self.corpus_version = NO_CORPUS_VERSION
+            self.has_corpus = False
 
     # ------------------------------------------------------------ retrieval
 
@@ -128,7 +155,18 @@ class RAGService:
             for r in rows
         ]
 
+    def _no_corpus_provenance(self) -> dict:
+        return {
+            "corpus_name": self.corpus_name,
+            "corpus_version": self.corpus_version,
+            "n_sources": 0,
+            "n_chunks": 0,
+            "date_ingested": "-",
+        }
+
     async def provenance(self) -> dict:
+        if not self.has_corpus:
+            return self._no_corpus_provenance()
         async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
             row = await (
                 await conn.execute(
@@ -154,8 +192,22 @@ class RAGService:
             "management of: " + "; ".join(conditions)
         )
 
+    def _no_corpus_refusal(self, query: str) -> dict:
+        """The refusal shape, for an installation with no manifest: no
+        retrieval, no LLM call, no citations."""
+        return {
+            "query": query,
+            "provenance": self._no_corpus_provenance(),
+            "top_similarity": 0.0,
+            "covered": False,
+            "summary": NO_CORPUS_SUMMARY,
+            "citations": [],
+        }
+
     async def answer(self, query: str) -> dict:
         """Retrieve for a free-text query, then summarise from the passages."""
+        if not self.has_corpus:
+            return self._no_corpus_refusal(query)
         return await self._summarise(query, await self.search(query))
 
     async def answer_for_conditions(self, conditions: list[str]) -> dict:
@@ -168,6 +220,8 @@ class RAGService:
         condition separately and capping passages per source keeps the set
         clinically diverse.
         """
+        if not self.has_corpus:
+            return self._no_corpus_refusal(self.query_for_conditions(conditions))
         merged: dict[str, dict] = {}
         for condition in conditions:
             for hit in await self.search(condition, k=12):
