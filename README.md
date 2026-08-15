@@ -119,13 +119,19 @@ record their own from the scripts.
 a summary grounded ONLY in retrieved guideline passages, each claim cited,
 with a provenance line (corpus name, version, ingestion date). If the local
 corpus doesn't cover the topic, the panel declines rather than improvises.
-The corpus itself is not committed (third-party content); rebuild it from
-the committed manifest:
+The corpus is defined per installation: the repository ships a
+validated example manifest, and each operator lists the guideline
+sources they hold licences to use this way. Copy it, edit it, then
+build:
 
 ```bash
-ollama pull embeddinggemma          # one-time: the embedding model
-uv run python scripts/ingest_guidelines.py   # fetch + chunk + embed into pgvector
+cp corpus/manifest.example.yaml corpus/manifest.yaml
+ollama pull embeddinggemma
+uv run python scripts/ingest_guidelines.py
 ```
+
+Without a manifest the app still runs; the guidelines panel reports
+that no corpus is configured and declines every query.
 
 **Speaker diarisation (one-time setup):** the finalisation pipeline uses
 `pyannote/speaker-diarization-3.1`, which is licence-gated on Hugging
@@ -187,6 +193,7 @@ reader-facing tour lives in `help/`.
 ```bash
 cp .env.example .env          # then set SECRET_KEY: openssl rand -hex 32
 docker compose up -d --build
+docker compose run --rm app cp corpus/manifest.example.yaml corpus/manifest.yaml  # then edit it in the corpus volume
 docker compose run --rm app python scripts/ingest_guidelines.py  # first run, validated, re-runnable
 docker compose exec app python scripts/manage_users.py create <user> admin "Your Name"
 ```
