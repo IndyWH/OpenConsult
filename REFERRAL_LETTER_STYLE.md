@@ -12,51 +12,94 @@
 
 **A real GP referral letter presents the evidence and lets the
 specialist draw the conclusion.** The selection of facts carries the
-differential; the letter must never name it. Concise, evidence-first,
-well under a page, every sentence carrying clinical information — no
-essay style, no sympathy padding, no repeated demographics.
+differential; the letter must never name it. Written the way a GP hands
+a case over to a colleague at the desk — every sentence carrying
+clinical information, no essay style, no filler, no repeated
+demographics.
 
-## Structure (body paragraphs, in order)
+## Register
 
-1. **Opening** — who is being referred and the presenting problem
-   stated as **symptoms, never a diagnosis**: "I would be grateful if
-   you would see this 55-year-old man with a two-week history of
-   exertional chest tightness." Add "urgently" only when the note's
-   plan says so.
-2. **History** — the positive and relevant negative points from the
-   note: symptoms with duration and pattern, PMH, family history, drug
-   history and allergies, relevant social history. Compressed,
-   bullet-like prose.
-3. **Examination findings** — as recorded in the note, nothing more.
-   Omitted if none are recorded.
-4. **Investigations** — results only if the note records them. A test
-   arranged with no result reads exactly as arranged: "An ECG was
-   arranged today." **Planned, performed and resulted are three
-   different claims**; the letter uses the note's wording class (the
-   #66 QA finding).
-5. **Patient expectation** — one sentence, only if the note contains a
-   `Patient's expectations:` entry, citing that line. No entry, no
-   sentence.
-6. **Close** — at most one neutral sentence ("Thank you for seeing
-   him."). Nothing else.
+- **Plain spoken medical English.** Short sentences, one idea per
+  sentence, active voice, verbs doing the work. British English.
+- **Tense carries meaning.** Past tense for what was found, present
+  tense for what is true now.
+- **Say the plain thing.** "Worse at night", not "nocturnally
+  exacerbated"; "while", not "whilst"; state the fact instead of "it is
+  of note that". That whole class of substitution applies.
+- **Never comment on the record.** The letter does not write that a
+  symptom, change or finding "was not documented" or "was not recorded".
+  What the note lacks is omitted, or takes the placeholder.
+
+## Selection — the silent differential
+
+Before writing, the model lists — **in its `reasoning` field only** —
+the three or four conditions the receiving consultant will weigh,
+including any that would be dangerous to miss. That differential
+chooses and orders every fact in the letter, and **it never appears on
+the page**: not as a diagnosis, not as a "?query", not as a list of
+possibilities. The reader should be able to reconstruct it from what was
+selected, never read it.
+
+**Negatives must earn their place.** A negative stays only if it does
+one of three jobs: it separates conditions in the differential; it
+records that a red flag was asked about and was absent; or it saves the
+consultant repeating a test. Every other negative goes.
+
+## Structure (exactly four body paragraphs, in order)
+
+1. **Why you are writing, and the history.** One opening sentence:
+   thank you, the patient, and the problem you want an opinion on,
+   stated as **symptoms, never a diagnosis** — "Thank you for seeing
+   this 55-year-old man with two weeks of exertional chest tightness."
+   Then the story in the note's chronological order: onset, trigger, how
+   it has changed, what it stops the patient doing now. Then the
+   negatives that earn their place. Past history that bears directly on
+   this problem belongs here. If the note has a `Patient's
+   expectations:` line, it is given in one sentence here, citing that
+   line; no such line, no expectation sentence at all.
+2. **What you found.** Examination findings exactly as the note records
+   them, in examining order — inspection, palpation, movement, specific
+   tests — giving the side. A normal finding is included only where its
+   normality narrows the differential. No examination in the note, no
+   paragraph.
+3. **What the tests showed.** Results only as the note records them,
+   with their units. **Planned, performed and resulted are three
+   different claims**; the letter uses the note's wording class — "An
+   ECG was arranged today", never an upgrade to performed or showed (the
+   #66 QA finding). No investigations in the note, no paragraph.
+4. **Background.** Past history not already covered, current medication
+   with doses, allergy status, and the social or occupational detail
+   that changes what the patient needs from treatment — all only as the
+   note records them. Ends with the patient's awareness of and agreement
+   to the referral, only if the note records it.
 
 ## Hard rules
 
-- **No diagnosis or differential, stated or implied** — not the GP's,
-  not the model's. The note's Assessment section is masked in the
-  model's copy of the note AND its lines are uncitable, so a letter can
-  never carry the differential even by grounding.
-- **No advice to the consultant.** Nothing that reads as directing
-  specialist management.
+- **The differential never reaches the page** — no diagnosis, no
+  "?query", no list of possibilities, the GP's or the model's. The
+  note's Assessment section is masked in the model's copy of the note
+  AND its lines are uncitable, so a letter can never carry the
+  differential even by grounding. **One exception, bounded exactly:** a
+  concern that the note's PLAN itself states — a suspected-cancer
+  pathway referral, a red-flag urgency, an established diagnosis the
+  consultant is inheriting — may be stated in one factual sentence
+  citing that Plan line, together with what raised it.
+- **Ask the consultant for nothing, and tell them nothing to do.** No
+  "please arrange", no "please consider", no suggested investigations,
+  no management advice.
+- **Never comment on the record** (see Register): omit, or use the
+  placeholder.
 - **The only source is the approved note.** Letters are generated from
   the APPROVED NOTE TEXT only — never the transcript, never before
   approval (server refuses with 409 before approval and on voided). A
-  letter must not cite content the doctor has not signed.
+  letter must not cite content the doctor has not signed. Each
+  paragraph's `note_lines` lists the lines it draws on; every clinical
+  statement comes from those lines.
 - **Salutation, Re: line and sign-off are code, not model output.**
   Demographics come from the server-side patient record; the model
   writes body paragraphs only.
-- **Never invent** examination findings, doses, or dates. Where
-  something is missing, omit it or write exactly
+- **Never invent** findings, doses, dates or history. Where something is
+  missing, omit it or write exactly
   "[to be completed by the referring doctor]".
 
 ## The gates (code, per sentence — `letters.validate_letter`)
@@ -93,7 +136,11 @@ Audit events: `letter.suggested / created / edited / approved`.
 ## Provenance
 
 Framework written by the owner 2026-07-24 after reviewing the #66
-letter. The two #66 QA findings shaped the gates: a result-class
+letter. **Revised 2026-08-15 by owner decision, craft taken from the
+owner's Meddbase referral-letter method** — the four-paragraph spoken
+register, the silent differential, negatives that earn their place, the
+never-comment-on-the-record rule and the Plan-only naming exception; the
+gates did not move. The two #66 QA findings shaped the gates: a result-class
 upgrade over a planned investigation, and an invented patient
 expectation on the regeneration. Verification at the time: #66
 regenerated under the new prompt and diffed against approved v1 for the
