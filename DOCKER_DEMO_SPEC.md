@@ -38,8 +38,8 @@ commit with its own tests, not folded into a Dockerfile commit.
 
 ### 1.2 What cannot go in the image
 
-**The corpus.** 38 sources, 1301 chunks of NICE, CKS, CDC and WHO content, licensed for local research
-use only, never committed or redistributed. **An image containing it is redistribution.** Ship
+**The corpus.** 38 sources, 1301 chunks of UK and international guideline content held under the
+operator's own licences, never committed or redistributed. **An image containing it is redistribution.** Ship
 `corpus/manifest.yaml` and `scripts/ingest_guidelines.py`; the operator ingests on first run.
 
 First-run ingestion is a long network step that can legitimately fail, and guideline drift is real —
