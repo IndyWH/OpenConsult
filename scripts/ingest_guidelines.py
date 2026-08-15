@@ -1,18 +1,20 @@
 """Build (or rebuild) the local guideline corpus and its pgvector store.
 
-Reads corpus/manifest.yaml, fetches each source (cached in corpus/ — which
-is gitignored; the manifest is the committed record of provenance), chunks
-it with the structure-aware chunker, embeds every chunk locally via Ollama
-(embeddinggemma), and loads the lot into PostgreSQL.
+Reads corpus/manifest.yaml (the per-installation record of provenance —
+local and uncommitted, like .env; corpus/manifest.example.yaml is the
+committed example of its format), fetches each source (cached in corpus/,
+which is gitignored), chunks it with the structure-aware chunker, embeds
+every chunk locally via Ollama (embeddinggemma), and loads the lot into
+PostgreSQL.
 
 Idempotent: re-running replaces each source's chunks.
 
-Validation (the NG28 lesson — a source that downloads is not a source
-that works):
-- Fetch time: a redirect to a different page is a failure (NICE redirects
-  retired chapter URLs to overview stubs instead of 404ing), and every
-  page's <title> must contain the manifest's expect_title (catches wrong
-  or replaced guideline codes).
+Validation (the replaced-source lesson — a source that downloads is not
+a source that works):
+- Fetch time: a redirect to a different page is a failure (some publishers
+  retire pages by redirecting them to overview stubs instead of returning
+  an error), and every page's <title> must contain the manifest's
+  expect_title (catches wrong or replaced guideline codes).
 - After ingestion: every expected_query in the manifest must retrieve a
   chunk from its own source within the global top VALIDATE_TOP_K at
   similarity >= the retrieval refusal floor. This is what proves the
@@ -56,7 +58,8 @@ MIN_SIMILARITY = float(os.getenv("RAG_MIN_SIMILARITY", "0.45"))
 # An expected query must place a chunk of its own source this high in the
 # GLOBAL ranking — generous enough for genuine cross-source overlap
 # (sepsis adult/child, chest pain/angina), tight enough to catch a source
-# that retrieval can never surface (crowding, the NG28-vs-CG173 class).
+# that retrieval can never surface (crowding by a larger source on an
+# overlapping topic).
 VALIDATE_TOP_K = 8
 
 USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36"
@@ -104,9 +107,9 @@ def fetch(url: str, cache_path: Path, expect_title: str) -> str:
         )
         response.raise_for_status()
         if not _same_page(url, str(response.url)):
-            # NICE retires chapter URLs by redirecting them to overview
-            # stubs (or research-only chapters) — that is a dead source,
-            # not a fetched one.
+            # Some publishers retire pages by redirecting them to overview
+            # stubs (or research-only chapters) instead of returning an
+            # error — that is a dead source, not a fetched one.
             raise IngestError(f"redirected to a different page: {url} -> {response.url}")
         html = response.text
         cache_path.write_text(html, encoding="utf-8")
