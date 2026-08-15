@@ -3174,7 +3174,21 @@ encoded in `pyproject.toml`. Summary:
 - Ollama is a user-space install (`~/.local/opt/ollama`), run by the
   `ollama.service` systemd unit since 2026-07-10 (as is the app, via
   `consultation-ai.service` — see the startup sequence below). Models
-  keep_alive 30 m.
+  keep_alive 30 m. **Reinstalling it: the asset is
+  `ollama-linux-amd64.tar.zst`, not the `.tgz` that older notes and blog
+  posts still name** — upstream changed packaging around v0.32, and
+  `https://ollama.com/download/ollama-linux-amd64.tgz` now redirects to a
+  GitHub asset that 404s. Take the `.tar.zst` from the release page and
+  verify its SHA-256 against upstream's `sha256sum.txt` before
+  extracting:
+
+  ```bash
+  curl -L -o ollama.tar.zst \
+    https://github.com/ollama/ollama/releases/latest/download/ollama-linux-amd64.tar.zst
+  curl -L https://github.com/ollama/ollama/releases/latest/download/sha256sum.txt \
+    | grep ollama-linux-amd64.tar.zst          # compare with sha256sum ollama.tar.zst
+  tar --zstd -xf ollama.tar.zst -C ~/.local/opt/ollama   # binary lands at bin/ollama
+  ```
 - sudo needs a real terminal (the assistant's shell can't prompt); batch
   root steps into one command for the user.
 - **Test-database bootstrap fails** ("CREATEDB not granted" / "pgvector
