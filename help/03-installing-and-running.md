@@ -63,8 +63,9 @@ its own environment — deliberately never added to the app's dependencies.
 this clearly, press yes."*
 
 **6 · The guideline corpus.** Not shipped in the repository (the content
-is third-party); a manifest and an ingestion script rebuild it locally,
-and the script *validates* what it fetched — expect it to fail loudly if
+is third-party); you copy the example manifest to `corpus/manifest.yaml`,
+list sources you hold licences for, and the ingestion script builds the
+corpus locally — *validating* what it fetched. Expect it to fail loudly if
 a guideline website has moved things around. That is the script working,
 not breaking. [Where the guidelines come from](09-the-guideline-corpus.md)
 explains the validation gates — and how to reshape the corpus for your

@@ -104,9 +104,9 @@ events instead (build decision 2).
 Clinical guideline corpus
 -------------------------
 
-Third-party content (NICE, CKS, CDC, WHO) is fetched for local research
-use only. It is **never committed and never redistributed** — the
-corpus directory is gitignored. `corpus/manifest.yaml` is the
+Guideline content is fetched per installation under the operator's own
+licences and is never redistributed with this software. It is **never
+committed** — the corpus directory is gitignored. `corpus/manifest.yaml` is the
 per-installation provenance record of what was fetched and from where; it
 is local and uncommitted (like `.env`), and `corpus/manifest.example.yaml`
 is the committed example of its format.

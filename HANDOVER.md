@@ -4945,3 +4945,13 @@ manifest renamed away `RAGService` gives the no-corpus refusal — manifest
 restored afterwards. **The running service was not restarted;** the
 `app/rag.py` change is inert in the live process until the owner
 restarts it, and it changes nothing for an instance that has a manifest.
+
+**Sweep rulings (owner, 2026-08-15):** of the four instruction-class hits
+that survived the slice, `app/rag.py`'s `answer_for_conditions` docstring
+and `NOTICE`'s corpus sentence are neutralised (no guideline code, no
+publisher); `scripts/evaluate_rag.py`'s comments and the Phase-6 mockup
+`docs/mockups/live_mockup.html` are KEPT as research records by owner
+decision — do not "tidy" them. `DOCKER_DEMO_SPEC.md` §1.2 now says the
+image ships `corpus/manifest.example.yaml` (the operator's manifest is
+local, never shipped), and `help/03` stage 6 carries the owner's approved
+copy-the-example wording.

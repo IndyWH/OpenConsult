@@ -40,7 +40,7 @@ commit with its own tests, not folded into a Dockerfile commit.
 
 **The corpus.** 38 sources, 1301 chunks of UK and international guideline content held under the
 operator's own licences, never committed or redistributed. **An image containing it is redistribution.** Ship
-`corpus/manifest.yaml` and `scripts/ingest_guidelines.py`; the operator ingests on first run.
+`corpus/manifest.example.yaml` and `scripts/ingest_guidelines.py`; the operator's `corpus/manifest.yaml` is local and never shipped, and the operator ingests on first run.
 
 First-run ingestion is a long network step that can legitimately fail, and guideline drift is real —
 the 2026-07-24 expansion caught NG51 replaced by NG253/NG254, NG138 by NG250, and both replacements'

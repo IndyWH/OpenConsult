@@ -214,9 +214,10 @@ class RAGService:
         """Retrieve per CDS condition, merge with per-source diversity.
 
         One concatenated query lets a single guideline's title vocabulary
-        dominate (every NG28 chunk contains "type 2 diabetes", so a
-        neuropathy+diabetes query returned NG28 wholesale and never reached
-        the cross-referenced neuropathic-pain guideline). Searching each
+        dominate (every chunk of one large diabetes guideline contains
+        "type 2 diabetes", so a neuropathy+diabetes query returned it
+        wholesale and never reached the cross-referenced neuropathic-pain
+        guideline). Searching each
         condition separately and capping passages per source keeps the set
         clinically diverse.
         """
