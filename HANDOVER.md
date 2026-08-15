@@ -4996,3 +4996,18 @@ process until the owner restarts the service. Then: regenerate a letter
 on a #66-class consultation and diff old against new, with the grounding
 stats compared — the owner and Cowork run that pass. Nothing in this
 entry claims the v2 letter reads better; that is what the pass is for.
+
+**Tuned 2026-08-15 (owner judgement of the v2 output, after the #66
+regenerate-and-diff — LETTER_V2_VERIFICATION.md in the owner's
+Documents):** the v2 letter read staccato — a run of one-fact sentences —
+paragraph 4 repeated paragraph 1, and one sentence over-read the note
+("The patient agrees to this referral", not in it). The prompt now
+restates the taste as rules the local model can follow mechanically:
+rhythm (fold one finding's qualities into one sentence, vary length,
+never a long run of one-fact sentences), a paragraph-4 dedup guard (only
+what earlier paragraphs have not said; up to four paragraphs, never
+more), and the patient-agreement sentence tightened to a note line that
+states it in those terms — the Plan recording a referral is not the
+patient's agreement. Prompt-layer only; `REFERRAL_LETTER_STYLE.md`
+Register and Structure follow. Verification is the same #66
+regenerate-and-diff, owed after restart.

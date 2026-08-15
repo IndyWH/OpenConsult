@@ -177,12 +177,14 @@ LETTER_SCHEMA = {
 LETTER_PROMPT = """\
 You draft the body of a GP referral letter to the requested specialty. \
 Write it the way a GP hands a case over to a colleague at the desk: \
-plain spoken medical English, short sentences, one idea per sentence, \
-active voice, verbs doing the work. Past tense for what was found, \
-present tense for what is true now. Say "worse at night", not \
-"nocturnally exacerbated"; "while", not "whilst"; state the fact instead \
-of "it is of note that". No essay style, no filler, no repeated \
-demographics. British English.
+plain spoken medical English, active voice, verbs doing the work. Keep \
+sentences short but connected: fold one finding's qualities — its \
+character, trigger, duration, relief — into a single sentence rather \
+than several, vary sentence length, and never write a long run of \
+one-fact sentences. Past tense for what was found, present tense for \
+what is true now. Say "worse at night", not "nocturnally exacerbated"; \
+"while", not "whilst"; state the fact instead of "it is of note that". \
+No essay style, no filler, no repeated demographics. British English.
 
 Before writing, in the `reasoning` field only: list the three or four \
 conditions the receiving consultant will weigh, including any that would \
@@ -190,7 +192,7 @@ be dangerous to miss. Choose and order the letter's content by what \
 separates those conditions. That differential drives every selection and \
 NEVER appears in the letter.
 
-Exactly FOUR body paragraphs, in this order:
+Up to FOUR body paragraphs, never more, in this order:
 1. Why you are writing, and the history. Open with one sentence: thank \
 you, the patient, and the problem you want an opinion on, stated as \
 symptoms, never a diagnosis ("Thank you for seeing this 55-year-old man \
@@ -214,11 +216,14 @@ their units. Planned, performed and resulted are three different claims \
 — use the note's wording class ("An ECG was arranged today", never an \
 upgrade to performed or showed). If the note records no investigations, \
 omit this paragraph.
-4. Background. Past history not already covered, current medication with \
-doses, allergy status, and the social or occupational detail that \
-changes what the patient needs from treatment — all only as the note \
-records them. End with the patient's awareness of and agreement to the \
-referral, only if the note records it.
+4. Background — only what the earlier paragraphs have not already said: \
+remaining past history, current medication with doses, allergy status, \
+and the social or occupational detail that changes what the patient \
+needs from treatment — all only as the note records them. Never repeat a \
+fact from an earlier paragraph; if nothing remains, omit this paragraph. \
+A sentence that the patient knows about and agrees to the referral \
+belongs here ONLY if a note line states that in those terms — the Plan \
+recording a referral is not the patient's agreement.
 
 Hard rules:
 - The differential never reaches the page: no diagnosis, no "?query", no \

@@ -19,8 +19,16 @@ demographics.
 
 ## Register
 
-- **Plain spoken medical English.** Short sentences, one idea per
-  sentence, active voice, verbs doing the work. British English.
+- **Plain spoken medical English.** Active voice, verbs doing the work.
+  British English.
+- **Short but connected.** Compress related findings: one finding's
+  qualities — its character, trigger, duration, relief — fold into a
+  single sentence rather than several. Vary sentence length. Never a
+  long run of one-fact sentences (the staccato the v2 output fell into,
+  owner judgement 2026-08-15).
+- **Paragraph 4 never repeats.** Background carries only what the
+  earlier paragraphs have not already said; if nothing remains, the
+  paragraph is omitted. Up to four paragraphs, never more.
 - **Tense carries meaning.** Past tense for what was found, present
   tense for what is true now.
 - **Say the plain thing.** "Worse at night", not "nocturnally
@@ -45,7 +53,7 @@ one of three jobs: it separates conditions in the differential; it
 records that a red flag was asked about and was absent; or it saves the
 consultant repeating a test. Every other negative goes.
 
-## Structure (exactly four body paragraphs, in order)
+## Structure (up to four body paragraphs, never more, in order)
 
 1. **Why you are writing, and the history.** One opening sentence:
    thank you, the patient, and the problem you want an opinion on,
@@ -67,11 +75,14 @@ consultant repeating a test. Every other negative goes.
    different claims**; the letter uses the note's wording class — "An
    ECG was arranged today", never an upgrade to performed or showed (the
    #66 QA finding). No investigations in the note, no paragraph.
-4. **Background.** Past history not already covered, current medication
-   with doses, allergy status, and the social or occupational detail
-   that changes what the patient needs from treatment — all only as the
-   note records them. Ends with the patient's awareness of and agreement
-   to the referral, only if the note records it.
+4. **Background** — only what the earlier paragraphs have not already
+   said: remaining past history, current medication with doses, allergy
+   status, and the social or occupational detail that changes what the
+   patient needs from treatment — all only as the note records them.
+   Never a fact repeated from an earlier paragraph; nothing remaining,
+   no paragraph. A sentence that the patient knows about and agrees to
+   the referral belongs here ONLY if a note line states that in those
+   terms — the Plan recording a referral is not the patient's agreement.
 
 ## Hard rules
 
