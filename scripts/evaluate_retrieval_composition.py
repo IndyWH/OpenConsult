@@ -2,8 +2,9 @@
 
 The finding (consultation 450, measured 2026-07-28): the per-source cap
 of 2 is SYMMETRIC — it caps the correct guideline exactly as hard as the
-wrong one — and the bare condition word "Anaemia" let NG203 (CKD
-anaemia, 75 chunks) outweigh the CKS iron-deficiency topic (32 chunks).
+wrong one — and the bare condition word "Anaemia" let the larger
+chronic-kidney-disease anaemia source (75 chunks) outweigh the smaller
+iron-deficiency topic (32 chunks).
 Three candidate fixes were recorded then; none had been tried. This
 harness implements all three as switchable strategies INSIDE THE HARNESS
 ONLY — `app/rag.py` is untouched, and nothing here ships. The owner

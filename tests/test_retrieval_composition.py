@@ -32,10 +32,10 @@ def hit(source, sim, text):
 # The 450 shape: one big source's vocabulary dominating the ranking, the
 # specific topic crowded below it.
 ANAEMIA = {"Anaemia": [
-    hit("NG203 CKD", 0.80, "a1"), hit("NG203 CKD", 0.79, "a2"),
-    hit("NG203 CKD", 0.78, "a3"), hit("NG203 CKD", 0.77, "a4"),
-    hit("CKS iron", 0.76, "b1"), hit("CKS iron", 0.75, "b2"),
-    hit("NG8 anaemia mgmt", 0.74, "c1")]}
+    hit("ckd guideline", 0.80, "a1"), hit("ckd guideline", 0.79, "a2"),
+    hit("ckd guideline", 0.78, "a3"), hit("ckd guideline", 0.77, "a4"),
+    hit("iron topic", 0.76, "b1"), hit("iron topic", 0.75, "b2"),
+    hit("anaemia guideline", 0.74, "c1")]}
 
 
 def test_production_mirror_caps_symmetrically():
@@ -43,13 +43,13 @@ def test_production_mirror_caps_symmetrically():
     guideline to two slots — and the right one to two slots as well."""
     selected = harness.select_production(ANAEMIA)
     assert harness.composition(selected) == [
-        ("NG203 CKD", 2), ("CKS iron", 2), ("NG8 anaemia mgmt", 1)]
+        ("ckd guideline", 2), ("iron topic", 2), ("anaemia guideline", 1)]
 
 
 def test_citation_diversity_widens_the_cited_source_set():
     selected = harness.select_citation_diversity(ANAEMIA)
     assert {h["source"] for h in selected} == {
-        "NG203 CKD", "CKS iron", "NG8 anaemia mgmt"}
+        "ckd guideline", "iron topic", "anaemia guideline"}
     # Breadth first, then depth by similarity — six slots still filled.
     assert len(selected) == 6
 
