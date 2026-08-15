@@ -4955,3 +4955,44 @@ decision — do not "tidy" them. `DOCKER_DEMO_SPEC.md` §1.2 now says the
 image ships `corpus/manifest.example.yaml` (the operator's manifest is
 local, never shipped), and `help/03` stage 6 carries the owner's approved
 copy-the-example wording.
+
+## Referral letter v2 — the drafting prompt revised (2026-08-15)
+
+**What changed.** `LETTER_PROMPT` in `app/letters.py` is replaced
+verbatim with the owner's approved v2 text (commit af2e985; spec
+`REFERRAL_LETTER_V2_SPEC.md` in the owner's Documents, not in the repo;
+craft taken from the owner's Meddbase referral-letter method).
+`REFERRAL_LETTER_STYLE.md` is rewritten to match (ce57569); it remains
+the owner's framework doc and its own rule stands — where it and the
+code disagree, the code wins. The method, in one paragraph:
+
+- **Four body paragraphs in a plain spoken register** — why you are
+  writing and the history; what you found; what the tests showed;
+  background — the way a GP hands a case over at the desk: short
+  sentences, one idea each, active voice, "while" not "whilst".
+- **Silent-differential selection.** Before writing, the model lists the
+  three or four conditions the consultant will weigh in the `reasoning`
+  field ONLY; that differential selects and orders every fact and never
+  reaches the page.
+- **Negatives must earn their place** — separate conditions, record an
+  absent red flag, or save the consultant a test; otherwise out.
+- **Never comment on the record** — no "was not documented"; omit, or
+  placeholder.
+- **Plan-only exception for naming a stated concern** — a
+  suspected-cancer pathway referral, a red-flag urgency, or a diagnosis
+  the consultant is inheriting, only when the note's PLAN states it, in
+  one factual sentence citing that Plan line.
+
+**All guarantees unchanged.** This is a prompt-layer change only: the
+approved-note-only source, the per-sentence citation and number gates,
+tense fidelity (planned ≠ performed ≠ resulted), the expectation
+drop-gate, and the masked, uncitable Assessment section are exactly as
+they were; `SUGGEST_PROMPT`, the schema, validation and assembly are
+untouched. `tests/test_letters.py` and the rest of the suite pass
+unmodified (689 passed).
+
+**Verification owed and not yet done.** The prompt is inert in the live
+process until the owner restarts the service. Then: regenerate a letter
+on a #66-class consultation and diff old against new, with the grounding
+stats compared — the owner and Cowork run that pass. Nothing in this
+entry claims the v2 letter reads better; that is what the pass is for.
