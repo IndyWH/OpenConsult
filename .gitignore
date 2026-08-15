@@ -4,8 +4,11 @@ __pycache__/
 .venv/
 *.egg-info/
 
-# Environment / secrets — never commit these
+# Environment / secrets — never commit these. The glob covers backups and
+# variants (.env.bak, .env.local); the template is the one exception.
 .env
+.env.*
+!.env.example
 
 # Security working documents at the repo root (audit findings, review
 # notes) may name live weaknesses and are deliberately kept out of a
