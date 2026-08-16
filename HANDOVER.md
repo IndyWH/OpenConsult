@@ -5160,3 +5160,109 @@ for the owner and Cowork:**
 **Not touched:** `help/`, `vendor/`, the two FROZEN documents. No help
 article is made untrue by this slice — nothing user-visible changes
 until slice 3.
+
+## Phase 7c slice 3 — turn-taking wired through GOLDEN, dark (2026-08-16)
+
+**What landed.** Auto mode now runs from the doctor's toggle through the
+golden minutes — invitation, encouragers on quiet, the end-of-turn
+officer, the exit to OPEN — and it is DARK: `AUTO_MODE_ENABLED` ships
+false, and with it false the entry's controller is never constructed,
+`speech_config` does not grow, no `auto_*` message is sent, an `auto`
+toggle is refused and a `quiet` report is ignored (pinned by test). OPEN
+and CLOSED are reachable but inert — question flow is slice 4. No UI in
+this slice; the slice-6 Auto pill will send the same `{"type":"auto"}`
+message the tests send. Needs a restart to be live, but there is nothing
+to see until the owner flips the flag, which he must not yet.
+
+- `ff08a1e` — the §12 configuration in the house pattern, mirrored in
+  `.env.example`; `AUTO_MODE_ENABLED` states the gate; the timing values
+  labelled uncalibrated guesses naming the mock-patient round. In the same
+  commit, **amendment A1** appended to `PHASE_7C_EVAL_PREREG.md`
+  (FROZEN; amendments allowed by its own rule) with the owner-approved
+  wording verbatim: metric 3's golden window is 1–2 minutes, carried as
+  `AUTO_GOLDEN_MINUTES_S` and scored against the value in force at the
+  run. `OPEN_CLOSED_RULE.md` untouched.
+- `18a33d2` — the client quiet reporter (`quietReporter` in `live.html`,
+  the nudge's design promoted): reports `{"type":"quiet","quiet_s":N}` at
+  each configured threshold and once a second while quiet lasts, only
+  while the server has confirmed auto on, configured only from
+  `speech_config.auto` (sent only when the gate is up). The three "do not
+  generalise the nudge" guard comments retired, each with its why written
+  in place; `tests/test_silence_nudge_client.py` updated deliberately —
+  the property it now pins is that **the nudge cage still holds outside
+  auto mode**, client and server. The nudge object itself is unchanged.
+- `8e6f722` — the end-of-turn officer in `app/cds.py`: own prompt (the
+  tie-break "when in doubt, not finished" written in), two-boolean
+  schema, recent turns last, temperature 0 seed 42 `CDS_NUM_CTX` (never a
+  reload), `AUTO_OFFICER_TIMEOUT_S`; never raises — a failed verdict plus
+  `turn_finished()`'s silence rule at `AUTO_EOT_FALLBACK_S`.
+- `e6b57f7` — the wiring: `handle_auto` (on requires the disclosure lock,
+  exactly as speak does; walks OFF → DISCLOSURE → INVITATION; GOLDEN
+  starts at the invitation's `speak_ended`), `handle_quiet` (encourager
+  rotated on cooldown through `issue_auto_speak`; officer at
+  `AUTO_EOT_QUIET_S`, re-asked as quiet grows), `maybe_apply_officer`
+  (hand-back exits early; otherwise window run AND turn ended), auto off
+  immediate from every state, everything audited (`auto.enabled`,
+  `auto.disabled`, `auto.phase` with from/to/trigger/detail,
+  `auto.officer_failed`).
+
+Suite 812 → 857 (24 protocol tests for GOLDEN, 16 for the officer, 5
+for the reporter).
+
+**Owner decision recorded for this slice (2026-08-16):** the
+politeness-abort threshold stays at the barge-in absolute floor
+(0.02 RMS) as slice 2 built it, confirmed as the starting value; the
+mock-patient round calibrates it from the audited abort readings. The
+quiet reporter uses the same floor for "quiet" (see below).
+
+**The gate is unchanged.** Barge-in calibration and the mock-patient-round
+review are still owed before `AUTO_MODE_ENABLED` ever flips.
+
+**Where the governing sections did not fully decide, and what the code
+does — for the owner and Cowork to confirm or overrule:**
+
+- **The officer runs in GOLDEN too.** §5 says the officer triggers
+  "outside GOLDEN", but §6's early exit on hand-back and its "timer
+  elapsed AND current turn ended" condition both need its verdict during
+  the golden minutes. It runs on quiet ≥ `AUTO_EOT_QUIET_S` in GOLDEN;
+  in GOLDEN its verdict is used only for the exit (a hand-back, or the
+  turn end once the window has run) — never to ask anything.
+- **Officer cadence within one silence:** once per quiet span at the
+  EOT threshold, and again each time the quiet has grown by
+  `AUTO_EOT_QUIET_S` (3, 6, 9 s…), so a "not finished" does not stick
+  through a long silence. Not a spec number; a mechanism detail.
+- **The reporter's "quiet" floor is the barge-in absolute floor**, the
+  same 0.02 RMS the politeness abort uses — not the nudge's 1e-4 silence
+  floor, which measured room noise exceeds and which would keep the
+  tracker permanently un-quiet in a real room. Copied into the reporter
+  at configure time so the meter loop never names the detector (a
+  standing constraint test). Our own playback ending starts a fresh
+  quiet span (err toward waiting).
+- **Reporter cadence: 1 Hz** after the first threshold while quiet
+  lasts, so the server can rotate encouragers on cooldown without the
+  client deciding anything. A protocol detail, not a threshold.
+- **Enable requires the disclosure already given** (spec §10's pill rule,
+  server-side). Consequence: the enable path never speaks the disclosure
+  itself; the auto path's face auto-on for a spoken disclosure exists in
+  `auto_issue` but is not reached from enable in this slice. If the
+  invitation already played before the toggle (the doctor tapped
+  Disclosure and the chain spoke it), GOLDEN starts at the toggle and
+  the `auto.phase` detail says `{"invitation": "already_completed"}` —
+  the metric-3 zero point is then the toggle, not the invitation's end.
+  Whether the owner wants the one-tap flow instead (Auto speaks the
+  disclosure) is his call; both are a small change.
+- **No server-to-client stop exists**, so auto off lets a playing
+  encourager finish (≤ a second) or the doctor cuts it with Stop/Esc;
+  nothing further is issued. Slice 5's urgency pause will need a stop
+  message or the same acceptance.
+- **With no committed transcript the officer is not asked** (a model
+  judging an empty transcript would be guessing); the silence rule alone
+  can move a patient who never spoke once the window has run.
+- **`auto_refused` is answered to the client and logged, not audited**
+  (nothing was done); `auto.enabled`/`auto.disabled` are audited.
+- **`AUTO_OFFICER_TIMEOUT_S` lives in `app/cds.py`** beside the officer;
+  the other eight in `app/main.py`. `app/auto_mode.py` stays pure.
+
+**Not touched:** `help/`, `vendor/`, `OPEN_CLOSED_RULE.md`;
+`PHASE_7C_EVAL_PREREG.md` only by amendment A1. No help article is made
+untrue: nothing user-visible changes with the gate down.
