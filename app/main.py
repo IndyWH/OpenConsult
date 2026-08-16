@@ -1394,6 +1394,38 @@ AUTO_INVITATION_AFTER_DISCLOSURE = (
 SILENCE_NUDGE_ENABLED = os.getenv("SILENCE_NUDGE_ENABLED", "true").lower() != "false"
 SILENCE_NUDGE_S = float(os.getenv("SILENCE_NUDGE_S", "5"))
 
+# --- Phase 7c: supervised auto history-taking (PHASE_7C_SPEC.md §12) -------
+#
+# THE GATE. Ships false. Everything in 7c builds and tests dark behind it;
+# with it false the app's behaviour is exactly what it was before 7c.
+# Flipping it is the OWNER'S act, after the frozen gate is met — barge-in
+# calibrated (scripts/calibrate_barge_in.py meets D5) and the mock-patient
+# round reviewed. Not a code change; 7c must not arrive by drift.
+AUTO_MODE_ENABLED = os.getenv("AUTO_MODE_ENABLED", "false").lower() == "true"
+# The golden window: encouragers only, zero questions, from the invitation's
+# speak_ended (the prereg's metric-3 zero point). Owner decision 2026-08-16:
+# 1–2 minutes, superseding the parent spec's 2–3 (PHASE_7C_EVAL_PREREG.md
+# amendment A1); recorded per run, scored against the value in force.
+AUTO_GOLDEN_MINUTES_S = float(os.getenv("AUTO_GOLDEN_MINUTES_S", "90"))
+# The remaining values are UNCALIBRATED GUESSES, stated as such; the
+# mock-patient round is the run that informs them (spec §5, §12).
+# Quiet this long in GOLDEN earns one encourager (spec's ~1.5–2 s)...
+AUTO_ENCOURAGER_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_QUIET_S", "1.75"))
+# ...at most one per this many seconds, so encouragers never machine-gun.
+AUTO_ENCOURAGER_COOLDOWN_S = float(os.getenv("AUTO_ENCOURAGER_COOLDOWN_S", "8"))
+# Quiet this long triggers the end-of-turn officer (app/cds.py).
+AUTO_EOT_QUIET_S = float(os.getenv("AUTO_EOT_QUIET_S", "3.0"))
+# Officer fail-soft: with the officer unavailable, quiet this long counts as
+# a finished thought. Longer than AUTO_EOT_QUIET_S on purpose — err toward
+# waiting.
+AUTO_EOT_FALLBACK_S = float(os.getenv("AUTO_EOT_FALLBACK_S", "5.0"))
+# Pre-synthesise the top agenda question during the patient's turn (slice 4).
+AUTO_PRESYNTH = os.getenv("AUTO_PRESYNTH", "true").lower() != "false"
+# D2 posture (owner decision 2026-08-16): a CDS pass after every answer,
+# questions only from the fresh agenda. Flippable so the mock-patient round
+# can compare postures as a recorded per-run threshold (slice 4).
+AUTO_STRICT_REVISE = os.getenv("AUTO_STRICT_REVISE", "true").lower() != "false"
+
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
     """Turn a live session's received audio into a queued consultation.

@@ -60,6 +60,12 @@ CDS_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K
 # 2255 MiB free — it fits (HANDOVER, "VRAM baseline — MEASURED").
 CDS_NUM_CTX = int(os.getenv("CDS_NUM_CTX", "16384"))
 
+# Phase 7c (PHASE_7C_SPEC.md §5, §12): the end-of-turn officer's own
+# timeout, in seconds — a tiny call that must answer inside the pause it is
+# judging, then fall back (silence-based, in app/main.py's wiring). An
+# UNCALIBRATED GUESS; the mock-patient round is the run that informs it.
+AUTO_OFFICER_TIMEOUT_S = float(os.getenv("AUTO_OFFICER_TIMEOUT_S", "2.0"))
+
 ASR_CAVEAT = """\
 You receive a rough LIVE TRANSCRIPT produced by speech recognition: it has \
 no speaker labels and may garble words, especially medication names — \

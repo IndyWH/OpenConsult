@@ -89,5 +89,15 @@ encourager discipline count; the cone.
 
 ## Amendments
 
-None yet. On freeze, any change to metrics, scripts, or gates after
+On freeze, any change to metrics, scripts, or gates after
 the first run is recorded here with a date and reason.
+
+A1 — 2026-08-16, before any run. Metric 3's golden-minutes window
+is reset by the owner from "the first 2–3 minutes" to the first
+1–2 minutes, carried in configuration as AUTO_GOLDEN_MINUTES_S
+(default 90 s) and recorded per run as this document already
+requires. Compliance is scored against the configured value in
+force at the run, not the 2–3 minutes written at freeze. Reason:
+the owner's clinical judgement that free narrative typically dries
+up within the first minute or two, and a silent system beyond that
+point reads as inattention rather than listening.
