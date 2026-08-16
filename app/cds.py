@@ -32,14 +32,26 @@ Code, not the model, does the bookkeeping: the alarm is cleared
 deterministically when the urgency call reports the step already arranged,
 and "arranged" latches for the rest of the session once seen.
 
+A fourth call lives here too, outside `update()`: the END-OF-TURN OFFICER
+(Phase 7c slice 3, PHASE_7C_SPEC.md §5) — a tiny stateless call in the
+affect call's shape that auto mode asks, when the patient has been quiet
+for a while, whether they have finished the thought and whether they have
+explicitly handed the conversation back. It never raises: a failure or a
+timeout is returned as a failed verdict, and the caller falls back to a
+silence rule (`turn_finished`). Officer QUALITY is an evals question, not
+a unit-test one.
+
 Everything is a draft for the doctor. Nothing here is medical advice.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
+import time
+from dataclasses import dataclass
 
 import httpx
 
@@ -310,6 +322,96 @@ def affect_message(transcript: str) -> str:
             f"{recent}")
 
 
+# ------------------------------------------- end-of-turn officer (Phase 7c)
+#
+# PHASE_7C_SPEC.md §5. Auto mode must decide, from a pause, whether the
+# patient has finished speaking or is merely drawing breath — and whether
+# they have handed the conversation back outright ("that's all", "what do
+# you think?"). Two booleans, one plain question each, in the affect call's
+# shape: stateless, sees the transcript and nothing clinical, the recent
+# turns repeated at the END where the model attends most. It reuses the
+# engine's `_chat` — same model, temperature 0, seed 42, CDS_NUM_CTX — so
+# MedGemma is never reloaded for it; only the timeout is its own.
+#
+# The tie-break is written into the prompt: when in doubt, NOT finished.
+# A slow system is polite; an interrupting one fails the eval.
+
+OFFICER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "finished_thought": {"type": "boolean"},
+        "handed_back": {"type": "boolean"},
+    },
+    "required": ["finished_thought", "handed_back"],
+}
+
+OFFICER_PROMPT = """\
+You are listening to a patient telling a doctor what has brought them in. \
+The patient has just gone quiet. Judge ONLY the most recent turns; earlier \
+transcript is context.
+Answer two questions, and nothing else.
+finished_thought: has the patient come to the end of what they were \
+saying — a complete thought, a natural stopping point — or have they \
+paused mid-thought? A trailing "and", "so", "because", "but", an unfinished \
+list, or a sentence that stops before its point means NOT finished. When \
+in doubt, answer false: waiting is polite, interrupting is not.
+handed_back: has the patient EXPLICITLY handed the conversation back to \
+the doctor — "that's all", "that's it really", "that's everything", \
+"what do you think?", "so what should I do?", a direct question to the \
+doctor — rather than merely stopped? Only an explicit hand-back counts; \
+silence is not one.\
+"""
+
+# How many turns at the end of the transcript count as "just now" — the
+# affect call's window, reused unmeasured (AFFECT_RECENT_TURNS is itself
+# a first guess). The mock-patient round is the run that informs it.
+OFFICER_RECENT_TURNS = AFFECT_RECENT_TURNS
+
+
+def officer_message(transcript: str) -> str:
+    """The officer's user message: the whole transcript for context, then
+    the most recent turns in a labelled block at the END — the affect
+    call's construction (affect_message), for the same reason: the thing
+    being judged goes where the model attends most. A transcript no longer
+    than the window is sent once."""
+    turns = [line for line in transcript.splitlines() if line.strip()]
+    full = f"LIVE TRANSCRIPT SO FAR:\n{transcript}"
+    if len(turns) <= OFFICER_RECENT_TURNS:
+        return full
+    recent = "\n".join(turns[-OFFICER_RECENT_TURNS:])
+    return (f"{full}\n\n"
+            f"THE MOST RECENT TURNS (the patient went quiet after these):\n"
+            f"{recent}")
+
+
+@dataclass(frozen=True)
+class OfficerVerdict:
+    """What the officer said — or that it did not answer.
+
+    `failed` is None when the model answered; otherwise it names the
+    failure (error class and message, or "timeout") and BOTH booleans are
+    False: a failed officer never claims a turn ended or a hand-back. The
+    caller applies the silence-based fallback (`turn_finished`) and audits
+    the failure; nothing here raises into a live session.
+    """
+
+    finished_thought: bool
+    handed_back: bool
+    failed: str | None = None
+    elapsed_ms: int = 0
+
+
+def turn_finished(verdict: OfficerVerdict, quiet_s: float, fallback_s: float) -> bool:
+    """Has the patient's turn ended? The officer's word when it answered;
+    when it did not, a quiet span of at least `fallback_s`
+    (AUTO_EOT_FALLBACK_S — longer than the officer's own trigger, so the
+    fallback errs toward waiting). Pure, so the fallback rule is testable
+    without a model."""
+    if verdict.failed is None:
+        return verdict.finished_thought
+    return float(quiet_s) >= float(fallback_s)
+
+
 class CDSEngine:
     """Stateless client: callers hold the assessment and pass it back in."""
 
@@ -317,8 +419,46 @@ class CDSEngine:
         self.model = model or CDS_MODEL
         self.base_url = (base_url or OLLAMA_URL).rstrip("/")
 
-    async def _chat(self, system: str, user: str, schema: dict) -> dict:
-        async with httpx.AsyncClient(timeout=180.0) as client:
+    async def end_of_turn(self, transcript: str) -> OfficerVerdict:
+        """The end-of-turn officer (Phase 7c, spec §5). NEVER RAISES.
+
+        Bounded by AUTO_OFFICER_TIMEOUT_S end to end (asyncio.wait_for
+        around the call, and the same value as the HTTP timeout beneath
+        it). Any failure — connection, HTTP status, malformed reply,
+        timeout — comes back as a failed verdict with both booleans False,
+        for the caller to fall back on silence and audit
+        (auto.officer_failed). A detected hand-back is logged here, as the
+        prereg requires for scoring, and again by the caller in its
+        transition record.
+        """
+        started = time.perf_counter()
+        try:
+            reply = await asyncio.wait_for(
+                self._chat(OFFICER_PROMPT, officer_message(transcript), OFFICER_SCHEMA,
+                           timeout=AUTO_OFFICER_TIMEOUT_S),
+                timeout=AUTO_OFFICER_TIMEOUT_S)
+            finished = bool(reply["finished_thought"])
+            handed_back = bool(reply["handed_back"])
+        except asyncio.TimeoutError:
+            elapsed = round(1000 * (time.perf_counter() - started))
+            logger.warning("End-of-turn officer timed out after %d ms "
+                           "(AUTO_OFFICER_TIMEOUT_S=%.1f); falling back to silence",
+                           elapsed, AUTO_OFFICER_TIMEOUT_S)
+            return OfficerVerdict(False, False, failed="timeout", elapsed_ms=elapsed)
+        except Exception as exc:  # noqa: BLE001 - fail-soft by contract
+            elapsed = round(1000 * (time.perf_counter() - started))
+            logger.warning("End-of-turn officer failed (%s: %s); falling back to silence",
+                           type(exc).__name__, exc)
+            return OfficerVerdict(False, False, failed=f"{type(exc).__name__}: {exc}",
+                                  elapsed_ms=elapsed)
+        elapsed = round(1000 * (time.perf_counter() - started))
+        if handed_back:
+            logger.info("End-of-turn officer: hand-back detected (%d ms)", elapsed)
+        return OfficerVerdict(finished, handed_back, elapsed_ms=elapsed)
+
+    async def _chat(self, system: str, user: str, schema: dict, *,
+                    timeout: float = 180.0) -> dict:
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
                 json={
