@@ -11,6 +11,7 @@ import functools
 import json
 import logging
 import os
+import time
 from pathlib import Path
 
 import psycopg
@@ -26,7 +27,7 @@ from app import (audit, auth, auto_mode, consultations, face, frontdesk, letters
                  monitor, ratelimit, raw_segments, retention, schema, speech,
                  system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
-from app.cds import CDSEngine
+from app.cds import CDSEngine, OfficerVerdict, turn_finished
 from app.finalize import (expect_declaration, finalize_consultation,
                           regenerate_note, release_declaration)
 from app import transcript_quality
@@ -1681,6 +1682,23 @@ async def issue_auto_speak(state, entry: dict, websocket, utterance: auto_mode.U
     return prepared
 
 
+def _new_auto_state() -> dict:
+    """Phase 7c: one session's auto-mode state — the pure controller with an
+    injected monotonic clock, and the wiring's bookkeeping around it. Only
+    ever built when AUTO_MODE_ENABLED is true."""
+    return {
+        "controller": auto_mode.AutoModeController(clock=time.monotonic),
+        "encourager_index": 0,        # rotation through ENCOURAGER_IDS
+        "last_encourager_at": None,   # monotonic seconds of the last one issued
+        "last_quiet_s": None,         # to notice a fresh quiet span
+        "officer_task": None,         # the in-flight end-of-turn call, if any
+        "officer_quiet_s": None,      # the quiet the running officer was asked about
+        "officer_last_run_quiet_s": None,   # per span: re-run when quiet grows by EOT
+        "officer_verdict": None,      # the last verdict in this span
+        "warm_task": None,
+    }
+
+
 def _cancel_playback(entry: dict, reason: str) -> None:
     """End any in-flight utterance without a client `speak_ended`.
 
@@ -1869,9 +1887,20 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # assessment has been logged yet. Lives in the entry so it
             # survives a reconnect, like everything else here.
             "affect_last_logged": _AFFECT_UNLOGGED,
+            # Phase 7c: the auto-mode controller and its bookkeeping —
+            # constructed ONLY behind the gate. None means 7c does not
+            # exist for this session: no controller, no quiet handling, no
+            # auto messages; the app behaves exactly as before 7c.
+            "auto": _new_auto_state() if AUTO_MODE_ENABLED else None,
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
+        if entry["auto"] is not None:
+            # Per-session warm (spec §9): the two doctor-named phrases for
+            # THIS doctor's name, off the loop, logged and never fatal — the
+            # rest of the table was warmed at service start.
+            entry["auto"]["warm_task"] = asyncio.create_task(asyncio.to_thread(
+                state.speech.presynthesise_phrases, speech.doctor_name_for(user)))
 
     # Session 3: the client runs the silence-nudge quiet-window detector
     # (it holds the mic analyser and sees the transcript stream), so it is
@@ -1929,6 +1958,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "eot_fallback_s": AUTO_EOT_FALLBACK_S,
         }
     await websocket.send_json(speech_config)
+    if entry["auto"] is not None:
+        # Phase 7c: the server's word on auto mode, on connect and on
+        # reconnect — the client's reporter and (slice 6) the pill follow
+        # it. Never sent when the gate is down.
+        _ctl = entry["auto"]["controller"]
+        await websocket.send_json({"type": "auto_toggled",
+                                   "on": _ctl.phase is not auto_mode.AutoPhase.OFF,
+                                   "phase": _ctl.phase.value})
 
     session: LiveSession = entry["session"]
     engine: CDSEngine = state.cds_engine
@@ -2265,6 +2302,13 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # THROUGH — a cut-off invitation opens nothing (session 3).
         if utterance.ref_detail.get("id") == "invitation" and reason == "complete":
             entry["invitation_completed"] = True
+            # Phase 7c: GOLDEN starts when the invitation's speak_ended
+            # arrives — the prereg's metric-3 zero point — whichever path
+            # spoke it (auto, the disclosure chain, or a tap).
+            auto = entry["auto"]
+            if (auto is not None and auto["controller"].is_legal(
+                    auto_mode.AutoEvent.INVITATION_COMPLETED)):
+                await auto_transition(auto["controller"].invitation_completed())
         # Auto-chain (owner decision 2026-07-28): a disclosure that played
         # THROUGH is followed by the invitation, through the NORMAL speak
         # path — its own utterance, its own audit rows, and behind the
@@ -2333,6 +2377,268 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if driver is not None:
             face_task = asyncio.create_task(driver.run(websocket.send_json))
 
+    # ================================ Phase 7c slice 3: auto mode, wired
+    # through GOLDEN and dark. Every function below is a no-op unless
+    # entry["auto"] exists, and it exists only when AUTO_MODE_ENABLED is
+    # true (see _new_auto_state). The controller (app/auto_mode.py) owns
+    # the phase; this wiring owns the events and consults controller.phase
+    # / is_legal() before firing — the machine's strict legality is
+    # deliberate, and a late timer or a second hand-back must never raise
+    # out of the receive loop.
+
+    async def auto_transition(transition: auto_mode.Transition,
+                              detail: dict | None = None) -> None:
+        """Audit auto.phase for every transition (spec §11: from, to,
+        trigger), with the session's audio time and whatever the caller
+        knows about why (quiet seconds, a hand-back, an officer timing)."""
+        await audit.log(user["id"], "auto.phase", None, None,
+                        {"session_id": session_id,
+                         "from": transition.from_phase.value,
+                         "to": transition.to_phase.value,
+                         "trigger": transition.trigger.value,
+                         "at_audio_s": round(session.audio_seconds, 1),
+                         **({"detail": detail} if detail else {})})
+        logger.info("Live session %s: auto %s → %s (%s)", session_id,
+                    transition.from_phase.value, transition.to_phase.value,
+                    transition.trigger.value)
+
+    async def auto_issue(utterance: auto_mode.Utterance, *, phase, trigger: dict) -> speech.Utterance | None:
+        """Speak through the auto path (issue_auto_speak) from inside the
+        connection. A guard refusal — already in flight, disclosure not
+        given, the nudge cage — is the controller's business, logged and
+        swallowed here (the moment has passed; nothing is requeued in this
+        slice); a synthesis fault has already been audited and shown to
+        the client by issue_auto_speak. A spoken disclosure through this
+        path switches the face on exactly as handle_speak does (owner
+        decision 2026-07-28), never over a manual off."""
+        try:
+            prepared = await issue_auto_speak(state, entry, websocket, utterance,
+                                              phase=phase, trigger=trigger)
+        except speech.SpeechRefused as exc:
+            logger.info("Live session %s: auto utterance not issued: %s", session_id, exc)
+            return None
+        except (speech.SpeechUnavailable, speech.SpeechFailed) as exc:
+            logger.warning("Live session %s: auto utterance failed: %s", session_id, exc)
+            return None
+        if (FACE_AUTO_ON_DISCLOSURE
+                and prepared.ref_detail.get("id") == "disclosure"
+                and entry["face"] is None
+                and not entry["face_manual_off"]):
+            await handle_face({"on": True}, via="disclosure_auto")
+        return prepared
+
+    async def refuse_auto(reason: str) -> None:
+        """A refused auto toggle is answered, never swallowed — the pill
+        (slice 6) shows the reason; nothing was done, so nothing is
+        audited."""
+        logger.info("Live session %s: auto toggle refused: %s", session_id, reason)
+        await websocket.send_json({"type": "auto_refused", "detail": reason})
+
+    async def handle_auto(payload: dict, via: str = "manual") -> None:
+        """The server-side auto on/off path the slice-6 Auto pill will call.
+
+        ON requires the disclosure lock satisfied, exactly as a gated speak
+        does (hard rule 4; spec §10: the pill is disabled until the
+        disclosure is given), and no utterance in flight. Enabling walks
+        the machine OFF → DISCLOSURE → INVITATION: the disclosure step is a
+        pass-through (it has been given — that is the precondition), the
+        invitation is spoken through the auto path unless it has already
+        played through this session, and GOLDEN starts when the
+        invitation's speak_ended arrives (handle_speak_ended) — the
+        prereg's metric-3 zero point. If the invitation cannot be issued,
+        enabling fails as a unit and the machine is switched back off.
+
+        OFF is legal and immediate from every state (hard rule 3): the
+        machine goes to OFF, the officer is cancelled, and nothing more is
+        issued. An utterance already playing finishes or is cut by the
+        doctor's Stop/Esc as today — there is no server-to-client stop.
+        """
+        auto = entry["auto"]
+        if auto is None:
+            await refuse_auto("auto mode is not enabled on this server (AUTO_MODE_ENABLED)")
+            return
+        if user["id"] != entry["user"]["id"]:
+            await refuse_auto("only the doctor running this consultation may toggle auto mode")
+            return
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        on = bool(payload.get("on"))
+        if on:
+            if ctl.phase is not auto_mode.AutoPhase.OFF:
+                await websocket.send_json({"type": "auto_toggled", "on": True,
+                                           "phase": ctl.phase.value})
+                return   # already on — idempotent, nothing to re-audit
+            if not entry["disclosed"]:
+                await refuse_auto(
+                    "the patient has not been told they are talking to a machine — "
+                    "play the disclosure, or tick 'disclosure given', before auto mode")
+                return
+            if session.speaking or entry["pending_utterance"] is not None:
+                await refuse_auto("an utterance is in flight — try again when it has finished")
+                return
+            await audit.log(user["id"], "auto.enabled", None, None,
+                            {"session_id": session_id, "via": via,
+                             "at_audio_s": round(session.audio_seconds, 1)})
+            await auto_transition(ctl.enable())
+            await auto_transition(ctl.disclosure_completed(),
+                                  detail={"disclosure": "already_given"})
+            if entry["invitation_completed"]:
+                # The invitation played through before auto was switched
+                # on (the doctor tapped Disclosure and the chain spoke it):
+                # GOLDEN starts NOW, and the record says why the zero point
+                # is the toggle rather than the invitation's end.
+                await auto_transition(ctl.invitation_completed(),
+                                      detail={"invitation": "already_completed"})
+            else:
+                prepared = await auto_issue(auto_mode.PhraseUtterance("invitation"),
+                                            phase=ctl.phase, trigger={"via": "auto_enable"})
+                if prepared is None:
+                    await audit.log(user["id"], "auto.disabled", None, None,
+                                    {"session_id": session_id, "via": "enable_failed",
+                                     "at_audio_s": round(session.audio_seconds, 1)})
+                    await auto_transition(ctl.auto_off(),
+                                          detail={"reason": "invitation_not_issued"})
+                    await refuse_auto("auto mode could not speak the invitation — "
+                                      "see the speech error, then try again")
+                    return
+            await websocket.send_json({"type": "auto_toggled", "on": True,
+                                       "phase": ctl.phase.value})
+        else:
+            if ctl.phase is auto_mode.AutoPhase.OFF:
+                await websocket.send_json({"type": "auto_toggled", "on": False,
+                                           "phase": ctl.phase.value})
+                return   # already off
+            await audit.log(user["id"], "auto.disabled", None, None,
+                            {"session_id": session_id, "via": via,
+                             "at_audio_s": round(session.audio_seconds, 1)})
+            await auto_transition(ctl.auto_off())
+            _cancel_officer(auto)
+            await websocket.send_json({"type": "auto_toggled", "on": False,
+                                       "phase": ctl.phase.value})
+
+    def _cancel_officer(auto: dict) -> None:
+        task = auto.get("officer_task")
+        if task is not None and not task.done():
+            task.cancel()
+        auto["officer_task"] = None
+        auto["officer_quiet_s"] = None
+
+    async def handle_quiet(payload: dict) -> None:
+        """A quiet report from the client's reporter (spec §5). Measurement
+        is the client's; every decision is here.
+
+        In GOLDEN: quiet of AUTO_ENCOURAGER_QUIET_S earns one encourager,
+        rotated through the three, at most one per
+        AUTO_ENCOURAGER_COOLDOWN_S, through the auto path (a politeness
+        abort drops it — the moment has passed). Quiet of AUTO_EOT_QUIET_S
+        starts the end-of-turn officer, once per quiet span and again each
+        time the quiet has grown by that much, so a "not finished" at 3 s
+        is re-asked at 6 s rather than sticking. Its verdict is applied by
+        maybe_apply_officer, on the loop's tick. OPEN and CLOSED are inert
+        in this slice (question flow is slice 4); every other phase ignores
+        quiet. Ignored entirely when the gate is down.
+        """
+        auto = entry["auto"]
+        if auto is None:
+            return
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        try:
+            quiet_s = float(payload.get("quiet_s"))
+        except (TypeError, ValueError):
+            return
+        if quiet_s < 0:
+            return
+        if auto["last_quiet_s"] is None or quiet_s < auto["last_quiet_s"]:
+            # A fresh quiet span: the patient spoke (or we did) in between.
+            auto["officer_last_run_quiet_s"] = None
+            auto["officer_verdict"] = None
+        auto["last_quiet_s"] = quiet_s
+        if ctl.phase is not auto_mode.AutoPhase.GOLDEN:
+            return
+        now = time.monotonic()
+        # 1. The encourager.
+        last = auto["last_encourager_at"]
+        if (quiet_s >= AUTO_ENCOURAGER_QUIET_S
+                and (last is None or now - last >= AUTO_ENCOURAGER_COOLDOWN_S)
+                and not session.speaking and entry["pending_utterance"] is None):
+            phrase_id = speech.ENCOURAGER_IDS[auto["encourager_index"] % len(speech.ENCOURAGER_IDS)]
+            prepared = await auto_issue(auto_mode.PhraseUtterance(phrase_id),
+                                        phase=ctl.phase, trigger={"quiet_s": round(quiet_s, 1)})
+            if prepared is not None:
+                auto["encourager_index"] += 1
+                auto["last_encourager_at"] = now
+        # 2. The officer.
+        last_run = auto["officer_last_run_quiet_s"]
+        due = (quiet_s >= AUTO_EOT_QUIET_S
+               and (last_run is None or quiet_s - last_run >= AUTO_EOT_QUIET_S))
+        if due and auto["officer_task"] is None:
+            transcript = "\n".join(entry["transcript_parts"]).strip()
+            auto["officer_last_run_quiet_s"] = quiet_s
+            if not transcript:
+                # Nothing committed yet: there is no turn to judge, and a
+                # model asked about an empty transcript would be guessing.
+                # The silence rule alone applies (maybe_apply_officer, via
+                # a failed-shaped verdict), so a patient who never spoke
+                # can still be moved on once the window has run.
+                auto["officer_verdict"] = None
+                await apply_officer_verdict(
+                    OfficerVerdict(False, False, failed="no committed transcript"), quiet_s)
+            else:
+                auto["officer_quiet_s"] = quiet_s
+                auto["officer_task"] = asyncio.create_task(engine.end_of_turn(transcript))
+        elif auto["officer_verdict"] is not None and auto["officer_verdict"].failed is not None:
+            # A failed officer earlier in this span: the silence rule keeps
+            # being consulted as the quiet grows.
+            await apply_officer_verdict(auto["officer_verdict"], quiet_s)
+
+    async def apply_officer_verdict(verdict, quiet_s: float) -> None:
+        """Turn the officer's word (or its absence) into GOLDEN's exit, per
+        spec §6: a hand-back exits to OPEN at once; otherwise OPEN only when
+        the golden window has run AND the turn has ended — never at a bare
+        timer boundary. Anything the machine says is illegal from here is
+        simply not fired."""
+        auto = entry["auto"]
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        auto["officer_verdict"] = verdict
+        if ctl.phase is not auto_mode.AutoPhase.GOLDEN:
+            return
+        detail = {"quiet_s": round(quiet_s, 1), "handed_back": verdict.handed_back,
+                  "officer_ms": verdict.elapsed_ms,
+                  **({"officer_failed": verdict.failed} if verdict.failed else {})}
+        if verdict.handed_back and ctl.is_legal(auto_mode.AutoEvent.HAND_BACK):
+            await auto_transition(ctl.hand_back(), detail=detail)
+            return
+        elapsed = ctl.seconds_in_phase()
+        if (elapsed >= AUTO_GOLDEN_MINUTES_S
+                and turn_finished(verdict, quiet_s, AUTO_EOT_FALLBACK_S)
+                and ctl.is_legal(auto_mode.AutoEvent.GOLDEN_TIMER_ELAPSED)):
+            await auto_transition(ctl.golden_timer_elapsed(),
+                                  detail={**detail, "golden_s": round(elapsed, 1)})
+
+    async def maybe_apply_officer() -> None:
+        """Called on the loop's tick, like maybe_run_cds: when the officer
+        has answered, audit a failure (auto.officer_failed — fail-soft
+        visibility, spec §11) and apply the verdict."""
+        auto = entry["auto"]
+        if auto is None or auto["officer_task"] is None or not auto["officer_task"].done():
+            return
+        task, quiet_s = auto["officer_task"], auto["officer_quiet_s"]
+        auto["officer_task"] = None
+        auto["officer_quiet_s"] = None
+        try:
+            verdict = task.result()
+        except asyncio.CancelledError:
+            return
+        except Exception as exc:  # noqa: BLE001 - end_of_turn never raises; belt and braces
+            logger.warning("Live session %s: officer task failed unexpectedly: %s", session_id, exc)
+            return
+        if verdict.failed is not None:
+            await audit.log(user["id"], "auto.officer_failed", None, None,
+                            {"session_id": session_id, "reason": verdict.failed,
+                             "quiet_s": round(quiet_s or 0.0, 1),
+                             "elapsed_ms": verdict.elapsed_ms,
+                             "fallback_s": AUTO_EOT_FALLBACK_S})
+        await apply_officer_verdict(verdict, quiet_s or 0.0)
+
     try:
         while True:
             try:
@@ -2385,6 +2691,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         await handle_speak_ended(payload)
                     elif kind == "face":
                         await handle_face(payload)
+                    elif kind == "auto":
+                        await handle_auto(payload)      # Phase 7c; refused when the gate is down
+                    elif kind == "quiet":
+                        await handle_quiet(payload)     # Phase 7c; ignored when the gate is down
                     elif kind == "disclosure_given":
                         # The doctor's own words instead of ours. Only the
                         # doctor running the consultation may attest it.
@@ -2403,6 +2713,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
                     )
                 await websocket.send_json({"type": "partial", "text": partial})
+
+            # Phase 7c: an officer verdict that has arrived is applied
+            # BEFORE this iteration's ack, so a client (or a test) that has
+            # seen the ack has seen the phase it implies.
+            await maybe_apply_officer()
 
             # Ack received audio so the client can prune its resend buffer.
             if entry["last_seq"] != last_acked:
@@ -2439,6 +2754,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if entry["face"] is not None:
             entry["face"].stop()
             entry["face"] = None
+        if entry["auto"] is not None:
+            _cancel_officer(entry["auto"])   # per-connection, like the CDS task
         still_mine = sessions.get(session_id) is entry
         if still_mine and not entry["stopped"]:
             if entry["last_seq"] > 0:

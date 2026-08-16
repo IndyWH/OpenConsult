@@ -827,7 +827,7 @@ class SpeechService:
         self._utterances[registered.utterance_id] = registered
         return registered
 
-    def presynthesise_phrases(self) -> dict[str, str]:
+    def presynthesise_phrases(self, doctor: str | None = None) -> dict[str, str]:
         """Warm the disk cache with every fixed phrase (PHASE_7C_SPEC.md §9).
 
         So that an encourager in the golden minutes is a cache hit — 0 ms
@@ -837,11 +837,13 @@ class SpeechService:
         service carries on exactly as before — pre-synthesis is a latency
         courtesy, not a condition of speaking.
 
-        Phrases with a `{doctor}` slot are skipped: the name is filled per
-        session from the doctor's account, so there is no one text to warm
-        at start. Neither of them is an encourager. Returns a per-phrase
-        outcome map ("cached", "synthesised", "skipped: …", "failed: …")
-        for the log and for tests.
+        Phrases with a `{doctor}` slot are skipped at service start: the
+        name is filled per session from the doctor's account, so there is
+        no one text to warm then. Neither of them is an encourager. Called
+        again with `doctor` when a session starts under auto mode (7c slice
+        3), it warms those two for that doctor's name — the others are
+        then cache hits. Returns a per-phrase outcome map ("cached",
+        "synthesised", "skipped: …", "failed: …") for the log and for tests.
         """
         outcomes: dict[str, str] = {}
         reason = self.unavailable_reason()
@@ -849,10 +851,10 @@ class SpeechService:
             logger.info("Speech pre-synthesis skipped: %s", reason)
             return {phrase_id: f"skipped: {reason}" for phrase_id in PHRASES}
         for phrase_id, template in PHRASES.items():
-            if "{doctor}" in template:
+            if "{doctor}" in template and doctor is None:
                 outcomes[phrase_id] = "skipped: doctor-named, filled per session"
                 continue
-            text = render_phrase(phrase_id)
+            text = render_phrase(phrase_id, doctor)
             try:
                 if self._cache_path(text).exists():
                     outcomes[phrase_id] = "cached"
