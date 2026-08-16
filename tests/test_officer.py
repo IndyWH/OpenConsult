@@ -26,6 +26,8 @@ import pytest
 from app import cds
 from app.cds import CDSEngine, OfficerVerdict
 
+_REAL_CLIENT = httpx.AsyncClient      # captured before any monkeypatch
+
 
 def _capture(monkeypatch, reply=None, *, status=200, sleep_s: float = 0.0,
              body: str | None = None):
@@ -43,11 +45,9 @@ def _capture(monkeypatch, reply=None, *, status=200, sleep_s: float = 0.0,
         content = json.dumps(reply if reply is not None else {})
         return httpx.Response(status, json={"message": {"content": content}})
 
-    real_client = httpx.AsyncClient
-
     def client_factory(**kwargs):
         seen["client_kwargs"] = kwargs
-        return real_client(transport=httpx.MockTransport(handler), **kwargs)
+        return _REAL_CLIENT(transport=httpx.MockTransport(handler), **kwargs)
 
     monkeypatch.setattr(cds.httpx, "AsyncClient", client_factory)
     return seen

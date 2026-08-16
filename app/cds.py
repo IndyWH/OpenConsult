@@ -41,6 +41,15 @@ timeout is returned as a failed verdict, and the caller falls back to a
 silence rule (`turn_finished`). Officer QUALITY is an evals question, not
 a unit-test one.
 
+And a fifth, the same shape (Phase 7c slice 4, spec §4 decision D1): the
+TOPIC CALL, which names what one agenda question is about as a short noun
+phrase ("the chest pain") so auto mode can ask it open-form through an
+owner-approved template. Stateless, its own prompt and timeout, never
+raises; on failure, timeout, or an unusable phrase the caller asks the
+agenda question verbatim — still correct, just less open. The CDS
+assessment prompt is untouched by it (the alternative, a topic field in
+the assessment schema, was declined for exactly that reason).
+
 Everything is a draft for the doctor. Nothing here is medical advice.
 """
 
@@ -77,6 +86,11 @@ CDS_NUM_CTX = int(os.getenv("CDS_NUM_CTX", "16384"))
 # judging, then fall back (silence-based, in app/main.py's wiring). An
 # UNCALIBRATED GUESS; the mock-patient round is the run that informs it.
 AUTO_OFFICER_TIMEOUT_S = float(os.getenv("AUTO_OFFICER_TIMEOUT_S", "2.0"))
+# Phase 7c (PHASE_7C_SPEC.md §4, decision D1): the topic call's own
+# timeout — the tiny call that names what an agenda question is about so
+# it can be asked open-form; on timeout the question is asked verbatim.
+# An UNCALIBRATED GUESS; the mock-patient round is the run that informs it.
+AUTO_TOPIC_TIMEOUT_S = float(os.getenv("AUTO_TOPIC_TIMEOUT_S", "2.0"))
 
 ASR_CAVEAT = """\
 You receive a rough LIVE TRANSCRIPT produced by speech recognition: it has \
@@ -412,8 +426,113 @@ def turn_finished(verdict: OfficerVerdict, quiet_s: float, fallback_s: float) ->
     return float(quiet_s) >= float(fallback_s)
 
 
+# --------------------------------------------------- topic call (Phase 7c)
+#
+# PHASE_7C_SPEC.md §4, D1. One question in, one noun phrase out, in the
+# affect call's shape. The phrase goes into a slot in an owner-approved
+# template ("Can you tell me more about {topic}?"), so the prompt asks for
+# exactly the thing that fits that slot and nothing else — no verb, no
+# question, no diagnosis, no advice — and `clean_topic_phrase` refuses
+# anything that does not look like a slot filler. Refusal is fail-soft:
+# the caller asks the agenda question verbatim.
+
+TOPIC_SCHEMA = {
+    "type": "object",
+    "properties": {"topic": {"type": "string"}},
+    "required": ["topic"],
+}
+
+TOPIC_PROMPT = """\
+You are helping a doctor ask a question in an open way. You are given ONE \
+question from the doctor's list. Name what it is ABOUT — the thing the \
+patient would talk about — as a short noun phrase, the way a doctor \
+would say it to the patient: "the chest pain", "your sleep", "the tablets \
+you started last week", "the falls".
+Rules: two to six words; lower case; no verb; not a question; no \
+diagnosis; no advice; nothing the patient has not already mentioned. The \
+phrase must fit the sentence "Can you tell me more about ___?" exactly.
+Answer with the phrase only.\
+"""
+
+# Bounds on a usable slot filler, stated as such: a phrase longer than
+# this is a sentence, not a topic, and would read oddly in the template.
+TOPIC_MAX_WORDS = 8
+TOPIC_MAX_CHARS = 60
+
+
+def topic_message(question: str) -> str:
+    """The topic call's user message: the one question, labelled."""
+    return f"THE QUESTION:\n{question.strip()}"
+
+
+def clean_topic_phrase(raw) -> str | None:
+    """A usable slot filler, or None.
+
+    Whitespace collapsed; surrounding quotes and a trailing full stop
+    stripped; anything empty, longer than the bounds, carrying a question
+    mark or a line break, or that is not a string, is unusable — the
+    caller then asks verbatim rather than speak a broken sentence.
+    """
+    if not isinstance(raw, str):
+        return None
+    phrase = " ".join(raw.split()).strip().strip('"\'“”‘’').strip()
+    phrase = phrase.rstrip(".").strip()
+    if not phrase or "?" in phrase or "\n" in raw.strip("\n"):
+        return None
+    if len(phrase.split()) > TOPIC_MAX_WORDS or len(phrase) > TOPIC_MAX_CHARS:
+        return None
+    return phrase
+
+
+@dataclass(frozen=True)
+class TopicVerdict:
+    """What the topic call named — or that it did not.
+
+    `topic` is a usable slot filler when `failed` is None; otherwise
+    `failed` names the failure (error, "timeout", or "unusable: …") and
+    `topic` is None. The caller asks the agenda question verbatim.
+    """
+
+    topic: str | None
+    failed: str | None = None
+    elapsed_ms: int = 0
+
+
 class CDSEngine:
     """Stateless client: callers hold the assessment and pass it back in."""
+
+    async def topic_for(self, question: str) -> TopicVerdict:
+        """The topic call (Phase 7c, spec §4 D1). NEVER RAISES.
+
+        Bounded by AUTO_TOPIC_TIMEOUT_S end to end (asyncio.wait_for and
+        the HTTP timeout beneath it). A failure, a timeout, or a phrase
+        `clean_topic_phrase` refuses comes back as a failed verdict; the
+        caller asks the question verbatim and audits (auto.topic_failed).
+        """
+        started = time.perf_counter()
+        try:
+            reply = await asyncio.wait_for(
+                self._chat(TOPIC_PROMPT, topic_message(question), TOPIC_SCHEMA,
+                           timeout=AUTO_TOPIC_TIMEOUT_S),
+                timeout=AUTO_TOPIC_TIMEOUT_S)
+            raw = reply["topic"]
+        except asyncio.TimeoutError:
+            elapsed = round(1000 * (time.perf_counter() - started))
+            logger.warning("Topic call timed out after %d ms (AUTO_TOPIC_TIMEOUT_S=%.1f); "
+                           "asking verbatim", elapsed, AUTO_TOPIC_TIMEOUT_S)
+            return TopicVerdict(None, failed="timeout", elapsed_ms=elapsed)
+        except Exception as exc:  # noqa: BLE001 - fail-soft by contract
+            elapsed = round(1000 * (time.perf_counter() - started))
+            logger.warning("Topic call failed (%s: %s); asking verbatim",
+                           type(exc).__name__, exc)
+            return TopicVerdict(None, failed=f"{type(exc).__name__}: {exc}",
+                                elapsed_ms=elapsed)
+        elapsed = round(1000 * (time.perf_counter() - started))
+        topic = clean_topic_phrase(raw)
+        if topic is None:
+            logger.info("Topic call returned an unusable phrase %r; asking verbatim", raw)
+            return TopicVerdict(None, failed=f"unusable: {raw!r}", elapsed_ms=elapsed)
+        return TopicVerdict(topic, elapsed_ms=elapsed)
 
     def __init__(self, model: str | None = None, base_url: str | None = None) -> None:
         self.model = model or CDS_MODEL
