@@ -5071,3 +5071,92 @@ H1 still reads "(DRAFT for owner approval)" because the approval
 instruction was to replace the header blockquote and change nothing
 else; the blockquote states the approval. Owner's call whether the H1
 should follow.
+
+## Phase 7c slice 2 — auto speak path landed dark (2026-08-16)
+
+**What landed.** The server can now initiate an utterance itself and the
+client can play it, through the tap pipeline with no new mechanism —
+and NOTHING CALLS IT YET: the controller wiring is slice 3, so the running
+app's behaviour is unchanged, the doctor's tap-to-ask path is
+byte-identical, and everything still ships dark behind
+`AUTO_MODE_ENABLED=false` (the flag itself arrives with slice 3's
+wiring). No restart is needed for this slice; the code is inert until
+wired.
+
+- `12cc301` — `PHASE_7C_SPEC.md`: two owner confirmations from the
+  slice-1 review. The H1 drops "(DRAFT for owner approval)"; §7 records
+  that an alarm re-firing while already `PAUSED_URGENT` is a legal
+  self-edge (stay paused, keep the prior phase, widen the pending set),
+  and the safety condition that binds slice 5: the pause banner must
+  show every pending action text at acknowledgement time, so an
+  acknowledgement only ever covers what the doctor actually saw.
+- `136dd54` — server side. `app/speech.py`: `anything_else` joins
+  PHRASES (owner wording, disclosure-gated), `TEMPLATES` holds the two
+  owner-approved open-question templates instantiated server-side only
+  (no client ref kind — a tap cannot reach them or choose a topic),
+  `resolve_utterance()` resolves each whitelist type from
+  `app/auto_mode.py` and refuses everything else, `prepare_auto()`
+  synthesises through the same cache and cap with
+  `ref_detail {"via":"auto","phase":…,"trigger":…}` and the agenda's
+  rationale, `presynthesise_phrases()` warms the cache at service start
+  (§9). `app/main.py`: `issue_auto_speak()` — same one-at-a-time guard,
+  same disclosure lock, same nudge cage, same pending slot, sends
+  `auto_speak` from the same builder as `speak_ready`; refusals audited
+  `speech.failed` via=auto and raised to the caller; a synthesis fault
+  also shown to the client as `speak_refused`. `handle_speak_ended`
+  accepts `politeness_abort` for the pending utterance with no window
+  open (row without span, slot released, audited
+  `speech.politeness_abort`). `END_REASONS` gains `politeness_abort`,
+  `urgency_pause`. 37 tests in `tests/test_auto_speak.py`.
+- `c0b7f56` — client side. `live.html` handles `auto_speak` through
+  `onSpeakReady` (same lifecycle, same Esc/Stop, same pill) with the §5
+  politeness re-check immediately before playback. Client executed under
+  Node in `tests/test_auto_speak_client.py`; the keystone exclusion
+  scenario re-run for an auto-issued utterance on both paths in
+  `tests/test_speech_exclusion.py`.
+
+Suite 770 → 812.
+
+**The gate is unchanged.** Barge-in calibration and the mock-patient-round
+review are still owed before `AUTO_MODE_ENABLED` ever flips; nothing in
+this slice advances either.
+
+**Choices the governing sections left open, decided in code and flagged
+for the owner and Cowork:**
+
+- **The politeness-abort threshold** (§5 says "if activity has resumed",
+  no number). The client compares its pre-playback RMS against the
+  barge-in ABSOLUTE floor it already holds (`BARGE_IN_RMS_THRESHOLD`,
+  0.02, uncalibrated, sent in `speech_config` regardless of the detector
+  flag) — not the 1e-4 silence floor, which measured room noise
+  (0.008–0.011 RMS) exceeds and which would abort every utterance in a
+  real room. At-floor aborts (err toward waiting); a null reading (mic
+  down) and a zero floor do not. The reading is audited on every abort
+  so the mock-patient round can set the number.
+- **`speech.politeness_abort` is its own audit event**, on the
+  `speech.barge_in` precedent, rather than a `speech.spoken` with a
+  reason: `scripts/calibrate_barge_in.py` counts `speech.spoken` as
+  utterances that played, and an abort did not play. No `auto.*` events
+  were added.
+- **Pre-synthesis skips the two doctor-named phrases** (`disclosure`,
+  `examination_handover`): the name is filled per session, so there is
+  no one text to warm at start; neither is an encourager, which is what
+  §9's budget is about. Warming them per session is slice-3 wiring if
+  wanted.
+- **`issue_auto_speak` does not do the face auto-on at a spoken
+  disclosure** (owner decision 2026-07-28, done in `handle_speak`
+  today): `handle_face` lives in the connection; the slice-3 wiring that
+  issues an auto disclosure calls it, as `handle_speak` does.
+- **Refusal semantics on the auto path**: guard refusals (already in
+  flight, disclosure not given, nudge cage) raise `SpeechRefused` to the
+  caller and are not shown to the client — they are the controller's to
+  requeue or a wiring bug; synthesis faults raise AND show
+  `speak_refused`, as for a tap.
+- **The pre-synthesis task runs whenever the lifespan runs**, including
+  `tests/test_live.py`'s one lifespan test on a machine with Piper — a
+  handful of cache writes into `SPEECH_CACHE_DIR` that the live app has
+  already made. Harmless; noted so nobody is surprised by it.
+
+**Not touched:** `help/`, `vendor/`, the two FROZEN documents. No help
+article is made untrue by this slice — nothing user-visible changes
+until slice 3.
