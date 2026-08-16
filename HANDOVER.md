@@ -5266,3 +5266,85 @@ does — for the owner and Cowork to confirm or overrule:**
 **Not touched:** `help/`, `vendor/`, `OPEN_CLOSED_RULE.md`;
 `PHASE_7C_EVAL_PREREG.md` only by amendment A1. No help article is made
 untrue: nothing user-visible changes with the gate down.
+
+## Phase 7c slice 4 — question phases wired: D1, D2, D3 (2026-08-16)
+
+**What landed.** Auto mode now runs from the one-tap start through the
+golden minutes into the question phases and out through the handover
+sequence — and it is still DARK behind `AUTO_MODE_ENABLED=false` (with
+the gate down nothing below exists; pinned). Needs a restart to be live;
+nothing to see until the owner flips the flag, which he must not yet.
+
+- `f83f2c2` — spec truth-ups (owner decisions 2026-08-16): §5 the officer
+  also runs in GOLDEN, for the exit only; §10 the Auto pill's ONE-TAP
+  rule replaces disabled-until-disclosure; §6 the anything-else refill
+  return path and once-per-session.
+- `841e76d` — the one-tap start in `handle_auto`: with no disclosure
+  given, toggling Auto speaks it through the auto path (face auto-on via
+  `handle_face`, as `handle_speak` does), the played-through disclosure
+  is recorded as given (spoken) and chains the invitation through the
+  auto path, and GOLDEN starts at the invitation's `speak_ended`. A
+  cut-off disclosure chains nothing; a failed disclosure fails enabling
+  as a unit. Manual-first shapes stay (already-given → pass-through;
+  both done → GOLDEN at the toggle, audited). **The slice-3 tests
+  pinning "enable requires disclosure already given" were deliberately
+  repinned to this rule** — an owner-decided property change, said so in
+  the docstrings, not a weakening.
+- `2a4a7b2` — the topic call (D1) in `app/cds.py` beside the officer:
+  own prompt, `{"topic": string}`, temperature 0 seed 42 `CDS_NUM_CTX`,
+  `AUTO_TOPIC_TIMEOUT_S` (2.0, `.env.example`); never raises; an
+  unusable phrase (empty, a question, > 8 words / 60 chars) is a failed
+  verdict and the caller asks verbatim.
+- `c9c5ff9` — the question flow: strict-revise (a post-answer CDS pass
+  at once, bypassing `CDS_MIN_NEW_CHARS`; ask only from the fresh
+  agenda; one bridging encourager; `AUTO_STRICT_REVISE=false` asks from
+  current), the topic-scoped cone (new topic → `tell_me_more` template,
+  seen topic → verbatim, OPEN→CLOSED at the first verbatim ask, late new
+  topics still opened in CLOSED), pre-synthesis at plan time
+  (`AUTO_PRESYNTH`), aborted questions requeued, the doctor's tap
+  displacing the queue (`auto.doctor_tap`), the handover sequence with
+  the refill return path (`auto.handover`), rows carrying
+  `via/phase/trigger/topic/open_form`. Every threshold in force is now
+  recorded per run on `auto.enabled` (`thresholds`), so both D2 postures
+  are visible in the record. Also a real bug found and fixed on the
+  way: the synthesis temp file was per-process, and a background warm
+  and a tap on the same phrase collided ("synthesis produced no
+  audio"); it is now unique per call.
+
+Suite 857 → 889.
+
+**The gate is unchanged.** Barge-in calibration and the mock-patient-round
+review are still owed before `AUTO_MODE_ENABLED` ever flips.
+
+**Where the governing sections did not fully decide, and what the code
+does — for the owner and Cowork to confirm or overrule:**
+
+- **Which agenda question is asked:** the top of the fresh agenda, but
+  not the same words twice in a row when there is another to ask
+  (re-asking is allowed and logged; a ping-pong on identical text is bad
+  manners). A silent patient who never answers therefore hears the top
+  question, then the second, alternately, until the doctor intervenes.
+- **Speech between the revision and the ask is not re-revised:** the ask
+  waits for the next turn end (officer) but is drawn from the agenda
+  the post-answer pass returned. Under D2's stated tie-break this errs
+  toward waiting, not toward re-running the ~17 s pass; if the patient
+  answers the queued question before it is asked, the CDS will drop it
+  on the next revision after the ask.
+- **`AUTO_STRICT_REVISE=false`** plans from the current agenda — except
+  when it is empty, where the fresh pass is still required before the
+  handover can be concluded (§6: agenda-empty counts only on a
+  post-answer revision).
+- **The handover phrase moves the machine to HANDOVER when it plays
+  through** (not at issue), so a politeness-aborted handover phrase is
+  requeued like a question; after HANDOVER the auto run has ended and
+  quiet reports do nothing.
+- **A tapped agenda question in OPEN/CLOSED sets "awaiting answer"** so
+  its answer's turn end triggers the revision; a tapped phrase or a tap
+  in GOLDEN is audited but changes no flow state.
+- **`affecting_you`** is registered and unused by the automatic flow,
+  as instructed.
+- **The thresholds-per-run record** lives on `auto.enabled` (there was
+  no earlier per-run recording; the prompt assumed one).
+
+**Not touched:** `help/`, `vendor/`, the two FROZEN documents. No help
+article is made untrue: nothing user-visible changes with the gate down.
