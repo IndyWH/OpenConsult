@@ -804,6 +804,14 @@ async function initMic() {
     // SAME floor as the dead-mic pill, reused so the two surfaces cannot
     // disagree about what silence is; the bias is toward not firing.
     if (rms > 1e-4) nudge.activity(now);
+    // Phase 7c: the quiet reporter reads the same loop. Speech, not any
+    // energy, is activity here (see the reporter's comment); a report goes
+    // to the server only while it has confirmed auto mode on.
+    if (rms >= quietReporter.floor) quietReporter.activity(now);
+    const quietS = quietReporter.poll(now, speaking !== null || pendingSpeakText !== '');
+    if (quietS !== null && recording && ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({type: 'quiet', quiet_s: Math.round(quietS * 10) / 10}));
+    }
     const level = Math.min(1, rms * 8);
     barEls.forEach((bar, k) => {
       bar.style.transform = `scaleY(${Math.max(.28, Math.min(1, level * BAR_GAIN[k] * 4))})`;
@@ -1225,9 +1233,15 @@ function requestSpeak(ref, label, extra) {
 
 // ============================== Phase 7b session 3: the silence nudge
 //
-// THE ONLY AUTONOMOUS UTTERANCE IN 7a/7b, deliberately caged — and it
-// must stay the only one until 7c's behaviour-policy machinery exists.
-// Do not generalise this into an encourager loop.
+// THE ONLY AUTONOMOUS UTTERANCE IN 7a/7b, deliberately caged. Its guard
+// comment ("do not generalise this into an encourager loop") was retired
+// in Phase 7c slice 3, when the behaviour-policy machinery it was waiting
+// for arrived: the quiet reporter below generalises this object's design
+// into a first-class quiet-window tracker, and the SERVER's controller
+// decides what, if anything, to say (PHASE_7C_SPEC.md §5). All of that is
+// dark behind AUTO_MODE_ENABLED=false; with auto mode off, the cage holds
+// exactly as before — this object is unchanged, and it is the only thing
+// that speaks unbidden.
 //
 // The client detects the quiet window (it holds the mic analyser and
 // sees the transcript stream) and requests the phrase through the NORMAL
@@ -1265,6 +1279,7 @@ const nudge = {
 setInterval(() => {
   if (!recording || !ws || ws.readyState !== WebSocket.OPEN) return;
   if (speaking !== null || pendingSpeakText !== '') return;  // we are talking
+  if (quietReporter.enabled) return;   // auto mode on: its machinery speaks, not the nudge
   const now = performance.now();
   if (!nudge.due(now)) return;
   const quiet = nudge.fire(now);
@@ -1272,6 +1287,58 @@ setInterval(() => {
                'When you’re ready, tell me what’s brought you in today.',
                {via: 'silence_nudge', quiet_s: Math.round(quiet * 10) / 10});
 }, 250);
+
+// ================================ Phase 7c slice 3: the quiet reporter
+//
+// PHASE_7C_SPEC.md §5 — measurement stays client-side, authority stays
+// server-side. The nudge object's design, promoted into a first-class
+// quiet-window tracker: fed by the SAME ~10 fps RMS loop, reset by the
+// same activity sources (room energy, transcript movement, our own
+// playback), and reporting {"type":"quiet","quiet_s":N} to the server when
+// quiet crosses each configured threshold and once a second thereafter
+// while it lasts. The server decides what, if anything, to say — an
+// encourager, the end-of-turn officer, nothing. Nothing here requests an
+// utterance. Enabled only when the server confirms auto mode ON
+// (auto_toggled), and the thresholds arrive in speech_config from
+// server-side env (house pattern) — the page holds no numbers of its own.
+//
+// "Quiet" means no SPEECH: room energy below the barge-in absolute floor
+// (bargeIn.absFloor, the same "this is speech" number the politeness abort
+// compares against — owner decision 2026-08-16), NOT the 1e-4 silence floor
+// the nudge and the dead-mic pill share: measured room noise sits above
+// that floor and would keep this tracker permanently un-quiet in a real
+// room. Our own playback is not the patient: while an utterance plays the
+// tracker does not report, and playback ending counts as activity — err
+// toward waiting, the parent spec's tie-break.
+const quietReporter = {
+  enabled: false,        // server-confirmed auto mode on (auto_toggled)
+  thresholds: [],        // seconds, ascending, from speech_config.auto
+  floor: 0.02,           // "this is speech": bargeIn.absFloor, copied at configure
+  quietSince: null,      // ms of the last activity; null = not tracking
+  crossed: 0,            // thresholds already reported in this quiet span
+  lastReportAt: null,    // ms of the last report in this span
+  configure(cfg) {
+    const raw = [cfg.encourager_quiet_s, cfg.eot_quiet_s, cfg.eot_fallback_s];
+    this.thresholds = [...new Set(raw.map(Number).filter(v => v > 0))].sort((a, b) => a - b);
+  },
+  activity(now) { this.quietSince = now; this.crossed = 0; this.lastReportAt = null; },
+  // Called at the meter's rate. Returns the quiet duration to report (s),
+  // or null. `busy` is our own playback or a request in flight.
+  poll(now, busy) {
+    if (!this.enabled || busy || this.quietSince === null) return null;
+    const quiet = (now - this.quietSince) / 1000;
+    if (this.crossed < this.thresholds.length && quiet >= this.thresholds[this.crossed]) {
+      this.crossed += 1;
+      this.lastReportAt = now;
+      return quiet;
+    }
+    if (this.crossed > 0 && now - this.lastReportAt >= 1000) {
+      this.lastReportAt = now;
+      return quiet;
+    }
+    return null;
+  },
+};
 
 // ==================================== Phase 7a session 3: barge-in detector
 //
@@ -1448,6 +1515,7 @@ function stopSpeaking(reason, cutLatencyMs) {
   } else {
     nudge.activity(performance.now());
   }
+  quietReporter.activity(performance.now());   // our voice is not the patient's
 }
 
 async function onSpeakReady(msg) {
@@ -2139,6 +2207,7 @@ function onWsMessage(event) {
   if (msg.type === 'final') {
     addFinal(msg); partialEl.textContent = '';
     nudge.activity(performance.now());   // committed transcript movement
+    quietReporter.activity(performance.now());
   }
   else if (msg.type === 'partial') {
     partialEl.textContent = msg.text;
@@ -2146,12 +2215,16 @@ function onWsMessage(event) {
     // the nudge is acceptable, the reverse is not.
     if (msg.text !== lastPartialText) {
       lastPartialText = msg.text;
-      if (msg.text) nudge.activity(performance.now());
+      if (msg.text) { nudge.activity(performance.now()); quietReporter.activity(performance.now()); }
     }
   }
   else if (msg.type === 'speech_config') {
     nudge.enabled = msg.silence_nudge_enabled !== false;
     nudge.windowS = Number(msg.silence_nudge_s) || nudge.windowS;
+    if (msg.auto) {                       // Phase 7c, only when enabled server-side
+      quietReporter.configure(msg.auto);
+      quietReporter.floor = bargeIn.absFloor;   // the same "this is speech" number
+    }
     if (msg.barge_in) {
       bargeIn.configure(msg.barge_in);
       // The config can arrive before or after start() flips `recording`
@@ -2201,6 +2274,12 @@ function onWsMessage(event) {
   else if (msg.type === 'face_toggled') { applyFaceToggle(msg.on); }
   else if (msg.type === 'speak_ready') { onSpeakReady(msg); }
   else if (msg.type === 'auto_speak') { onAutoSpeak(msg); }   // Phase 7c, same path
+  else if (msg.type === 'auto_toggled') {
+    // Phase 7c: the server's word on whether auto mode is on. The reporter
+    // starts a fresh quiet span at the moment of confirmation.
+    quietReporter.enabled = !!msg.on;
+    if (msg.on) quietReporter.activity(performance.now());
+  }
   else if (msg.type === 'speak_refused') {
     pendingSpeakText = '';
     refreshSpeechControls();

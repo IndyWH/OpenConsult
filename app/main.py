@@ -1389,8 +1389,11 @@ AUTO_INVITATION_AFTER_DISCLOSURE = (
 # caged (one-shot per consultation, server-enforced; only after the
 # invitation has played through; disclosure-gated like every clinical
 # phrase; any activity cancels it client-side, biased toward NOT firing).
-# It must stay the only one until 7c's behaviour-policy machinery exists —
-# do not generalise it into an encourager loop.
+# Its guard ("do not generalise it into an encourager loop") was retired in
+# Phase 7c slice 3, when the behaviour-policy machinery arrived: the
+# client's quiet reporter and the controller's encourager loop, dark behind
+# AUTO_MODE_ENABLED below. With auto mode off, the cage holds exactly as
+# before.
 SILENCE_NUDGE_ENABLED = os.getenv("SILENCE_NUDGE_ENABLED", "true").lower() != "false"
 SILENCE_NUDGE_S = float(os.getenv("SILENCE_NUDGE_S", "5"))
 
@@ -1901,7 +1904,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         logger.warning("Barge-in scale anomaly for %s: residual %s > raw %s",
                        user["username"], scale["anomaly"]["residual_peak_rms"],
                        scale["anomaly"]["raw_peak_rms"])
-    await websocket.send_json({
+    speech_config = {
         "type": "speech_config",
         "silence_nudge_enabled": SILENCE_NUDGE_ENABLED,
         "silence_nudge_s": SILENCE_NUDGE_S,
@@ -1914,7 +1917,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "residual_peak_rms": scale["residual_peak_rms"],
             "loopback_device": (loopback or {}).get("device_label"),
         },
-    })
+    }
+    if AUTO_MODE_ENABLED:
+        # Phase 7c (spec §5): the client's quiet reporter is told the
+        # server's thresholds — env lives server-side only. Sent only when
+        # the gate is up, so the shipped (off) protocol is byte-identical.
+        speech_config["auto"] = {
+            "enabled": True,
+            "encourager_quiet_s": AUTO_ENCOURAGER_QUIET_S,
+            "eot_quiet_s": AUTO_EOT_QUIET_S,
+            "eot_fallback_s": AUTO_EOT_FALLBACK_S,
+        }
+    await websocket.send_json(speech_config)
 
     session: LiveSession = entry["session"]
     engine: CDSEngine = state.cds_engine
@@ -2062,9 +2076,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         audited. The nudge is THE ONLY AUTONOMOUS UTTERANCE in 7a/7b and
         its cage is enforced HERE, server-side, not only in the client:
         one shot per consultation, only after the invitation has played
-        through, and disclosure-gated like every clinical phrase. Keep it
-        that way until 7c's behaviour-policy machinery exists — do not
-        generalise it into an encourager loop.
+        through, and disclosure-gated like every clinical phrase. Its
+        guard against generalisation was retired in Phase 7c slice 3 —
+        the controller's encourager loop is that generalisation, behind
+        AUTO_MODE_ENABLED; with auto mode off, the cage holds exactly as
+        before.
         """
         if "text" in payload or "text" in (payload.get("ref") or {}):
             # Rejected outright rather than stripped. Sanitising would make

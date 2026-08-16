@@ -201,9 +201,10 @@ PHRASES: dict[str, str] = {
     # Silence nudge (Phase 7b session 3, owner's wording verbatim). THE
     # ONLY AUTONOMOUS UTTERANCE IN 7a/7b — the caging lives in main.py's
     # speak handler (one-shot per consultation, only after the invitation
-    # has played through, any activity cancels it client-side). It must
-    # stay the only one until 7c's behaviour-policy machinery exists — do
-    # not generalise it into an encourager loop.
+    # has played through, any activity cancels it client-side). Its guard
+    # against generalisation was retired in Phase 7c slice 3, when the
+    # behaviour-policy machinery arrived behind AUTO_MODE_ENABLED; with
+    # auto mode off, the cage holds exactly as before.
     "silence_nudge": "When you're ready, tell me what's brought you in today.",
     # Phase 7c (PHASE_7C_SPEC.md §4 item 4, owner-approved wording): the
     # invitation-class follow-up auto mode speaks once before the

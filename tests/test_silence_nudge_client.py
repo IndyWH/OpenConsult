@@ -94,11 +94,44 @@ def test_every_activity_source_is_wired():
     assert "via: 'silence_nudge'" in source
 
 
-def test_the_only_autonomous_utterance_boundary_is_written_down():
-    """The cage's reasoning must survive in both the client and the server
-    (a rule stripped of its why reads as a style opinion): do not
-    generalise the nudge into an encourager loop before 7c."""
+def _prose(path: str) -> str:
+    """Comment text with its wrapping and comment markers flattened, so a
+    sentence can be asserted whole across line breaks."""
+    text = Path(path).read_text().replace("//", " ").replace("#", " ")
+    return " ".join(text.split())
+
+
+def test_the_nudge_cage_still_holds_outside_auto_mode():
+    """Phase 7c slice 3 retired the three guard comments ("do not
+    generalise the nudge into an encourager loop"): they existed to block
+    exactly that change until 7c's behaviour-policy machinery carried it,
+    and slice 3 is that machinery — the client's quiet reporter and the
+    controller's encourager loop, dark behind AUTO_MODE_ENABLED. What
+    remains pinned is the property that survives the retirement, on both
+    sides: with auto mode OFF the nudge is caged and behaves exactly as
+    before. The reasoning must still be written down in all three places
+    (a rule stripped of its why reads as a style opinion), and the client
+    must not request the nudge while the server has confirmed auto mode on.
+    """
     for path in ("app/static/live.html", "app/main.py", "app/speech.py"):
-        text = Path(path).read_text()
-        assert "ONLY AUTONOMOUS UTTERANCE" in text, path
-        assert "encourager loop" in text, path
+        prose = _prose(path)
+        assert "ONLY AUTONOMOUS UTTERANCE IN 7a/7b" in prose, path
+        assert "the cage holds exactly as before" in prose, path
+        assert "AUTO_MODE_ENABLED" in prose, path
+        assert "retired in Phase 7c slice 3" in prose, (
+            f"{path}: the retirement of the guard must be written down, not silent")
+    source = Path("app/static/live.html").read_text()
+    # The nudge's own request loop yields to auto mode; the object itself
+    # is unchanged (the Node test above executes it verbatim).
+    assert "if (quietReporter.enabled) return;" in source
+    nudge_loop = source[source.index("if (!nudge.due(now)) return;") - 400:
+                        source.index("if (!nudge.due(now)) return;")]
+    assert "quietReporter.enabled" in nudge_loop
+    # Server side: the cage is the same three refusals, in one function
+    # shared by the tap path and the auto path.
+    main = Path("app/main.py").read_text()
+    cage = main[main.index("def _nudge_refusal("):main.index("def _speak_message(")]
+    for reason in ("the silence nudge is disabled",
+                   "the silence nudge only follows a completed invitation",
+                   "the silence nudge has already been used this consultation"):
+        assert reason in cage
