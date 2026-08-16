@@ -753,9 +753,15 @@ class SpeechService:
             return wav_bytes, wav_duration_ms(wav_bytes), 0
 
         # Synthesise to a temp file first: the cache must never hold audio
-        # that failed validation, and a torn file would be poison.
+        # that failed validation, and a torn file would be poison. The temp
+        # name is unique PER CALL, not per process: since 7c pre-synthesis
+        # warms the cache in a background thread, two synthesisers can be
+        # working on the same text at once (a warm and a tap), and a shared
+        # temp path had one of them installing the other's file and then
+        # finding nothing to read (found 2026-08-16). Both produce the same
+        # audio; the last atomic replace wins.
         self.cache_dir.mkdir(parents=True, exist_ok=True)
-        tmp = cached.with_suffix(f".{os.getpid()}.wav.tmp")
+        tmp = cached.with_suffix(f".{os.getpid()}.{secrets.token_hex(4)}.wav.tmp")
         started = time.perf_counter()
         try:
             self._run_command(text, tmp)
@@ -797,6 +803,7 @@ class SpeechService:
     def prepare_auto(self, utterance: auto_mode.Utterance,
                      agenda: AgendaLog | None = None, *,
                      phase: str, trigger: dict | None = None,
+                     detail: dict | None = None,
                      user_id: int | None = None, consultation_id: int | None = None,
                      doctor: str | None = None) -> Utterance:
         """Resolve a WHITELIST utterance for the auto path, synthesise it
@@ -810,7 +817,8 @@ class SpeechService:
         column; `cds_rationale` comes from the agenda version exactly as
         for a tap. `phase` is the controller's phase value; `trigger` is
         the caller's account of what prompted it (quiet seconds, a
-        hand-back) and is stored as given.
+        hand-back) and is stored as given; `detail` (slice 4) adds the
+        question record — topic and open_form — beside them.
         """
         resolution = resolve_utterance(utterance, agenda, doctor)
         wav_bytes, duration_ms, synth_ms = self.synthesise(resolution.text)
@@ -821,7 +829,8 @@ class SpeechService:
             duration_ms=duration_ms, synth_ms=synth_ms,
             ref_kind=resolution.ref_kind,
             ref_detail={**resolution.ref_detail, "via": "auto",
-                        "phase": str(phase_value), "trigger": dict(trigger or {})},
+                        "phase": str(phase_value), "trigger": dict(trigger or {}),
+                        **dict(detail or {})},
             cds_rationale=resolution.cds_rationale, stale=resolution.stale,
             user_id=user_id, consultation_id=consultation_id)
         self._utterances[registered.utterance_id] = registered

@@ -352,6 +352,33 @@ def test_presynthesis_never_raises_when_the_command_fails(tmp_path):
     assert not cache.exists() or list(cache.iterdir()) == []
 
 
+def test_two_synthesisers_on_the_same_text_at_once_both_succeed(tmp_path):
+    """Pre-synthesis runs in a background thread, so a warm and a tap can
+    be synthesising the same phrase at the same moment. Found 2026-08-16:
+    with one temp path per process, one caller installed the other's file
+    and then found nothing to read ("synthesis produced no audio"). The
+    temp name is now unique per call; both callers succeed and the cache
+    holds one file."""
+    from concurrent.futures import ThreadPoolExecutor
+    script = tmp_path / "slow_tts.py"
+    script.write_text(
+        "import sys, time, wave\n"
+        "sys.stdin.buffer.read()\n"
+        "time.sleep(0.2)\n"
+        "with wave.open(sys.argv[sys.argv.index('--output-file') + 1], 'wb') as w:\n"
+        "    w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)\n"
+        "    w.writeframes(b'\\x00\\x00' * 2205)\n")
+    (tmp_path / "voice.onnx").write_bytes(b"never read")
+    service = speech.SpeechService(
+        voice="test", model_path=str(tmp_path / "voice.onnx"), cache_dir=tmp_path / "cache",
+        command=f"{sys.executable} {script} --model {{model}} --output-file {{output}}")
+    with ThreadPoolExecutor(max_workers=4) as pool:
+        results = list(pool.map(lambda _: service.synthesise("Mm-hm."), range(4)))
+    assert all(duration == 100 for _, duration, _ in results)
+    assert len(list((tmp_path / "cache").glob("*.wav"))) == 1
+    assert list((tmp_path / "cache").glob("*.tmp")) == []
+
+
 def test_the_app_starts_presynthesis_at_service_start_off_the_loop():
     """Spec §9: 'pre-synthesised into the disk cache at service start'.
     Asserted on the lifespan source: the task is created right after the
