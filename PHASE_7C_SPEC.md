@@ -131,6 +131,11 @@ until the mock-patient round:
   (explicit hand-backs like "that's all" / "what do you think?") is
   logged when detected, as the prereg requires for metric 3 scoring.
 
+  The officer also runs during GOLDEN, where its verdict is used
+  only for the exit decision — hand-back, or turn-end at the
+  timer — and never to ask. Section 5's earlier "outside GOLDEN"
+  wording was imprecise (recorded 2026-08-16 at slice-3 review).
+
 **Politeness abort (interruption count ~0 by construction).** The
 server never orders playback into live speech: an `auto_speak` is only
 issued while the quiet window is still open, and the client re-checks
@@ -187,6 +192,10 @@ the answer, then the examination-handover phrase, and auto mode ends
 (state HANDOVER; standard mode keeps listening and transcribing).
 The agenda-empty condition only counts on a post-answer revision —
 never on a stale version.
+If the anything-else answer refills the agenda on its
+post-answer revision, the flow returns to the question phases
+and handover waits; the anything-else phrase is spoken at most
+once per session.
 
 ## 7. Urgency pause protocol
 
@@ -277,10 +286,17 @@ v1 remedy, as with #469.
 House pattern throughout; the three standing interface rules apply
 and `test_standing_rules.py` extends to the new controls.
 
-- **Auto pill** in the control row beside Sound check and Face:
-  labelled, server-confirmed (an `auto_toggled` echo, face-toggle
-  precedent), audited, disabled until disclosure is given, hidden
-  entirely when `AUTO_MODE_ENABLED` is false.
+- Auto pill in the control row beside Sound check and Face:
+  labelled, server-confirmed (an auto_toggled echo, face-toggle
+  precedent), audited, hidden entirely when AUTO_MODE_ENABLED is
+  false. One tap starts the auto session: if the disclosure has
+  not yet been given, toggling Auto speaks it through the auto
+  path (face auto-on included), chains the invitation, and GOLDEN
+  begins at the invitation's speak_ended — the metric-3 zero
+  point. If the disclosure and invitation were already done
+  manually, GOLDEN begins at the toggle, and the audit detail
+  says so. (Owner decision 2026-08-16, replacing the earlier
+  disabled-until-disclosure rule.)
 - **Phase indicator** on the status line while auto is on (Golden
   minutes / Open questions / Closed questions / Paused — urgent /
   Handing over), so the supervising doctor always knows what the
