@@ -1,4 +1,4 @@
-# PHASE_7C_SPEC.md — Supervised auto history-taking (DRAFT for owner approval)
+# PHASE_7C_SPEC.md — Supervised auto history-taking
 
 > **APPROVED by the owner 2026-08-16, wholesale.** Design by
 > Claude Cowork from a full recon of the live 7a/7b code; decision
@@ -210,6 +210,15 @@ resume pauses again and needs a fresh acknowledgement — no automatic
 ack-resume loop. An alarm still unresolved at Stop flows into the
 review page's acknowledge-gated banner exactly as today; a live ack
 is recorded so the review page can show who acknowledged what, when.
+
+Confirmed by the owner 2026-08-16 after slice-1 review: an alarm
+re-firing while already PAUSED_URGENT is a legal self-edge — the
+machine stays paused, keeps the prior phase, and the pending
+action set widens so one acknowledgement covers everything that
+fired. The safety condition this creates binds slice 5: the pause
+banner must display every pending action text at acknowledgement
+time, so an acknowledgement only ever covers what the doctor
+actually saw.
 
 **Assessment snapshots.** Prereg metric 7 (red-flag utterance → alarm
 fire → pause) needs per-revision timing that today only exists as a
