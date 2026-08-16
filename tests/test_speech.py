@@ -61,6 +61,7 @@ def test_phrase_table_holds_exactly_the_specified_phrases():
         "examination_handover",
         "sound_check",   # spec Part 10, added 2026-07-25
         "silence_nudge",  # session 3, the ONLY autonomous utterance in 7a/7b
+        "anything_else",  # Phase 7c §4 item 4, the invitation-class follow-up
     }
 
 
@@ -180,7 +181,8 @@ def test_the_disclosure_gate_list_exempts_the_encouragers():
     a rule; it is not a clinical interaction."""
     assert set(speech.DISCLOSURE_GATED_PHRASES) == {"invitation",
                                                     "examination_handover",
-                                                    "silence_nudge"}
+                                                    "silence_nudge",
+                                                    "anything_else"}  # 7c: a question
     for encourager in speech.ENCOURAGER_IDS:
         assert encourager not in speech.DISCLOSURE_GATED_PHRASES
     assert "disclosure" not in speech.DISCLOSURE_GATED_PHRASES, (

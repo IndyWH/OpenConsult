@@ -45,9 +45,14 @@ DATABASE_URL = os.getenv("DATABASE_URL", "")
 # never resumed across one); 'failed_to_play' means speak_started never
 # arrived, so there was no window and no exclusion; 'window_ceiling' means
 # speak_ended never arrived and the window closed at
-# start + duration + tail.
+# start + duration + tail. Phase 7c (PHASE_7C_SPEC.md §5, §7, §11):
+# 'politeness_abort' — the client found speech had resumed immediately
+# before playback and declined to play (no window, no span; the utterance
+# is requeued by the controller, not lost); 'urgency_pause' — an auto
+# utterance cut because an urgent alarm paused auto mode.
 END_REASONS = ("complete", "barge_in", "doctor_stop", "cancelled",
-               "failed_to_play", "window_ceiling")
+               "failed_to_play", "window_ceiling",
+               "politeness_abort", "urgency_pause")
 
 SCHEMA_SQL = """
 CREATE TABLE IF NOT EXISTS system_utterance (
@@ -55,8 +60,10 @@ CREATE TABLE IF NOT EXISTS system_utterance (
     consultation_id int NOT NULL REFERENCES consultation(id) ON DELETE CASCADE,
     utterance_id text NOT NULL,
     text text NOT NULL,
-    ref_kind text NOT NULL,          -- 'phrase' | 'cds_question'
-    ref_detail jsonb,                -- phrase id, or assessment version + index
+    ref_kind text NOT NULL,          -- 'phrase' | 'cds_question' | 'template' (7c)
+    ref_detail jsonb,                -- phrase id, or assessment version + index,
+                                     -- or template id + topic; auto utterances
+                                     -- (7c) add via/phase/trigger
     cds_rationale text,              -- the agenda's reasoning as it stood
     requested_at timestamptz NOT NULL DEFAULT now(),
     -- Authoritative exclusion span: byte offsets into the WAV's PCM data.

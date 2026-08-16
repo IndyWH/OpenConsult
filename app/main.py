@@ -22,8 +22,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import (audit, auth, consultations, face, frontdesk, letters, monitor,
-                 ratelimit, raw_segments, retention, schema, speech,
+from app import (audit, auth, auto_mode, consultations, face, frontdesk, letters,
+                 monitor, ratelimit, raw_segments, retention, schema, speech,
                  system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine
@@ -84,6 +84,13 @@ async def lifespan(app: FastAPI):
     # on first synthesis, so a machine without piper-tts starts normally
     # and simply cannot speak.
     app.state.speech = speech.SpeechService()
+    # Phase 7c (PHASE_7C_SPEC.md §9): warm the disk cache with the fixed
+    # phrases so an encourager is a cache hit. Off the event loop and never
+    # fatal — the method logs and returns whatever happened; a machine
+    # without Piper skips in one line. The task handle is kept so it is not
+    # collected mid-run and can be cancelled at shutdown.
+    app.state.speech_presynth = asyncio.create_task(
+        asyncio.to_thread(app.state.speech.presynthesise_phrases))
     app.state.cds_engine = CDSEngine()
     app.state.rag = RAGService()
     # Finalisation is serialised through a single-consumer queue: exactly
@@ -113,6 +120,7 @@ async def lifespan(app: FastAPI):
     except Exception:  # noqa: BLE001 - startup must survive a sweep failure
         logger.exception("Stale-entry sweep failed at startup")
     yield
+    app.state.speech_presynth.cancel()
     app.state.retention_task.cancel()
     app.state.finalize_worker.cancel()
 
@@ -1491,6 +1499,153 @@ def _needs_disclosure(ref: dict) -> bool:
     return False
 
 
+def _auto_needs_disclosure(utterance: auto_mode.Utterance) -> bool:
+    """The disclosure lock for the auto path — the same coverage as
+    `_needs_disclosure`, on the whitelist types: every agenda question and
+    every template question, plus the gated phrases; not the disclosure
+    itself and not the encouragers."""
+    if isinstance(utterance, auto_mode.PhraseUtterance):
+        return utterance.phrase_id in speech.DISCLOSURE_GATED_PHRASES
+    return True
+
+
+def _nudge_refusal(entry: dict) -> str | None:
+    """The silence nudge's cage, server-enforced (Phase 7b session 3): one
+    shot per consultation, only after the invitation has played through,
+    and only while enabled. Returns the refusal reason, or None if the
+    nudge may fire. Shared by the tap path and the auto path so the cage
+    cannot drift between them."""
+    if not SILENCE_NUDGE_ENABLED:
+        return "the silence nudge is disabled"
+    if not entry["invitation_completed"]:
+        return "the silence nudge only follows a completed invitation"
+    if entry["nudge_used"]:
+        return "the silence nudge has already been used this consultation"
+    return None
+
+
+def _speak_message(utterance: speech.Utterance, msg_type: str) -> dict:
+    """The play command for the client: `speak_ready` for a tap, and —
+    Phase 7c — `auto_speak` for a server-initiated utterance, built by the
+    SAME function so the two can never differ in shape. The client plays
+    both through one code path and reports the same lifecycle."""
+    ready = {
+        "type": msg_type, "utterance_id": utterance.utterance_id,
+        "ref_id": utterance.ref_detail.get("id"),
+        "duration_ms": utterance.duration_ms,
+        # What the server decided to say. The client needs it to log
+        # the utterance faithfully rather than by button label — it
+        # showed "Disclosure" where the room heard three sentences
+        # (2026-07-25 room test). This is the server TELLING the
+        # client; it remains impossible for the client to supply text.
+        "text": utterance.text,
+        "url": f"/api/speech/{utterance.utterance_id}.wav"}
+    if speech.BARGE_IN_ENABLED:
+        # 7a session 3: the normalised playback envelope rides along so
+        # the detector's threshold can follow what is actually being
+        # rendered. Only when the flag is up — the shipped (off)
+        # protocol is byte-identical to session 2's. A failure here
+        # must not stop the system speaking: no envelope simply means
+        # absolute-floor detection.
+        try:
+            ready["envelope"] = speech.playback_envelope(utterance.wav)
+            ready["envelope_window_ms"] = speech.ENVELOPE_WINDOW_MS
+        except Exception as exc:  # noqa: BLE001 - comfort, not speech
+            logger.warning("No playback envelope for %s: %s",
+                           utterance.utterance_id, exc)
+    return ready
+
+
+async def issue_auto_speak(state, entry: dict, websocket, utterance: auto_mode.Utterance,
+                           *, phase, trigger: dict | None = None) -> speech.Utterance:
+    """Server-initiated speak — Phase 7c slice 2 (PHASE_7C_SPEC.md §3, §4,
+    §11). NOTHING CALLS THIS YET: the controller wiring that will (slice
+    3) is not built, so the running app's behaviour is unchanged by its
+    existence. It is here, tested, so that slice 3 wires an existing path
+    rather than inventing one under pressure.
+
+    The auto path reuses the tap pipeline end to end and adds no
+    mechanism: the same one-utterance-at-a-time guard, the same
+    disclosure lock (hard rule 4), the same nudge cage, the same
+    SpeechService (cache, `SPEECH_MAX_UTTERANCE_S` cap), the same
+    `pending_utterance` slot — so `speak_started`/`speak_ended` and the
+    exclusion window work on an auto utterance exactly as on a tap. The
+    client is sent `auto_speak`, built by `_speak_message` — the same
+    shape as `speak_ready`.
+
+    What differs from a tap: the input is a WHITELIST TYPE, never a
+    message (hard rule 1 by construction — see app/auto_mode.py), and
+    refusals RAISE to the caller instead of being answered to a client,
+    because the caller is the server. Every refusal is still audited as
+    `speech.failed` with via="auto". A synthesis fault or an unavailable
+    synthesiser is additionally shown to the client as `speak_refused`,
+    exactly as for a tap: a dead speaker must look like a fault, never
+    like a system that chose not to speak. Guard refusals (already in
+    flight, disclosure not given) are the caller's to handle — requeue,
+    or fix the wiring — and are not shown.
+
+    Face auto-on at a spoken disclosure (owner decision 2026-07-28) is
+    NOT done here: `handle_face` lives in the connection; the wiring that
+    issues an auto disclosure calls it, as `handle_speak` does today.
+    """
+    session: LiveSession = entry["session"]
+    user = entry["user"]
+    phase_value = str(getattr(phase, "value", phase))
+    trigger = dict(trigger or {})
+
+    async def refuse(reason: str, exc: type[Exception] = speech.SpeechRefused,
+                     *, tell_client: bool = False) -> None:
+        await audit.log(user["id"], "speech.failed", None, None,
+                        {"reason": reason, "via": "auto", "phase": phase_value})
+        if tell_client:
+            await websocket.send_json({"type": "speak_refused", "detail": reason})
+        raise exc(reason)
+
+    if not isinstance(utterance, (auto_mode.PhraseUtterance, auto_mode.TemplateUtterance,
+                                  auto_mode.AgendaUtterance)):
+        # The type system is the first line; this is the second. A bare
+        # string here is the auto path's equivalent of a `speak` carrying
+        # text, and it is refused and audited the same way.
+        await refuse("the auto path speaks only a whitelist utterance "
+                     f"(got {type(utterance).__name__})")
+    if session.speaking or entry["pending_utterance"] is not None:
+        # One utterance at a time, queue depth zero (7a spec §2.3).
+        await refuse("an utterance is already in flight")
+    if not entry["disclosed"] and _auto_needs_disclosure(utterance):
+        await refuse("the patient has not been told they are talking to a machine — "
+                     "play the disclosure, or tick 'disclosure given'")
+    if (isinstance(utterance, auto_mode.PhraseUtterance)
+            and utterance.phrase_id == "silence_nudge"):
+        cage = _nudge_refusal(entry)
+        if cage is not None:
+            await refuse(cage)
+    try:
+        prepared = await asyncio.to_thread(
+            functools.partial(
+                state.speech.prepare_auto, utterance, entry["agenda"],
+                phase=phase_value, trigger=trigger, user_id=user["id"],
+                # Server-side, from the session's own doctor account.
+                doctor=speech.doctor_name_for(entry["user"])))
+    except speech.SpeechRefused as exc:
+        await refuse(str(exc))
+    except speech.SpeechUnavailable as exc:
+        await refuse(f"speech unavailable: {exc}", speech.SpeechUnavailable,
+                     tell_client=True)
+    except speech.SpeechFailed as exc:
+        await refuse(f"synthesis failed: {exc}", speech.SpeechFailed, tell_client=True)
+    entry["pending_utterance"] = prepared
+    if prepared.ref_detail.get("id") == "silence_nudge":
+        entry["nudge_used"] = True     # marked used at REQUEST, as for a tap
+    await audit.log(user["id"], "speech.requested", None, None,
+                    {"utterance_id": prepared.utterance_id,
+                     "ref_kind": prepared.ref_kind,
+                     "ref_detail": prepared.ref_detail,
+                     "stale": prepared.stale,
+                     "via": "auto", "phase": phase_value, "trigger": trigger})
+    await websocket.send_json(_speak_message(prepared, "auto_speak"))
+    return prepared
+
+
 def _cancel_playback(entry: dict, reason: str) -> None:
     """End any in-flight utterance without a client `speak_ended`.
 
@@ -1904,16 +2059,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if (payload.get("ref") or {}).get("id") == "silence_nudge":
             # The nudge's cage (see the docstring): server-enforced,
             # because a client-side-only cage is a suggestion.
-            if not SILENCE_NUDGE_ENABLED:
-                await refuse_speech("the silence nudge is disabled")
-                return
-            if not entry["invitation_completed"]:
-                await refuse_speech(
-                    "the silence nudge only follows a completed invitation")
-                return
-            if entry["nudge_used"]:
-                await refuse_speech(
-                    "the silence nudge has already been used this consultation")
+            cage = _nudge_refusal(entry)
+            if cage is not None:
+                await refuse_speech(cage)
                 return
         try:
             utterance = await asyncio.to_thread(
@@ -1959,31 +2107,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          # calibration data for SILENCE_NUDGE_S.
                          **({"quiet_s": round(float(quiet_s), 1)}
                             if quiet_s is not None else {})})
-        ready = {
-            "type": "speak_ready", "utterance_id": utterance.utterance_id,
-            "ref_id": utterance.ref_detail.get("id"),
-            "duration_ms": utterance.duration_ms,
-            # What the server decided to say. The client needs it to log
-            # the utterance faithfully rather than by button label — it
-            # showed "Disclosure" where the room heard three sentences
-            # (2026-07-25 room test). This is the server TELLING the
-            # client; it remains impossible for the client to supply text.
-            "text": utterance.text,
-            "url": f"/api/speech/{utterance.utterance_id}.wav"}
-        if speech.BARGE_IN_ENABLED:
-            # 7a session 3: the normalised playback envelope rides along so
-            # the detector's threshold can follow what is actually being
-            # rendered. Only when the flag is up — the shipped (off)
-            # protocol is byte-identical to session 2's. A failure here
-            # must not stop the system speaking: no envelope simply means
-            # absolute-floor detection.
-            try:
-                ready["envelope"] = speech.playback_envelope(utterance.wav)
-                ready["envelope_window_ms"] = speech.ENVELOPE_WINDOW_MS
-            except Exception as exc:  # noqa: BLE001 - comfort, not speech
-                logger.warning("No playback envelope for %s: %s",
-                               utterance.utterance_id, exc)
-        await websocket.send_json(ready)
+        # The play command, built by the same function that builds the
+        # auto path's `auto_speak` (Phase 7c) — one shape, one code path
+        # on the client.
+        await websocket.send_json(_speak_message(utterance, "speak_ready"))
 
     def record_utterance(utterance, span: dict | None, end_reason: str,
                          cut_latency_ms: int | None = None) -> None:
@@ -2039,10 +2166,27 @@ async def ws_transcribe(websocket: WebSocket) -> None:
 
     async def handle_speak_ended(payload: dict) -> None:
         utterance = entry["pending_utterance"]
+        reason = payload.get("reason") or "complete"
+        if (utterance is not None and not session.speaking
+                and reason == "politeness_abort"
+                and payload.get("utterance_id") == utterance.utterance_id):
+            # Phase 7c (PHASE_7C_SPEC.md §5): the client re-checked its own
+            # microphone immediately before playback and found speech had
+            # resumed, so it declined to play. Nothing entered the room, no
+            # window was opened, there is nothing to exclude — the row says
+            # so (end_reason politeness_abort, no span) and the slot is
+            # released. Requeueing the utterance is the controller's job
+            # (slice 3/4); here it is simply not lost from the record.
+            record_utterance(utterance, None, "politeness_abort")
+            entry["pending_utterance"] = None
+            await audit.log(user["id"], "speech.politeness_abort", None, None,
+                            {"utterance_id": utterance.utterance_id,
+                             "via": utterance.ref_detail.get("via", "tap"),
+                             "phase": utterance.ref_detail.get("phase")})
+            return
         if utterance is None or not session.speaking:
             await refuse_speech("speak_ended with no window open")
             return
-        reason = payload.get("reason") or "complete"
         if reason not in system_utterances.END_REASONS:
             reason = "complete"
         span = session.close_speaking_window(reason)

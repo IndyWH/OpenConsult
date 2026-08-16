@@ -70,6 +70,8 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+from app import auto_mode
+
 load_dotenv()
 
 logger = logging.getLogger(__name__)
@@ -203,6 +205,11 @@ PHRASES: dict[str, str] = {
     # stay the only one until 7c's behaviour-policy machinery exists — do
     # not generalise it into an encourager loop.
     "silence_nudge": "When you're ready, tell me what's brought you in today.",
+    # Phase 7c (PHASE_7C_SPEC.md §4 item 4, owner-approved wording): the
+    # invitation-class follow-up auto mode speaks once before the
+    # examination handover. A fixed phrase like the others — no slot, no
+    # model — and disclosure-gated because it is a question to the patient.
+    "anything_else": "Is there anything else you wanted to talk about today?",
 }
 
 ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
@@ -210,7 +217,46 @@ ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
 # Phrases the patient must have heard the disclosure before (hard rule 4).
 # The encouragers are exempt: "mm-hm" is not a clinical interaction, and
 # gating them would make the lock feel like a nuisance rather than a rule.
-DISCLOSURE_GATED_PHRASES = ("invitation", "examination_handover", "silence_nudge")
+DISCLOSURE_GATED_PHRASES = ("invitation", "examination_handover", "silence_nudge",
+                            "anything_else")
+
+
+# --- the open-question templates (Phase 7c, PHASE_7C_SPEC.md §4 item 3) ----
+#
+# Owner-approved wording, instantiated SERVER-SIDE ONLY with a short topic
+# noun phrase ("the chest pain") — the {doctor} precedent above, applied to
+# a second slot. There is no client reference kind for these: `resolve()`
+# below does not know them, so a tap cannot reach them, and the auto path
+# reaches them only through `TemplateUtterance` (app/auto_mode.py), which
+# names the template by id and carries the topic string and nothing else.
+# The words around the slot are never authored at speak time.
+
+TEMPLATES: dict[str, str] = {
+    "tell_me_more": "Can you tell me more about {topic}?",
+    "affecting_you": "How has {topic} been affecting you?",
+}
+
+
+def render_template(template_id: str, topic: str) -> str:
+    """An owner-approved template with its topic slot filled, server-side.
+
+    The topic is the ONLY variable part and it is a noun phrase, not a
+    sentence: it must be non-empty and a single line. Anything longer than
+    the utterance cap is refused downstream by `synthesise()`.
+    """
+    if template_id not in TEMPLATES:
+        raise SpeechRefused(f"unknown template id: {template_id!r}")
+    return TEMPLATES[template_id].format(topic=clean_topic(topic))
+
+
+def clean_topic(topic: str) -> str:
+    """The topic slot, whitespace-collapsed to one line; empty is refused."""
+    if not isinstance(topic, str):
+        raise SpeechRefused("template topic must be a string")
+    cleaned = " ".join(topic.split())
+    if not cleaned:
+        raise SpeechRefused("template topic is empty")
+    return cleaned
 
 
 # --- sound check (spec Part 10) --------------------------------------------
@@ -452,6 +498,49 @@ def resolve(ref: dict, agenda: AgendaLog | None = None,
                           cds_rationale=snapshot.reasoning, stale=stale)
 
     raise SpeechRefused(f"unknown speak.ref kind: {kind!r}")
+
+
+# --- the auto path's resolution (Phase 7c, PHASE_7C_SPEC.md §4) -----------
+#
+# The server-initiated path never sees a client message at all: it is
+# handed one of the three whitelist TYPES from app/auto_mode.py and nothing
+# else. There is no free-text type to hand it, so hard rule 1 holds by
+# construction one layer up; this function then refuses anything that is
+# not one of the three (a bare string, a dict, a client-style ref), so a
+# caller cannot smuggle words past the type either.
+
+def resolve_utterance(utterance: auto_mode.Utterance,
+                      agenda: AgendaLog | None = None,
+                      doctor: str | None = None) -> Resolution:
+    """Turn a whitelist utterance into server-authored text.
+
+    - `PhraseUtterance` → the fixed phrase table, `{doctor}` filled from the
+      session's own doctor account exactly as a tapped phrase is.
+    - `TemplateUtterance` → an owner-approved template with its topic slot
+      filled server-side; recorded as ref_kind "template" with the id and
+      the topic, so the review page can show what was said and why.
+    - `AgendaUtterance` → the versioned AgendaLog, by assessment version and
+      index, exactly as a doctor's tap resolves — same stale rule, same
+      rationale, same refusal to guess at another version's wording.
+
+    Anything else raises SpeechRefused. Not TypeError: a wrong type here is
+    the same class of event as a `speak` carrying text, and it is audited
+    the same way by the caller.
+    """
+    if isinstance(utterance, auto_mode.PhraseUtterance):
+        return resolve({"kind": "phrase", "id": utterance.phrase_id}, agenda, doctor)
+    if isinstance(utterance, auto_mode.AgendaUtterance):
+        return resolve({"kind": "cds_question",
+                        "assessment_version": utterance.assessment_version,
+                        "index": utterance.index}, agenda, doctor)
+    if isinstance(utterance, auto_mode.TemplateUtterance):
+        text = render_template(utterance.template_id, utterance.topic)
+        return Resolution(text=text, ref_kind="template",
+                          ref_detail={"template_id": utterance.template_id,
+                                      "topic": clean_topic(utterance.topic)})
+    raise SpeechRefused(
+        "the auto path speaks only a PhraseUtterance, TemplateUtterance or "
+        f"AgendaUtterance, not {type(utterance).__name__}")
 
 
 # --- synthesis -------------------------------------------------------------
@@ -703,6 +792,78 @@ class SpeechService:
             user_id=user_id, consultation_id=consultation_id)
         self._utterances[utterance.utterance_id] = utterance
         return utterance
+
+    def prepare_auto(self, utterance: auto_mode.Utterance,
+                     agenda: AgendaLog | None = None, *,
+                     phase: str, trigger: dict | None = None,
+                     user_id: int | None = None, consultation_id: int | None = None,
+                     doctor: str | None = None) -> Utterance:
+        """Resolve a WHITELIST utterance for the auto path, synthesise it
+        through the same cache and cap as a tap, and register the result.
+
+        Phase 7c (PHASE_7C_SPEC.md §4, §11). The registered utterance's
+        `ref_detail` carries the resolution's own detail plus
+        `{"via": "auto", "phase": ..., "trigger": ...}`, so the
+        system_utterance row written at session end and the review page's
+        grey channel can tell an auto utterance from a tap without a new
+        column; `cds_rationale` comes from the agenda version exactly as
+        for a tap. `phase` is the controller's phase value; `trigger` is
+        the caller's account of what prompted it (quiet seconds, a
+        hand-back) and is stored as given.
+        """
+        resolution = resolve_utterance(utterance, agenda, doctor)
+        wav_bytes, duration_ms, synth_ms = self.synthesise(resolution.text)
+        phase_value = getattr(phase, "value", phase)
+        registered = Utterance(
+            utterance_id=secrets.token_hex(8),
+            text=resolution.text, voice=self.voice, wav=wav_bytes,
+            duration_ms=duration_ms, synth_ms=synth_ms,
+            ref_kind=resolution.ref_kind,
+            ref_detail={**resolution.ref_detail, "via": "auto",
+                        "phase": str(phase_value), "trigger": dict(trigger or {})},
+            cds_rationale=resolution.cds_rationale, stale=resolution.stale,
+            user_id=user_id, consultation_id=consultation_id)
+        self._utterances[registered.utterance_id] = registered
+        return registered
+
+    def presynthesise_phrases(self) -> dict[str, str]:
+        """Warm the disk cache with every fixed phrase (PHASE_7C_SPEC.md §9).
+
+        So that an encourager in the golden minutes is a cache hit — 0 ms
+        synthesis, the play command is a WebSocket message and a cached
+        fetch. Runs at service start, off the event loop, and NEVER raises:
+        a machine without Piper, or a phrase that fails, is logged and the
+        service carries on exactly as before — pre-synthesis is a latency
+        courtesy, not a condition of speaking.
+
+        Phrases with a `{doctor}` slot are skipped: the name is filled per
+        session from the doctor's account, so there is no one text to warm
+        at start. Neither of them is an encourager. Returns a per-phrase
+        outcome map ("cached", "synthesised", "skipped: …", "failed: …")
+        for the log and for tests.
+        """
+        outcomes: dict[str, str] = {}
+        reason = self.unavailable_reason()
+        if reason is not None:
+            logger.info("Speech pre-synthesis skipped: %s", reason)
+            return {phrase_id: f"skipped: {reason}" for phrase_id in PHRASES}
+        for phrase_id, template in PHRASES.items():
+            if "{doctor}" in template:
+                outcomes[phrase_id] = "skipped: doctor-named, filled per session"
+                continue
+            text = render_phrase(phrase_id)
+            try:
+                if self._cache_path(text).exists():
+                    outcomes[phrase_id] = "cached"
+                    continue
+                self.synthesise(text)
+                outcomes[phrase_id] = "synthesised"
+            except Exception as exc:  # noqa: BLE001 - never fatal, by contract
+                outcomes[phrase_id] = f"failed: {exc}"
+                logger.warning("Pre-synthesis of phrase %r failed: %s", phrase_id, exc)
+        logger.info("Speech pre-synthesis: %s",
+                    ", ".join(f"{k}={v.split(':')[0]}" for k, v in outcomes.items()))
+        return outcomes
 
     def get(self, utterance_id: str) -> Utterance | None:
         return self._utterances.get(utterance_id)
