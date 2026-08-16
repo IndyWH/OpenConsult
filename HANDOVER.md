@@ -5022,3 +5022,52 @@ paragraph-4 dedup is hardened into an explicit pre-output check of every
 paragraph-4 sentence against paragraphs 1–3, delete the repeat, omit the
 paragraph if nothing remains. `REFERRAL_LETTER_STYLE.md` Selection and
 item 4 follow. Verification is the same #66 regenerate after restart.
+
+## Phase 7c slice 1 — spec committed, pure state machine landed dark (2026-08-16)
+
+**What landed.** `PHASE_7C_SPEC.md` is in the repo (e490668): the
+supervised auto history-taking design, approved by the owner wholesale on
+2026-08-16 with D1–D3 and the 1–2 minute golden window decided the same
+day and recorded inline. `app/auto_mode.py` (fd83191) is the pure phase
+machine of spec §3/§4/§7 — the nine phases, one explicit legal-transition
+table, event methods named for what happened, `Transition(from, to,
+trigger, at)` records for the audit trail, `AutoModeError` on every
+illegal edge, the utterance whitelist as three frozen types with no
+free-text member (hard rule 1 by construction), the question-in-GOLDEN
+guard that raises, the pause protocol with resume-to-exact-phase and
+terminal take-over, and the ratchet set. `tests/test_auto_mode.py`
+(1faf4d3) pins those properties: 81 tests, suite 689 → 770 passed.
+
+**No behaviour change.** Nothing imports the module; the running app is
+byte-identical in behaviour and needs no restart for this slice. There
+are no config constants yet — `AUTO_MODE_ENABLED` and the thresholds
+arrive with the wiring in slice 3, and the machine holds no numbers.
+
+**The gate is unchanged.** Everything in 7c builds dark behind
+`AUTO_MODE_ENABLED=false`. Enabling it is the owner's act, after
+barge-in calibration and the mock-patient-round review — both still
+owed; neither is advanced by this slice.
+
+**Two cases the spec leaves open, decided in code, flagged for the
+owner and Cowork to confirm or overrule** (spec §6/§7 do not name them;
+the choice is recorded in the fd83191 message and the module docstring):
+
+- An urgent alarm re-firing while already `PAUSED_URGENT` is a legal
+  self-edge — the machine stays paused, keeps the prior phase, and the
+  pending action set widens so one acknowledgement covers everything
+  that fired. Chosen because the session keeps listening and the CDS
+  keeps revising during a pause, so a re-fire before the doctor answers
+  the banner is the normal case, not an edge case.
+- `hand_back`, `golden_timer_elapsed` and `agenda_exhausted` are legal
+  only from the phases spec §6 names for them (GOLDEN; GOLDEN;
+  OPEN/CLOSED). A late golden timer after an early hand-back exit, or a
+  hand-back detected in OPEN/CLOSED, raises — the slice-3 wiring must
+  consult `controller.phase` (or `is_legal(event)`) rather than fire
+  blindly. Strict by default; loosening any of these is a table edit
+  plus a test edit, not a design change.
+
+**Not touched:** `help/`, `vendor/`, the two FROZEN documents. The spec's
+H1 still reads "(DRAFT for owner approval)" because the approval
+instruction was to replace the header blockquote and change nothing
+else; the blockquote states the approval. Owner's call whether the H1
+should follow.
