@@ -1493,6 +1493,52 @@ async function onSpeakReady(msg) {
   addSpoken(msg.text || label);
 }
 
+// ============================ Phase 7c slice 2: the auto speak path (client)
+//
+// The server may now initiate an utterance itself — `auto_speak`,
+// PHASE_7C_SPEC.md §3 — shaped exactly like speak_ready. NOTHING SENDS IT YET:
+// the controller wiring is slice 3, and everything in 7c ships dark behind
+// AUTO_MODE_ENABLED=false. It plays through EXACTLY the tap's code
+// path (onSpeakReady): the same speak_started/speak_ended reporting, so the
+// server's exclusion window opens and closes on it with no new mechanism;
+// the same Esc / Stop cancel; the same speaking pill. One addition, spec
+// §5 — the POLITENESS ABORT: immediately before starting playback the page
+// re-checks its own microphone, and if speech has resumed it declines to
+// play and reports speak_ended with reason politeness_abort. Nothing
+// entered the room, no window opens, and the server keeps the utterance on
+// its record for the controller to requeue — it is not lost. The server
+// never orders playback into live speech; this is the last check, at the
+// last moment, on the one clock that can see the room.
+const politeness = {
+  // "Speech has resumed" is mic energy at or above the barge-in ABSOLUTE
+  // floor — the one number this page already holds for "this is speech,
+  // not room noise" (BARGE_IN_RMS_THRESHOLD, server-configured, arrives in
+  // speech_config whether or not the detector is enabled; an uncalibrated
+  // guess, like the rest, until the mock-patient round). NOT the 1e-4
+  // silence floor the nudge and the dead-mic pill share: room noise sits
+  // at 0.008–0.011 RMS in this project's own measurements, and that floor
+  // would abort every utterance in a real room. A null reading (no running
+  // analyser — the microphone itself is down) cannot show speech and does
+  // not abort: the server issued this into a quiet window by its own
+  // measure, and a page that cannot listen has nothing to be polite to.
+  shouldAbort(rms, floor) {
+    return rms !== null && Number(floor) > 0 && rms >= Number(floor);
+  },
+};
+
+async function onAutoSpeak(msg) {
+  const rms = currentRms();
+  if (politeness.shouldAbort(rms, bargeIn.absFloor)) {
+    // Declined, not cancelled: no audio was created, no window opens.
+    // The measured RMS rides along as calibration data for the floor.
+    ws.send(JSON.stringify({type: 'speak_ended', utterance_id: msg.utterance_id,
+                            seq: seq + 1, reason: 'politeness_abort',
+                            rms: Math.round(rms * 1e5) / 1e5}));
+    return;
+  }
+  return onSpeakReady(msg);
+}
+
 // ================================================ Phase 7a: the sound check
 //
 // WHY THIS EXISTS, and it is not a convenience (spec Part 10.1): a dead
@@ -2154,6 +2200,7 @@ function onWsMessage(event) {
   }
   else if (msg.type === 'face_toggled') { applyFaceToggle(msg.on); }
   else if (msg.type === 'speak_ready') { onSpeakReady(msg); }
+  else if (msg.type === 'auto_speak') { onAutoSpeak(msg); }   // Phase 7c, same path
   else if (msg.type === 'speak_refused') {
     pendingSpeakText = '';
     refreshSpeechControls();

@@ -2179,10 +2179,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # (slice 3/4); here it is simply not lost from the record.
             record_utterance(utterance, None, "politeness_abort")
             entry["pending_utterance"] = None
+            rms = payload.get("rms")
             await audit.log(user["id"], "speech.politeness_abort", None, None,
                             {"utterance_id": utterance.utterance_id,
                              "via": utterance.ref_detail.get("via", "tap"),
-                             "phase": utterance.ref_detail.get("phase")})
+                             "phase": utterance.ref_detail.get("phase"),
+                             # The client's reading at the moment it declined
+                             # — calibration data for the floor it compared
+                             # against, like quiet_s for the nudge.
+                             **({"rms": round(float(rms), 5)} if rms is not None else {})})
             return
         if utterance is None or not session.speaking:
             await refuse_speech("speak_ended with no window open")

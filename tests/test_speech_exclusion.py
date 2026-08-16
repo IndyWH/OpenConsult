@@ -106,6 +106,80 @@ def test_keystone_system_audio_in_the_room_never_reaches_the_transcriber():
     assert np.max(np.abs(buffer_of(session)[window_end:])) > 0
 
 
+def test_keystone_holds_for_an_auto_issued_utterance_on_both_paths(tmp_path):
+    """Phase 7c slice 2 (PHASE_7C_SPEC.md §3): the guarantee applies to an
+    auto utterance WITH NO NEW MECHANISM. Same scenario as the keystone,
+    but the utterance is server-issued — prepared through
+    `SpeechService.prepare_auto` from a whitelist type, never a client
+    message — and the window is opened with ITS id and ITS synthesised
+    duration, exactly as the protocol does on speak_started.
+
+    Both paths: the live transcriber never hears the tone (the buffer is
+    silence across the window), and the finalisation path — the derived
+    copy `finalize.mute_spans` builds from the row's span — is zero across
+    the same bytes while the recording keeps the real audio. Real
+    resolution, a real subprocess synthesiser (a fake command writing a
+    known-length WAV), the real session; only Piper and Whisper are
+    stood in for.
+    """
+    import sys
+    from app import finalize
+    from app.auto_mode import PhraseUtterance
+
+    # A synthesiser that is a real subprocess (as tests/test_speech.py does)
+    # producing a 1.0 s WAV, so the window is the length the server saw.
+    script = tmp_path / "fake_tts.py"
+    script.write_text(
+        "import sys, wave\n"
+        "sys.stdin.buffer.read()\n"
+        "with wave.open(sys.argv[sys.argv.index('--output-file') + 1], 'wb') as w:\n"
+        "    w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)\n"
+        "    w.writeframes(b'\\x00\\x00' * 22050)\n")
+    (tmp_path / "voice.onnx").write_bytes(b"never read")
+    service = speech.SpeechService(
+        voice="test", model_path=str(tmp_path / "voice.onnx"),
+        cache_dir=tmp_path / "cache",
+        command=f"{sys.executable} {script} --model {{model}} --output-file {{output}}")
+    utterance = service.prepare_auto(PhraseUtterance("mm-hm"), None, phase="golden",
+                                     trigger={"quiet_s": 1.8})
+    assert utterance.text == "Mm-hm." and utterance.duration_ms == 1000
+    assert utterance.ref_detail["via"] == "auto"
+
+    session = LiveSession(LeakDetector())
+    feed(session, 4, PATIENT_AMPLITUDE)                 # 1.0 s of patient
+    session.open_speaking_window(utterance.utterance_id, duration_ms=utterance.duration_ms,
+                                 tail_ms=200)
+    feed(session, 4, TTS_AMPLITUDE)                     # 1.0 s of us, in the room
+    span = session.close_speaking_window("complete")
+    session.append_pcm16(tone(200 * 16, TTS_AMPLITUDE))  # 200 ms of room decay
+    feed(session, 4, PATIENT_AMPLITUDE)                 # patient again
+
+    # Live path: the transcriber sees none of it.
+    committed, partial = asyncio.run(session.process())
+    heard = " ".join(s.text for s in committed) + " " + partial
+    assert "SYSTEM-VOICE-LEAKED" not in heard, (
+        "the system's own voice reached the transcriber through the auto path")
+    window_start = 4 * FRAME_SAMPLES
+    window_end = window_start + 1200 * 16
+    assert np.all(buffer_of(session)[window_start:window_end] == 0.0)
+    assert np.max(np.abs(buffer_of(session)[:window_start])) > 0
+    assert np.max(np.abs(buffer_of(session)[window_end:])) > 0
+
+    # Finalisation path: the span the row would carry, applied to the
+    # recording as finalisation applies it, mutes exactly the window — and
+    # the recording itself still holds the tone.
+    assert span["utterance_id"] == utterance.utterance_id
+    assert (span["start_byte"], span["end_byte"]) == (window_start * 2, window_end * 2)
+    recording = np.frombuffer(b"".join(session._recording), dtype=np.int16
+                              ).astype(np.float32) / 32768.0
+    assert np.max(np.abs(recording[window_start:window_end])) > 0.5, "the recording lost the tone"
+    derived = finalize.mute_spans(recording, [(span["start_byte"], span["end_byte"])])
+    assert np.all(derived[window_start:window_end] == 0.0)
+    assert np.array_equal(derived[:window_start], recording[:window_start])
+    assert np.array_equal(derived[window_end:], recording[window_end:])
+    assert LeakDetector().transcribe(derived)[0].text != "SYSTEM-VOICE-LEAKED"
+
+
 def test_the_recording_keeps_the_real_audio():
     """The room is recorded as it was. Only the transcript is of the
     patient alone — `_recording` is the faithful record, and the retention
