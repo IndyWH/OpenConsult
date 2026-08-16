@@ -7,10 +7,15 @@ monkeypatch, a real SpeechService on a fake command, and a FAKE
 end-of-turn officer whose verdicts the tests script — officer QUALITY
 belongs to evals. What is pinned:
 
-- Enabling requires the disclosure lock satisfied, exactly as a gated
-  speak does; the walk OFF → DISCLOSURE → INVITATION speaks the
-  invitation through the auto path, and GOLDEN starts when its
-  speak_ended arrives — the prereg's metric-3 zero point.
+- ONE TAP starts the auto session (owner decision 2026-08-16, spec §10
+  as amended — this REPINS slice 3's "enable requires the disclosure
+  already given", a property change the owner decided, not a
+  weakening): with no disclosure given, toggling Auto speaks it through
+  the auto path (face auto-on included), chains the invitation, and
+  GOLDEN starts at the invitation's speak_ended — the prereg's metric-3
+  zero point; with the disclosure already given the walk passes through
+  DISCLOSURE and speaks the invitation; with both already done manually
+  GOLDEN starts at the toggle and the audit detail says so.
 - In GOLDEN a quiet report at AUTO_ENCOURAGER_QUIET_S earns one
   encourager, rotated through the three, on cooldown, through the auto
   path — its row carries {"via":"auto","phase":"golden","trigger":
@@ -303,20 +308,113 @@ def test_with_the_gate_down_the_controller_is_never_constructed_and_the_protocol
 # ==========================================================================
 # Enabling
 
-def test_enable_requires_the_disclosure_lock_exactly_as_speak_does(gate):
+def test_one_tap_with_no_disclosure_speaks_it_chains_the_invitation_and_golden_starts_at_its_end(gate):
+    """REPINNED for the one-tap start (owner decision 2026-08-16, spec §10
+    as amended). Slice 3 pinned "enable requires the disclosure already
+    given"; that property is deliberately replaced, not weakened: with no
+    disclosure given, toggling Auto speaks the disclosure through the auto
+    path, the machine waits in DISCLOSURE, the played-through disclosure
+    is recorded as given (spoken) and chains the invitation through the
+    auto path, and GOLDEN starts at the invitation's speak_ended. Hard
+    rule 4 still holds by construction: the invitation is only ever
+    chained from a disclosure that played through."""
     with live(gate) as s:
         _collect_until(s.ws, {"auto_toggled"})           # the connect echo: off
-        s.auto(True)
-        refused = _until(s.ws, {"auto_refused"})
-        assert "talking to a machine" in refused["detail"]
-        assert s.phase is AutoPhase.OFF
-        # And once given, the same toggle is accepted.
-        s.disclose()
+        assert s.entry["disclosed"] is False
         s.auto(True)
         seen = _collect_until(s.ws, {"auto_toggled"})
-        assert seen[-1]["on"] is True and seen[-1]["phase"] == "invitation"
+        disclosure = next(m for m in seen if m.get("type") == "auto_speak")
+        assert disclosure["ref_id"] == "disclosure"
+        assert disclosure["text"].startswith("Hello. I'm a computer, not a person.")
+        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "disclosure"}
+        assert s.phase is AutoPhase.DISCLOSURE
+        # The disclosure plays through: given (spoken), and the invitation
+        # is chained — through the AUTO path, not the tap chain.
+        s.play(disclosure["utterance_id"])
+        seen = _collect_until(s.ws, {"auto_speak"})
+        assert any(m.get("type") == "disclosure" and m["how"] == "spoken" for m in seen)
+        assert not any(m.get("type") == "speak_ready" for m in seen), "the auto chain, not the tap chain"
+        invitation = seen[-1]
+        assert invitation["ref_id"] == "invitation"
+        assert s.entry["disclosed"] is True
+        assert s.phase is AutoPhase.INVITATION
+        s.play(invitation["utterance_id"])
+        s.probe()
+        assert s.phase is AutoPhase.GOLDEN
+        cid = _stop(s)
+    phases = [(d["from"], d["to"], d["trigger"]) for d in _audit("auto.phase", s.session_id)]
+    assert phases == [("off", "disclosure", "enable"),
+                      ("disclosure", "invitation", "disclosure_completed"),
+                      ("invitation", "golden", "invitation_completed")]
+    assert _audit("auto.phase", s.session_id)[1]["detail"] == {"disclosure": "spoken"}
+    enabled = _audit("auto.enabled", s.session_id)
+    assert len(enabled) == 1 and enabled[0]["disclosed"] is False
+    rows = asyncio.run(system_utterances.for_consultation(cid))
+    assert [r["ref_detail"]["id"] for r in rows] == ["disclosure", "invitation"]
+    assert rows[0]["ref_detail"] == {"id": "disclosure", "via": "auto", "phase": "disclosure",
+                                     "trigger": {"via": "auto_enable"}}
+    assert rows[1]["ref_detail"] == {"id": "invitation", "via": "auto", "phase": "invitation",
+                                     "trigger": {"via": "auto_chain"}}
+
+
+def test_the_one_tap_disclosure_switches_the_face_on(gate, monkeypatch):
+    """The spoken disclosure switches the face on (owner decision
+    2026-07-28) whichever path speaks it — the auto path calls handle_face
+    exactly as handle_speak does, never over a manual off."""
+    monkeypatch.setattr(appmain, "FACE_AUTO_ON_DISCLOSURE", True)
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        assert any(m.get("type") == "face_toggled" and m["on"] is True for m in seen)
+        assert s.entry["face"] is not None
         _stop(s)
-    assert _audit("auto.enabled", s.session_id) != []
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        rows = conn.execute(
+            "SELECT detail FROM audit_event WHERE action = 'face.toggled'"
+            " AND detail->>'session_id' = %s", (s.session_id,)).fetchall()
+    assert [r[0]["via"] for r in rows] == ["disclosure_auto"]
+
+
+def test_a_cut_off_auto_disclosure_chains_nothing_and_the_machine_waits(gate):
+    """A cut-off disclosure has not been given: no invitation, no GOLDEN,
+    the machine waits in DISCLOSURE — exactly the tap chain's rule."""
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        disclosure = next(m for m in _collect_until(s.ws, {"auto_toggled"}) if m.get("type") == "auto_speak")
+        s.play(disclosure["utterance_id"], reason="doctor_stop")
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
+        assert s.entry["disclosed"] is False
+        assert s.phase is AutoPhase.DISCLOSURE
+        # The doctor's own tap of the disclosure, played through, then
+        # completes the walk: given, and the invitation chains via auto.
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase", "id": "disclosure"}}))
+        ready = _until(s.ws, {"speak_ready"})
+        s.play(ready["utterance_id"])
+        invitation = _until(s.ws, {"auto_speak"})
+        assert invitation["ref_id"] == "invitation" and s.phase is AutoPhase.INVITATION
+        _stop(s)
+
+
+def test_enable_fails_as_a_unit_when_the_disclosure_cannot_be_spoken(gate, tmp_path):
+    """A dead synthesiser at the toggle: the fault is shown (speak_refused,
+    as for a tap), the toggle is refused, and the machine is back OFF —
+    not stuck in DISCLOSURE with nothing coming."""
+    script = tmp_path / "broken_tts.py"
+    script.write_text("import sys\nsys.stdin.buffer.read()\nsys.exit(3)\n")
+    gate.speech = speech.SpeechService(
+        voice="test", model_path=str(tmp_path / "voice.onnx"), cache_dir=tmp_path / "cache2",
+        command=f"{sys.executable} {script} --model {{model}} --output-file {{output}}")
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        seen = _collect_until(s.ws, {"auto_refused"})
+        assert any(m.get("type") == "speak_refused" for m in seen)
+        assert "could not speak the disclosure" in seen[-1]["detail"]
+        assert s.phase is AutoPhase.OFF
+        _stop(s)
+    assert [d["via"] for d in _audit("auto.disabled", s.session_id)] == ["enable_failed"]
 
 
 def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
@@ -332,8 +430,11 @@ def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
 
 
 def test_enabling_walks_disclosure_and_invitation_and_golden_starts_at_the_invitations_end(gate):
-    """The metric-3 zero point: not the toggle, not the play command — the
-    invitation's speak_ended. Every step audited as auto.phase."""
+    """The manual-first shape: the disclosure ticked (given, not spoken),
+    the invitation not yet played — the DISCLOSURE step passes through
+    and the invitation is spoken through the auto path. The metric-3
+    zero point: not the toggle, not the play command — the invitation's
+    speak_ended. Every step audited as auto.phase."""
     with live(gate) as s:
         s.disclose()
         s.auto(True)

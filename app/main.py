@@ -2318,11 +2318,24 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # disclosure recorded and handle_speak would refuse the
         # invitation anyway. Stop/Esc cuts the chained utterance like any
         # other.
-        if (AUTO_INVITATION_AFTER_DISCLOSURE
-                and utterance.ref_detail.get("id") == "disclosure"
-                and reason == "complete"):
-            await handle_speak({"ref": {"kind": "phrase", "id": "invitation"}},
-                               via="auto_invitation")
+        if utterance.ref_detail.get("id") == "disclosure" and reason == "complete":
+            auto = entry["auto"]
+            if (auto is not None and auto["controller"].is_legal(
+                    auto_mode.AutoEvent.DISCLOSURE_COMPLETED)):
+                # Phase 7c (one-tap start, owner decision 2026-08-16): auto
+                # mode spoke — or the doctor tapped — the disclosure while
+                # the machine waited in DISCLOSURE. It has now been GIVEN
+                # (played through; a cut-off one never reaches here), so
+                # the machine moves on and the invitation is chained
+                # through the AUTO path, its own row and audit, via=auto.
+                await auto_transition(auto["controller"].disclosure_completed(),
+                                      detail={"disclosure": "spoken"})
+                await auto_issue(auto_mode.PhraseUtterance("invitation"),
+                                 phase=auto["controller"].phase,
+                                 trigger={"via": "auto_chain"})
+            elif AUTO_INVITATION_AFTER_DISCLOSURE:
+                await handle_speak({"ref": {"kind": "phrase", "id": "invitation"}},
+                                   via="auto_invitation")
 
     async def handle_face(payload: dict, via: str = "manual") -> None:
         """Phase 7b: toggle the face. OFF is a first-class state — the
@@ -2437,16 +2450,25 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     async def handle_auto(payload: dict, via: str = "manual") -> None:
         """The server-side auto on/off path the slice-6 Auto pill will call.
 
-        ON requires the disclosure lock satisfied, exactly as a gated speak
-        does (hard rule 4; spec §10: the pill is disabled until the
-        disclosure is given), and no utterance in flight. Enabling walks
-        the machine OFF → DISCLOSURE → INVITATION: the disclosure step is a
-        pass-through (it has been given — that is the precondition), the
-        invitation is spoken through the auto path unless it has already
-        played through this session, and GOLDEN starts when the
-        invitation's speak_ended arrives (handle_speak_ended) — the
-        prereg's metric-3 zero point. If the invitation cannot be issued,
-        enabling fails as a unit and the machine is switched back off.
+        ONE TAP starts the auto session (owner decision 2026-08-16, spec
+        §10 as amended; replacing slice 3's disabled-until-disclosure
+        rule). ON needs no utterance in flight, and then:
+        - disclosure NOT yet given: it is spoken through the auto path
+          (auto_issue — face auto-on included, exactly as handle_speak),
+          the machine waits in DISCLOSURE, and when it plays THROUGH
+          handle_speak_ended moves the machine on and chains the
+          invitation through the auto path; a cut-off disclosure chains
+          nothing, exactly as the tap chain behaves;
+        - disclosure already given: the DISCLOSURE step is a pass-through
+          (audited as such) and the invitation is spoken through the auto
+          path unless it has already played through this session — then
+          GOLDEN starts at the toggle and the audit detail says so.
+        Either way GOLDEN starts when the invitation's speak_ended arrives
+        (handle_speak_ended) — the prereg's metric-3 zero point. If the
+        first utterance cannot be issued, enabling fails as a unit and the
+        machine is switched back off. Hard rule 4 holds by construction:
+        the invitation is disclosure-gated in issue_auto_speak, and the
+        chain only runs on a disclosure that played through.
 
         OFF is legal and immediate from every state (hard rule 3): the
         machine goes to OFF, the officer is cancelled, and nothing more is
@@ -2467,18 +2489,29 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "auto_toggled", "on": True,
                                            "phase": ctl.phase.value})
                 return   # already on — idempotent, nothing to re-audit
-            if not entry["disclosed"]:
-                await refuse_auto(
-                    "the patient has not been told they are talking to a machine — "
-                    "play the disclosure, or tick 'disclosure given', before auto mode")
-                return
             if session.speaking or entry["pending_utterance"] is not None:
                 await refuse_auto("an utterance is in flight — try again when it has finished")
                 return
             await audit.log(user["id"], "auto.enabled", None, None,
                             {"session_id": session_id, "via": via,
+                             "disclosed": entry["disclosed"],
                              "at_audio_s": round(session.audio_seconds, 1)})
             await auto_transition(ctl.enable())
+            if not entry["disclosed"]:
+                prepared = await auto_issue(auto_mode.PhraseUtterance("disclosure"),
+                                            phase=ctl.phase, trigger={"via": "auto_enable"})
+                if prepared is None:
+                    await audit.log(user["id"], "auto.disabled", None, None,
+                                    {"session_id": session_id, "via": "enable_failed",
+                                     "at_audio_s": round(session.audio_seconds, 1)})
+                    await auto_transition(ctl.auto_off(),
+                                          detail={"reason": "disclosure_not_issued"})
+                    await refuse_auto("auto mode could not speak the disclosure — "
+                                      "see the speech error, then try again")
+                    return
+                await websocket.send_json({"type": "auto_toggled", "on": True,
+                                           "phase": ctl.phase.value})
+                return
             await auto_transition(ctl.disclosure_completed(),
                                   detail={"disclosure": "already_given"})
             if entry["invitation_completed"]:
