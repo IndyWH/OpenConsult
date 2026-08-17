@@ -1717,6 +1717,9 @@ def _new_auto_state() -> dict:
         "anything_else_done": False,  # at most once per session
         "last_issued": None,          # the last queued utterance issued, for requeue
         "last_asked_text": None,
+        # Slice 5: golden seconds spent BEFORE a pause, so the window is not
+        # restarted by a resume (seconds_in_phase resets on every transition).
+        "golden_spent": 0.0,
     }
 
 
@@ -2095,6 +2098,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 entry["assessment_snapshots"].append(assessment_snapshots.snapshot_of(
                     entry["assessment"], assessment_version,
                     datetime.now(timezone.utc), session.audio_seconds))
+                # Phase 7c slice 5 (spec §7, hard rule 2): a non-empty
+                # urgent_actions while auto mode is listening pauses it.
+                # Nothing here touches the face (the alarm is deliberately
+                # kept off it, app/face.py); with the gate down or auto
+                # off this is a no-op and today's behaviour stands.
+                if entry["auto"] is not None and entry["assessment"].get("urgent_actions"):
+                    await on_urgent_alarm(entry["assessment"]["urgent_actions"],
+                                          assessment_version)
                 # Phase 7c (D2): the pass auto mode asked for has landed —
                 # plan the next ask from THIS version only.
                 if entry["auto"] is not None and entry["auto"]["revision"] == "running":
@@ -2435,6 +2446,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto = entry["auto"]
             if (auto is not None and auto["controller"].is_legal(
                     auto_mode.AutoEvent.INVITATION_COMPLETED)):
+                auto["golden_spent"] = 0.0
                 await auto_transition(auto["controller"].invitation_completed())
         if utterance.ref_detail.get("via") == "auto":
             await on_auto_utterance_ended(utterance, reason)
@@ -2651,6 +2663,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # on (the doctor tapped Disclosure and the chain spoke it):
                 # GOLDEN starts NOW, and the record says why the zero point
                 # is the toggle rather than the invitation's end.
+                auto["golden_spent"] = 0.0
                 await auto_transition(ctl.invitation_completed(),
                                       detail={"invitation": "already_completed"})
             else:
@@ -2678,7 +2691,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await auto_transition(ctl.auto_off())
             _cancel_officer(auto)
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
-                        handover=None, last_issued=None)
+                        handover=None, last_issued=None, golden_spent=0.0)
             await websocket.send_json({"type": "auto_toggled", "on": False,
                                        "phase": ctl.phase.value})
 
@@ -2914,6 +2927,57 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["turn_ended"] = False
             auto["last_asked_text"] = utterance.text
 
+    async def on_urgent_alarm(actions: list[dict], assessment_version: int) -> None:
+        """The urgency pause (Phase 7c slice 5, spec §7, hard rule 2).
+
+        A CDS pass returned non-empty urgent_actions while the machine is
+        in GOLDEN, OPEN or CLOSED: the machine pauses (urgent_alarm — first
+        fire, or the widening self-edge while already paused), the current
+        and queued auto utterances are cut through the server stop with
+        reason urgency_pause, the officer is stood down, and the pause is
+        audited (auto.paused: the action texts, the assessment_snapshot
+        version, the transition) and shown to the client (auto_pause, with
+        EVERY pending action text — the banner must display all of them at
+        acknowledgement time). Listening and transcription continue; the
+        quiet reporter stays on but earns nothing while paused. In any
+        other phase — auto off, disclosure, handover, taken over — nothing
+        happens beyond today's alarm behaviour.
+        """
+        auto = entry["auto"]
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        texts = [str(a.get("action", "")) for a in actions if a.get("action")]
+        if not texts or not ctl.is_legal(auto_mode.AutoEvent.URGENT_ALARM):
+            return
+        already_paused = ctl.phase is auto_mode.AutoPhase.PAUSED_URGENT
+        if ctl.phase is auto_mode.AutoPhase.GOLDEN:
+            auto["golden_spent"] += ctl.seconds_in_phase()
+        transition = ctl.urgent_alarm(texts)
+        pending = sorted(ctl.pending_actions)
+        if not already_paused:
+            await cancel_auto_playback(entry, websocket, "urgency_pause")
+            _cancel_officer(auto)          # also drops the queue and any plan
+            auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
+                        revision=None, last_issued=None)
+        await auto_transition(transition, detail={"actions": texts, "pending": pending,
+                                                  "assessment_version": assessment_version,
+                                                  "refire": already_paused})
+        await audit.log(user["id"], "auto.paused", None, None,
+                        {"session_id": session_id, "actions": texts, "pending": pending,
+                         "assessment_version": assessment_version,
+                         "refire": already_paused,
+                         "paused_from": (ctl.paused_from.value if ctl.paused_from else None),
+                         "transition": {"from": transition.from_phase.value,
+                                        "to": transition.to_phase.value,
+                                        "trigger": transition.trigger.value},
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        await websocket.send_json({"type": "auto_pause", "pending": pending,
+                                   "actions": texts, "refire": already_paused,
+                                   "paused_from": (ctl.paused_from.value
+                                                   if ctl.paused_from else None),
+                                   "assessment_version": assessment_version})
+        logger.info("Live session %s: auto PAUSED (%s) on %s — pending %s", session_id,
+                    "re-fire" if already_paused else "alarm", texts, pending)
+
     async def handle_quiet(payload: dict) -> None:
         """A quiet report from the client's reporter (spec §5). Measurement
         is the client's; every decision is here.
@@ -3021,7 +3085,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 auto["turn_ended"] = True
                 _request_revision(auto, "golden exit: hand-back")
                 return
-            elapsed = ctl.seconds_in_phase()
+            elapsed = auto["golden_spent"] + ctl.seconds_in_phase()
             if (elapsed >= AUTO_GOLDEN_MINUTES_S and ended
                     and ctl.is_legal(auto_mode.AutoEvent.GOLDEN_TIMER_ELAPSED)):
                 await auto_transition(ctl.golden_timer_elapsed(),
