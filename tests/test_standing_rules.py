@@ -274,3 +274,27 @@ def test_the_auto_pill_keeps_all_three_standing_rules():
     refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
     refused = refused[:refused.index("\n  }")]
     assert "showSpeakError(msg.detail);" in refused                   # rule 1: refusal shown
+
+
+# ------------------------------------ Phase 7c slice 6: the Handover control
+
+def test_the_handover_control_keeps_all_three_standing_rules():
+    """The Handover control (PHASE_7C_SPEC.md §6, §10): labelled in words;
+    present only while it can act (auto on and the machine listening),
+    disabled with the reason on itself when the socket is down; beside the
+    Auto pill in the control row; the tap sends and a refusal is shown."""
+    live = _page("live.html")
+    row = live[live.index('id="soundCheckBtn"'):live.index('id="btn"')]
+    assert 'id="handoverBtn"' in row and 'id="autoPill"' in row              # rule 3
+    assert ">Hand over<" in live                                              # labelled
+    refresh = live[live.index("function refreshSpeechControls()"):]
+    refresh = refresh[:refresh.index("\n}")]
+    assert "handover.hidden = !(autoAvailable && listening);" in refresh     # rule 2: absent when it cannot act
+    assert "handover.disabled = !live;" in refresh                            # rule 2: disabled with reason
+    assert "handover.title = !live" in refresh
+    click = live[live.index("handoverBtn.addEventListener('click'"):]
+    click = click[:click.index("\n});")]
+    assert "ws.send(JSON.stringify({type: 'auto_handover'}));" in click      # rule 1
+    refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
+    refused = refused[:refused.index("\n  }")]
+    assert "showSpeakError(msg.detail);" in refused

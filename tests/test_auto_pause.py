@@ -552,7 +552,9 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
         for _ in range(12):                                # ticks and quiet, no speech
             s.probe()
             s.quiet(2.0 + _ * 0.3)
-        assert s.phase.value == "open"
+        # It may have ASKED the alarm-bearing question by now (a verbatim
+        # ask narrows OPEN → CLOSED) — but nothing re-fired: no pass, no pause.
+        assert s.phase.value in ("open", "closed")
         assert len(engine.updates) == passes, "no pass ran without an answer"
         assert len(_audit("auto.paused", s.session_id)) == 1
         _stop(s)
@@ -680,3 +682,149 @@ def test_the_reconnect_echo_carries_the_pending_texts_while_paused(gate):
                             "pending": ["Bedside ECG now", "Call 999"]}
         ws2.send_text("stop")
         _until(ws2, {"done"})
+
+
+# ==========================================================================
+# Slice 6: the live phase push and the doctor's Handover control
+
+def test_every_transition_is_pushed_live_as_auto_phase(gate):
+    """The indicator on the status line follows a push per transition, not
+    only the toggle echo."""
+    with live(gate) as s:
+        s.disclose()
+        s.toggle(True)
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        pushes = [(m["from"], m["phase"], m["trigger"]) for m in seen if m.get("type") == "auto_phase"]
+        assert pushes == [("off", "disclosure", "enable"),
+                          ("disclosure", "invitation", "disclosure_completed")]
+        invitation = next(m for m in seen if m.get("type") == "auto_speak")
+        s.play(invitation["utterance_id"])
+        seen = s.probe()
+        assert [(m["from"], m["phase"]) for m in seen if m.get("type") == "auto_phase"] == \
+            [("invitation", "golden")]
+        _stop(s)
+
+
+def test_the_doctors_handover_from_open_runs_the_sequence_and_ends_by_the_doctors_event(gate, monkeypatch):
+    """OPEN: anything-else once, its answer's revision (empty here), the
+    examination handover; the machine fires handover_requested (the doctor
+    asked), auto.doctor_handover and auto.handover(requested_by=doctor)
+    are on the record, and the run ends."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], []]
+    _engine_with_alarms(engine, {})
+    with live(gate) as s:
+        s.to_golden()
+        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+        s.to_open()
+        first = s.wait_for_auto_speak()                    # the first question, playing
+        s.play(first["utterance_id"])
+        s.ws.send_text(json.dumps({"type": "auto_handover"}))
+        started = _until(s.ws, {"auto_handover_started", "auto_refused"})
+        assert started["type"] == "auto_handover_started" and started["phase"] == "open"
+        s.turn_end("Tuesday night.")                       # the room goes quiet: anything-else
+        anything = s.wait_for_auto_speak()
+        assert anything["ref_id"] == "anything_else"
+        s.play(anything["utterance_id"])
+        s.turn_end("No, that's everything.")               # revision (pass 2): empty
+        final = s.wait_for_auto_speak()
+        assert final["ref_id"] == "examination_handover"
+        s.play(final["utterance_id"])
+        s.probe()
+        assert s.phase.value == "handover"
+        _stop(s)
+    assert len(_audit("auto.doctor_handover", s.session_id)) == 1
+    last = _audit("auto.phase", s.session_id)[-1]
+    assert (last["from"], last["to"], last["trigger"]) == ("open", "handover", "handover_requested")
+    assert last["detail"]["by"] == "doctor"
+    handover = _audit("auto.handover", s.session_id)
+    assert len(handover) == 1 and handover[0]["requested_by"] == "doctor"
+
+
+def test_the_doctors_handover_refill_path_returns_to_the_questions(gate, monkeypatch):
+    """The agenda-refill return path applies to the doctor's handover
+    identically: the anything-else answer refills the agenda → back to the
+    questions, and the eventual end is the agenda's, not the doctor's."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Have you missed any of your tablets?"], []]
+    _engine_with_alarms(engine, {})
+    with live(gate) as s:
+        s.to_golden()
+        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.ws.send_text(json.dumps({"type": "auto_handover"}))
+        _until(s.ws, {"auto_handover_started"})
+        s.turn_end("Tuesday night.")
+        anything = s.wait_for_auto_speak()
+        assert anything["ref_id"] == "anything_else"
+        s.play(anything["utterance_id"])
+        s.turn_end("Well — my tablets, I keep forgetting them.")   # pass 2: refill
+        back = s.wait_for_auto_speak()
+        assert back["text"] == "Can you tell me more about your tablets?"
+        assert s.phase.value in ("open", "closed")
+        s.play(back["utterance_id"])
+        s.turn_end("Most mornings.")                       # pass 3: empty → final
+        final = s.wait_for_auto_speak()
+        assert final["ref_id"] == "examination_handover", "anything_else not spoken twice"
+        s.play(final["utterance_id"])
+        s.probe()
+        assert s.phase.value == "handover"
+        _stop(s)
+    last = _audit("auto.phase", s.session_id)[-1]
+    assert last["trigger"] == "agenda_exhausted"
+    assert _audit("auto.handover", s.session_id)[0]["requested_by"] == "agenda_empty"
+
+
+def test_the_doctors_handover_from_golden_ends_the_golden_minutes_and_speaks_the_sequence(gate, monkeypatch):
+    """GOLDEN: the machine's own edge fires at once (GOLDEN → HANDOVER: the
+    doctor has ended the golden minutes and the history) and the two
+    phrases are spoken from HANDOVER — anything-else, its answer, the
+    examination handover — with no refill path (stated in HANDOVER as the
+    asymmetry the design left open)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {})
+    with live(gate) as s:
+        s.to_golden()
+        s.ws.send_text(json.dumps({"type": "auto_handover"}))
+        seen = _collect_until(s.ws, {"auto_handover_started"})
+        assert s.phase.value == "handover"
+        assert any(m.get("type") == "auto_phase" and m["phase"] == "handover" for m in seen)
+        s.commit_transcript("It started on Tuesday.")
+        s.quiet(3.2)
+        s.probe()
+        anything = s.wait_for_auto_speak()
+        assert anything["ref_id"] == "anything_else"
+        s.play(anything["utterance_id"])
+        s.turn_end("No, nothing else.")
+        final = s.wait_for_auto_speak()
+        assert final["ref_id"] == "examination_handover"
+        s.play(final["utterance_id"])
+        seen = s.probe()
+        assert any(m.get("type") == "auto_toggled" and m["on"] is False for m in seen)
+        assert s.phase.value == "handover"
+        _stop(s)
+    phases = [(d["from"], d["to"], d["trigger"]) for d in _audit("auto.phase", s.session_id)]
+    assert phases[-1] == ("golden", "handover", "handover_requested")
+    assert _audit("auto.handover", s.session_id)[0]["requested_by"] == "doctor"
+
+
+def test_handover_refusals_are_answered(gate, monkeypatch):
+    engine = gate.cds_engine
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG]})
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.ws.send_text(json.dumps({"type": "auto_handover"}))       # auto off
+        assert "listening" in _until(s.ws, {"auto_refused"})["detail"]
+        s.to_golden()
+        _fire_pass(s, LONG)                                          # paused
+        s.ws.send_text(json.dumps({"type": "auto_handover"}))
+        assert "paused urgent" in _until(s.ws, {"auto_refused"})["detail"]
+        _stop(s)
+    assert _audit("auto.doctor_handover", s.session_id) == []

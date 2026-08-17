@@ -41,6 +41,9 @@ const autoPillLabel = {textContent: ''};
 let autoOn = false, autoPhase = 'off';
 let refreshed = 0;
 function refreshSpeechControls() { refreshed += 1; }
+// The indicator (slice 6) is applyAutoPhase's business; here it only keeps
+// the phase, as the shipped function does when given one.
+function applyAutoPhase(phase) { autoPhase = phase || autoPhase; }
 const out = [];
 for (const msg of [{on: true, phase: 'disclosure'}, {on: true, phase: 'golden'},
                    {on: true, phase: 'paused_urgent'}, {on: false, phase: 'off'},

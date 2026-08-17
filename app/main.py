@@ -1737,6 +1737,7 @@ def _new_auto_state() -> dict:
         "golden_spent": 0.0,
         "pause_versions": [],         # assessment_snapshot versions of the alarms in the live pause
         "acks": [],                   # live acknowledgements, for the consultation-linked audit row
+        "handover_by_doctor": False,  # slice 6: the doctor's Handover tap started the sequence
     }
 
 
@@ -2580,6 +2581,13 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         logger.info("Live session %s: auto %s → %s (%s)", session_id,
                     transition.from_phase.value, transition.to_phase.value,
                     transition.trigger.value)
+        # Slice 6: the phase indicator on the live page follows a live push
+        # of every transition (the auto_toggled echo carries the phase only
+        # at toggles and reconnects).
+        await websocket.send_json({"type": "auto_phase",
+                                   "phase": transition.to_phase.value,
+                                   "from": transition.from_phase.value,
+                                   "trigger": transition.trigger.value})
 
     async def auto_issue(utterance: auto_mode.Utterance, *, phase, trigger: dict,
                          detail: dict | None = None) -> speech.Utterance | None:
@@ -2725,7 +2733,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await auto_transition(ctl.auto_off())
             _cancel_officer(auto)
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
-                        handover=None, last_issued=None, golden_spent=0.0)
+                        handover=None, last_issued=None, golden_spent=0.0,
+                        handover_by_doctor=False)
             await websocket.send_json({"type": "auto_toggled", "on": False,
                                        "phase": ctl.phase.value})
 
@@ -2809,6 +2818,61 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
                                    "phase": ctl.phase.value})
 
+    async def handle_auto_handover(payload: dict) -> None:
+        """The doctor's Handover control (Phase 7c slice 6, spec §6, §10).
+
+        Available only while auto mode is listening (GOLDEN, OPEN, CLOSED)
+        and only to the doctor running the session; audited as a doctor
+        intervention (auto.doctor_handover). It starts the wired handover
+        sequence: the anything-else follow-up once, its answer, then the
+        examination handover, and the auto run ends.
+
+        In OPEN or CLOSED the sequence runs exactly as the agenda-empty
+        path does — including the agenda-refill return: if the anything-
+        else answer's revision refills the agenda, the flow returns to the
+        questions and the handover waits — and when the examination
+        handover plays through the machine fires handover_requested (the
+        doctor asked) rather than agenda_exhausted.
+
+        In GOLDEN there are no question phases to return to and no
+        questions may be asked, so the machine's own edge fires at once
+        (GOLDEN → HANDOVER: the doctor has ended the golden minutes and
+        the history), and the two phrases are spoken from HANDOVER as a
+        fixed sequence — anything-else, its answer, the examination
+        handover — with no refill path: the machine is past its question
+        phases (HANDOVER has no edge back to OPEN). Stated in HANDOVER as
+        the one asymmetry the design left open.
+        """
+        auto = entry["auto"]
+        if auto is None:
+            await refuse_auto("auto mode is not enabled on this server (AUTO_MODE_ENABLED)")
+            return
+        if user["id"] != entry["user"]["id"]:
+            await refuse_auto("only the doctor running this consultation may hand over")
+            return
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        if ctl.phase not in auto_mode.LISTENING_PHASES:
+            await refuse_auto("handover is available while auto mode is listening — "
+                              f"it is {ctl.phase.value.replace('_', ' ')} now")
+            return
+        if auto["handover"] is not None:
+            await refuse_auto("the handover sequence is already under way")
+            return
+        await audit.log(user["id"], "auto.doctor_handover", None, None,
+                        {"session_id": session_id, "phase": ctl.phase.value,
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        auto["handover_by_doctor"] = True
+        # Whatever was queued or planned yields to the doctor's decision.
+        auto["queued"] = None
+        if auto["plan_task"] is not None and not auto["plan_task"].done():
+            auto["plan_task"].cancel()
+        auto["plan_task"] = None
+        auto.update(awaiting_answer=False, revision=None, bridge_used=False)
+        if ctl.phase is auto_mode.AutoPhase.GOLDEN:
+            await auto_transition(ctl.handover_requested(), detail={"by": "doctor"})
+        _plan_handover(auto, entry["agenda"].current_version)
+        await websocket.send_json({"type": "auto_handover_started", "phase": ctl.phase.value})
+
     def _cancel_officer(auto: dict) -> None:
         for key in ("officer_task", "plan_task"):
             task = auto.get(key)
@@ -2861,6 +2925,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             _plan_handover(auto, version)
             return
         auto["handover"] = None
+        auto["handover_by_doctor"] = False   # a refill returned the flow to the questions
         # The top question — but not the same words twice in a row when
         # there is any other to ask (re-asking is allowed and logged, a
         # ping-pong on identical text is bad manners).
@@ -3005,12 +3070,22 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         if last["kind"] == "handover" and reason == "complete":
             ctl: auto_mode.AutoModeController = auto["controller"]
-            if ctl.is_legal(auto_mode.AutoEvent.AGENDA_EXHAUSTED):
+            by_doctor = auto.get("handover_by_doctor", False)
+            if by_doctor and ctl.is_legal(auto_mode.AutoEvent.HANDOVER_REQUESTED):
+                # The doctor asked (slice 6), from OPEN/CLOSED: the machine
+                # records that, not an empty agenda.
+                await auto_transition(ctl.handover_requested(),
+                                      detail={"by": "doctor",
+                                              "agenda_version": last["agenda_version"]})
+            elif not by_doctor and ctl.is_legal(auto_mode.AutoEvent.AGENDA_EXHAUSTED):
                 await auto_transition(ctl.agenda_exhausted(),
                                       detail={"agenda_version": last["agenda_version"]})
+            if ctl.phase is auto_mode.AutoPhase.HANDOVER:
+                auto["handover"] = None
                 await audit.log(user["id"], "auto.handover", None, None,
                                 {"session_id": session_id,
                                  "agenda_version": last["agenda_version"],
+                                 "requested_by": "doctor" if by_doctor else "agenda_empty",
                                  "at_audio_s": round(session.audio_seconds, 1)})
                 await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
                                            "phase": ctl.phase.value})
@@ -3131,7 +3206,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["last_quiet_s"] = quiet_s
         in_golden = ctl.phase is auto_mode.AutoPhase.GOLDEN
         in_questions = ctl.phase in auto_mode.QUESTION_PHASES
-        if not (in_golden or in_questions):
+        # Slice 6: the doctor's Handover from GOLDEN runs its two-phrase
+        # sequence from HANDOVER — the queued ask and the officer work there
+        # for exactly that.
+        in_handover_seq = (ctl.phase is auto_mode.AutoPhase.HANDOVER
+                           and auto["handover"] is not None)
+        if not (in_golden or in_questions or in_handover_seq):
             return
         now = time.monotonic()
         free = not session.speaking and entry["pending_utterance"] is None
@@ -3150,8 +3230,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 if in_questions:
                     auto["bridge_used"] = True
                 free = False
-        # 2. The queued ask, once the turn has ended in this span.
-        if in_questions and auto["queued"] is not None and auto["turn_ended"] and free:
+        # 2. The queued ask, once the turn has ended in this span. (A
+        #    doctor-requested handover sequence is issued as soon as the
+        #    room is quiet enough for the officer to have judged — the same
+        #    turn-end rule.)
+        if ((in_questions or in_handover_seq) and auto["queued"] is not None
+                and auto["turn_ended"] and free):
             await _issue_queued(auto, quiet_s)
             free = False
         # 3. The officer.
@@ -3217,6 +3301,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if auto["awaiting_answer"]:
                 auto["awaiting_answer"] = False
                 _request_revision(auto, "answer's turn ended")
+            return
+        if (ctl.phase is auto_mode.AutoPhase.HANDOVER and auto["handover"] is not None
+                and ended and not auto["turn_ended"]):
+            # Slice 6: the doctor's handover from GOLDEN — the anything-else
+            # answer has ended; no return path from HANDOVER, so the
+            # examination handover follows directly.
+            auto["turn_ended"] = True
+            if auto["awaiting_answer"]:
+                auto["awaiting_answer"] = False
+                _plan_handover(auto, entry["agenda"].current_version)
 
     async def maybe_apply_officer() -> None:
         """Called on the loop's tick, like maybe_run_cds: when the officer
@@ -3299,6 +3393,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         await handle_auto(payload)      # Phase 7c; refused when the gate is down
                     elif kind == "auto_ack":
                         await handle_auto_ack(payload)  # Phase 7c slice 5: RESUME AUTO / TAKE OVER
+                    elif kind == "auto_handover":
+                        await handle_auto_handover(payload)   # Phase 7c slice 6: the Handover control
                     elif kind == "quiet":
                         await handle_quiet(payload)     # Phase 7c; ignored when the gate is down
                     elif kind == "disclosure_given":

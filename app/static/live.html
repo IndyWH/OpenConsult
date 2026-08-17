@@ -114,6 +114,8 @@
                         cursor: pointer; background: var(--panel); color: var(--red); }
   .pausebanner button.primary { background: var(--red); color: #fff; }
   .pausebanner button:disabled { opacity: .5; cursor: not-allowed; }
+  /* Phase 7c slice 6: the auto-mode phase indicator on the status line. */
+  .autophase { font-weight: 600; color: var(--green); }
   .facepane {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: var(--radius); padding: .8rem 1rem;
@@ -412,9 +414,23 @@
             title="Start the consultation first — auto mode runs inside a live session">
       <span id="autoPillLabel">Auto: off</span>
     </button>
+    <!-- Handover control (Phase 7c slice 6, spec §6, §10): visible only
+         while auto mode is listening (golden minutes, open or closed
+         questions). One tap: the anything-else follow-up, its answer, the
+         examination handover — the wired sequence — and the auto run
+         ends. Labelled; where the doctor is looking (beside the Auto
+         pill); a refusal is shown. -->
+    <button class="soundcheck" id="handoverBtn" type="button" hidden
+            title="Hand over to examination: the system asks if there is anything else, then hands over to you">
+      <span>Hand over</span>
+    </button>
     <button class="primary" id="btn" disabled title="Recording needs a linked patient">Start</button>
   </div>
   <div id="status" class="hint"></div>
+  <!-- Phase 7c slice 6: the auto-mode phase indicator (spec §10) — the
+       supervising doctor always knows what the machine thinks it is doing.
+       Follows the server's live auto_phase push; hidden unless auto is on. -->
+  <div id="autoPhase" class="hint autophase" hidden aria-live="polite"></div>
 </div>
 
 <!-- STICKY TOP ROW — Phase 7b session 3, revised variant A (owner-approved
@@ -1262,6 +1278,15 @@ function refreshSpeechControls() {
   pill.title = !live
     ? 'Start the consultation first — the face runs inside a live session'
     : 'Toggle the assistant face (the label shows its current state)';
+  // The Handover control (Phase 7c slice 6): present only while auto mode
+  // is listening — golden minutes, open or closed questions.
+  const handover = document.getElementById('handoverBtn');
+  const listening = autoOn && ['golden', 'open', 'closed'].includes(autoPhase);
+  handover.hidden = !(autoAvailable && listening);
+  handover.disabled = !live;
+  handover.title = !live
+    ? 'Reconnecting — handover waits until the connection is back'
+    : 'Hand over to examination: the system asks if there is anything else, then hands over to you';
   // The Auto pill (Phase 7c slice 6): present only when the server said
   // auto mode exists (speech_config.auto); needs a live session like every
   // speak control — disabled with the reason on it otherwise; when it can
@@ -2284,9 +2309,33 @@ autoPill.addEventListener('click', () => {
   ws.send(JSON.stringify({type: 'auto', on: !autoOn}));
 });
 
+// The phase indicator (spec §10): what the machine thinks it is doing,
+// in the doctor's words, from the server's live push of each transition.
+const AUTO_PHASE_LABELS = {
+  disclosure: 'Disclosure', invitation: 'Invitation', golden: 'Golden minutes',
+  open: 'Open questions', closed: 'Closed questions', paused_urgent: 'Paused — urgent',
+  handover: 'Handing over',
+};
+function applyAutoPhase(phase) {
+  autoPhase = phase || autoPhase;
+  const box = document.getElementById('autoPhase');
+  const label = AUTO_PHASE_LABELS[autoPhase];
+  const show = autoOn && !!label;
+  box.hidden = !show;
+  box.textContent = show ? ('Auto mode: ' + label) : '';
+  refreshSpeechControls();
+}
+
+const handoverBtn = document.getElementById('handoverBtn');
+handoverBtn.addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
+  ws.send(JSON.stringify({type: 'auto_handover'}));
+});
+
 function applyAutoToggle(msg) {
   autoOn = !!msg.on;
   autoPhase = msg.phase || (autoOn ? autoPhase : 'off');
+  applyAutoPhase(autoPhase);
   // The pill shows the current state — a control that can act must not
   // look as if it cannot (and the reverse; the 448 companion rule).
   autoPillLabel.textContent = autoOn ? 'Auto: on' : 'Auto: off';
@@ -2487,6 +2536,7 @@ function onWsMessage(event) {
     if (msg.phase === 'paused_urgent') renderPause(true, msg.pending || pausePending);
     else if (pausedLive) renderPause(false, []);
   }
+  else if (msg.type === 'auto_phase') { applyAutoPhase(msg.phase); }   // slice 6: the indicator
   else if (msg.type === 'auto_pause') {
     // Slice 5: paused (or a widening re-fire). `pending` is EVERY pending
     // action text; the list is replaced, never appended to.
