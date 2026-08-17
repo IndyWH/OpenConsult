@@ -46,11 +46,13 @@ Three things the map can't show, and each is a deliberate choice:
 ## One reasoning model wears every clinical hat
 
 MedGemma 27B does the differential, the red-flag watch, the guideline
-summaries, the note and the letters — as separate calls with separate
-rules, never as one conversation. All clinical output runs at temperature
-zero with a fixed seed: ask the same transcript twice, get the same answer.
-A system being evaluated must be repeatable, and a clinical system should
-not improvise.
+summaries, the note and the letters — and, when auto mode is enabled, the
+two small judgements that pace the spoken interview: has the patient
+finished speaking, and what a question is about. All are separate calls with
+separate rules, never one conversation. All clinical output runs at
+temperature zero with a fixed seed: ask the same transcript twice, get the
+same answer. A system being evaluated must be repeatable, and a clinical
+system should not improvise.
 
 ## The models take turns on the card
 

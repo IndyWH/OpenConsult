@@ -32,7 +32,10 @@ on this one screen. Matching the numbers on the picture:
 2. **The clock and microphone.** Recording time, and which microphone the
    app is hearing through.
 3. **Face switch and Stop.** The face can be turned on or off at any time;
-   Stop ends the consultation and starts the write-up.
+   Stop ends the consultation and starts the write-up. If auto mode is
+   enabled on your server, an Auto switch sits here too — one tap hands the
+   history-taking to the assistant, one tap takes it back — with a Hand over
+   control and a status line showing what the assistant is doing.
 4. **The assistant's face** — a listening presence for the patient, on
    only if you turn it on (or accept it at the disclosure).
 5. **Questions to ask.** Suggestions that update as the conversation
@@ -49,13 +52,19 @@ on this one screen. Matching the numbers on the picture:
 
 ## Step 3 — Consult; the panels work while you listen
 
-Talk to the patient normally. The transcript streams in, questions come
-and go as they are answered, and the differential revises itself as
-evidence arrives. If something time-critical appears, an **urgent
-actions** banner opens at the top — in this consultation, chest pain
-earned a bedside ECG and, as the story firmed up, an urgent referral. The
-banner is a prompt to the doctor, not an instruction, and it clears when
-the transcript shows the action arranged.
+Talk to the patient normally. The transcript streams in, questions come and
+go as they are answered, and the differential revises itself as evidence
+arrives. If auto mode is enabled and switched on, the assistant takes the
+history instead — it invites, listens, encourages and asks aloud, one
+question at a time, while you supervise and can take over with one tap. If
+something time-critical appears, an **urgent actions** banner opens at the
+top — in this consultation, chest pain earned a bedside ECG and, as the
+story firmed up, an urgent referral. The banner is a prompt to the doctor,
+not an instruction, and it clears when the transcript shows the action
+arranged. With auto mode on, an alarm also pauses the assistant's
+questioning: the panel asks you to acknowledge it and stays until you do —
+then you resume the assistant, or take over yourself. If the same concern
+fires again, it pauses again.
 
 ![The panels mid-consultation: urgent actions, questions, differential](images/02-3-cds-working.png)
 

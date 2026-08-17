@@ -53,11 +53,13 @@ flowchart TB
 
 ## 3 · When the machine speaks: excluded by construction
 
-The doctor can tap a suggested question and the app asks it aloud — after
-telling the patient, in a fixed disclosure, that it is a computer. This
-creates the project's sharpest safety problem: **if the system's own voice
-reached the transcript, it could put words in the patient's mouth**, and
-the note would faithfully cite them.
+The doctor can tap a suggested question and the app asks it aloud — and if
+auto mode is enabled, the app can conduct the history-taking itself,
+inviting, encouraging and asking questions of its own choosing while the
+doctor supervises. Either way it speaks only after telling the patient, in a
+fixed disclosure, that it is a computer. This creates the project's sharpest
+safety problem: **if the system's own voice reached the transcript, it could
+put words in the patient's mouth**, and the note would faithfully cite them.
 
 The defence is structural. The client tells the server *when* playback runs;
 the server feeds the transcriber **silence** for exactly those spans and
@@ -67,7 +69,7 @@ never altered.
 
 ```mermaid
 sequenceDiagram
-    participant D as Doctor taps a question
+    participant D as Doctor taps — or auto mode plans — a question
     participant S as Server
     participant T as Transcriber
     D->>S: speak (reference only — never free text)
