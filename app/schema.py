@@ -50,7 +50,9 @@ logger = logging.getLogger(__name__)
 # `consultation`, `queue_entry` references `patient` and `app_user`. This
 # tuple is the single ordering.
 MODULE_NAMES = ("auth", "frontdesk", "consultations", "letters",
-                "system_utterances", "raw_segments", "audit")
+                "system_utterances", "raw_segments", "audit",
+                # Phase 7c slice 5: references consultation(id), so after it.
+                "assessment_snapshots")
 
 
 class _Rollback(Exception):

@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import psycopg
@@ -23,9 +24,9 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import (audit, auth, auto_mode, consultations, face, frontdesk, letters,
-                 monitor, ratelimit, raw_segments, retention, schema, speech,
-                 system_utterances)
+from app import (assessment_snapshots, audit, auth, auto_mode, consultations, face,
+                 frontdesk, letters, monitor, ratelimit, raw_segments, retention,
+                 schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine, OfficerVerdict, turn_finished
 from app.finalize import (expect_declaration, finalize_consultation,
@@ -1461,6 +1462,13 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
         await system_utterances.save(cid, entry["utterances"])
         logger.info("Consultation %d: %d system utterance(s) recorded",
                     cid, len(entry["utterances"]))
+    # Phase 7c slice 5: the per-revision assessment snapshots, persisted the
+    # same way and for the same reason — from here they live in the
+    # database, not the session object.
+    if entry.get("assessment_snapshots"):
+        await assessment_snapshots.save(cid, entry["assessment_snapshots"])
+        logger.info("Consultation %d: %d assessment snapshot(s) recorded",
+                    cid, len(entry["assessment_snapshots"]))
 
     # Phase 7b: one consultation-linked audit row with the whole toggle
     # history, so a study arm is one query — the live face.toggled rows
@@ -1948,6 +1956,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # every utterance it has been asked to speak this session.
             "agenda": speech.AgendaLog(),
             "utterances": [],          # dicts, persisted at session end
+            # Phase 7c slice 5: one row per CDS revision, persisted at
+            # session end beside the utterances (app/assessment_snapshots.py).
+            "assessment_snapshots": [],
             "pending_utterance": None,  # prepared, not yet started
             # Hard rule 4: the patient must be told they are talking to a
             # machine. Held server-side because the rule is code-enforced,
@@ -2079,6 +2090,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # client tap refers to is one the server can resolve.
                 assessment_version = entry["agenda"].record(entry["assessment"])
                 entry["assessment"]["assessment_version"] = assessment_version
+                # Phase 7c slice 5: the revision's snapshot — every pass,
+                # auto mode on or off (metric 7 and replay both want it).
+                entry["assessment_snapshots"].append(assessment_snapshots.snapshot_of(
+                    entry["assessment"], assessment_version,
+                    datetime.now(timezone.utc), session.audio_seconds))
                 # Phase 7c (D2): the pass auto mode asked for has landed —
                 # plan the next ask from THIS version only.
                 if entry["auto"] is not None and entry["auto"]["revision"] == "running":
