@@ -1114,6 +1114,10 @@ let disclosed = false;
 const askedQuestions = new Set();
 let speaking = null;        // {utterance_id, audio, text}
 let pendingSpeakText = '';  // what we asked for, to label the pill
+// Phase 7c slice 5: an utterance the SERVER cut (auto_stop) before this
+// page had started playing it — the play command may still be in hand
+// (or in flight); when it comes, it is declined rather than played.
+let serverCancelled = null;
 
 // Phrases the patient must have heard the disclosure before. Mirrors the
 // server's DISCLOSURE_GATED_PHRASES — the server is the authority and
@@ -1524,6 +1528,13 @@ async function onSpeakReady(msg) {
   // the pill must never read as speaking nothing.
   const label = pendingSpeakText || msg.text || '';
   pendingSpeakText = '';
+  if (serverCancelled === msg.utterance_id) {
+    // Cut by the server (auto_stop) before it began: the row is already
+    // resolved server-side; nothing plays, nothing is reported.
+    serverCancelled = null;
+    refreshSpeechControls();
+    return;
+  }
   const audio = new Audio(msg.url);
   audio.onended = () => { if (speaking) stopSpeaking('complete'); };
   audio.onerror = () => {
@@ -1538,6 +1549,14 @@ async function onSpeakReady(msg) {
     await audio.play();
   } catch (err) {
     audio.onerror();
+    return;
+  }
+  if (serverCancelled === msg.utterance_id) {
+    // The stop landed while play() was starting: cut before a single
+    // frame is reported, no window opens.
+    serverCancelled = null;
+    try { audio.pause(); } catch (e) { /* already ended */ }
+    refreshSpeechControls();
     return;
   }
   // speak_started goes AFTER playback actually begins, carrying the seq of
@@ -1593,6 +1612,24 @@ const politeness = {
     return rms !== null && Number(floor) > 0 && rms >= Number(floor);
   },
 };
+
+// Phase 7c slice 5: the SERVER-INITIATED STOP (spec §7). An urgency pause
+// cuts whatever is playing, at once, through EXACTLY the Esc/Stop path —
+// stopSpeaking with the reason the server named (this slice: urgency_pause;
+// the message carries the reason so later callers can reuse it), so the
+// pill goes, the detector disarms, speak_ended is reported and the window
+// closes at the cut. If the stop arrives before playback began, the play
+// command is declined when it comes (serverCancelled, checked in
+// onSpeakReady). Never leaves a window open; nothing breaks when nothing
+// is playing.
+function onAutoStop(msg) {
+  const reason = msg.reason || 'cancelled';
+  if (speaking && (!msg.utterance_id || speaking.utterance_id === msg.utterance_id)) {
+    stopSpeaking(reason);
+    return;
+  }
+  serverCancelled = msg.utterance_id || null;
+}
 
 async function onAutoSpeak(msg) {
   const rms = currentRms();
@@ -2274,6 +2311,7 @@ function onWsMessage(event) {
   else if (msg.type === 'face_toggled') { applyFaceToggle(msg.on); }
   else if (msg.type === 'speak_ready') { onSpeakReady(msg); }
   else if (msg.type === 'auto_speak') { onAutoSpeak(msg); }   // Phase 7c, same path
+  else if (msg.type === 'auto_stop') { onAutoStop(msg); }     // Phase 7c slice 5: the server's cut
   else if (msg.type === 'auto_toggled') {
     // Phase 7c: the server's word on whether auto mode is on. The reporter
     // starts a fresh quiet span at the moment of confirmation.

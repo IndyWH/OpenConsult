@@ -1731,32 +1731,85 @@ def _thresholds_in_force() -> dict:
     }
 
 
-def _cancel_playback(entry: dict, reason: str) -> None:
+def _cancel_playback(entry: dict, reason: str, *,
+                     unplayed_reason: str = "failed_to_play") -> dict | None:
     """End any in-flight utterance without a client `speak_ended`.
 
-    Used on reconnect and at session end. The window closes at whatever it
-    had reached; an utterance that never started leaves no window at all
-    and is recorded `failed_to_play` — no window means no exclusion, which
-    is correct, because nothing was played into the room.
+    Used on reconnect and at session end — and, since Phase 7c slice 5, by
+    the server-initiated stop. The window closes at whatever it had
+    reached; an utterance that never started leaves no window at all and
+    is recorded `unplayed_reason` — `failed_to_play` by default (no window
+    means no exclusion, which is correct, because nothing was played into
+    the room), or the server's own reason when the server is the one
+    cutting it (an urgency pause cancels a not-yet-started utterance
+    too, and the row should say why). Returns the row written, or None.
     """
     utterance = entry.get("pending_utterance")
     if utterance is None:
-        return
+        return None
     session: LiveSession = entry["session"]
     span = session.close_speaking_window(reason) if session.speaking else None
-    entry["utterances"].append({
+    row = {
         "utterance_id": utterance.utterance_id, "text": utterance.text,
         "ref_kind": utterance.ref_kind, "ref_detail": utterance.ref_detail,
         "cds_rationale": utterance.cds_rationale, "voice": utterance.voice,
         "synth_ms": utterance.synth_ms, "stale": utterance.stale,
-        "end_reason": reason if span is not None else "failed_to_play",
+        "end_reason": reason if span is not None else unplayed_reason,
         "cut_latency_ms": None,
         "start_byte": span["start_byte"] if span else None,
         "end_byte": span["end_byte"] if span else None,
         "started_offset_ms": bytes_to_ms(span["start_byte"]) if span else None,
         "ended_offset_ms": bytes_to_ms(span["end_byte"]) if span else None,
-    })
+    }
+    entry["utterances"].append(row)
     entry["pending_utterance"] = None
+    return row
+
+
+async def cancel_auto_playback(entry: dict, websocket, reason: str) -> dict | None:
+    """The server-initiated stop (Phase 7c slice 5, PHASE_7C_SPEC.md §7).
+
+    Cuts the current utterance NOW: the client is told to stop
+    (`auto_stop`, carrying the reason, which it handles through exactly
+    its own Esc/Stop path), the exclusion window closes at the cut and the
+    row is resolved with the named reason SERVER-SIDE — an utterance not
+    yet started records the reason too, with no span — and the queued
+    auto utterance and any plan in flight are cleared. The client's echoed
+    speak_ended is then recognised by `server_cancelled_id`, not refused.
+    Safe with nothing in flight: nothing is sent, nothing breaks. Any
+    utterance is cut, tap or auto — an urgency pause is not the moment
+    for anyone's question. This slice's caller passes `urgency_pause`;
+    the reason travels in the message so later callers can reuse it.
+    Returns the row resolved, or None.
+    """
+    auto = entry.get("auto")
+    if auto is not None:
+        auto["queued"] = None
+        if auto.get("plan_task") is not None and not auto["plan_task"].done():
+            auto["plan_task"].cancel()
+        auto["plan_task"] = None
+    utterance = entry.get("pending_utterance")
+    if utterance is None:
+        return None
+    await websocket.send_json({"type": "auto_stop", "reason": reason,
+                               "utterance_id": utterance.utterance_id})
+    entry["server_cancelled_id"] = utterance.utterance_id
+    row = _cancel_playback(entry, reason, unplayed_reason=reason)
+    if entry.get("face") is not None and row is not None and row["start_byte"] is not None:
+        entry["face"].on_system_speech_ended()
+    if (auto is not None and auto.get("last_issued")
+            and auto["last_issued"].get("utterance_id") == utterance.utterance_id):
+        auto["last_issued"] = None       # cut, not aborted: never requeued
+    if row is not None and row["start_byte"] is not None:
+        # It played into the room and was cut: audited as every other end
+        # of playback is, marked as the server's cut. An unplayed one is
+        # on the row alone — nothing was spoken.
+        await audit.log(entry["user"]["id"], "speech.spoken", None, None,
+                        {"utterance_id": utterance.utterance_id, "reason": reason,
+                         "server_stop": True,
+                         "excluded_ms": bytes_to_ms(row["end_byte"] - row["start_byte"])})
+    logger.info("Server stop (%s) cut utterance %s", reason, utterance.utterance_id)
+    return row
 
 
 def _detach_for_grace(app_state, session_id: str, entry: dict) -> None:
@@ -1924,6 +1977,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # exist for this session: no controller, no quiet handling, no
             # auto messages; the app behaves exactly as before 7c.
             "auto": _new_auto_state() if AUTO_MODE_ENABLED else None,
+            # Phase 7c slice 5: the utterance the SERVER last cut (auto_stop),
+            # so the client's echoed speak_ended is recognised, not refused.
+            "server_cancelled_id": None,
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -2321,6 +2377,13 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              # — calibration data for the floor it compared
                              # against, like quiet_s for the nudge.
                              **({"rms": round(float(rms), 5)} if rms is not None else {})})
+            return
+        if (utterance is None and entry.get("server_cancelled_id") is not None
+                and payload.get("utterance_id") == entry["server_cancelled_id"]):
+            # Phase 7c slice 5: the client's echo of a server-initiated stop
+            # (auto_stop). The server resolved the row when it cut; this is
+            # the client confirming, not a stray message — nothing to refuse.
+            entry["server_cancelled_id"] = None
             return
         if utterance is None or not session.speaking:
             await refuse_speech("speak_ended with no window open")
