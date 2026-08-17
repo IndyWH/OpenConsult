@@ -772,3 +772,37 @@ def test_a_reconnect_echoes_the_live_auto_state(gate):
         assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "golden"}
         ws2.send_text("stop")
         _until(ws2, {"done"})
+
+
+# ==========================================================================
+# Slice 6: the Auto pill's two taps, over the protocol
+
+def test_the_pills_two_taps_are_the_one_tap_start_and_the_immediate_off(gate):
+    """What the pill sends is exactly what the server accepts: {"type":
+    "auto","on":true} starts the one-tap sequence (here: disclosure already
+    given → invitation → GOLDEN) and {"type":"auto","on":false} stops it
+    at once from wherever it is; each is echoed as auto_toggled, which is
+    what the pill's label follows."""
+    with live(gate) as s:
+        s.enable_to_golden()                        # the "on" tap, through the same message
+        s.ws.send_text(json.dumps({"type": "auto", "on": False}))
+        off = _until(s.ws, {"auto_toggled"})
+        assert off == {"type": "auto_toggled", "on": False, "phase": "off"}
+        assert s.phase is AutoPhase.OFF
+        # A second "on" tap starts a fresh run.
+        s.ws.send_text(json.dumps({"type": "auto", "on": True}))
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        assert seen[-1]["on"] is True
+        _stop(s)
+    assert len(_audit("auto.enabled", s.session_id)) == 2
+    assert len(_audit("auto.disabled", s.session_id)) == 1
+
+
+def test_with_the_gate_down_the_page_is_never_told_auto_mode_exists(gate_down):
+    """The pill hides itself unless speech_config carries an auto block, and
+    the server sends none with the gate down (the pill's own hidden-when-
+    dark test is tests/test_auto_pill_client.py)."""
+    with live(gate_down) as s:
+        first = _collect_until(s.ws, {"speech_config"})
+        assert "auto" not in first[-1]
+        _stop(s)

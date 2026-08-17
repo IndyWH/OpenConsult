@@ -236,3 +236,41 @@ def test_the_pause_banner_buttons_keep_all_three_standing_rules():
     refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
     refused = refused[:refused.index("\n  }")]
     assert "showSpeakError(msg.detail);" in refused
+
+
+# ------------------------------------------- Phase 7c slice 6: the Auto pill
+
+def test_the_auto_pill_keeps_all_three_standing_rules():
+    """The Auto pill (PHASE_7C_SPEC.md §10 as amended), under the same
+    three rules as every other control on the live page:
+
+    1. Never swallow: the tap sends the toggle (the server decides and
+       echoes); a refusal comes back as auto_refused and is shown.
+    2. A control that can act must not look as if it cannot — and the
+       reverse: hidden entirely when auto mode does not exist on this
+       server, disabled WITH THE REASON on itself when there is no live
+       session, and when it can act the title says what the tap will do
+       in the current state; the label shows the server-confirmed state.
+    3. Where the doctor is looking: in the control row beside Sound check
+       and Face, not on a settings page.
+    """
+    live = _page("live.html")
+    row = live[live.index('id="soundCheckBtn"'):live.index('id="btn"')]
+    assert 'id="autoPill"' in row and 'id="facePill"' in row       # rule 3
+    assert 'id="autoPillLabel">Auto: off<' in live                    # labelled
+    refresh = live[live.index("function refreshSpeechControls()"):]
+    refresh = refresh[:refresh.index("\n}")]
+    assert "autoBtn.hidden = !autoAvailable;" in refresh              # rule 2: absent when it cannot exist
+    assert "autoBtn.disabled = !live;" in refresh                     # rule 2: disabled with reason
+    assert "autoBtn.title = !live" in refresh
+    assert "Start the consultation first — auto mode runs inside a live session" in refresh
+    apply = live[live.index("function applyAutoToggle(msg) {"):]
+    apply = apply[:apply.index("\n}")]
+    assert "autoPillLabel.textContent = autoOn ? 'Auto: on' : 'Auto: off';" in apply
+    assert "autoPill.setAttribute('aria-pressed', String(autoOn));" in apply
+    click = live[live.index("autoPill.addEventListener('click'"):]
+    click = click[:click.index("\n});")]
+    assert "ws.send(JSON.stringify({type: 'auto', on: !autoOn}));" in click   # rule 1
+    refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
+    refused = refused[:refused.index("\n  }")]
+    assert "showSpeakError(msg.detail);" in refused                   # rule 1: refusal shown

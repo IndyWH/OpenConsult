@@ -398,6 +398,20 @@
             title="Start the consultation first — the face runs inside a live session">
       <span id="facePillLabel">Face: off</span>
     </button>
+    <!-- Auto pill (Phase 7c slice 6, PHASE_7C_SPEC.md §10 as amended):
+         supervised auto history-taking, on and off. LABELLED, shows its
+         state (a control that can act must not look as if it cannot),
+         beside Sound check and Face where the doctor already looks.
+         Server-confirmed: the label follows the auto_toggled echo, never
+         the tap. HIDDEN ENTIRELY unless the server's speech_config carries
+         an auto block — with AUTO_MODE_ENABLED false this control does not
+         exist on the page. One tap on = the one-tap start (disclosure if
+         not yet given, invitation, golden minutes); one tap off =
+         immediate, from every state. -->
+    <button class="soundcheck" id="autoPill" type="button" aria-pressed="false" hidden
+            title="Start the consultation first — auto mode runs inside a live session">
+      <span id="autoPillLabel">Auto: off</span>
+    </button>
     <button class="primary" id="btn" disabled title="Recording needs a linked patient">Start</button>
   </div>
   <div id="status" class="hint"></div>
@@ -1144,6 +1158,11 @@ const discLock = document.getElementById('discLock');
 
 let agendaVersion = 0;
 let disclosed = false;
+// Phase 7c slice 6: the Auto pill's server-confirmed state. Declared here,
+// before refreshSpeechControls can run, because that function reads them.
+let autoAvailable = false;   // the server said auto mode exists (speech_config.auto)
+let autoOn = false;          // server-confirmed: in a live auto run
+let autoPhase = 'off';       // server-confirmed phase value
 // Questions already spoken this session, by their text (stable across
 // agenda revisions, unlike the index). Re-asking stays ALLOWED and logged
 // — the panel can lag and repetition is sometimes right — but in 447 the
@@ -1243,6 +1262,18 @@ function refreshSpeechControls() {
   pill.title = !live
     ? 'Start the consultation first — the face runs inside a live session'
     : 'Toggle the assistant face (the label shows its current state)';
+  // The Auto pill (Phase 7c slice 6): present only when the server said
+  // auto mode exists (speech_config.auto); needs a live session like every
+  // speak control — disabled with the reason on it otherwise; when it can
+  // act, the title says what the tap will do in the current state.
+  const autoBtn = document.getElementById('autoPill');
+  autoBtn.hidden = !autoAvailable;
+  autoBtn.disabled = !live;
+  autoBtn.title = !live
+    ? 'Start the consultation first — auto mode runs inside a live session'
+    : autoOn
+      ? 'Stop auto mode now — immediate; the system says nothing more unbidden'
+      : 'Start auto mode: the system takes the history itself — you supervise, and one tap here or Esc stops it';
   // Disabled while recording (spec 10.3): a test phrase inside a live
   // consultation would be a system utterance and would need the whole
   // exclusion machinery for no clinical benefit.
@@ -2237,6 +2268,33 @@ facePill.addEventListener('click', () => {
   ws.send(JSON.stringify({type: 'face', on: !faceOn}));
 });
 
+// ============================ Phase 7c slice 6: the Auto pill (spec §10)
+//
+// The tap SENDS; the server DECIDES and echoes auto_toggled; the label
+// follows the echo. `autoAvailable` is set only from speech_config.auto,
+// which the server sends only when AUTO_MODE_ENABLED is true — so with the
+// gate down the pill is hidden and nothing on this page can ask for auto
+// mode. A refusal (auto_refused) is shown, never swallowed.
+const autoPill = document.getElementById('autoPill');
+const autoPillLabel = document.getElementById('autoPillLabel');
+// (autoAvailable / autoOn / autoPhase are declared up by `disclosed`.)
+
+autoPill.addEventListener('click', () => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
+  ws.send(JSON.stringify({type: 'auto', on: !autoOn}));
+});
+
+function applyAutoToggle(msg) {
+  autoOn = !!msg.on;
+  autoPhase = msg.phase || (autoOn ? autoPhase : 'off');
+  // The pill shows the current state — a control that can act must not
+  // look as if it cannot (and the reverse; the 448 companion rule).
+  autoPillLabel.textContent = autoOn ? 'Auto: on' : 'Auto: off';
+  autoPill.setAttribute('aria-pressed', String(autoOn));
+  autoPill.classList.toggle('done', autoOn);
+  refreshSpeechControls();
+}
+
 async function applyFaceToggle(on) {
   faceOn = on;
   updateStickyRow(alarmLive, on);
@@ -2364,6 +2422,8 @@ function onWsMessage(event) {
     if (msg.auto) {                       // Phase 7c, only when enabled server-side
       quietReporter.configure(msg.auto);
       quietReporter.floor = bargeIn.absFloor;   // the same "this is speech" number
+      autoAvailable = true;                     // slice 6: the Auto pill exists
+      refreshSpeechControls();
     }
     if (msg.barge_in) {
       bargeIn.configure(msg.barge_in);
@@ -2420,6 +2480,7 @@ function onWsMessage(event) {
     // starts a fresh quiet span at the moment of confirmation.
     quietReporter.enabled = !!msg.on;
     if (msg.on) quietReporter.activity(performance.now());
+    applyAutoToggle(msg);                       // slice 6: the pill follows the echo
     // Slice 5: the pause banner follows the phase — paused_urgent shows it
     // (with the server's pending list on a reconnect echo), anything else
     // clears it.
