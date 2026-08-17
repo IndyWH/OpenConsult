@@ -94,6 +94,26 @@
   .stickyrow .urgent, .stickyrow .facepane {
     pointer-events: auto; box-shadow: 0 6px 24px #29231F14;
   }
+  /* Phase 7c slice 5: the auto-mode PAUSE banner. Lives INSIDE the urgent
+     panel — the alarm's reserved home in the sticky row, on screen at
+     every scroll position — because it accompanies the alarm and must
+     outlive a CDS pass that clears the list while the machine is still
+     paused. It lists EVERY pending action text (spec §7: an
+     acknowledgement covers only what the doctor actually saw) and offers
+     the two one-tap resolutions. Hidden entirely unless paused. */
+  .pausebanner { display: none; margin-top: .7rem; padding-top: .6rem;
+                 border-top: 1px dashed var(--line); }
+  .pausebanner.on { display: block; }
+  .pausebanner .plabel { font-size: .72rem; text-transform: uppercase;
+                         letter-spacing: .09em; color: var(--red); font-weight: 700; margin: 0 0 .3rem; }
+  .pausebanner ul { margin: 0 0 .5rem; padding-left: 1.15rem; }
+  .pausebanner li { font-weight: 600; font-size: .98rem; margin-bottom: .2rem; }
+  .pausebanner .pbtns { display: flex; gap: .6rem; flex-wrap: wrap; }
+  .pausebanner button { font: inherit; font-weight: 700; padding: .45rem .9rem;
+                        border-radius: 999px; border: 1px solid var(--red);
+                        cursor: pointer; background: var(--panel); color: var(--red); }
+  .pausebanner button.primary { background: var(--red); color: #fff; }
+  .pausebanner button:disabled { opacity: .5; cursor: not-allowed; }
   .facepane {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: var(--radius); padding: .8rem 1rem;
@@ -400,6 +420,22 @@
     <div class="urgent" id="urgentBox">
       <h2 class="pane-label">⚠ Urgent actions</h2>
       <ul id="urgentList"></ul>
+      <!-- Phase 7c slice 5: the auto-mode pause banner (spec §7, §10).
+           Shown only while the machine is PAUSED_URGENT. Lists EVERY
+           pending action text — all of them, never only the latest — and
+           the two one-tap resolutions. Standing rules: labelled controls;
+           a control that cannot act says why on itself; where the doctor
+           is already looking (the alarm's home). -->
+      <div class="pausebanner" id="pauseBanner" role="alert" aria-live="assertive">
+        <p class="plabel" id="pauseLabel">Auto mode paused — urgent action</p>
+        <ul id="pauseList" aria-label="Pending urgent actions"></ul>
+        <div class="pbtns">
+          <button type="button" id="pauseResume" class="primary"
+                  title="Acknowledge every action listed and return auto mode to where it was">RESUME AUTO</button>
+          <button type="button" id="pauseTakeOver"
+                  title="Acknowledge every action listed and take the consultation over — auto mode ends">TAKE OVER</button>
+        </div>
+      </div>
     </div>
   </div>
   <div id="stickyRight">
@@ -980,7 +1016,9 @@ function renderCDS(a) {
   // Membership, not display, is the state: the captured references are
   // used because getElementById cannot find a detached node.
   const urgent = a.urgent_actions || [];
-  alarmLive = urgent.length > 0;
+  // Phase 7c slice 5: while auto mode is paused the panel stays — the
+  // pause banner inside it must outlive a pass that clears the list.
+  alarmLive = urgent.length > 0 || pausedLive;
   updateStickyRow(alarmLive, faceOn);
   urgentListEl.innerHTML = '';
   for (const u of urgent) {
@@ -1213,6 +1251,7 @@ function refreshSpeechControls() {
     ? 'Not during a consultation — run it before you start'
     : 'Play a test phrase and check the room can hear it';
   discCheck.disabled = disclosed || !live;
+  refreshPauseControls();   // Phase 7c slice 5: the pause banner's two buttons
 }
 
 function requestSpeak(ref, label, extra) {
@@ -2221,6 +2260,70 @@ async function applyFaceToggle(on) {
 // state, and the sticky row itself must be absent then.
 updateStickyRow(false, false);
 
+// ====================== Phase 7c slice 5: the auto-mode pause banner
+//
+// Spec §7 and §10. The SERVER decides the pause and the pending set (the
+// controller's ratchet); this page shows it and offers the two one-tap
+// resolutions. `pending` is EVERY pending action text as the server sent
+// it — a widening re-fire replaces the whole list — so an acknowledgement
+// only ever covers what the doctor actually saw. Both buttons are labelled,
+// say why when they cannot act, and a refusal comes back as auto_refused
+// and is shown; nothing is silently swallowed.
+// Captured through the urgent box, which is already DETACHED at this point
+// (updateStickyRow(false, false) above) — getElementById cannot see it.
+const pauseBanner = urgentBoxEl.querySelector('#pauseBanner');
+const pauseList = urgentBoxEl.querySelector('#pauseList');
+const pauseResume = urgentBoxEl.querySelector('#pauseResume');
+const pauseTakeOver = urgentBoxEl.querySelector('#pauseTakeOver');
+let pausedLive = false;          // server-confirmed PAUSED_URGENT
+let pausePending = [];           // every pending action text, server's list
+
+function renderPause(paused, pending) {
+  pausedLive = !!paused;
+  pausePending = Array.isArray(pending) ? pending.slice() : [];
+  pauseList.innerHTML = '';
+  for (const text of pausePending) {
+    pauseList.appendChild(el('li', null, text));
+  }
+  pauseBanner.classList.toggle('on', pausedLive);
+  // The panel's membership follows the alarm OR the pause; the pause
+  // banner never floats without its panel.
+  alarmLive = alarmLive || pausedLive;
+  if (!pausedLive) alarmLive = urgentListEl.children.length > 0;
+  updateStickyRow(alarmLive, faceOn);
+  refreshPauseControls();
+}
+
+function refreshPauseControls() {
+  // Looked up by id (the faceToggle precedent): this also runs from
+  // refreshSpeechControls at page load, before this block's consts exist,
+  // and a DETACHED banner is not findable — which is the not-shown case
+  // and needs no refresh.
+  const resume = document.getElementById('pauseResume');
+  const takeOver = document.getElementById('pauseTakeOver');
+  if (!resume || !takeOver) return;
+  const connected = ws && ws.readyState === WebSocket.OPEN;
+  for (const btn of [resume, takeOver]) {
+    btn.disabled = !connected;
+    btn.title = !connected
+      ? 'Reconnecting — auto mode cannot be resumed or taken over until the connection is back'
+      : (btn === resume
+         ? 'Acknowledge every action listed and return auto mode to where it was'
+         : 'Acknowledge every action listed and take the consultation over — auto mode ends');
+  }
+}
+
+function acknowledgePause(resolution) {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {   // disabled anyway; race guard
+    showSpeakError('Not connected — cannot acknowledge.');
+    refreshPauseControls();
+    return;
+  }
+  ws.send(JSON.stringify({type: 'auto_ack', resolution: resolution}));
+}
+pauseResume.addEventListener('click', () => acknowledgePause('resume'));
+pauseTakeOver.addEventListener('click', () => acknowledgePause('take_over'));
+
 // ============================================================= start / stop
 function standDown(statusText) {
   // Fully reset to the not-recording state (used by busy/resume_failed).
@@ -2317,6 +2420,24 @@ function onWsMessage(event) {
     // starts a fresh quiet span at the moment of confirmation.
     quietReporter.enabled = !!msg.on;
     if (msg.on) quietReporter.activity(performance.now());
+    // Slice 5: the pause banner follows the phase — paused_urgent shows it
+    // (with the server's pending list on a reconnect echo), anything else
+    // clears it.
+    if (msg.phase === 'paused_urgent') renderPause(true, msg.pending || pausePending);
+    else if (pausedLive) renderPause(false, []);
+  }
+  else if (msg.type === 'auto_pause') {
+    // Slice 5: paused (or a widening re-fire). `pending` is EVERY pending
+    // action text; the list is replaced, never appended to.
+    renderPause(true, msg.pending || []);
+  }
+  else if (msg.type === 'auto_acknowledged') {
+    renderPause(false, []);
+  }
+  else if (msg.type === 'auto_refused') {
+    // A refused auto toggle or acknowledgement is shown, never swallowed.
+    showSpeakError(msg.detail);
+    refreshPauseControls();
   }
   else if (msg.type === 'speak_refused') {
     pendingSpeakText = '';

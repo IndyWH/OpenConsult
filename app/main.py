@@ -940,9 +940,16 @@ async def consultation_state(
     # function the approve guard uses, so the banner and the button cannot
     # disagree about it.
     labels = await consultations.labels_state(cid)
+    # Phase 7c slice 5: the live acknowledgements of urgency pauses, read
+    # from the audit trail — who, when, which action texts. Display only;
+    # the acknowledge-gated banner and its gate are exactly as they were.
+    live_acks = [ack for row in await audit.for_subject("consultation", cid,
+                                                        "auto.acknowledgements")
+                 for ack in (row["detail"] or {}).get("acknowledgements", [])]
     await audit.log(user["id"], "consultation.viewed", "consultation", cid)
     return JSONResponse(
         content={**consultation, "turns": turns, "note": note, "plain_text": plain,
+                 "live_acknowledgements": live_acks,
                  "letters": letter_rows, "system_utterances": spoken,
                  "labels": labels}
     )
@@ -1469,6 +1476,14 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
         await assessment_snapshots.save(cid, entry["assessment_snapshots"])
         logger.info("Consultation %d: %d assessment snapshot(s) recorded",
                     cid, len(entry["assessment_snapshots"]))
+    # Phase 7c slice 5: the live acknowledgements, as one consultation-linked
+    # audit row (the face.arms pattern) — the live auto.acknowledged rows
+    # carry only the session id, because no consultation row existed yet.
+    # The review page reads this to SHOW who acknowledged what, when; it
+    # gates nothing.
+    if entry.get("auto") and entry["auto"].get("acks"):
+        await audit.log(user["id"], "auto.acknowledgements", "consultation", cid,
+                        {"acknowledgements": entry["auto"]["acks"]})
 
     # Phase 7b: one consultation-linked audit row with the whole toggle
     # history, so a study arm is one query — the live face.toggled rows
@@ -1720,7 +1735,16 @@ def _new_auto_state() -> dict:
         # Slice 5: golden seconds spent BEFORE a pause, so the window is not
         # restarted by a resume (seconds_in_phase resets on every transition).
         "golden_spent": 0.0,
+        "pause_versions": [],         # assessment_snapshot versions of the alarms in the live pause
+        "acks": [],                   # live acknowledgements, for the consultation-linked audit row
     }
+
+
+def _auto_on(ctl: auto_mode.AutoModeController) -> bool:
+    """What the client's `auto_toggled.on` means: the machine is in a live
+    run — not OFF, and not past its end (HANDOVER, TAKEN_OVER)."""
+    return ctl.phase not in (auto_mode.AutoPhase.OFF, auto_mode.AutoPhase.HANDOVER,
+                             auto_mode.AutoPhase.TAKEN_OVER)
 
 
 def _thresholds_in_force() -> dict:
@@ -2065,9 +2089,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # reconnect — the client's reporter and (slice 6) the pill follow
         # it. Never sent when the gate is down.
         _ctl = entry["auto"]["controller"]
-        await websocket.send_json({"type": "auto_toggled",
-                                   "on": _ctl.phase is not auto_mode.AutoPhase.OFF,
-                                   "phase": _ctl.phase.value})
+        await websocket.send_json({"type": "auto_toggled", "on": _auto_on(_ctl),
+                                   "phase": _ctl.phase.value,
+                                   **({"pending": sorted(_ctl.pending_actions)}
+                                      if _ctl.phase is auto_mode.AutoPhase.PAUSED_URGENT else {})})
 
     session: LiveSession = entry["session"]
     engine: CDSEngine = state.cds_engine
@@ -2627,8 +2652,17 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         ctl: auto_mode.AutoModeController = auto["controller"]
         on = bool(payload.get("on"))
         if on:
+            if ctl.phase in (auto_mode.AutoPhase.HANDOVER, auto_mode.AutoPhase.TAKEN_OVER):
+                # The previous auto run has ended; a fresh tap starts a
+                # fresh run — the machine goes through OFF first (auto off
+                # is legal from every state), audited as a restart.
+                await audit.log(user["id"], "auto.disabled", None, None,
+                                {"session_id": session_id, "via": "restart",
+                                 "at_audio_s": round(session.audio_seconds, 1)})
+                await auto_transition(ctl.auto_off(), detail={"reason": "restart"})
+                _cancel_officer(auto)
             if ctl.phase is not auto_mode.AutoPhase.OFF:
-                await websocket.send_json({"type": "auto_toggled", "on": True,
+                await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
                                            "phase": ctl.phase.value})
                 return   # already on — idempotent, nothing to re-audit
             if session.speaking or entry["pending_utterance"] is not None:
@@ -2694,6 +2728,73 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         handover=None, last_issued=None, golden_spent=0.0)
             await websocket.send_json({"type": "auto_toggled", "on": False,
                                        "phase": ctl.phase.value})
+
+    async def handle_auto_ack(payload: dict) -> None:
+        """RESUME AUTO / TAKE OVER on the pause banner (spec §7, §10).
+
+        Only while PAUSED_URGENT, only by the doctor running the session.
+        Both first audit auto.acknowledged with EVERY pending action text
+        the acknowledgement covers and the assessment_snapshot versions of
+        the alarms that fired in this pause — the doctor saw all of them
+        on the banner (the slice-2 hard requirement); an acknowledgement
+        never covers what was not shown. Then:
+        - resume: controller.acknowledge_and_resume returns to the exact
+          prior phase, audited auto.resumed; in a question phase the D2
+          revision is asked for at once — the agenda reprioritises itself
+          through the CDS (spec §7), no new mechanism. The ratchet is the
+          machine's: the same action re-firing pauses again.
+        - take_over: controller.acknowledge_and_take_over — TAKEN_OVER,
+          terminal for the auto run — audited auto.takeover; the session
+          continues in standard mode with all of today's behaviour.
+        A refusal is answered (auto_refused), never swallowed.
+        """
+        auto = entry["auto"]
+        if auto is None:
+            await refuse_auto("auto mode is not enabled on this server (AUTO_MODE_ENABLED)")
+            return
+        if user["id"] != entry["user"]["id"]:
+            await refuse_auto("only the doctor running this consultation may acknowledge")
+            return
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        resolution = payload.get("resolution")
+        if resolution not in ("resume", "take_over"):
+            await refuse_auto("acknowledge with resolution 'resume' or 'take_over'")
+            return
+        if ctl.phase is not auto_mode.AutoPhase.PAUSED_URGENT:
+            await refuse_auto("nothing to acknowledge — auto mode is not paused")
+            return
+        covered = sorted(ctl.pending_actions)
+        versions = list(auto["pause_versions"])
+        paused_from = ctl.paused_from.value if ctl.paused_from else None
+        ack_detail = {"session_id": session_id, "resolution": resolution,
+                      "actions": covered, "assessment_versions": versions,
+                      "paused_from": paused_from,
+                      "at_audio_s": round(session.audio_seconds, 1)}
+        await audit.log(user["id"], "auto.acknowledged", None, None, ack_detail)
+        auto["acks"].append({**ack_detail, "at": datetime.now(timezone.utc).isoformat(),
+                             "user_id": user["id"], "username": user["username"],
+                             "display_name": user.get("display_name")})
+        auto["pause_versions"] = []
+        if resolution == "resume":
+            transition = ctl.acknowledge_and_resume()
+            await auto_transition(transition, detail={"actions": covered})
+            await audit.log(user["id"], "auto.resumed", None, None,
+                            {"session_id": session_id, "phase": ctl.phase.value,
+                             "actions": covered, "at_audio_s": round(session.audio_seconds, 1)})
+            auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False)
+            if ctl.phase in auto_mode.QUESTION_PHASES:
+                _request_revision(auto, "resumed after pause")
+        else:
+            transition = ctl.acknowledge_and_take_over()
+            await auto_transition(transition, detail={"actions": covered})
+            await audit.log(user["id"], "auto.takeover", None, None,
+                            {"session_id": session_id, "actions": covered,
+                             "at_audio_s": round(session.audio_seconds, 1)})
+            _cancel_officer(auto)
+        await websocket.send_json({"type": "auto_acknowledged", "resolution": resolution,
+                                   "actions": covered, "phase": ctl.phase.value})
+        await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
+                                   "phase": ctl.phase.value})
 
     def _cancel_officer(auto: dict) -> None:
         for key in ("officer_task", "plan_task"):
@@ -2898,7 +2999,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                 {"session_id": session_id,
                                  "agenda_version": last["agenda_version"],
                                  "at_audio_s": round(session.audio_seconds, 1)})
-                await websocket.send_json({"type": "auto_toggled", "on": True,
+                await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
                                            "phase": ctl.phase.value})
 
     async def on_doctor_tap(utterance: speech.Utterance) -> None:
@@ -2954,10 +3055,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         transition = ctl.urgent_alarm(texts)
         pending = sorted(ctl.pending_actions)
         if not already_paused:
+            auto["pause_versions"] = []
             await cancel_auto_playback(entry, websocket, "urgency_pause")
             _cancel_officer(auto)          # also drops the queue and any plan
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
                         revision=None, last_issued=None)
+        auto["pause_versions"].append(assessment_version)
         await auto_transition(transition, detail={"actions": texts, "pending": pending,
                                                   "assessment_version": assessment_version,
                                                   "refire": already_paused})
@@ -3181,6 +3284,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         await handle_face(payload)
                     elif kind == "auto":
                         await handle_auto(payload)      # Phase 7c; refused when the gate is down
+                    elif kind == "auto_ack":
+                        await handle_auto_ack(payload)  # Phase 7c slice 5: RESUME AUTO / TAKE OVER
                     elif kind == "quiet":
                         await handle_quiet(payload)     # Phase 7c; ignored when the gate is down
                     elif kind == "disclosure_given":

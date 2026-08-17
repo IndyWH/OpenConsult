@@ -184,3 +184,55 @@ def test_a_silent_refresh_no_longer_stands_in_for_a_refusal_on_today():
     assert "alert(" in offer, "an unexplained refusal must still say something"
     assert "opened at" in offer, "say when the blocking entry was opened"
     assert "free the slot" in offer, "say what the doctor can do about it"
+
+
+# ------------------------------- Phase 7c slice 5: the pause banner's buttons
+
+def test_the_pause_banner_buttons_keep_all_three_standing_rules():
+    """RESUME AUTO and TAKE OVER (PHASE_7C_SPEC.md §7, §10), extended under
+    the same three rules as every other control on the live page:
+
+    1. Never swallow: each tap sends the acknowledgement or shows why it
+       could not; a server refusal (auto_refused) is shown, never dropped.
+    2. A control that can act must not look as if it cannot — and the
+       reverse: the buttons are disabled WITH THE REASON on themselves
+       when the socket is down, and carry a reason when they can act.
+    3. Where the doctor is looking: the banner lives inside the urgent
+       panel in the sticky row — the alarm's reserved home, on screen at
+       every scroll position — never at the bottom of the page.
+    Both are labelled, plainly, in words.
+    """
+    live = _page("live.html")
+    # Rule 3: inside the urgent panel, inside the sticky row's left half.
+    left = live[live.index('id="stickyLeft"'):live.index('id="stickyRight"')]
+    assert 'id="urgentBox"' in left
+    urgent = left[left.index('id="urgentBox"'):]
+    assert 'id="pauseBanner"' in urgent
+    banner = urgent[urgent.index('id="pauseBanner"'):urgent.index('</div>\n      </div>')]
+    # Labelled, in words.
+    assert 'id="pauseResume"' in banner and ">RESUME AUTO<" in banner
+    assert 'id="pauseTakeOver"' in banner and ">TAKE OVER<" in banner
+    assert 'title="' in banner.split('id="pauseResume"')[1].split(">")[0]
+    assert 'title="' in banner.split('id="pauseTakeOver"')[1].split(">")[0]
+    # Every pending action text is listed — the list, not a count.
+    assert 'id="pauseList"' in banner
+    # Rule 2: the disabled state carries its reason, on the control.
+    refresh = live[live.index("function refreshPauseControls()"):]
+    refresh = refresh[:refresh.index("\n}")]
+    assert "btn.disabled = !connected;" in refresh
+    assert "btn.title = !connected" in refresh
+    assert "Reconnecting" in refresh
+    # ...and refreshSpeechControls (the socket-state writer) drives it.
+    speech_controls = live[live.index("function refreshSpeechControls()"):]
+    speech_controls = speech_controls[:speech_controls.index("\n}")]
+    assert "refreshPauseControls();" in speech_controls
+    # Rule 1: a tap either sends or says why; a refusal is shown.
+    ack = live[live.index("function acknowledgePause(resolution)"):]
+    ack = ack[:ack.index("\n}")]
+    assert "ws.send(JSON.stringify({type: 'auto_ack', resolution: resolution}));" in ack
+    assert "showSpeakError(" in ack
+    assert "pauseResume.addEventListener('click', () => acknowledgePause('resume'));" in live
+    assert "pauseTakeOver.addEventListener('click', () => acknowledgePause('take_over'));" in live
+    refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
+    refused = refused[:refused.index("\n  }")]
+    assert "showSpeakError(msg.detail);" in refused

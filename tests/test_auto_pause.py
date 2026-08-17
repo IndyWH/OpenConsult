@@ -406,3 +406,205 @@ def test_the_urgency_alarm_still_never_reaches_the_face():
     assert "face" not in code.lower()
     import app.face as face
     assert not any("urgen" in n.lower() or "alarm" in n.lower() for n in dir(face.FaceDriver))
+
+
+# ==========================================================================
+# Item 4: the banner's acknowledgements — RESUME AUTO / TAKE OVER, the
+# ratchet end to end, and what the review page shows
+
+def _ack(s, resolution):
+    s.ws.send_text(json.dumps({"type": "auto_ack", "resolution": resolution}))
+    return _collect_until(s.ws, {"auto_acknowledged", "auto_refused"})
+
+
+def _pause_from_open(s, engine, monkeypatch, alarm_pass=2, actions=(ECG,)):
+    """GOLDEN → OPEN by a hand-back, first ask played, then the D2 revision
+    (pass `alarm_pass`) carries the alarm → PAUSED_URGENT from OPEN."""
+    s.to_golden()
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+    s.commit_transcript("It started on Tuesday.", "That's all really.")
+    s.quiet(3.1)
+    s.probe()
+    first = s.wait_for_auto_speak()
+    s.play(first["utterance_id"])
+    s.turn_end("Tuesday night.")
+    for _ in range(30):
+        if s.phase.value == "paused_urgent":
+            break
+        s.probe()
+    assert s.phase.value == "paused_urgent"
+
+
+def test_resume_returns_to_the_exact_prior_phase_and_the_ratchet_re_arms(gate, monkeypatch):
+    """RESUME AUTO: auto.acknowledged carries every pending text and the
+    snapshot versions; the machine returns to exactly OPEN; auto.resumed
+    is written; the D2 revision runs (the agenda reprioritises through
+    the CDS, no new mechanism). Then the SAME action text re-fires on the
+    next pass and pauses again — a fresh acknowledgement is needed, and
+    both are on the record."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
+    _engine_with_alarms(engine, {2: [ECG], 3: [ECG], 4: []})
+    with live(gate) as s:
+        _pause_from_open(s, engine, monkeypatch)
+        assert s.auto["controller"].paused_from.value == "open"
+        seen = _ack(s, "resume")
+        assert seen[-1]["type"] == "auto_acknowledged"
+        assert seen[-1]["resolution"] == "resume" and seen[-1]["actions"] == ["Bedside ECG now"]
+        assert seen[-1]["phase"] == "open"
+        assert s.phase.value == "open", "the exact prior phase"
+        assert s.auto["controller"].pending_actions == frozenset()
+        assert s.auto["controller"].acknowledged_actions == frozenset({"Bedside ECG now"})
+        assert s.auto["revision"] in ("requested", "running"), "the D2 revision is asked for at once"
+        # The revision (pass 3) re-fires the SAME text: paused again — the
+        # ratchet — and needs a fresh acknowledgement.
+        for _ in range(30):
+            if s.phase.value == "paused_urgent":
+                break
+            s.probe()
+        assert s.phase.value == "paused_urgent"
+        assert s.auto["controller"].pending_actions == frozenset({"Bedside ECG now"})
+        seen = _ack(s, "resume")
+        assert seen[-1]["type"] == "auto_acknowledged"
+        assert s.phase.value == "open"
+        cid = _stop(s)
+    acks = _audit("auto.acknowledged", s.session_id)
+    assert [a["resolution"] for a in acks] == ["resume", "resume"]
+    assert acks[0]["actions"] == ["Bedside ECG now"] and acks[0]["assessment_versions"] == [2]
+    assert acks[1]["assessment_versions"] == [3]
+    assert acks[0]["paused_from"] == "open"
+    resumed = _audit("auto.resumed", s.session_id)
+    assert [r["phase"] for r in resumed] == ["open", "open"]
+    phases = [(d["from"], d["to"], d["trigger"]) for d in _audit("auto.phase", s.session_id)]
+    assert phases.count(("paused_urgent", "open", "acknowledge_resume")) == 2
+    assert phases.count(("open", "paused_urgent", "urgent_alarm")) == 2
+    # The consultation-linked summary carries both, for the review page.
+    from app import audit as audit_mod
+    summary = asyncio.run(audit_mod.for_subject("consultation", cid, "auto.acknowledgements"))
+    assert len(summary) == 1
+    assert [a["resolution"] for a in summary[0]["detail"]["acknowledgements"]] == ["resume", "resume"]
+
+
+def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeypatch):
+    """A pause does not restart the golden window: the seconds spent before
+    it count. With a 0 s window, the resumed GOLDEN exits at the next turn
+    end without waiting another window."""
+    monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: []})
+    with live(gate) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)
+        assert s.phase.value == "paused_urgent" and s.auto["controller"].paused_from.value == "golden"
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        assert s.auto["golden_spent"] >= 0.0
+        s.commit_transcript("and that is all")
+        s.quiet(3.2)
+        s.probe()
+        assert s.phase.value == "open"
+        _stop(s)
+
+
+def test_take_over_is_terminal_and_standard_mode_works(gate, monkeypatch):
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
+    _engine_with_alarms(engine, {2: [ECG, CALL], 3: [ECG]})
+    with live(gate) as s:
+        _pause_from_open(s, engine, monkeypatch)
+        seen = _ack(s, "take_over")
+        assert seen[-1]["type"] == "auto_acknowledged" and seen[-1]["resolution"] == "take_over"
+        assert sorted(seen[-1]["actions"]) == ["Bedside ECG now", "Call 999"]
+        assert s.phase.value == "taken_over"
+        toggled = [m for m in s.probe() if m.get("type") == "auto_toggled"]
+        # (the auto_toggled echo came right after auto_acknowledged)
+        # Standard mode: a tap works, quiet earns nothing, a further alarm
+        # pauses nothing, and no auto event but auto-off is legal.
+        s.quiet(5.0)
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
+        version = s.entry["agenda"].current_version
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": version, "index": 0}}))
+        ready = _until(s.ws, {"speak_ready"})
+        s.play(ready["utterance_id"])
+        _fire_pass(s, LONG)                              # pass 3: alarm again → nothing
+        assert s.phase.value == "taken_over"
+        # Acknowledging again is refused: nothing is paused.
+        seen = _ack(s, "resume")
+        assert seen[-1]["type"] == "auto_refused" and "not paused" in seen[-1]["detail"]
+        cid = _stop(s)
+    assert len(_audit("auto.takeover", s.session_id)) == 1
+    assert _audit("auto.acknowledged", s.session_id)[0]["resolution"] == "take_over"
+    assert len(_audit("auto.paused", s.session_id)) == 1, "no pause after take-over"
+    # Unresolved at Stop still flows to the review banner exactly as today.
+    from app import consultations
+    review = asyncio.run(consultations.get_consultation(cid))
+    assert {a["action"] for a in review["urgent_actions"]} == {"Bedside ECG now"}
+    assert review["urgent_ack_at"] is None, "the live ack does not pre-acknowledge the review banner"
+
+
+def test_the_review_payload_shows_the_live_acknowledgements_and_keeps_the_gate(gate, monkeypatch):
+    """Display only: the review payload carries who/when/which texts under
+    its own key, and the acknowledge-gated banner's data is untouched —
+    urgent_actions present, urgent_ack_at null, so approval is still gated."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
+    _engine_with_alarms(engine, {2: [ECG]})
+    with live(gate) as s:
+        _pause_from_open(s, engine, monkeypatch)
+        _ack(s, "take_over")
+        user = s.entry["user"]
+        cid = _stop(s)
+    from auto_harness import _client_for
+    client = _client_for(user)
+    payload = client.get(f"/api/consultations/{cid}").json()
+    acks = payload["live_acknowledgements"]
+    assert len(acks) == 1
+    assert acks[0]["resolution"] == "take_over"
+    assert acks[0]["actions"] == ["Bedside ECG now"]
+    assert acks[0]["username"] == user["username"]
+    assert acks[0]["at"] and acks[0]["assessment_versions"] == [2]
+    assert [a["action"] for a in payload["urgent_actions"]] == ["Bedside ECG now"]
+    assert payload["urgent_ack_at"] is None
+    # And a consultation with no live acks carries an empty list, not an error.
+    with live(gate, user) as s2:
+        s2.disclose()
+        cid2 = _stop(s2)
+    assert _client_for(user).get(f"/api/consultations/{cid2}").json()["live_acknowledgements"] == []
+
+
+def test_acknowledgement_refusals_are_answered(gate):
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        seen = _ack(s, "resume")                          # not paused
+        assert seen[-1]["type"] == "auto_refused" and "not paused" in seen[-1]["detail"]
+        s.ws.send_text(json.dumps({"type": "auto_ack", "resolution": "ignore"}))
+        seen = _collect_until(s.ws, {"auto_refused"})
+        assert "resolution" in seen[-1]["detail"]
+        _stop(s)
+
+
+def test_the_reconnect_echo_carries_the_pending_texts_while_paused(gate):
+    engine = gate.cds_engine
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG, CALL]})
+    from auto_harness import _client_for, _make_user
+    user = _make_user()
+    with live(gate, user) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)
+        assert s.phase.value == "paused_urgent"
+        session_id = s.session_id
+    client = _client_for(user)
+    with client.websocket_connect("/ws/transcribe") as ws2:
+        ws2.send_json({"session_id": session_id, "resume": True})
+        seen = _collect_until(ws2, {"auto_toggled"})
+        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "paused_urgent",
+                            "pending": ["Bedside ECG now", "Call 999"]}
+        ws2.send_text("stop")
+        _until(ws2, {"done"})

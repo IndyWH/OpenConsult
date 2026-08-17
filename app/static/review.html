@@ -24,6 +24,13 @@
   /* Flag tier: AMBER, deliberately — red stays urgency-only (the design
      system's rule). Same layout, same acknowledge gate, different tier. */
   .urgency.flagged .icon, .urgency.flagged h3 { color: var(--amber-ink, #8a6d1a); }
+  /* Phase 7c slice 5: live acknowledgements — a record, not an alert. */
+  .liveacks { margin: .6rem 0 0; font-size: .86rem; color: var(--ink-soft); }
+  .liveacks h3 { margin: 0 0 .2rem; font-size: .9rem; color: var(--ink); }
+  .liveacks ul { margin: 0; padding-left: 1.1rem; }
+  .liveacks li { margin-bottom: .25rem; }
+  .liveacks .who { font-weight: 600; color: var(--ink); }
+  .liveacks .texts { display: block; font-size: .84rem; }
 
   /* SOAP note */
   .soap h3 { font-family: var(--serif); font-size: 1.02rem; margin: 1rem 0 .35rem; }
@@ -184,6 +191,11 @@
          the same semantics as the urgency banner; no new colour meaning. -->
     <div class="urgency" id="qualityBanner" style="display:none"></div>
     <div class="urgency" id="urgentBanner" style="display:none"></div>
+    <!-- Phase 7c slice 5: the LIVE acknowledgements of urgency pauses
+         (RESUME AUTO / TAKE OVER during the session), read from the audit
+         trail — who, when, which action texts. Display only: no button, no
+         gate; the acknowledge-gated banner above is exactly as it was. -->
+    <div class="liveacks" id="liveAcks" style="display:none"></div>
 
     <!-- 1. DRAFT NOTE — the document the doctor is here to sign -->
     <div class="pane">
@@ -682,6 +694,7 @@ async function refresh() {
     state.connection_lost ? '' : 'none';
   renderQualityBanner();
   renderUrgentBanner();
+  renderLiveAcks();
   renderSingleVoiceBanner();
   renderLabelsBanner();
   renderTranscript();
@@ -976,6 +989,33 @@ function renderUrgentBanner() {
   if (!state.urgent_ack_at) {
     banner.appendChild(ackButton('acknowledge-urgent'));
   }
+}
+
+// Phase 7c slice 5: live acknowledgements of urgency pauses, from the
+// audit trail (auto.acknowledgements, written at session end). Shown when
+// they exist, whether or not an alarm is still unresolved. DISPLAY ONLY —
+// nothing here touches the Approve button or any acknowledgement gate;
+// an unresolved-at-Stop alarm still gates approval exactly as above.
+function renderLiveAcks() {
+  const box = document.getElementById('liveAcks');
+  const acks = state.live_acknowledgements || [];
+  if (!acks.length) { box.style.display = 'none'; return; }
+  box.style.display = '';
+  box.innerHTML = '';
+  box.appendChild(el('h3', null, 'Urgency pauses acknowledged live during the session'));
+  const list = el('ul');
+  for (const a of acks) {
+    const li = el('li');
+    li.appendChild(el('span', 'who',
+      (a.resolution === 'take_over' ? 'TAKE OVER' : 'RESUME AUTO') + ' — ' +
+      (a.display_name || a.username || 'the doctor')));
+    li.appendChild(document.createTextNode(
+      (a.at ? ' at ' + String(a.at).slice(11, 16) + ' UTC' : '') +
+      (a.at_audio_s != null ? ` (${fmt(a.at_audio_s)} of the recording)` : '')));
+    li.appendChild(el('span', 'texts', 'Covered: ' + (a.actions || []).join(' · ')));
+    list.appendChild(li);
+  }
+  box.appendChild(list);
 }
 
 // One acknowledge button, three banners. Each renderer draws itself and

@@ -74,6 +74,23 @@ async def latest_detail(action: str, user_id: int) -> dict | None:
     return row[0] if row else None
 
 
+async def for_subject(subject_type: str, subject_id: int, action: str) -> list[dict]:
+    """Every row of one action about one subject, oldest first, with who
+    wrote it. Added for the review page's live-acknowledgement display
+    (Phase 7c slice 5): display only, read from the trail, no gate."""
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        rows = await (
+            await conn.execute(
+                "SELECT a.at, u.username, u.display_name, a.detail"
+                " FROM audit_event a LEFT JOIN app_user u ON u.id = a.user_id"
+                " WHERE a.subject_type = %s AND a.subject_id = %s AND a.action = %s"
+                " ORDER BY a.id", (subject_type, subject_id, action),
+            )
+        ).fetchall()
+    return [{"at": str(r[0]), "username": r[1], "display_name": r[2], "detail": r[3]}
+            for r in rows]
+
+
 async def recent(limit: int = 200) -> list[dict]:
     async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
         rows = await (
