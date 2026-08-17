@@ -5571,3 +5571,33 @@ and `08`'s audit claim gains events rather than losing any.
 
 **Not touched:** `help/`, `vendor/`, `OPEN_CLOSED_RULE.md`;
 `PHASE_7C_EVAL_PREREG.md` only by amendment A1 (slice 3).
+
+## Phase 7c closing micro-slice — the help/ wording and the last spec truth-up (2026-08-17)
+
+**The six flagged help/ sentences are resolved.** Five owner-approved
+replacements applied verbatim, character for character, reflowed to each
+file's line width, nothing else in any article changed (`5c95a43`):
+`help/01` §3 (tap-to-ask now also names auto mode; the sequence diagram's
+participant reads "Doctor taps — or auto mode plans — a question"),
+`help/02` Step 2 item 3 (the Auto switch, the Hand over control, the
+status line), `help/02` Step 3 (the assistant taking the history; an alarm
+pausing its questioning until acknowledged, re-pausing if the same concern
+fires again), `help/04` (MedGemma's two small pacing judgements). The
+sixth — `help/05`'s "one consultation keeps that model busy roughly a
+third of the time" — is **held, by owner decision**, until the figure is
+re-measured in the mock-patient round.
+
+**The GOLDEN-handover spec truth-up recorded** in `PHASE_7C_SPEC.md` §6
+(this commit): from GOLDEN a doctor's Handover goes straight to the
+handover sequence with no return path — the machine has no edge back from
+HANDOVER, and a doctor handing over during the golden minutes is taking
+the consultation back; the agenda-refill return applies in the question
+phases.
+
+**The phase's written record is now closed.** Spec, prereg amendment A1,
+HANDOVER entries per slice, and the help series are consistent with the
+build. **The gate is unchanged**: `AUTO_MODE_ENABLED` ships false; enabling
+auto mode is the owner's act, after barge-in calibration and the
+mock-patient-round review, and nothing in the build advances either. The
+next restart begins recording `assessment_snapshot` rows regardless of the
+flag (schema-level, nothing the doctor can see).

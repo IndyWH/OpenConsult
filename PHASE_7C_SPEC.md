@@ -196,6 +196,11 @@ If the anything-else answer refills the agenda on its
 post-answer revision, the flow returns to the question phases
 and handover waits; the anything-else phrase is spoken at most
 once per session.
+From GOLDEN, a doctor's Handover goes straight to the handover
+sequence with no return path — the machine has no edge back from
+HANDOVER, and a doctor handing over during the golden minutes is
+taking the consultation back. The agenda-refill return applies in
+the question phases. (Recorded 2026-08-17 at slice-6 review.)
 
 ## 7. Urgency pause protocol
 
