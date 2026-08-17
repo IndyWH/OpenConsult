@@ -5443,3 +5443,131 @@ does — for the owner and Cowork to confirm or overrule:**
 **Not touched:** `help/`, `vendor/`, the two FROZEN documents. Help
 articles unaffected while the gate is down; the review page's new
 live-acknowledgement block appears only for sessions that had one.
+
+## Phase 7c — BUILD COMPLETE across six slices, dark (2026-08-17)
+
+**The phase is built.** Supervised auto history-taking exists end to end
+— the pure phase machine, the auto speak path, turn-taking through the
+golden minutes, the question phases (D1 topic call, D2 strict-revise, D3
+topic-scoped cone), the urgency pause protocol with its ratchet, and the
+UI (Auto pill, phase indicator, Handover control, pause banner). **All of
+it is DARK behind `AUTO_MODE_ENABLED=false`**: with the flag false the
+running app behaves exactly as it did before 7c, with the one
+schema-level exception below. Nothing here has been used in a room.
+
+**The gate, stated plainly one more time.** Enabling auto mode is the
+OWNER'S act, after barge-in calibration
+(`scripts/calibrate_barge_in.py` meeting D5) and the mock-patient-round
+review — and NOTHING in this build advances either. The flag is a config
+boundary in the `BARGE_IN_ENABLED` pattern; 7c must not arrive by drift.
+
+**What the next restart changes regardless of the flag:** the
+`assessment_snapshot` table begins recording one row per CDS revision of
+every live session (version, moment, audio position, urgent, action
+texts) — a small insert per ~17 s pass, nothing the doctor can see. The
+table is created by schema setup at startup like every other.
+
+**The six slices, by commit:**
+
+| slice | commits |
+|---|---|
+| 1 — spec + pure state machine | `e490668` spec, `fd83191` `app/auto_mode.py`, `1faf4d3` tests, `3238dd6` record |
+| 2 — the auto speak path | `12cc301` spec touch-up, `136dd54` server, `c0b7f56` client + keystone, `8945edd` record |
+| 3 — turn-taking through GOLDEN | `ff08a1e` config + prereg A1, `18a33d2` quiet reporter, `8e6f722` officer, `e6b57f7` GOLDEN loop, `30b2e27` record |
+| 4 — the question phases | `f83f2c2` spec truth-ups, `841e76d` one-tap start, `2a4a7b2` topic call, `c9c5ff9` question flow, `6bf517f` record |
+| 5 — the urgency pause protocol | `f37fb42` server stop, `39116ca` snapshots, `30620f5` the pause, `f568130` banner + acks, `fb127d6` record |
+| 6 — UI, the resume fix, the record | `87ff105` resume fix + spec, `254831e` Auto pill, `799741f` phase indicator + Handover, this entry |
+
+Suite at the end of the phase: 938 passed (from 689 before slice 1).
+
+**Slice 6.** The RESUME AUTO fix (owner decision 2026-08-17, spec §7
+extended verbatim in `87ff105`): on resume no immediate revision is
+requested — the alarm-bearing pass's agenda already carries the alarm's
+clarifying questions, so clarification gets exactly one answer's chance
+before urgency re-evaluates at the next post-answer revision, clearing
+the alarm or re-pausing under the ratchet; the slice-5 test that
+expected the immediate revision was deliberately repinned. The Auto pill
+(`254831e`): beside Sound check and Face, labelled, server-confirmed via
+the `auto_toggled` echo, hidden entirely when `speech_config` carries no
+auto block, one tap on = the one-tap start, one tap off = immediate. The
+phase indicator and the Handover control (`799741f`): every transition
+is pushed live as `auto_phase`; the status line names the phase (Golden
+minutes / Open questions / Closed questions / Paused — urgent / Handing
+over); the Handover control, visible only while listening, starts the
+wired anything-else → answer → examination-handover sequence, audited
+`auto.doctor_handover`. All three under the standing rules, pinned in
+`tests/test_standing_rules.py`.
+
+**Where the governing sections did not fully decide in slice 6:**
+
+- **The doctor's Handover from GOLDEN.** The machine's edge
+  `(GOLDEN, handover_requested) → HANDOVER` is immediate and HANDOVER has
+  no edge back to OPEN, so from GOLDEN the two phrases are spoken from
+  HANDOVER as a fixed sequence with NO agenda-refill return path; from
+  OPEN/CLOSED the sequence runs exactly as the agenda-empty path does,
+  refill return included, and the machine fires `handover_requested`
+  (the doctor asked) when the examination handover plays through. The
+  prompt's "the agenda-refill return path applies to it identically"
+  therefore holds in the question phases and cannot in GOLDEN without a
+  machine change — flagged, not improvised.
+- **`auto.doctor_handover`** is the audit event for the doctor's tap (an
+  intervention, hard rule 5); `auto.handover` carries `requested_by`
+  (`doctor` | `agenda_empty`).
+- After a resume the alarm-bearing question may be asked before any
+  answer, and a verbatim ask narrows OPEN → CLOSED — so the second pause
+  of a ratchet cycle can leave CLOSED and the second resume returns
+  there; correct, and pinned.
+
+**help/ — sentences the completed phase makes untrue once the flag
+flips (REPORT ONLY; nothing in `help/` was edited; the owner writes any
+replacement wording, and nothing in this build waits on it):**
+
+1. `help/01-a-consultations-journey.md` §3 — *"The doctor can tap a
+   suggested question and the app asks it aloud — after telling the
+   patient, in a fixed disclosure, that it is a computer."* — With auto
+   mode on, the app also invites, encourages and asks questions of its
+   own choosing with no tap (code-owned phases; the CDS agenda;
+   owner-approved templates); the disclosure still comes first, but the
+   app itself speaks it at the one-tap start. (The section's sequence
+   diagram, "Doctor taps a question", has the same gap.)
+2. `help/02-using-it-step-by-step.md` Step 2 — *"Everything lives on this
+   one screen. Matching the numbers on the picture:"* and item 3, *"Face
+   switch and Stop. The face can be turned on or off at any time; Stop
+   ends the consultation and starts the write-up."* — With the flag on,
+   the control row also carries the Auto pill (Auto: on/off) and, while
+   auto mode is listening, the Hand over control; the status line shows
+   the auto phase; the numbered picture and list no longer show
+   everything on the screen.
+3. `help/02-using-it-step-by-step.md` Step 3 — *"Talk to the patient
+   normally. The transcript streams in, questions come and go as they are
+   answered, and the differential revises itself as evidence arrives."* —
+   With auto mode on, the machine takes the history (invitation, golden
+   minutes with encouragers only, then its own questions one at a time,
+   then the examination handover) and the doctor supervises; questions
+   are asked aloud by the machine, not only tapped.
+4. `help/02-using-it-step-by-step.md` Step 3 — *"The banner is a prompt
+   to the doctor, not an instruction, and it clears when the transcript
+   shows the action arranged."* — With auto mode on, an alarm also PAUSES
+   auto mode: the urgent panel then carries the pause banner (every
+   pending action text, RESUME AUTO / TAKE OVER) and stays until the
+   doctor acknowledges, even if a later revision clears the list; the
+   ratchet re-pauses on a re-fire after a resume.
+5. `help/04-the-architecture.md` — *"MedGemma 27B does the differential,
+   the red-flag watch, the guideline summaries, the note and the letters
+   — as separate calls with separate rules, never as one conversation."*
+   — Two more calls join that list under auto mode: the end-of-turn
+   officer and the topic call (both stateless, temperature 0, same
+   context length, fail-soft).
+6. `help/05-why-one-consultation-at-a-time.md` — *"One consultation keeps
+   that model busy roughly a third of the time."* — Under auto mode's
+   strict-revise posture a CDS pass runs after every answer, plus the
+   officer and topic calls; the measured third will not hold and needs
+   re-measuring before the promise about the alarm is restated.
+
+Nothing in `help/00-introduction.md`, `03`, `06`, `07`, `08` or `09` is
+made false: `06`'s guarantees (reference-only speech, server-side
+disclosure, code clears the alarm) hold on the auto path by construction,
+and `08`'s audit claim gains events rather than losing any.
+
+**Not touched:** `help/`, `vendor/`, `OPEN_CLOSED_RULE.md`;
+`PHASE_7C_EVAL_PREREG.md` only by amendment A1 (slice 3).
