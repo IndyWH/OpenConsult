@@ -5348,3 +5348,98 @@ does — for the owner and Cowork to confirm or overrule:**
 
 **Not touched:** `help/`, `vendor/`, the two FROZEN documents. No help
 article is made untrue: nothing user-visible changes with the gate down.
+
+## Phase 7c slice 5 — the urgency pause protocol wired (2026-08-17)
+
+**What landed.** Hard rule 2 is machinery now: an urgent alarm while auto
+mode is listening pauses it, cuts what it was saying, shows every
+pending action text on a banner in the alarm's home, and waits for the
+doctor's RESUME AUTO or TAKE OVER — the ratchet in force. Still DARK
+behind `AUTO_MODE_ENABLED=false`, with ONE schema-level exception noted
+below. Needs a restart to be live.
+
+- `f37fb42` — the server-initiated stop: `auto_stop` (with the reason)
+  handled by the client through exactly the Esc/Stop path; a stop that
+  lands before playback declines the play command; server helper
+  `cancel_auto_playback` closes the window at the cut, resolves the row
+  with the named reason (unstarted → reason, no span), clears the queue,
+  and recognises the client's echoed `speak_ended`. Cuts tap or auto.
+- `39116ca` — `assessment_snapshot` (`app/assessment_snapshots.py`, in
+  the schema ordering after consultations): one row per CDS revision —
+  version, the revision's own moment, audio position, urgent, the action
+  texts — buffered in the session, persisted at completion beside the
+  utterances, cascading on delete including the #469 void-and-purge
+  path. Read by nothing yet (metric 7, replay, the review page later).
+- `30620f5` — the pause: a pass returning non-empty `urgent_actions`
+  while in GOLDEN/OPEN/CLOSED fires `controller.urgent_alarm`, cuts the
+  current and queued auto utterances (`urgency_pause`), stands the
+  officer down, audits `auto.paused` (texts, every pending text, the
+  snapshot version, the transition, re-fire flag) and sends `auto_pause`
+  with EVERY pending text; a re-fire widens (the machine's self-edge,
+  audited); listening continues; auto off / other phases untouched; the
+  face untouched (guard tests unchanged). Golden seconds spent before a
+  pause are kept.
+- `f568130` — the banner (inside the urgent panel in the sticky row,
+  lists every pending text, RESUME AUTO / TAKE OVER under the three
+  standing rules), `auto_ack` on the server (`auto.acknowledged` with
+  every text covered + snapshot versions, then `auto.resumed` to the
+  exact prior phase — with the D2 revision requested — or
+  `auto.takeover`, terminal), the ratchet end to end, the reconnect echo
+  carrying pending texts, and the review page's display-only list of
+  live acknowledgements (`live_acknowledgements`, from the
+  `auto.acknowledgements` consultation-linked audit row) beside the
+  untouched acknowledge-gated banner.
+
+Suite 889 → 920.
+
+**Owner decision recorded (2026-08-16):** the silent-patient
+alternating-questions behaviour from slice 4 is accepted for v1 and
+watch-listed for the mock-patient round — no stall guard in this slice.
+
+**Note for the owner — the one change outside the flag.** Once this
+build is restarted, `assessment_snapshot` is written on EVERY CDS
+revision of every live session, auto mode on or off: one small insert
+per ~17 s pass, schema-level, nothing the doctor can see. The table is
+created by schema setup at startup like every other.
+
+**The gate is unchanged.** Barge-in calibration and the mock-patient-round
+review are still owed before `AUTO_MODE_ENABLED` ever flips.
+
+**Where the governing sections did not fully decide, and what the code
+does — for the owner and Cowork to confirm or overrule:**
+
+- **RESUME AUTO in a question phase requests the D2 revision at once.**
+  Under the ratchet, that pass re-fires the same action unless the
+  transcript by then shows it done or arranged (the CDS's arranged
+  latch) — so in practice RESUME is a no-op-and-re-pause until the
+  doctor has dealt with the alarm, and TAKE OVER is the button for
+  "I'll handle this myself". That is the spec's ratchet as written;
+  it is flagged because it will feel sharp in the room. Resuming into
+  GOLDEN does not trigger a pass (the pass comes from transcript
+  growth as before), so a golden-minutes resume holds until the CDS
+  next revises.
+- **The banner lives inside the urgent panel** ("same position class as
+  the urgent panel it accompanies" read literally: the alarm's reserved
+  home). While paused the panel stays even if a later pass clears the
+  CDS list, so the banner never floats without its panel and the doctor
+  can always acknowledge.
+- **`auto_toggled.on` now means "in a live run"** — false after HANDOVER
+  and TAKEN_OVER as well as OFF; the client's quiet reporter follows it.
+  A fresh Auto tap after either restarts through OFF (audited
+  `auto.disabled` via=restart) — the doctor may start a new run.
+- **Auto off while paused drops the pause unacknowledged** (the machine's
+  slice-1 rule); the alarm itself is still in the CDS panel and flows to
+  the review banner at Stop.
+- **The live acknowledgement does not pre-acknowledge the review banner**
+  (`urgent_ack_at` stays null; approval stays gated). The review page
+  shows the live acks as a record beside it — spec §7 says "so the review
+  page can show who acknowledged what, when"; it does not say the gate
+  changes, so it does not.
+- **A cut utterance is never requeued** (unlike a politeness-aborted
+  one): after a resume the fresh revision decides what is asked next.
+- **`speech.spoken` with `server_stop=true`** audits a played-and-cut
+  utterance; an unstarted cut is on its row alone.
+
+**Not touched:** `help/`, `vendor/`, the two FROZEN documents. Help
+articles unaffected while the gate is down; the review page's new
+live-acknowledgement block appears only for sessions that had one.
