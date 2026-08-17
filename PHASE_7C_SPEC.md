@@ -210,6 +210,13 @@ shows a pause banner with the alarm and two buttons:
   agenda naturally reprioritises toward the alarm because the CDS
   already writes clarifying questions for urgent actions; no separate
   reprioritisation mechanism is invented.
+  On resume no immediate revision is requested: the alarm-bearing
+  pass's agenda is the freshest there is and already carries the
+  alarm's clarifying questions, so clarification gets exactly one
+  answer's chance before urgency re-evaluates at the next
+  post-answer revision — clearing the alarm or re-pausing under the
+  ratchet. (Owner decision 2026-08-17, replacing the
+  immediate-re-revision behaviour built in slice 5.)
 - **TAKE OVER** — acknowledges and drops to standard mode
   (`TAKEN_OVER`). One tap, immediate.
 

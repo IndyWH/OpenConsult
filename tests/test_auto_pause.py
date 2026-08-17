@@ -436,12 +436,17 @@ def _pause_from_open(s, engine, monkeypatch, alarm_pass=2, actions=(ECG,)):
 
 
 def test_resume_returns_to_the_exact_prior_phase_and_the_ratchet_re_arms(gate, monkeypatch):
-    """RESUME AUTO: auto.acknowledged carries every pending text and the
-    snapshot versions; the machine returns to exactly OPEN; auto.resumed
-    is written; the D2 revision runs (the agenda reprioritises through
-    the CDS, no new mechanism). Then the SAME action text re-fires on the
-    next pass and pauses again — a fresh acknowledgement is needed, and
-    both are on the record."""
+    """REPINNED for the owner decision of 2026-08-17 (spec §7 as amended):
+    slice 5 built an immediate re-revision on resume, which re-paused before
+    any answer could be given; that property is deliberately replaced, not
+    weakened. RESUME AUTO: auto.acknowledged carries every pending text and
+    the snapshot versions; the machine returns to exactly OPEN; auto.resumed
+    is written; NO revision is requested — the next ask is planned from the
+    alarm-bearing pass's agenda (its clarifying question), asked at the next
+    turn end. Then the answer's turn end runs the D2 revision as always;
+    here it leaves the alarm standing, so the SAME text re-fires and pauses
+    again — the ratchet — needing a fresh acknowledgement; both are on the
+    record."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
@@ -449,6 +454,7 @@ def test_resume_returns_to_the_exact_prior_phase_and_the_ratchet_re_arms(gate, m
     with live(gate) as s:
         _pause_from_open(s, engine, monkeypatch)
         assert s.auto["controller"].paused_from.value == "open"
+        passes_before = len(engine.updates)
         seen = _ack(s, "resume")
         assert seen[-1]["type"] == "auto_acknowledged"
         assert seen[-1]["resolution"] == "resume" and seen[-1]["actions"] == ["Bedside ECG now"]
@@ -456,34 +462,100 @@ def test_resume_returns_to_the_exact_prior_phase_and_the_ratchet_re_arms(gate, m
         assert s.phase.value == "open", "the exact prior phase"
         assert s.auto["controller"].pending_actions == frozenset()
         assert s.auto["controller"].acknowledged_actions == frozenset({"Bedside ECG now"})
-        assert s.auto["revision"] in ("requested", "running"), "the D2 revision is asked for at once"
-        # The revision (pass 3) re-fires the SAME text: paused again — the
-        # ratchet — and needs a fresh acknowledgement.
+        assert s.auto["revision"] is None, "no immediate revision on resume (owner decision 2026-08-17)"
+        # The clarifying question from the ALARM-BEARING pass is asked at
+        # the next turn end, with no new pass having run.
+        s.commit_transcript("okay")                       # the room speaks again; a turn ends
+        s.quiet(3.2)
+        s.probe()
+        ask = s.wait_for_auto_speak()
+        assert ask["text"] == "Any nausea?"
+        assert len(engine.updates) == passes_before, "asked from the pass in hand, not a new one"
+        s.play(ask["utterance_id"])
+        # The answer's turn end runs the D2 revision (pass 3): the alarm is
+        # still there → the SAME text re-fires → paused again, fresh ack.
+        s.turn_end("No, no nausea.")
         for _ in range(30):
             if s.phase.value == "paused_urgent":
                 break
             s.probe()
         assert s.phase.value == "paused_urgent"
+        assert len(engine.updates) == passes_before + 1
         assert s.auto["controller"].pending_actions == frozenset({"Bedside ECG now"})
         seen = _ack(s, "resume")
         assert seen[-1]["type"] == "auto_acknowledged"
-        assert s.phase.value == "open"
+        # The verbatim ask had narrowed OPEN → CLOSED, so the second pause
+        # left CLOSED and the second resume returns exactly there.
+        assert s.phase.value == "closed"
         cid = _stop(s)
     acks = _audit("auto.acknowledged", s.session_id)
     assert [a["resolution"] for a in acks] == ["resume", "resume"]
     assert acks[0]["actions"] == ["Bedside ECG now"] and acks[0]["assessment_versions"] == [2]
     assert acks[1]["assessment_versions"] == [3]
-    assert acks[0]["paused_from"] == "open"
+    assert [a["paused_from"] for a in acks] == ["open", "closed"]
     resumed = _audit("auto.resumed", s.session_id)
-    assert [r["phase"] for r in resumed] == ["open", "open"]
+    assert [r["phase"] for r in resumed] == ["open", "closed"]
     phases = [(d["from"], d["to"], d["trigger"]) for d in _audit("auto.phase", s.session_id)]
-    assert phases.count(("paused_urgent", "open", "acknowledge_resume")) == 2
-    assert phases.count(("open", "paused_urgent", "urgent_alarm")) == 2
+    assert phases.count(("paused_urgent", "open", "acknowledge_resume")) == 1
+    assert phases.count(("paused_urgent", "closed", "acknowledge_resume")) == 1
+    assert phases.count(("open", "paused_urgent", "urgent_alarm")) == 1
+    assert phases.count(("closed", "paused_urgent", "urgent_alarm")) == 1
     # The consultation-linked summary carries both, for the review page.
     from app import audit as audit_mod
     summary = asyncio.run(audit_mod.for_subject("consultation", cid, "auto.acknowledgements"))
     assert len(summary) == 1
     assert [a["resolution"] for a in summary[0]["detail"]["acknowledgements"]] == ["resume", "resume"]
+
+
+def test_after_resume_a_clarifying_answer_that_clears_the_alarm_continues_normally(gate, monkeypatch):
+    """The one answer's chance, taken: the clarifying question is asked from
+    the alarm-bearing agenda, the answer's revision comes back with no
+    urgent actions, and the flow simply carries on to the next question —
+    no pause, no second acknowledgement."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"],
+                      ["How have you been sleeping?"]]
+    _engine_with_alarms(engine, {2: [ECG], 3: []})
+    with live(gate) as s:
+        _pause_from_open(s, engine, monkeypatch)
+        _ack(s, "resume")
+        s.commit_transcript("okay")
+        s.quiet(3.2)
+        s.probe()
+        ask = s.wait_for_auto_speak()
+        assert ask["text"] == "Any nausea?"                # the alarm-bearing pass's question
+        s.play(ask["utterance_id"])
+        s.turn_end("No — and the ECG is being done now.")  # pass 3: alarm cleared
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        assert s.phase.value in ("open", "closed")
+        _stop(s)
+    assert len(_audit("auto.paused", s.session_id)) == 1
+    assert len(_audit("auto.acknowledged", s.session_id)) == 1
+
+
+def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monkeypatch):
+    """After a resume nothing re-fires by itself: no revision runs until an
+    answer's turn ends, so the machine cannot bounce pause → ack → pause
+    on its own. Quiet reports and loop ticks alone leave it in OPEN with
+    the alarm-bearing question queued and no new pass."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
+    _engine_with_alarms(engine, {2: [ECG], 3: [ECG]})
+    with live(gate) as s:
+        _pause_from_open(s, engine, monkeypatch)
+        passes = len(engine.updates)
+        _ack(s, "resume")
+        assert s.phase.value == "open"
+        for _ in range(12):                                # ticks and quiet, no speech
+            s.probe()
+            s.quiet(2.0 + _ * 0.3)
+        assert s.phase.value == "open"
+        assert len(engine.updates) == passes, "no pass ran without an answer"
+        assert len(_audit("auto.paused", s.session_id)) == 1
+        _stop(s)
 
 
 def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeypatch):

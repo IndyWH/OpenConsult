@@ -2739,10 +2739,13 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         on the banner (the slice-2 hard requirement); an acknowledgement
         never covers what was not shown. Then:
         - resume: controller.acknowledge_and_resume returns to the exact
-          prior phase, audited auto.resumed; in a question phase the D2
-          revision is asked for at once — the agenda reprioritises itself
-          through the CDS (spec §7), no new mechanism. The ratchet is the
-          machine's: the same action re-firing pauses again.
+          prior phase, audited auto.resumed; in a question phase the next
+          ask is planned from the alarm-bearing pass's agenda — no
+          revision is requested first (owner decision 2026-08-17): that
+          agenda already carries the alarm's clarifying questions, and
+          urgency re-evaluates at the next post-answer revision. The
+          ratchet is the machine's: the same action re-firing pauses
+          again and needs a fresh acknowledgement.
         - take_over: controller.acknowledge_and_take_over — TAKEN_OVER,
           terminal for the auto run — audited auto.takeover; the session
           continues in standard mode with all of today's behaviour.
@@ -2783,7 +2786,17 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              "actions": covered, "at_audio_s": round(session.audio_seconds, 1)})
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False)
             if ctl.phase in auto_mode.QUESTION_PHASES:
-                _request_revision(auto, "resumed after pause")
+                # Owner decision 2026-08-17 (spec §7 as amended): NO immediate
+                # revision. The alarm-bearing pass's agenda is the freshest
+                # there is and already carries the alarm's clarifying
+                # questions, so clarification gets exactly one answer's
+                # chance; urgency re-evaluates at the next post-answer
+                # revision as D2 always does — clearing the alarm, or
+                # re-pausing under the ratchet. Replaces slice 5's
+                # immediate re-revision, which re-paused before any answer
+                # could be given.
+                _plan_from_agenda(auto, entry["agenda"].current_version,
+                                  why="resumed after pause")
         else:
             transition = ctl.acknowledge_and_take_over()
             await auto_transition(transition, detail={"actions": covered})
