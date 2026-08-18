@@ -582,6 +582,14 @@ def wav_duration_ms(wav_bytes: bytes) -> int:
 
 # --- barge-in threshold scale (Part 10 amendment, 2026-07-30) ---------------
 
+# How far the detector-stream residual PEAK may exceed the main-stream raw
+# PEAK before that is treated as an anomaly rather than the expected
+# window-length effect: the main analyser's fftSize 2048 (~43 ms) against
+# the residual analyser's 512 (~11 ms) bounds the ratio of same-signal
+# peaks at sqrt(4) = 2 (see barge_in_scale). Observed 2026-08-18: x1.3–1.9.
+RESIDUAL_EXCESS_MAX = 2.0
+
+
 def barge_in_scale(detail: dict | None) -> dict:
     """The threshold scale for the client, from the newest sound-check row.
 
@@ -591,21 +599,42 @@ def barge_in_scale(detail: dict | None) -> dict:
     residual, not the raw loopback — measured on this room, raw loopback
     (0.30–0.58 RMS) towers over quiet speech (0.056), a gap no raw-derived
     threshold can bridge. The raw loopback is retained as a SANITY UPPER
-    BOUND: a residual above it is physically wrong (a canceller only
-    removes), so the value is clamped to raw and the anomaly reported for
-    the caller to audit. Rows without a residual fall back to the raw
-    figure — conservative, since its failure direction is a miss, which
-    is hard mute.
+    BOUND and the value is always clamped to it. Rows without a residual
+    fall back to the raw figure — conservative, since its failure
+    direction is a miss, which is hard mute.
+
+    A residual peak ABOVE the raw peak is NOT, by itself, physically
+    wrong (revised 2026-08-18 after the read-only analysis of that day's
+    batches). The two peaks are not on one scale: the main stream's
+    analyser reads ~43 ms RMS windows (fftSize 2048) with AGC on, the
+    detector stream's ~11 ms windows (fftSize 512) with AGC off, so for
+    the same signal the shorter window's peak can exceed the longer's by
+    up to sqrt(2048/512) = x2, and the un-AGC'd stream keeps a loud
+    onset the main stream compressed — the observed case on most MacBook
+    Air readings (0.24 vs 0.14). Within that bound the excess is the
+    EXPECTED consequence of the measurement, clamped and logged, not
+    audited. Beyond it (RESIDUAL_EXCESS_MAX) it may still be an anomaly —
+    a gain difference or a stream mix-up — and keeps the anomaly audit.
+
+    Returns raw_peak_rms, residual_peak_rms (clamped), `clamped` (the
+    expected excess, or None) and `anomaly` (the unexplained excess, or
+    None); the two are exclusive.
     """
     detail = detail or {}
     raw = detail.get("peak_rms")
     residual = (detail.get("residual") or {}).get("peak_rms")
     anomaly = None
+    clamped = None
     if residual is not None and raw is not None and residual > raw:
-        anomaly = {"residual_peak_rms": residual, "raw_peak_rms": raw}
+        excess = {"residual_peak_rms": residual, "raw_peak_rms": raw,
+                  "ratio": round(residual / raw, 3) if raw > 0 else None}
+        if raw > 0 and residual <= raw * RESIDUAL_EXCESS_MAX:
+            clamped = excess
+        else:
+            anomaly = excess
         residual = raw
     return {"raw_peak_rms": raw, "residual_peak_rms": residual,
-            "anomaly": anomaly}
+            "clamped": clamped, "anomaly": anomaly}
 
 
 # --- playback envelope (Phase 7a session 3, barge-in) -----------------------

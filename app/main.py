@@ -2049,17 +2049,30 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             logger.warning("Could not read sound-check rows for barge-in: %s", exc)
     # Part 10 amendment: the threshold scale is the DETECTOR-stream
     # residual when the row carries one; the raw loopback stays as the
-    # sanity upper bound. A residual above raw is physically wrong — the
-    # value is clamped and the anomaly audited, never silently used.
+    # sanity upper bound and the value is always clamped to it. A residual
+    # above raw within the window-length bound is the expected effect of
+    # the two streams' different analyser windows and AGC (2026-08-18) and
+    # is logged; beyond that bound it is an anomaly and audited — never
+    # silently used either way.
     scale = speech.barge_in_scale(loopback)
     if scale["anomaly"] is not None:
         await audit.log(user["id"], "speech.barge_in_anomaly", None, None,
                         {"kind": "residual_exceeds_raw_loopback",
                          **scale["anomaly"],
                          "device_label": (loopback or {}).get("device_label")})
-        logger.warning("Barge-in scale anomaly for %s: residual %s > raw %s",
+        logger.warning("Barge-in scale anomaly for %s: residual %s > raw %s "
+                       "(x%s — beyond the window-length bound)",
                        user["username"], scale["anomaly"]["residual_peak_rms"],
-                       scale["anomaly"]["raw_peak_rms"])
+                       scale["anomaly"]["raw_peak_rms"], scale["anomaly"]["ratio"])
+    elif scale.get("clamped") is not None:
+        # The expected case (2026-08-18): the shorter-window, un-AGC'd
+        # detector stream peaks above the main stream's peak. Clamped to
+        # raw, logged, not an anomaly.
+        logger.info("Barge-in scale: residual %s > raw %s (x%s) for %s — the "
+                    "window-length/AGC effect; clamped to raw",
+                    scale["clamped"]["residual_peak_rms"],
+                    scale["clamped"]["raw_peak_rms"], scale["clamped"]["ratio"],
+                    user["username"])
     speech_config = {
         "type": "speech_config",
         "silence_nudge_enabled": SILENCE_NUDGE_ENABLED,

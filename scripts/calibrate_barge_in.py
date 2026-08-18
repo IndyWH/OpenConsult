@@ -362,20 +362,39 @@ def assess_device(readings: list[dict], *, margin: float, abs_floor: float,
             "numbers": numbers}
 
 
-def convergence_summary(reading: dict, threshold_loud: float) -> dict | None:
-    """First-window vs settled residual for one dual reading, and whether
-    the FIRST window alone would have crossed the residual-derived
-    threshold. An unconverged canceller at the start of an utterance is
-    the false-stop risk the sustain requirement must cover, so it is
-    stated per reading rather than averaged away."""
+def series_summary(reading: dict, threshold_loud: float) -> dict | None:
+    """An honest readout of one dual reading's residual series — the 250 ms
+    window means the client stores (live.html, RESIDUAL_WINDOW_MS):
+
+    - `pre_onset`: series[0], the first 250 ms. The residual stream is
+      opened BEFORE playback starts, so this window is mostly silence
+      before the first syllable — NOT the canceller's first sight of the
+      echo, and nothing about convergence can be read from it.
+    - `loudest`: the largest 250 ms mean, with its window index — the
+      sustained echo level the detector would actually sit under during
+      the utterance's loud syllables.
+    - `final`: series[-1], the last window, which lies after playback has
+      ended (the sample runs duration + 250 ms) — the post-playback tail,
+      NOT a settled canceller.
+
+    Replaced `convergence_summary` (2026-08-18): that readout called
+    series[0] "first window/unconverged" and min(series) "settled", so it
+    compared two silences and implied a convergence it could not see; the
+    read-only analysis of the 2026-08-18 batches showed the series is the
+    utterance's own speech envelope with residual ≈ raw throughout. This
+    summary makes no convergence claim. `loudest_exceeds` says whether the
+    loudest window mean sits at or above the residual-derived threshold —
+    the sustained (not onset) false-stop risk.
+    """
     series = (reading.get("residual") or {}).get("series") or []
     if not series:
         return None
-    first = float(series[0])
-    settled = min(float(v) for v in series)
-    return {"first": first, "settled": settled,
-            "ratio": first / max(settled, 1e-9),
-            "would_fire": first >= threshold_loud}
+    values = [float(v) for v in series]
+    loudest_index = max(range(len(values)), key=values.__getitem__)
+    return {"pre_onset": values[0], "loudest": values[loudest_index],
+            "loudest_index": loudest_index, "final": values[-1],
+            "windows": len(values),
+            "loudest_exceeds": values[loudest_index] >= threshold_loud}
 
 
 # --- sound-check ratio recommendations --------------------------------------
@@ -519,22 +538,26 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  residual-derived threshold: {n['threshold_loud']:.5f} loud"
                   f" / {n['threshold_worst']:.5f} worst — raw-derived sanity"
                   f" upper bound {n['raw_bound_worst']:.5f}")
-            # Convergence, per reading: an unconverged first utterance is
-            # the false-stop risk the sustain requirement must cover.
+            # The residual series, per reading, read honestly (2026-08-18):
+            # pre-onset window, loudest 250 ms window, post-playback tail.
+            # No convergence is inferred — the series is the utterance's
+            # own envelope through the canceller, and residual ≈ raw.
             for r in usable:
-                curve = convergence_summary(r, n["threshold_loud"])
+                curve = series_summary(r, n["threshold_loud"])
                 if curve is None:
                     continue
-                fired = ("WOULD have crossed the threshold "
-                         f"({n['threshold_loud']:.5f}) — the sustain "
-                         "requirement is what stands between an unconverged "
-                         "canceller and a false stop"
-                         if curve["would_fire"] else
-                         f"would NOT have crossed the threshold "
-                         f"({n['threshold_loud']:.5f})")
-                print(f"    convergence {str(r['at'])[:19]}: first window "
-                      f"{curve['first']:.5f} → settled {curve['settled']:.5f} "
-                      f"(x{curve['ratio']:.1f}); first window {fired}")
+                verdict_txt = ("AT/ABOVE the residual-derived threshold "
+                               f"({n['threshold_loud']:.5f}) — a sustained echo, "
+                               "not an onset transient, is the false-stop risk"
+                               if curve["loudest_exceeds"] else
+                               f"below the residual-derived threshold "
+                               f"({n['threshold_loud']:.5f})")
+                print(f"    series {str(r['at'])[:19]}: pre-onset window "
+                      f"{curve['pre_onset']:.5f} (mostly silence before playback)"
+                      f" · loudest 250 ms window {curve['loudest']:.5f} "
+                      f"(window {curve['loudest_index'] + 1} of {curve['windows']})"
+                      f" · final window {curve['final']:.5f} (post-playback tail);"
+                      f" loudest window {verdict_txt}")
         print(f"  D5 side 1 — false stops <= {D5_FALSE_STOP_MAX:.0%}: "
               f"{_verdict(verdicts['side_a'])}")
         for why in verdicts["side_a_why"]:

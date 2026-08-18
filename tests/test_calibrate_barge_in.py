@@ -186,18 +186,27 @@ def test_a_sustain_requirement_over_the_budget_fails_the_catch_side():
     assert verdicts["numbers"]["predicted_latency_ms"] == 350
 
 
-def test_convergence_summary_flags_a_first_window_that_would_fire():
-    """The unconverged first window is the false-stop risk: the summary
-    says per reading whether it alone would have crossed the threshold."""
-    hot_start = dual(0.010, residual_series=[0.045, 0.012, 0.006, 0.005])
-    curve = calib.convergence_summary(hot_start, threshold_loud=0.020)
-    assert curve["first"] == pytest.approx(0.045)
-    assert curve["settled"] == pytest.approx(0.005)
-    assert curve["would_fire"] is True
-
+def test_series_summary_reads_the_series_honestly_with_no_convergence_claim():
+    """Replaces the convergence readout (2026-08-18). The stored series is
+    250 ms window means over duration + 250 ms with the stream opened
+    BEFORE playback: series[0] is mostly pre-onset silence and series[-1]
+    is the post-playback tail, so "first window → settled" compared two
+    silences and implied a canceller convergence it could not see (the
+    2026-08-18 batches showed the series is the utterance's own envelope,
+    residual ≈ raw throughout). The summary now names the three things it
+    can actually see — pre-onset window, loudest 250 ms window, final
+    window — and whether the loudest sits at or above the residual-derived
+    threshold: the sustained false-stop risk, not an onset one."""
+    row = dual(0.010, residual_series=[0.004, 0.166, 0.043, 0.002, 0.097, 0.065, 0.001])
+    curve = calib.series_summary(row, threshold_loud=0.020)
+    assert curve == {"pre_onset": pytest.approx(0.004), "loudest": pytest.approx(0.166),
+                     "loudest_index": 1, "final": pytest.approx(0.001), "windows": 7,
+                     "loudest_exceeds": True}
+    assert "settled" not in curve and "ratio" not in curve and "would_fire" not in curve
     calm = dual(0.010, residual_series=[0.012, 0.008, 0.006])
-    assert calib.convergence_summary(calm, threshold_loud=0.020)["would_fire"] is False
-    assert calib.convergence_summary(reading(), 0.02) is None
+    assert calib.series_summary(calm, threshold_loud=0.020)["loudest_exceeds"] is False
+    assert calib.series_summary(reading(), 0.02) is None
+    assert not hasattr(calib, "convergence_summary")
 
 
 # --- the --since window -----------------------------------------------------

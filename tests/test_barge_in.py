@@ -139,7 +139,7 @@ def test_the_scale_is_the_residual_when_the_row_carries_one():
     scale = speech.barge_in_scale({"peak_rms": 0.4,
                                    "residual": {"peak_rms": 0.012}})
     assert scale == {"raw_peak_rms": 0.4, "residual_peak_rms": 0.012,
-                     "anomaly": None}
+                     "clamped": None, "anomaly": None}
 
 
 def test_the_scale_falls_back_to_raw_without_a_residual():
@@ -149,17 +149,51 @@ def test_the_scale_falls_back_to_raw_without_a_residual():
     assert scale["residual_peak_rms"] is None
     assert scale["raw_peak_rms"] == 0.4
     assert speech.barge_in_scale(None) == {
-        "raw_peak_rms": None, "residual_peak_rms": None, "anomaly": None}
+        "raw_peak_rms": None, "residual_peak_rms": None,
+        "clamped": None, "anomaly": None}
 
 
-def test_a_residual_above_raw_is_clamped_and_reported():
-    """A canceller only removes: residual > raw is physically wrong.
-    The value is clamped to the raw bound and the anomaly handed back —
-    never silently used, never silently dropped."""
+def test_a_residual_far_above_raw_is_clamped_and_reported_as_an_anomaly():
+    """Beyond what the window-length effect can explain (x2, the sqrt of
+    the two analysers' fftSize ratio), residual > raw is still wrong — a
+    gain difference or a stream mix-up. The value is clamped to the raw
+    bound and the anomaly handed back — never silently used, never
+    silently dropped. (Updated 2026-08-18: this pin used to say ANY excess
+    was physically wrong; see the test below for the expected case.)"""
     scale = speech.barge_in_scale({"peak_rms": 0.1,
                                    "residual": {"peak_rms": 0.3}})
     assert scale["residual_peak_rms"] == 0.1
-    assert scale["anomaly"] == {"residual_peak_rms": 0.3, "raw_peak_rms": 0.1}
+    assert scale["anomaly"] == {"residual_peak_rms": 0.3, "raw_peak_rms": 0.1,
+                                "ratio": 3.0}
+    assert scale["clamped"] is None
+
+
+def test_a_residual_modestly_above_raw_is_the_expected_effect_clamped_not_an_anomaly():
+    """The read-only analysis of the 2026-08-18 batches: on most MacBook
+    Air readings the residual PEAK exceeded the raw PEAK (0.24 vs 0.14)
+    although the residual MEAN sat below the raw mean — because the
+    detector stream's analyser reads ~11 ms windows without AGC and the
+    main stream's ~43 ms windows with AGC, so the two peaks are not one
+    scale and the shorter window's may exceed the longer's by up to x2
+    for the same signal. That is the measurement, not the acoustics: the
+    value is still clamped to raw (the conservative bound, unchanged), the
+    excess is reported as `clamped` for the log, and no anomaly is raised.
+    Deliberately repinned from "any excess is an anomaly"."""
+    assert speech.RESIDUAL_EXCESS_MAX == 2.0
+    scale = speech.barge_in_scale({"peak_rms": 0.131,
+                                   "residual": {"peak_rms": 0.24}})
+    assert scale["residual_peak_rms"] == 0.131                # clamp unchanged
+    assert scale["anomaly"] is None
+    assert scale["clamped"] == {"residual_peak_rms": 0.24, "raw_peak_rms": 0.131,
+                                "ratio": pytest.approx(1.832)}
+    # Exactly at the bound is still the expected case; just over is not.
+    at_bound = speech.barge_in_scale({"peak_rms": 0.1, "residual": {"peak_rms": 0.2}})
+    assert at_bound["clamped"] is not None and at_bound["anomaly"] is None
+    over = speech.barge_in_scale({"peak_rms": 0.1, "residual": {"peak_rms": 0.2001}})
+    assert over["anomaly"] is not None and over["clamped"] is None
+    # residual <= raw: neither.
+    plain = speech.barge_in_scale({"peak_rms": 0.4, "residual": {"peak_rms": 0.4}})
+    assert plain["clamped"] is None and plain["anomaly"] is None
 
 
 # --- audit read: the loopback level -----------------------------------------
@@ -429,9 +463,10 @@ def test_a_missing_residual_is_visible_never_a_silent_zero(barge_env):
 @needs_db
 def test_the_clamp_anomaly_fires_when_residual_exceeds_the_raw_bound(
         barge_env, monkeypatch):
-    """A canceller only removes, so residual > raw is physically wrong:
-    the client receives the clamped value and the anomaly is AUDITED —
-    something wrong must leave a record, not a quietly corrected number."""
+    """Beyond the window-length bound (here x3), residual > raw is still
+    unexplained: the client receives the clamped value and the anomaly is
+    AUDITED — something wrong must leave a record, not a quietly corrected
+    number. (The expected within-bound excess is the next test.)"""
     monkeypatch.setattr(speech, "BARGE_IN_ENABLED", True)
     doctor = _make_user()
     asyncio.run(audit.log(doctor["id"], "speech.sound_check", None, None,
@@ -453,6 +488,36 @@ def test_the_clamp_anomaly_fires_when_residual_exceeds_the_raw_bound(
     assert row[0]["kind"] == "residual_exceeds_raw_loopback"
     assert row[0]["residual_peak_rms"] == pytest.approx(0.3)
     assert row[0]["raw_peak_rms"] == pytest.approx(0.1)
+
+
+@needs_db
+def test_the_expected_excess_is_clamped_and_logged_not_audited(barge_env, monkeypatch, caplog):
+    """The 2026-08-18 MacBook case: residual peak 0.24 over raw 0.131 is the
+    window-length/AGC effect. The client still receives the clamped value
+    (the conservative bound is unchanged); no anomaly row is written; the
+    clamp is logged so it is not silent."""
+    import logging
+    monkeypatch.setattr(speech, "BARGE_IN_ENABLED", True)
+    doctor = _make_user()
+    asyncio.run(audit.log(doctor["id"], "speech.sound_check", None, None,
+                          {"peak_rms": 0.131, "device_label": "MacBook Air Speakers",
+                           "residual": {"peak_rms": 0.24, "series": [0.05, 0.088]}}))
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        before = conn.execute("SELECT count(*) FROM audit_event"
+                              " WHERE action = 'speech.barge_in_anomaly'").fetchone()[0]
+    client = _client_for(doctor)
+    with caplog.at_level(logging.INFO, logger="app.main"):
+        with client.websocket_connect("/ws/transcribe") as ws:
+            ws.send_json({"session_id": secrets.token_hex(8)})
+            config = _drain_until(ws, {"speech_config"})
+    assert config["barge_in"]["residual_peak_rms"] == pytest.approx(0.131)
+    assert config["barge_in"]["loopback_peak_rms"] == pytest.approx(0.131)
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        after = conn.execute("SELECT count(*) FROM audit_event"
+                             " WHERE action = 'speech.barge_in_anomaly'").fetchone()[0]
+    assert after == before, "the expected excess is not an anomaly"
+    assert any("window-length/AGC effect; clamped to raw" in r.getMessage()
+               for r in caplog.records)
 
 
 # --- the client's decision object, executed under Node ----------------------
