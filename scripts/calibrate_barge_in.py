@@ -35,15 +35,22 @@ calibrate_transcript_quality convention).
 Usage:
     uv run python scripts/calibrate_barge_in.py
     uv run python scripts/calibrate_barge_in.py --since 2026-07-30
+    uv run python scripts/calibrate_barge_in.py --since 2026-08-18T14:30
+    uv run python scripts/calibrate_barge_in.py --since 2026-08-18T14:30:00
 
-`--since YYYY-MM-DD` limits every per-device analysis to readings from
-that date onward, so the CURRENT room configuration can be evaluated
-without the device's whole history polluting the spread — the intended
-cut after any change of volume, position, or capture-stream constraints
-(readings across such a change are not comparable, the same lesson as
-the device grouping). When the flag excludes readings the report says
-how many and from when, so a narrowed window is always visible in the
-output rather than silent. Default remains all readings.
+`--since` limits every per-device analysis to readings from that moment
+onward, so the CURRENT room configuration can be evaluated without the
+device's whole history polluting the spread — the intended cut after any
+change of volume, position, or capture-stream constraints (readings
+across such a change are not comparable, the same lesson as the device
+grouping). It takes a date, `YYYY-MM-DD` — from that day onward, exactly
+as before — or a timestamp, `YYYY-MM-DDTHH:MM` or `YYYY-MM-DDTHH:MM:SS`,
+in LOCAL time: calibration sessions iterate within a day (a volume
+change, a microphone moved), and readings across such a change must not
+pool, so a batch needs cutting at the minute it began, not at midnight.
+When the flag excludes readings the report says how many and from when,
+so a narrowed window is always visible in the output rather than silent.
+Default remains all readings.
 """
 
 from __future__ import annotations
@@ -178,11 +185,55 @@ def _reading_date(row: dict) -> datetime.date:
     return datetime.date.fromisoformat(str(at)[:10])
 
 
+def _reading_local_time(row: dict) -> datetime.datetime:
+    """The reading's moment in LOCAL wall-clock time, naive — what a
+    timestamp `--since` is compared against. Database rows carry an aware
+    timestamptz and are converted; naive datetimes and ISO strings are
+    taken as local already (a date-only string is that day's midnight)."""
+    at = row.get("at")
+    if isinstance(at, datetime.datetime):
+        return at.astimezone().replace(tzinfo=None) if at.tzinfo else at
+    text = str(at)
+    if len(text) <= 10:
+        return datetime.datetime.combine(datetime.date.fromisoformat(text), datetime.time())
+    parsed = datetime.datetime.fromisoformat(text)
+    return parsed.astimezone().replace(tzinfo=None) if parsed.tzinfo else parsed
+
+
+def parse_since(text: str) -> datetime.date | datetime.datetime:
+    """The --since value: a date (YYYY-MM-DD) or a local timestamp
+    (YYYY-MM-DDTHH:MM or YYYY-MM-DDTHH:MM:SS). Anything else is an
+    argparse error, not a guess. A date stays a `date` so the whole-day
+    behaviour is exactly what it was; a timestamp is a naive local
+    `datetime`, cut at the minute a same-day calibration batch began."""
+    if "T" not in text and " " not in text:
+        return datetime.date.fromisoformat(text)
+    parsed = datetime.datetime.fromisoformat(text)
+    if parsed.tzinfo is not None:
+        raise ValueError("--since is local time; do not give an offset")
+    return parsed
+
+
+def since_label(since: datetime.date | datetime.datetime | None) -> str:
+    if isinstance(since, datetime.datetime):
+        return since.isoformat(timespec="seconds" if since.second else "minutes")
+    return str(since)
+
+
 def split_since(rows: list[dict],
-                since: datetime.date | None) -> tuple[list[dict], list[dict]]:
-    """(kept, excluded) by reading date; since=None keeps everything."""
+                since: datetime.date | datetime.datetime | None,
+                ) -> tuple[list[dict], list[dict]]:
+    """(kept, excluded) by reading moment; since=None keeps everything.
+
+    A date keeps every reading ON that day and later (unchanged since the
+    flag was added); a timestamp keeps readings AT that local moment and
+    later — the same-day cut a calibration batch needs."""
     if since is None:
         return rows, []
+    if isinstance(since, datetime.datetime):
+        kept = [r for r in rows if _reading_local_time(r) >= since]
+        excluded = [r for r in rows if _reading_local_time(r) < since]
+        return kept, excluded
     kept = [r for r in rows if _reading_date(r) >= since]
     excluded = [r for r in rows if _reading_date(r) < since]
     return kept, excluded
@@ -365,11 +416,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Barge-in calibration report (D5) — report only.")
     parser.add_argument(
-        "--since", metavar="YYYY-MM-DD", type=datetime.date.fromisoformat,
+        "--since", metavar="YYYY-MM-DD[THH:MM[:SS]]", type=parse_since,
         default=None,
-        help="analyse only readings from this date onward, per device — "
-             "use after any change of volume, position or capture "
-             "constraints; excluded readings are counted in the output")
+        help="analyse only readings from this moment onward, per device: a "
+             "date (that day onward) or a local timestamp (that minute "
+             "onward) — use after any change of volume, position or capture "
+             "constraints; calibration sessions iterate within a day, and "
+             "readings across such a change must not pool; excluded readings "
+             "are counted in the output")
     args = parser.parse_args(argv or [])
 
     schema.ensure_all()
@@ -384,8 +438,8 @@ def main(argv: list[str] | None = None) -> int:
     print(f"Settings in force: BARGE_IN_ENABLED={speech.BARGE_IN_ENABLED}"
           f"  margin=x{margin}  abs_floor={abs_floor} RMS  min_ms={min_ms}")
     if args.since is not None:
-        print(f"Window: readings from {args.since} onward only (--since); "
-              "anything older is excluded per device, and said so.")
+        print(f"Window: readings from {since_label(args.since)} onward only "
+              "(--since); anything older is excluded per device, and said so.")
     print(f"D5 target: false stops <= {D5_FALSE_STOP_MAX:.0%} of utterances"
           f"  AND  >= {D5_CATCH_MIN:.0%} of interruptions caught within"
           f" {D5_CATCH_WITHIN_MS} ms\n")
@@ -408,9 +462,12 @@ def main(argv: list[str] | None = None) -> int:
               f" path ({headphones} headphone/no-path, "
               f"{len(rows) - len(usable) - headphones} other)")
         if excluded:
-            first, last = (str(_reading_date(excluded[0])),
-                           str(_reading_date(excluded[-1])))
-            print(f"  EXCLUDED by --since {args.since}: {len(excluded)} "
+            if isinstance(args.since, datetime.datetime):
+                stamp = lambda r: _reading_local_time(r).isoformat(timespec="minutes")  # noqa: E731
+            else:
+                stamp = lambda r: str(_reading_date(r))  # noqa: E731
+            first, last = stamp(excluded[0]), stamp(excluded[-1])
+            print(f"  EXCLUDED by --since {since_label(args.since)}: {len(excluded)} "
                   f"reading(s) from {first}..{last} — not in any number below")
         for r in rows:
             db = f"{r['ratio_db']:.0f} dB" if r.get("ratio_db") is not None else "—"

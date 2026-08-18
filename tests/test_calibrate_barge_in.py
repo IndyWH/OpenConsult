@@ -264,6 +264,101 @@ def test_an_invalid_since_date_is_an_argparse_error_not_a_guess():
         calib.main(["--since", "yesterday"])
 
 
+# --- --since as a timestamp (same-day calibration batches, 2026-08-18) -------
+#
+# Calibration sessions iterate within a day — a volume change, a microphone
+# moved — and readings across such a change must not pool. A date-only
+# --since cannot cut inside a day; a timestamp can. Date-only input must
+# behave exactly as before.
+
+def test_parse_since_accepts_a_date_or_a_local_timestamp_and_nothing_else():
+    import datetime
+    assert calib.parse_since("2026-08-18") == datetime.date(2026, 8, 18)
+    assert calib.parse_since("2026-08-18T14:30") == datetime.datetime(2026, 8, 18, 14, 30)
+    assert calib.parse_since("2026-08-18T14:30:05") == datetime.datetime(2026, 8, 18, 14, 30, 5)
+    # A date stays a DATE (whole-day behaviour unchanged); a timestamp is naive local.
+    assert type(calib.parse_since("2026-08-18")) is datetime.date
+    assert calib.parse_since("2026-08-18T14:30").tzinfo is None
+    for bad in ("yesterday", "2026-08-18T", "14:30", "2026-08-18T14:30+01:00"):
+        with pytest.raises(ValueError):
+            calib.parse_since(bad)
+    with pytest.raises(SystemExit):
+        calib.main(["--since", "2026-08-18T25:99"])
+
+
+def test_a_timestamp_since_cuts_inside_the_day_and_a_date_does_not():
+    """The purpose: two batches on one day, the second after a volume
+    change. --since at the minute the second batch began keeps only it;
+    the date form keeps the whole day, exactly as it always did."""
+    import datetime
+    d = datetime.datetime
+    rows = [reading(at=d(2026, 8, 18, 9, 0)),        # morning batch
+            reading(at=d(2026, 8, 18, 14, 29, 59)),  # last of it
+            reading(at=d(2026, 8, 18, 14, 30)),      # volume changed: new batch
+            reading(at=d(2026, 8, 18, 15, 0))]
+    kept, excluded = calib.split_since(rows, calib.parse_since("2026-08-18T14:30"))
+    assert [r["at"].hour for r in kept] == [14, 15]
+    assert [r["at"].hour for r in excluded] == [9, 14]
+    kept, excluded = calib.split_since(rows, calib.parse_since("2026-08-18T14:30:00"))
+    assert len(kept) == 2
+    kept, excluded = calib.split_since(rows, calib.parse_since("2026-08-18"))
+    assert kept == rows and excluded == []                       # date: unchanged behaviour
+    # ISO strings (older test fixtures) and date-only strings work under a
+    # timestamp too: a date-only string is that day's midnight.
+    strings = [reading(at="2026-08-18"), reading(at="2026-08-18T14:45:00")]
+    kept, excluded = calib.split_since(strings, calib.parse_since("2026-08-18T14:30"))
+    assert [r["at"] for r in kept] == ["2026-08-18T14:45:00"]
+
+
+def test_database_timestamps_are_compared_in_local_time():
+    """The audit rows are aware timestamptz; --since is local wall-clock.
+    The comparison converts the row, so the cut lands where the doctor's
+    clock said it did whatever the server's zone offset is."""
+    import datetime
+    aware = datetime.datetime(2026, 8, 18, 13, 30, tzinfo=datetime.timezone.utc)
+    local = aware.astimezone().replace(tzinfo=None)
+    assert calib._reading_local_time(reading(at=aware)) == local
+    just_before = local - datetime.timedelta(minutes=1)
+    just_after = local + datetime.timedelta(minutes=1)
+    kept, _ = calib.split_since([reading(at=aware)], just_before)
+    assert len(kept) == 1
+    kept, _ = calib.split_since([reading(at=aware)], just_after)
+    assert kept == []
+
+
+def test_since_labels_show_the_form_given():
+    import datetime
+    assert calib.since_label(datetime.date(2026, 8, 18)) == "2026-08-18"
+    assert calib.since_label(datetime.datetime(2026, 8, 18, 14, 30)) == "2026-08-18T14:30"
+    assert calib.since_label(datetime.datetime(2026, 8, 18, 14, 30, 5)) == "2026-08-18T14:30:05"
+
+
+@pytest.mark.skipif(not _db_ready(), reason="PostgreSQL not available")
+def test_a_timestamp_window_announces_its_exclusions_to_the_minute(capsys):
+    """Same guarantee as the date form: a narrowed window is visible in the
+    output — how many readings, and from when, to the minute."""
+    import datetime
+    from app import schema
+    schema.ensure_all()
+    early = datetime.datetime(2026, 5, 20, 8, 0, tzinfo=datetime.timezone.utc)
+    late = datetime.datetime(2026, 5, 20, 12, 0, tzinfo=datetime.timezone.utc)
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+        for at in (early, late):
+            conn.execute(
+                "INSERT INTO audit_event (at, action, detail) VALUES (%s, 'speech.sound_check',"
+                " '{\"peak_rms\": 0.02, \"noise_floor_rms\": 0.004, \"answer\": \"yes\","
+                "   \"ratio\": 5.0, \"device_label\": \"Since-timestamp test device\"}')",
+                (at,))
+    cut = (late.astimezone().replace(tzinfo=None) - datetime.timedelta(minutes=30))
+    flag = cut.isoformat(timespec="minutes")
+    assert calib.main(["--since", flag]) == 0
+    out = capsys.readouterr().out
+    assert f"readings from {flag} onward only" in out
+    early_local = early.astimezone().replace(tzinfo=None).isoformat(timespec="minutes")
+    assert (f"EXCLUDED by --since {flag}: 1 reading(s) from {early_local}..{early_local}"
+            in out)
+
+
 # --- sound-check ratio recommendations --------------------------------------
 
 def test_no_recommendation_from_too_few_confirmed_readings():
