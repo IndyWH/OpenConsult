@@ -5601,3 +5601,5 @@ auto mode is the owner's act, after barge-in calibration and the
 mock-patient-round review, and nothing in the build advances either. The
 next restart begins recording `assessment_snapshot` rows regardless of the
 flag (schema-level, nothing the doctor can see).
+
+## Tooling (2026-08-18): `scripts/calibrate_barge_in.py --since` accepts a local timestamp (`YYYY-MM-DDTHH:MM[:SS]`) as well as a date, so same-day calibration batches — before and after a volume or microphone change — are never pooled (`6ab3c1b`); date-only input unchanged, report-only unchanged.
