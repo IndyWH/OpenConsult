@@ -5603,3 +5603,64 @@ next restart begins recording `assessment_snapshot` rows regardless of the
 flag (schema-level, nothing the doctor can see).
 
 ## Tooling (2026-08-18): `scripts/calibrate_barge_in.py --since` accepts a local timestamp (`YYYY-MM-DDTHH:MM[:SS]`) as well as a date, so same-day calibration batches — before and after a volume or microphone change — are never pooled (`6ab3c1b`); date-only input unchanged, report-only unchanged.
+
+## Barge-in D5 — CLOSED with a NEGATIVE RESULT (2026-08-18)
+
+**Decision (owner, 2026-08-18): the barge-in gate item is closed, not
+postponed** — the Sinhala kind of closure, per the pre-agreed rule that
+no patient-friendly configuration passes the frozen D5 target (false
+stops ≤ 1% of utterances AND ≥ 90% of interruptions caught within
+300 ms). `BARGE_IN_ENABLED` stays false for v1; **hard mute is the v1
+posture**, and the 7c build already assumes it (one-tap cancel, Esc, the
+Auto pill; the doctor wins between utterances). With this closure **the
+7c gate reduces to one item: the mock-patient-round review.**
+
+**Evidence.** Three same-day calibration batches on 2026-08-18 — webcam
+under the monitor, webcam on top of the monitor, MacBook Air built-ins
+(`--since 08:23` / `08:28`, the timestamp form landed the same day,
+`6ab3c1b`) — plus the read-only analysis of the stored residual series:
+
+- The browser echo canceller removes only **~5–10 %** of the playback
+  echo on every tested path (residual mean 0.048–0.051 vs raw mean
+  0.051–0.053 on the monitor path; 0.032–0.039 vs 0.036–0.043 on the
+  MacBook). **Residual ≈ raw throughout.**
+- The echo is **sustained** through the utterance's loud syllables —
+  250 ms window means of 0.05–0.37 RMS held for 250–750 ms, five times
+  the 150 ms sustain rule — **not an onset transient.** The series is
+  the sound-check phrase's own envelope; the "settled" 0.0001–0.0017
+  is the post-playback tail and the 0.003–0.009 minima are inter-word
+  pauses, not canceller convergence.
+- Any threshold low enough to catch quiet speech (0.056 RMS, the 445
+  measurement) sits **inside** the sustained echo band; the report's
+  residual-derived thresholds come out at 0.45–0.65 RMS. **D5 side 2
+  fails by an order of magnitude on all tested hardware.** Side 1 is
+  predicted met only because the threshold is that high.
+- Residual peak > raw peak on most MacBook readings (0.24 vs 0.14) is a
+  measurement-scale effect, not acoustics: the main analyser reads
+  ~43 ms windows with AGC, the detector's ~11 ms windows without, so the
+  peaks are not one scale (report fix below).
+
+**Report fixes from the analysis (`52bd13e`):** the calibration
+script's "first window → settled" convergence readout, which compared
+pre-onset silence with the post-playback tail, is replaced by an honest
+series readout (pre-onset window · loudest 250 ms window · final
+window, no convergence claim); `speech.barge_in_scale` now treats a
+residual peak within ×2 of raw as the expected window-length/AGC effect
+(clamped to raw as before, logged, not audited) and keeps the anomaly
+audit beyond that bound. Nothing in the app's behaviour changes; the
+script remains report-only in a READ ONLY transaction.
+
+**v2 routes recorded, not scheduled:** a directional microphone; and/or
+rethinking the playback path so the echo canceller can reference it (the
+page's own `Audio` playback is what Chrome's canceller should be
+referencing and evidently is not, at these levels). The 50 ms
+per-tick instrumentation proposal from the analysis (store the raw
+50 ms snapshot lists for both streams, the onset moment and each
+analyser's window length) is **parked as optional v2 measurement work.**
+
+**Side findings for the mock-patient round:** the daytime noise floor
+reached **0.0135 RMS with the webcam under the monitor** — the 0.02
+absolute floor, and the politeness-abort threshold that shares it, keep
+only ×1.5 headroom there (**watch item**); and the monitor's up-firing
+drivers explain why moving the webcam to the top of the monitor did not
+reduce the echo (the same driver path fires at it either way).
