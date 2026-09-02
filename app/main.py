@@ -2895,7 +2895,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         await audit.log(user["id"], "auto.doctor_handover", None, None,
                         {"session_id": session_id, "phase": ctl.phase.value,
-                         "at_audio_s": round(session.audio_seconds, 1)})
+                         "via": "control", "at_audio_s": round(session.audio_seconds, 1)})
         auto["handover_by_doctor"] = True
         # Whatever was queued or planned yields to the doctor's decision.
         auto["queued"] = None
@@ -3129,7 +3129,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         """A doctor's tap while auto mode is on (spec §3, hard rule 5): the
         queued auto utterance is cancelled, the tap is audited as an
         intervention naming what it displaced, and the answer that follows
-        is treated like any other — its turn end triggers the revision."""
+        is treated like any other — its turn end triggers the revision.
+
+        A tapped EXAMINATION HANDOVER in GOLDEN, OPEN or CLOSED ends the
+        auto run exactly as the Handover control does (owner decision
+        2026-09-01, pilot defect D5): in 482 the doctor tapped "Thank you —
+        Dr … will examine you now" during the golden minutes and the
+        machine, whose flow state a tap did not touch, said "Mm-hm." 1.8 s
+        later. The doctor has handed over; the history is finished."""
         auto = entry["auto"]
         if auto is None or auto["controller"].phase is auto_mode.AutoPhase.OFF:
             return
@@ -3145,11 +3152,42 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          "displaced": ({"kind": displaced["kind"], "text": displaced["text"]}
                                        if displaced else None),
                          "at_audio_s": round(session.audio_seconds, 1)})
+        if (utterance.ref_kind == "phrase"
+                and utterance.ref_detail.get("id") == "examination_handover"
+                and auto["controller"].phase in auto_mode.LISTENING_PHASES):
+            await _end_run_by_tapped_handover(auto, utterance)
+            return
         if (utterance.ref_kind == "cds_question"
                 and auto["controller"].phase in auto_mode.QUESTION_PHASES):
             auto["awaiting_answer"] = True
             auto["turn_ended"] = False
             auto["last_asked_text"] = utterance.text
+
+    async def _end_run_by_tapped_handover(auto: dict, utterance: speech.Utterance) -> None:
+        """The tapped handover phrase IS the handover: the same edge the
+        Handover control fires (handover_requested → HANDOVER), audited
+        auto.doctor_handover with via=tap and auto.handover with
+        requested_by=doctor, the officer and any plan or sequence stood
+        down, and the client told the run has ended (auto_toggled off) —
+        so no encourager, ask or machine handover can follow the doctor's
+        own words. The run ends at the tap, not at the phrase's end: a
+        cut-off phrase is still the doctor's decision."""
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        await audit.log(user["id"], "auto.doctor_handover", None, None,
+                        {"session_id": session_id, "phase": ctl.phase.value, "via": "tap",
+                         "utterance_id": utterance.utterance_id,
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        _cancel_officer(auto)          # drops the queue, any plan and the revision
+        auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
+                    handover=None, handover_by_doctor=True, last_issued=None)
+        await auto_transition(ctl.handover_requested(), detail={"by": "doctor", "via": "tap"})
+        await audit.log(user["id"], "auto.handover", None, None,
+                        {"session_id": session_id,
+                         "agenda_version": entry["agenda"].current_version,
+                         "requested_by": "doctor", "via": "tap",
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
+                                   "phase": ctl.phase.value})
 
     async def on_urgent_alarm(actions: list[dict], assessment_version: int) -> None:
         """The urgency pause (Phase 7c slice 5, spec §7, hard rule 2).

@@ -892,6 +892,79 @@ def test_the_doctors_handover_from_golden_ends_the_golden_minutes_and_speaks_the
     assert _audit("auto.handover", s.session_id)[0]["requested_by"] == "doctor"
 
 
+@pytest.mark.parametrize("phase", ["golden", "open"])
+def test_a_tapped_examination_handover_ends_the_run_like_the_control(gate, monkeypatch, phase):
+    """Owner decision 2026-09-01 (pilot defect D5): in 482 the doctor
+    tapped the examination handover during the golden minutes and "Mm-hm."
+    followed it — a tap changed no flow state. Now a tapped handover in
+    GOLDEN, OPEN or CLOSED ends the auto run exactly as the Handover
+    control does: the same handover_requested edge to HANDOVER, audited
+    auto.doctor_handover with via=tap and auto.handover with
+    requested_by=doctor, the client told the run has ended, and no
+    encourager, ask or machine handover afterwards."""
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
+    _engine_with_alarms(engine, {})
+    with live(gate) as s:
+        s.to_golden()
+        if phase == "open":
+            monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+            s.to_open()
+        assert s.phase.value == phase
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase",
+                                                            "id": "examination_handover"}}))
+        seen = _collect_until(s.ws, {"speak_ready"})
+        assert s.phase.value == "handover", "the run ended at the tap"
+        pushes = [(m["from"], m["phase"], m["trigger"]) for m in seen if m.get("type") == "auto_phase"]
+        assert (phase, "handover", "handover_requested") in pushes
+        assert any(m.get("type") == "auto_toggled" and m["on"] is False for m in seen)
+        s.play(seen[-1]["utterance_id"])
+        # Silence afterwards earns nothing: no encourager, no ask, no
+        # machine handover — the doctor has already said it.
+        for q in (5.5, 9.0, 14.0):
+            s.quiet(q)
+            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"spoke at {q}s"
+        for _ in range(10):
+            assert all(m.get("type") != "auto_speak" for m in s.probe())
+        assert s.auto["queued"] is None and s.auto["handover"] is None
+        cid = _stop(s)
+    handovers = _audit("auto.doctor_handover", s.session_id)
+    assert len(handovers) == 1 and handovers[0]["via"] == "tap" and handovers[0]["phase"] == phase
+    ended = _audit("auto.handover", s.session_id)
+    assert len(ended) == 1 and ended[0]["requested_by"] == "doctor" and ended[0]["via"] == "tap"
+    last = _audit("auto.phase", s.session_id)[-1]
+    assert (last["from"], last["to"], last["trigger"]) == (phase, "handover", "handover_requested")
+    assert last["detail"] == {"by": "doctor", "via": "tap"}
+    taps = _audit("auto.doctor_tap", s.session_id)
+    assert taps[-1]["ref_detail"]["id"] == "examination_handover"
+    auto_rows = [r for r in _rows(cid) if r["ref_detail"].get("via") == "auto"]
+    assert [r["ref_detail"]["id"] for r in auto_rows if r["ref_detail"].get("id") in
+            ("go_on", "mm-hm", "i_see", "anything_else", "examination_handover")] == []
+
+
+def test_a_tapped_handover_after_the_run_has_ended_changes_nothing(gate):
+    """Outside the listening phases a tapped handover is just a tap: in
+    DISCLOSURE the machine keeps waiting; after HANDOVER it is over anyway."""
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.toggle(True)                                        # DISCLOSURE, disclosure in flight
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        disclosure = next(m for m in seen if m.get("type") == "auto_speak")
+        s.play(disclosure["utterance_id"])
+        invitation = _until(s.ws, {"auto_speak"})
+        assert s.phase.value == "invitation"
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase",
+                                                            "id": "examination_handover"}}))
+        _until(s.ws, {"speak_refused"})                       # one utterance at a time
+        assert s.phase.value == "invitation"
+        s.play(invitation["utterance_id"])
+        s.probe()
+        _stop(s)
+    assert _audit("auto.doctor_handover", s.session_id) == []
+
+
 def test_handover_refusals_are_answered(gate, monkeypatch):
     engine = gate.cds_engine
     engine.agendas = [["Q?"]]

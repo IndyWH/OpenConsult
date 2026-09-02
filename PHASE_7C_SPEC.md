@@ -71,7 +71,8 @@ one-utterance-at-a-time guard, the disclosure lock and the
 Doctor taps still work in auto mode. A tap cancels any queued auto
 utterance, speaks the tapped question, and is logged as a doctor
 intervention (hard rule 5); the controller treats the answer that
-follows like any other.
+follows like any other. A tapped examination handover ends the run
+(§10, owner decision 2026-09-01).
 
 ## 4. What the system may say — the utterance whitelist
 
@@ -357,6 +358,19 @@ and `test_standing_rules.py` extends to the new controls.
   already looking — same position class as the urgent panel it
   accompanies.
 - The speaking pill and Esc behave exactly as in 7a.
+- **A tapped examination handover ends the auto run** (owner decision
+  2026-09-01, pilot defect D5). The doctor's one-tap "Thank you — Dr …
+  will examine you now" in GOLDEN, OPEN or CLOSED is the handover: the
+  same `handover_requested` edge the Handover control fires, audited
+  `auto.doctor_handover` with `via=tap` (the control writes
+  `via=control`) and `auto.handover` with `requested_by=doctor`; the
+  officer, any queued ask and any handover sequence under way are
+  stood down and the client is told the run has ended. Slice 4 had a
+  tapped phrase change no flow state, so in 482 the machine said
+  "Mm-hm." 1.8 s after the doctor had handed over. The run ends at the
+  tap, not at the phrase's end: a cut-off phrase is still the doctor's
+  decision. Outside the listening phases a tapped handover remains
+  just a tap.
 
 ## 11. Logging and schema
 
