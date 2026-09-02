@@ -423,6 +423,7 @@ def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
         config = next(m for m in first if m["type"] == "speech_config")
         assert config["auto"] == {"enabled": True,
                                   "encourager_quiet_s": appmain.AUTO_ENCOURAGER_QUIET_S,
+                                  "encourager_min_quiet_s": appmain.AUTO_ENCOURAGER_MIN_QUIET_S,
                                   "eot_quiet_s": appmain.AUTO_EOT_QUIET_S,
                                   "eot_fallback_s": appmain.AUTO_EOT_FALLBACK_S}
         assert first[-1] == {"type": "auto_toggled", "on": False, "phase": "off"}
@@ -512,94 +513,122 @@ def test_enable_is_idempotent_and_only_the_owner_may_toggle(gate):
 # ==========================================================================
 # GOLDEN: encouragers
 
-def test_a_quiet_report_in_golden_earns_one_encourager_with_via_phase_and_trigger(gate, monkeypatch):
+def test_a_quiet_report_in_golden_earns_the_one_encourager_go_on_after_the_minimum_quiet(gate):
+    """REPINNED 2026-09-01 (owner decision, solo pilot F3/D1): slice 3
+    pinned an encourager at AUTO_ENCOURAGER_QUIET_S (1.75 s), rotated from
+    three. That property is deliberately replaced, not weakened: in GOLDEN
+    the encourager is "go on" only, and it is issued only once the quiet
+    has reached AUTO_ENCOURAGER_MIN_QUIET_S (5.0 s) — reports at 1.8 s and
+    4.9 s earn nothing. The row still carries via/phase/trigger."""
     with live(gate) as s:
         s.enable_to_golden()
-        s.quiet(1.8)
+        for q in (1.8, 3.0, 4.9):
+            s.quiet(q)
+            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"encourager at {q}s"
+        s.quiet(5.2)
         seen = _collect_until(s.ws, {"auto_speak"})
         encourager = seen[-1]
-        assert encourager["text"] == "Mm-hm." and encourager["ref_id"] == "mm-hm"
+        assert encourager["text"] == "Go on." and encourager["ref_id"] == "go_on"
         s.play(encourager["utterance_id"])
-        # Below the threshold: nothing.
-        s.quiet(1.0)
-        assert all(m.get("type") != "auto_speak" for m in s.probe())
         cid = _stop(s)
     rows = asyncio.run(system_utterances.for_consultation(cid))
-    row = next(r for r in rows if r["text"] == "Mm-hm.")
-    assert row["ref_detail"] == {"id": "mm-hm", "via": "auto", "phase": "golden",
-                                 "trigger": {"quiet_s": 1.8}}
+    row = next(r for r in rows if r["text"] == "Go on.")
+    assert row["ref_detail"] == {"id": "go_on", "via": "auto", "phase": "golden",
+                                 "trigger": {"quiet_s": 5.2}}
     assert row["end_reason"] == "complete"
 
 
-def test_encouragers_rotate_through_the_three_and_respect_the_cooldown(gate, monkeypatch):
+def test_at_most_one_encourager_per_golden_window(gate):
+    """REPINNED 2026-09-01 (owner decision): slice 3 pinned a rotation
+    mm-hm → i_see → go_on on an 8 s cooldown. Replaced: ONE encourager per
+    golden window. However long the quiet goes on afterwards — the window
+    not yet run, the room still silent — nothing more is said."""
     with live(gate) as s:
         s.enable_to_golden()
-        # Cooldown in force: a second quiet report inside it earns nothing.
-        s.quiet(2.0)
+        s.quiet(5.5)
         first = _until(s.ws, {"auto_speak"})
+        assert first["ref_id"] == "go_on"
         s.play(first["utterance_id"])
-        s.quiet(2.5)
-        assert all(m.get("type") != "auto_speak" for m in s.probe()), "cooldown"
-        # Cooldown lifted: the rotation continues i_see, go_on, mm-hm.
-        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
-        heard = [first["ref_id"]]
-        for q in (2.1, 2.2, 2.3):
+        for q in (5.5, 9.0, 14.0, 30.0):
             s.quiet(q)
-            e = _until(s.ws, {"auto_speak"})
-            heard.append(e["ref_id"])
-            s.play(e["utterance_id"])
-        assert heard == ["mm-hm", "i_see", "go_on", "mm-hm"]
+            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"a second at {q}s"
+        assert s.phase is AutoPhase.GOLDEN
         _stop(s)
 
 
-def test_no_encourager_while_an_utterance_is_in_flight(gate, monkeypatch):
+def test_no_encourager_while_an_utterance_is_in_flight(gate):
     """One utterance at a time holds for the loop too: a quiet report that
-    lands while an encourager is pending or playing earns nothing."""
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
+    lands while an utterance is pending or playing earns nothing, and the
+    window's one encourager comes once the slot is free."""
     with live(gate) as s:
         s.enable_to_golden()
-        s.quiet(2.0)
-        e = _until(s.ws, {"auto_speak"})
-        s.quiet(2.5)                                    # pending, not yet started
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase", "id": "i_see"}}))
+        tapped = _until(s.ws, {"speak_ready"})           # the doctor's tap, in flight
+        s.quiet(5.5)
         assert all(m.get("type") != "auto_speak" for m in s.probe())
-        s.play(e["utterance_id"])
-        s.quiet(2.6)                                    # released: the next one comes
-        assert _until(s.ws, {"auto_speak"})["ref_id"] == "i_see"
+        s.play(tapped["utterance_id"])
+        s.quiet(5.6)                                     # released: the one comes
+        assert _until(s.ws, {"auto_speak"})["ref_id"] == "go_on"
         _stop(s)
 
 
-def test_a_politeness_aborted_encourager_is_dropped_not_requeued(gate, monkeypatch):
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
+def test_a_politeness_aborted_encourager_is_dropped_not_requeued(gate):
+    """An aborted encourager is dropped — the moment has passed — and
+    (REPINNED 2026-09-01, owner decision) it was the window's one: spent at
+    issue, like the nudge, so a fresh quiet report earns nothing more."""
     with live(gate) as s:
         s.enable_to_golden()
-        s.quiet(2.0)
+        s.quiet(5.5)
         e = _until(s.ws, {"auto_speak"})
         s.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": e["utterance_id"],
                                  "seq": s.seq + 1, "reason": "politeness_abort", "rms": 0.07}))
-        # Nothing is re-issued on its own; only a fresh quiet report earns
-        # the next encourager, and the rotation has moved on.
         assert all(m.get("type") != "auto_speak" for m in s.probe())
-        s.quiet(2.1)
-        assert _until(s.ws, {"auto_speak"})["ref_id"] == "i_see"
+        s.quiet(6.5)
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
         cid = _stop(s)
     rows = asyncio.run(system_utterances.for_consultation(cid))
-    assert [r["end_reason"] for r in rows if r["text"] == "Mm-hm."] == ["politeness_abort"]
+    assert [r["end_reason"] for r in rows if r["text"] == "Go on."] == ["politeness_abort"]
 
 
-def test_no_encourager_outside_golden(gate, monkeypatch):
-    """OPEN is inert in this slice, and nothing is spoken there — no
-    encourager, no question (question flow is slice 4)."""
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
+def test_the_other_two_encouragers_stay_registered_and_tappable(gate):
+    """"Mm-hm" and "I see" are unused by the automatic flow, not deleted:
+    still in the phrase table, still a one-tap phrase for the doctor."""
+    assert set(speech.ENCOURAGER_IDS) == {"mm-hm", "i_see", "go_on"}
+    assert speech.ENCOURAGER_ID == "go_on"
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase", "id": "mm-hm"}}))
+        assert _until(s.ws, {"speak_ready"})["text"] == "Mm-hm."
+        _stop(s)
+
+
+def test_outside_golden_the_only_encourager_is_the_single_bridge(gate):
+    """REPINNED 2026-09-01. Slice 3 pinned "nothing is spoken in OPEN", and
+    that held after slice 4 only by accident: the 3.2 s quiet report that
+    triggered the hand-back also issued a golden encourager (then at
+    1.75 s) which the test never played, so the one-utterance slot stayed
+    blocked for the rest of the run. With the golden encourager now needing
+    5 s of quiet the slot is free, and what OPEN actually says shows: at
+    most the single bridge ("go on") while the D2 revision runs, then the
+    flow's own asks (here the agenda is empty, so the anything-else
+    phrase) — never a rotation of encouragers."""
     gate.cds_engine.verdicts = [OfficerVerdict(True, True)]      # a hand-back
     with live(gate) as s:
         s.enable_to_golden()
         s.commit_transcript("It started on Tuesday.", "That's all really.")
         s.quiet(3.2)
-        s.probe()
+        assert all(m.get("type") != "auto_speak" for m in s.probe()), "3.2 s earns nothing in GOLDEN now"
         assert s.phase is AutoPhase.OPEN
-        for q in (2.0, 3.5, 6.0):
+        heard = []
+        for q in (2.0, 3.5, 6.0, 9.0):
             s.quiet(q)
-            assert all(m.get("type") != "auto_speak" for m in s.probe())
+            for m in s.probe():
+                if m.get("type") == "auto_speak":
+                    heard.append(m["ref_id"])
+                    s.play(m["utterance_id"])
+        encouragers = [r for r in heard if r in speech.ENCOURAGER_IDS]
+        assert len(encouragers) <= 1 and set(encouragers) <= {"go_on"}
+        assert set(heard) - set(speech.ENCOURAGER_IDS) <= {"anything_else", "examination_handover"}
         _stop(s)
 
 
@@ -715,7 +744,9 @@ def test_no_encourager_once_the_window_has_run_and_the_run_is_audited_exactly_on
     written once per run, on the first observation (a quiet report or a
     verdict), never again however many reports follow."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
+    # The minimum quiet set BELOW the fallback, so "none after the window"
+    # is pinned on its own and not by the two thresholds coinciding at 5 s.
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 2.0)
     gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
     with live(gate) as s:
         s.enable_to_golden()

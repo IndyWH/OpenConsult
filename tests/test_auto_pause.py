@@ -57,10 +57,10 @@ def _ws_of(s):
 # Item 1: the server-initiated stop
 
 def test_a_playing_utterance_is_cut_and_its_window_closes_at_the_cut(gate, monkeypatch):
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)   # the harness parks it
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)   # the harness parks it
     with live(gate) as s:
         s.to_golden()
-        s.quiet(2.0)                                   # → an encourager (GOLDEN)
+        s.quiet(5.5)                                   # → the window's encourager (GOLDEN)
         gate_up = [m for m in s.probe() if m.get("type") == "auto_speak"]
         assert gate_up, "an encourager was issued"
         e = gate_up[0]
@@ -83,9 +83,10 @@ def test_a_playing_utterance_is_cut_and_its_window_closes_at_the_cut(gate, monke
                                    "seq": s.seq + 1, "reason": "urgency_pause"}))
         assert all(m.get("type") != "speak_refused" for m in s.probe())
         assert s.entry["server_cancelled_id"] is None
-        # And the slot is free again.
-        s.quiet(2.5)
-        assert any(m.get("type") == "auto_speak" for m in s.probe())
+        # And the slot is free again (the window's one encourager is spent,
+        # so a tap shows it rather than a second encourager).
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase", "id": "i_see"}}))
+        assert _until(s.ws, {"speak_ready"})["text"] == "I see."
         cid = _stop(s)
     rows = _rows(cid)
     cut = next(r for r in rows if r["utterance_id"] == e["utterance_id"])
@@ -96,10 +97,10 @@ def test_a_playing_utterance_is_cut_and_its_window_closes_at_the_cut(gate, monke
 
 
 def test_an_unstarted_utterance_is_cut_with_the_reason_and_no_span(gate, monkeypatch):
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)
     with live(gate) as s:
         s.to_golden()
-        s.quiet(2.0)
+        s.quiet(5.5)
         e = next(m for m in s.probe() if m.get("type") == "auto_speak")
         row = _cancel(s)                                # never started playing
         assert row["end_reason"] == "urgency_pause"
@@ -228,7 +229,7 @@ def test_an_alarm_in_each_active_phase_pauses_cuts_and_audits(gate, monkeypatch,
     dropped, auto.paused carries the texts, the snapshot version and the
     transition, and the client is shown every pending text. Listening
     goes on: frames are still acked, the transcript still grows."""
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [["When did the chest pain first start?"],
@@ -238,7 +239,7 @@ def test_an_alarm_in_each_active_phase_pauses_cuts_and_audits(gate, monkeypatch,
     with live(gate) as s:
         s.to_golden()
         if phase == "golden":
-            s.quiet(2.0)                                     # an encourager in flight
+            s.quiet(5.5)                                     # the encourager in flight
             e = next(m for m in s.probe() if m.get("type") == "auto_speak")
             s.ws.send_text(json.dumps({"type": "speak_started",
                                        "utterance_id": e["utterance_id"], "seq": s.seq + 1}))
@@ -289,7 +290,7 @@ def test_an_alarm_in_each_active_phase_pauses_cuts_and_audits(gate, monkeypatch,
     assert (phase, "paused_urgent") in phases
     if phase == "golden":
         rows = _rows(cid)
-        cut = next(r for r in rows if r["text"] == "Mm-hm.")
+        cut = next(r for r in rows if r["text"] == "Go on.")
         assert cut["end_reason"] == "urgency_pause"
 
 
@@ -581,6 +582,32 @@ def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeyp
         s.probe()
         assert s.phase.value == "open"
         _stop(s)
+
+
+def test_the_windows_one_encourager_is_one_across_a_pause_and_resume(gate, monkeypatch):
+    """"At most one per golden window" (owner decision 2026-09-01) counts
+    the window, not the stretch: an encourager spoken before a pause is
+    the window's one, and the resumed GOLDEN earns no second."""
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(False, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: []})
+    with live(gate) as s:
+        s.to_golden()
+        s.quiet(5.5)
+        e = _until(s.ws, {"auto_speak"})
+        assert e["ref_id"] == "go_on"
+        s.play(e["utterance_id"])
+        _fire_pass(s, LONG)                                   # paused
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        for q in (5.5, 8.0, 12.0):
+            s.quiet(q)
+            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"a second at {q}s"
+        cid = _stop(s)
+    assert [r["text"] for r in _rows(cid) if r["ref_detail"].get("via") == "auto"
+            and r["text"] == "Go on."] == ["Go on."]
 
 
 def test_the_window_runs_correctly_across_two_pauses_the_482_arithmetic(gate, monkeypatch):

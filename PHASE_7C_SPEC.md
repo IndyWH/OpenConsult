@@ -116,12 +116,26 @@ in the same commit that builds their replacement.
 Two thresholds, both env-tunable, both labelled uncalibrated guesses
 until the mock-patient round:
 
-- `AUTO_ENCOURAGER_QUIET_S` (default 1.75, the spec's ~1.5–2 s): in
-  GOLDEN, a pause this long earns one encourager, rotated from the
-  three, with a cooldown (`AUTO_ENCOURAGER_COOLDOWN_S`, default 8) so
-  encouragers never machine-gun. Zero questions in GOLDEN is enforced
-  in the controller — a question request in GOLDEN is a coding error
-  and raises, it is not filtered.
+- `AUTO_ENCOURAGER_QUIET_S` (default 1.75, the spec's ~1.5–2 s): the
+  quiet that earns the single bridging encourager in the question
+  phases while the D2 revision runs (one per revision). Zero
+  questions in GOLDEN is enforced in the controller — a question
+  request in GOLDEN is a coding error and raises, it is not filtered.
+
+  **The encourager policy (owner decision 2026-09-01, after the solo
+  pilot: "we need to get rid of the mm-hm").** In GOLDEN, at most ONE
+  encourager per golden window, the phrase `go_on` only, issued only
+  once the quiet has reached `AUTO_ENCOURAGER_MIN_QUIET_S` (default
+  5.0 s), spent at issue (a politeness abort drops it), and never once
+  the window has run (§6). The bridge in the question phases keeps its
+  one-per-revision rule and speaks the same phrase. This replaces the
+  rotation through three phrases on an 8 s cooldown
+  (`AUTO_ENCOURAGER_COOLDOWN_S`, retired): a cooldown was the only
+  brake on a loop that ran for the whole of GOLDEN, and each
+  encourager restarted the client's quiet span, so the quiet could
+  never reach the officer's fallback (482, 483). `mm-hm` and `i_see`
+  stay registered, tappable and pre-synthesised — unused by the
+  automatic flow, not deleted, like the `affecting_you` template.
 - `AUTO_EOT_QUIET_S` (default 3.0): outside GOLDEN, a pause this long
   triggers the **end-of-turn officer** — a tiny stateless model call
   (affect-call shape) over the recent committed transcript answering
@@ -384,8 +398,8 @@ and `test_standing_rules.py` extends to the new controls.
 |---|---|---|
 | `AUTO_MODE_ENABLED` | `false` | The gate. Owner's flip, after barge-in calibration + mock-patient review |
 | `AUTO_GOLDEN_MINUTES_S` | `90` | Owner range 1–2 min (decided 2026-08-16; prereg amendment A1) |
-| `AUTO_ENCOURAGER_QUIET_S` | `1.75` | Uncalibrated guess |
-| `AUTO_ENCOURAGER_COOLDOWN_S` | `8` | Uncalibrated guess |
+| `AUTO_ENCOURAGER_QUIET_S` | `1.75` | Uncalibrated guess; the bridge's quiet (question phases only, from 2026-09-01) |
+| `AUTO_ENCOURAGER_MIN_QUIET_S` | `5.0` | Owner decision 2026-09-01: the golden window's one encourager, after this much quiet |
 | `AUTO_EOT_QUIET_S` | `3.0` | Uncalibrated guess |
 | `AUTO_EOT_FALLBACK_S` | `5.0` | Officer fail-soft silence |
 | `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back |

@@ -1417,7 +1417,8 @@ const quietReporter = {
   crossed: 0,            // thresholds already reported in this quiet span
   lastReportAt: null,    // ms of the last report in this span
   configure(cfg) {
-    const raw = [cfg.encourager_quiet_s, cfg.eot_quiet_s, cfg.eot_fallback_s];
+    const raw = [cfg.encourager_quiet_s, cfg.encourager_min_quiet_s,
+                 cfg.eot_quiet_s, cfg.eot_fallback_s];
     this.thresholds = [...new Set(raw.map(Number).filter(v => v > 0))].sort((a, b) => a - b);
   },
   activity(now) { this.quietSince = now; this.crossed = 0; this.lastReportAt = null; },

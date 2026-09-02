@@ -136,11 +136,12 @@ def gate(monkeypatch, tmp_path):
     system_utterances.ensure_schema()
     monkeypatch.setattr(speech, "TTS_ENABLED", True)
     monkeypatch.setattr(appmain, "AUTO_MODE_ENABLED", True)
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
     # Encouragers are slice 3's subject (tests/test_auto_golden.py); here
     # they would only take the one utterance slot at the wrong moment, so
-    # the threshold is parked out of reach except where a test wants them.
+    # both thresholds — the golden window's minimum quiet and the bridge's
+    # — are parked out of reach except where a test wants them.
     monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 100.0)
     state = appmain.app.state
     missing = object()
     installed = {

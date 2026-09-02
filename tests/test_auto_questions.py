@@ -158,11 +158,12 @@ def gate(monkeypatch, tmp_path):
     system_utterances.ensure_schema()
     monkeypatch.setattr(speech, "TTS_ENABLED", True)
     monkeypatch.setattr(appmain, "AUTO_MODE_ENABLED", True)
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
     # Encouragers are slice 3's subject (tests/test_auto_golden.py); here
     # they would only take the one utterance slot at the wrong moment, so
-    # the threshold is parked out of reach except where a test wants them.
+    # both thresholds — the golden window's minimum quiet and the bridge's
+    # — are parked out of reach except where a test wants them.
     monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 100.0)
     state = appmain.app.state
     missing = object()
     installed = {
@@ -398,6 +399,7 @@ def test_the_bridge_encourager_is_at_most_one_while_the_pass_runs(gate, monkeypa
                     s.play(m["utterance_id"])
         encouragers = [m for m in heard if m["ref_id"] in speech.ENCOURAGER_IDS]
         assert len(encouragers) == 1, "one bridge, not a machine-gun"
+        assert encouragers[0]["ref_id"] == "go_on", "the bridge's phrase (owner decision 2026-09-01)"
         assert not any(m["ref_id"] is None for m in heard), "no question before the pass lands"
         s.ws.portal.call(lambda: engine.gate_event.set())   # release the pass
         s.commit_transcript("still here")             # nothing more said, but a fresh span

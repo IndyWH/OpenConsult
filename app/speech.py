@@ -214,6 +214,12 @@ PHRASES: dict[str, str] = {
 }
 
 ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
+# The one the automatic flow speaks (owner decision 2026-09-01, after the
+# solo pilot: "we need to get rid of the mm-hm"): at most one per golden
+# window and one bridge per revision, "go on" only. The other two stay
+# registered, tappable and pre-synthesised — unused, not deleted, like
+# the affecting_you template.
+ENCOURAGER_ID = "go_on"
 
 # Phrases the patient must have heard the disclosure before (hard rule 4).
 # The encouragers are exempt: "mm-hm" is not a clinical interaction, and
