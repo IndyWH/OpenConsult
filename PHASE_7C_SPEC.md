@@ -136,6 +136,16 @@ until the mock-patient round:
   timer — and never to ask. Section 5's earlier "outside GOLDEN"
   wording was imprecise (recorded 2026-08-16 at slice-3 review).
 
+  **After the golden window has run, the fallback applies whether
+  or not the officer answered** (owner decision 2026-09-01, pilot
+  defect D3): quiet of `AUTO_EOT_FALLBACK_S` ends the turn on the
+  quiet report itself. As built in slice 3 the fallback applied
+  only to a FAILED officer, so a healthy officer answering "not
+  finished" to every ask — with the machine's own encouragers
+  wiping the quiet span every ~8 s — held the golden minutes open
+  indefinitely (consultation 483), while a failing officer exited
+  at 5 s. The inversion is closed.
+
 **Politeness abort (interruption count ~0 by construction).** The
 server never orders playback into live speech: an `auto_speak` is only
 issued while the quiet window is still open, and the client re-checks
@@ -159,6 +169,22 @@ slice that lands this setting). Encouragers only. Early exit to OPEN
 on an explicit hand-back; otherwise exit when the timer has elapsed
 AND the current turn has ended (never cut a patient off at a timer
 boundary).
+
+**The post-window state (owner decision 2026-09-01, pilot defects D1
+and D3).** There is no timer object; the window is the arithmetic
+`golden_spent + seconds in GOLDEN`, kept across an urgency pause. The
+first time that arithmetic reaches `AUTO_GOLDEN_MINUTES_S` on ANY
+quiet report or officer verdict in GOLDEN, the per-run flag
+`golden_window_ran` is set and audited once
+(`auto.golden_window_ran`, with `golden_s`). Once set: no encourager
+is issued in GOLDEN (each one restarted the client's quiet span and
+was the livelock's engine in 482 and 483), and GOLDEN → OPEN (the
+`golden_timer_elapsed` edge) fires at the first of an officer verdict
+with `finished_thought` or `handed_back`, or quiet of
+`AUTO_EOT_FALLBACK_S` — evaluated on every quiet report, not only
+when a verdict is applied, and whether or not the officer answered.
+The window's end is now visible in the record even when it does not
+coincide with an exit. Before the window, behaviour is as above.
 
 **D2 — DECIDED 2026-08-16: strict-revise.** The parent spec says:
 one question at a time, wait for the answer, let the CDS revise on
@@ -328,7 +354,10 @@ and `test_standing_rules.py` extends to the new controls.
 - Audit events: `auto.enabled`, `auto.disabled`, `auto.phase`
   (with from/to/trigger), `auto.paused`, `auto.acknowledged`,
   `auto.resumed`, `auto.takeover`, `auto.handover`,
-  `auto.officer_failed` (fail-soft visibility), and
+  `auto.officer_failed` (fail-soft visibility),
+  `auto.golden_window_ran` (once per run: the window's end, with
+  `golden_s`, whichever report or verdict first observed it — owner
+  decision 2026-09-01), and
   `auto.officer_verdict` for EVERY officer verdict — quiet_s, the
   golden window elapsed when in GOLDEN, finished_thought,
   handed_back, the failure if any, elapsed_ms, the phase, and the

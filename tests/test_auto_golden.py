@@ -625,21 +625,29 @@ def test_a_hand_back_exits_golden_early_and_is_recorded(gate):
 
 def test_the_timer_alone_does_not_exit_golden_the_turn_must_have_ended(gate, monkeypatch):
     """§6: never cut a patient off at a timer boundary. With the window run
-    and the officer saying 'not finished', GOLDEN holds; when the officer
-    (re-asked as the quiet grows) says finished, GOLDEN exits."""
+    and the officer saying 'not finished', GOLDEN holds while the quiet is
+    short; when the officer (re-asked as the quiet grows) says finished,
+    GOLDEN exits.
+
+    REPINNED 2026-09-01 (owner decision, pilot D3): the re-ask now happens
+    at 4.9 s rather than 6.1 s, because post-window quiet of
+    AUTO_EOT_FALLBACK_S (5.0) is itself the exit — see the 483-shape test
+    below. The property kept: a "not finished" verdict alone holds GOLDEN,
+    and a finished verdict exits it."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)     # window already run
+    monkeypatch.setattr(appmain, "AUTO_EOT_QUIET_S", 1.5)          # re-ask inside the fallback span
     gate.cds_engine.verdicts = [OfficerVerdict(False, False), OfficerVerdict(True, False)]
     with live(gate) as s:
         s.enable_to_golden()
         s.commit_transcript("It started on Tuesday and")
-        s.quiet(3.0)
+        s.quiet(1.6)
         s.probe()
         assert s.phase is AutoPhase.GOLDEN, "not finished → hold, whatever the timer says"
-        s.quiet(4.0)                                     # same span, officer not re-asked yet
+        s.quiet(2.5)                                     # same span, officer not re-asked yet
         s.probe()
         assert s.phase is AutoPhase.GOLDEN
         assert len(gate.cds_engine.asked) == 1
-        s.quiet(6.1)                                     # quiet grew by EOT: asked again
+        s.quiet(3.2)                                     # quiet grew by EOT: asked again
         s.probe()
         assert len(gate.cds_engine.asked) == 2
         assert s.phase is AutoPhase.OPEN
@@ -647,6 +655,100 @@ def test_the_timer_alone_does_not_exit_golden_the_turn_must_have_ended(gate, mon
     last = _audit("auto.phase", s.session_id)[-1]
     assert (last["from"], last["to"], last["trigger"]) == ("golden", "open", "golden_timer_elapsed")
     assert last["detail"]["handed_back"] is False
+    assert last["detail"]["by"] == "verdict"
+
+
+# --------------------------------------------------------------------------
+# The post-window state (owner decisions 2026-09-01, pilot D1 and D3)
+
+def test_the_483_shape_a_healthy_not_finished_officer_no_longer_holds_golden_past_the_fallback(gate, monkeypatch):
+    """Owner decision 2026-09-01 (pilot D3, consultation 483): once the
+    window has run, quiet of AUTO_EOT_FALLBACK_S exits GOLDEN on the quiet
+    report itself, whether or not the officer answered. Before this the
+    fallback applied only to a FAILED officer, so a healthy one answering
+    "not finished" to every ask could hold the golden minutes open
+    indefinitely — and did, for 19 s in 483. Here the officer is asked
+    once, says not finished, is never re-asked, and the exit comes from
+    the report at 5.1 s."""
+    monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
+    gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("…this is not like a usual fever. I'm worried.")
+        s.quiet(3.0)
+        s.probe()
+        assert s.phase is AutoPhase.GOLDEN and len(gate.cds_engine.asked) == 1
+        s.quiet(4.9)
+        s.probe()
+        assert s.phase is AutoPhase.GOLDEN, "under the fallback span: hold"
+        s.quiet(5.1)
+        s.probe()
+        assert s.phase is AutoPhase.OPEN
+        assert len(gate.cds_engine.asked) == 1, "the exit came from the report, not a re-ask"
+        _stop(s)
+    last = _audit("auto.phase", s.session_id)[-1]
+    assert (last["from"], last["to"], last["trigger"]) == ("golden", "open", "golden_timer_elapsed")
+    assert last["detail"]["by"] == "quiet_fallback" and last["detail"]["quiet_s"] == 5.1
+    assert last["detail"]["fallback_s"] == appmain.AUTO_EOT_FALLBACK_S
+    assert last["detail"]["handed_back"] is False, "the span's verdict travels in the record"
+
+
+def test_a_finished_verdict_after_the_window_exits_golden_before_the_fallback(gate, monkeypatch):
+    monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
+    gate.cds_engine.verdicts = [OfficerVerdict(True, False, elapsed_ms=300)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started on Tuesday.")
+        s.quiet(3.1)
+        s.probe()
+        assert s.phase is AutoPhase.OPEN
+        _stop(s)
+    last = _audit("auto.phase", s.session_id)[-1]
+    assert last["trigger"] == "golden_timer_elapsed" and last["detail"]["by"] == "verdict"
+    assert last["detail"]["quiet_s"] == 3.1 and last["detail"]["officer_ms"] == 300
+
+
+def test_no_encourager_once_the_window_has_run_and_the_run_is_audited_exactly_once(gate, monkeypatch):
+    """Owner decision 2026-09-01 (pilot D1): after golden_window_ran no
+    encourager is issued in GOLDEN — each one restarted the client's quiet
+    span and was the livelock's engine — and auto.golden_window_ran is
+    written once per run, on the first observation (a quiet report or a
+    verdict), never again however many reports follow."""
+    monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_COOLDOWN_S", 0.0)
+    gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started on Tuesday and")
+        for q in (1.8, 2.5, 3.2, 4.0, 4.6):              # reports before the fallback
+            s.quiet(q)
+            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"encourager at {q}s"
+        assert s.entry["auto"]["golden_window_ran"] is True
+        assert s.phase is AutoPhase.GOLDEN
+        s.quiet(5.2)
+        s.probe()
+        assert s.phase is AutoPhase.OPEN
+        _stop(s)
+    ran = _audit("auto.golden_window_ran", s.session_id)
+    assert len(ran) == 1
+    assert ran[0]["golden_s"] >= 0.0 and ran[0]["window_s"] == 0.0 and ran[0]["seen_on"] == "quiet"
+
+
+def test_before_the_window_has_run_encouragers_and_the_hold_are_unchanged(gate):
+    """The pre-window behaviour is untouched by the exit rule: a long quiet
+    with the window not run exits nothing, and auto.golden_window_ran is
+    not written."""
+    gate.cds_engine.verdicts = [OfficerVerdict(True, False)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started on Tuesday.")
+        for q in (3.2, 5.5, 8.0):
+            s.quiet(q)
+            s.probe()
+            assert s.phase is AutoPhase.GOLDEN
+        assert s.entry["auto"]["golden_window_ran"] is False
+        _stop(s)
+    assert _audit("auto.golden_window_ran", s.session_id) == []
 
 
 def test_a_finished_turn_before_the_window_has_run_does_not_exit_golden(gate):
@@ -737,15 +839,16 @@ def test_a_failed_verdict_and_a_transition_causing_verdict_are_audited_too(gate,
     the new row is written beside it, and a verdict that exits GOLDEN
     carries the transition it caused."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
+    monkeypatch.setattr(appmain, "AUTO_EOT_QUIET_S", 1.5)   # re-ask inside the fallback span
     gate.cds_engine.verdicts = [OfficerVerdict(False, False, failed="timeout", elapsed_ms=2001),
                                 OfficerVerdict(True, True, elapsed_ms=410)]
     with live(gate) as s:
         s.enable_to_golden()
         s.commit_transcript("It started on Tuesday.")
-        s.quiet(3.2)
+        s.quiet(1.6)
         s.probe()                                        # the failed verdict
         assert s.phase is AutoPhase.GOLDEN
-        s.quiet(6.3)
+        s.quiet(3.2)
         s.probe()                                        # re-asked: the hand-back
         assert s.phase is AutoPhase.OPEN
         _stop(s)

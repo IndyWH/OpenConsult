@@ -1735,10 +1735,24 @@ def _new_auto_state() -> dict:
         # Slice 5: golden seconds spent BEFORE a pause, so the window is not
         # restarted by a resume (seconds_in_phase resets on every transition).
         "golden_spent": 0.0,
+        # Owner decision 2026-09-01 (pilot D1/D3): the window has run. Set
+        # the first time elapsed >= AUTO_GOLDEN_MINUTES_S is observed on any
+        # quiet report or verdict in GOLDEN, audited once; from then on no
+        # encourager is issued and the exit waits only for a turn end or
+        # AUTO_EOT_FALLBACK_S of quiet. Reset with golden_spent.
+        "golden_window_ran": False,
         "pause_versions": [],         # assessment_snapshot versions of the alarms in the live pause
         "acks": [],                   # live acknowledgements, for the consultation-linked audit row
         "handover_by_doctor": False,  # slice 6: the doctor's Handover tap started the sequence
     }
+
+
+def _reset_golden(auto: dict) -> None:
+    """A fresh golden window: at the invitation's end (either path) and at
+    auto off. The window's bookkeeping — seconds spent before a pause and
+    the has-run flag — belongs to one run of the golden minutes."""
+    auto["golden_spent"] = 0.0
+    auto["golden_window_ran"] = False
 
 
 def _auto_on(ctl: auto_mode.AutoModeController) -> bool:
@@ -2485,7 +2499,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto = entry["auto"]
             if (auto is not None and auto["controller"].is_legal(
                     auto_mode.AutoEvent.INVITATION_COMPLETED)):
-                auto["golden_spent"] = 0.0
+                _reset_golden(auto)
                 await auto_transition(auto["controller"].invitation_completed())
         if utterance.ref_detail.get("via") == "auto":
             await on_auto_utterance_ended(utterance, reason)
@@ -2718,7 +2732,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # on (the doctor tapped Disclosure and the chain spoke it):
                 # GOLDEN starts NOW, and the record says why the zero point
                 # is the toggle rather than the invitation's end.
-                auto["golden_spent"] = 0.0
+                _reset_golden(auto)
                 await auto_transition(ctl.invitation_completed(),
                                       detail={"invitation": "already_completed"})
             else:
@@ -2746,8 +2760,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await auto_transition(ctl.auto_off())
             _cancel_officer(auto)
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
-                        handover=None, last_issued=None, golden_spent=0.0,
-                        handover_by_doctor=False)
+                        handover=None, last_issued=None, handover_by_doctor=False)
+            _reset_golden(auto)
             await websocket.send_json({"type": "auto_toggled", "on": False,
                                        "phase": ctl.phase.value})
 
@@ -3182,17 +3196,61 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         logger.info("Live session %s: auto PAUSED (%s) on %s — pending %s", session_id,
                     "re-fire" if already_paused else "alarm", texts, pending)
 
+    def _golden_elapsed(auto: dict) -> float:
+        """The golden window elapsed: seconds spent before any pause plus
+        the seconds in GOLDEN since the last transition (there is no timer
+        object — this arithmetic IS the window)."""
+        return auto["golden_spent"] + auto["controller"].seconds_in_phase()
+
+    async def _note_golden_window(auto: dict, elapsed: float, *, seen_on: str,
+                                  quiet_s: float) -> None:
+        """Owner decision 2026-09-01 (pilot D1): the first observation of
+        elapsed >= AUTO_GOLDEN_MINUTES_S in GOLDEN — on a quiet report or
+        a verdict — sets golden_window_ran and audits it once
+        (auto.golden_window_ran, with golden_s). Before this the window's
+        end was invisible unless it coincided with an exit; in 482 and 483
+        it did not, and the record could not say when the minutes ran."""
+        if auto["golden_window_ran"] or elapsed < AUTO_GOLDEN_MINUTES_S:
+            return
+        auto["golden_window_ran"] = True
+        await audit.log(user["id"], "auto.golden_window_ran", None, None,
+                        {"session_id": session_id, "golden_s": round(elapsed, 1),
+                         "window_s": AUTO_GOLDEN_MINUTES_S, "seen_on": seen_on,
+                         "quiet_s": round(quiet_s, 1),
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        logger.info("Live session %s: golden window ran (%.1fs of %.0fs, seen on %s)",
+                    session_id, elapsed, AUTO_GOLDEN_MINUTES_S, seen_on)
+
+    async def _exit_golden(auto: dict, detail: dict, why: str) -> auto_mode.Transition:
+        """GOLDEN → OPEN (the golden_timer_elapsed edge): the window has run
+        and the turn has ended, by whichever rule judged it. The exit is
+        itself a turn end, so the D2 revision is asked for at once."""
+        transition = auto["controller"].golden_timer_elapsed()
+        await auto_transition(transition, detail=detail)
+        auto["turn_ended"] = True
+        _request_revision(auto, why)
+        return transition
+
     async def handle_quiet(payload: dict) -> None:
         """A quiet report from the client's reporter (spec §5). Measurement
         is the client's; every decision is here.
 
-        In GOLDEN: quiet of AUTO_ENCOURAGER_QUIET_S earns one encourager,
-        rotated through the three, at most one per
-        AUTO_ENCOURAGER_COOLDOWN_S, through the auto path (a politeness
-        abort drops it — the moment has passed). Quiet of AUTO_EOT_QUIET_S
-        starts the end-of-turn officer, once per quiet span and again each
-        time the quiet has grown by that much, so a "not finished" at 3 s
-        is re-asked at 6 s rather than sticking. Its verdict is applied by
+        In GOLDEN: every report first checks the window (owner decision
+        2026-09-01, pilot D1/D3). Once it has run — golden_window_ran —
+        no encourager is issued, and quiet of AUTO_EOT_FALLBACK_S exits
+        to OPEN on the report itself, whether or not the officer has
+        answered: in 483 a healthy officer answering "not finished" to
+        every 3 s and 6 s ask, with the machine's own encouragers wiping
+        the quiet span every ~8 s, kept the golden minutes open for 19 s
+        after the window had run, and the fallback was never consulted
+        because it applied only to a FAILED officer. Before the window:
+        quiet of AUTO_ENCOURAGER_QUIET_S earns one encourager, rotated
+        through the three, at most one per AUTO_ENCOURAGER_COOLDOWN_S,
+        through the auto path (a politeness abort drops it — the moment
+        has passed). Quiet of AUTO_EOT_QUIET_S starts the end-of-turn
+        officer, once per quiet span and again each time the quiet has
+        grown by that much, so a "not finished" at 3 s is re-asked at 6 s
+        rather than sticking. Its verdict is applied by
         maybe_apply_officer, on the loop's tick.
 
         In OPEN/CLOSED (slice 4): the officer runs the same way and its
@@ -3226,12 +3284,32 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                            and auto["handover"] is not None)
         if not (in_golden or in_questions or in_handover_seq):
             return
+        if in_golden:
+            # 0. The window, on every report. Once it has run, quiet of the
+            #    fallback length is the exit — evaluated here, not only
+            #    when a verdict is applied (owner decision 2026-09-01).
+            elapsed = _golden_elapsed(auto)
+            await _note_golden_window(auto, elapsed, seen_on="quiet", quiet_s=quiet_s)
+            if (auto["golden_window_ran"] and quiet_s >= AUTO_EOT_FALLBACK_S
+                    and ctl.is_legal(auto_mode.AutoEvent.GOLDEN_TIMER_ELAPSED)):
+                verdict = auto["officer_verdict"]
+                await _exit_golden(
+                    auto,
+                    {"quiet_s": round(quiet_s, 1), "golden_s": round(elapsed, 1),
+                     "by": "quiet_fallback", "fallback_s": AUTO_EOT_FALLBACK_S,
+                     **({"handed_back": verdict.handed_back, "officer_ms": verdict.elapsed_ms,
+                         **({"officer_failed": verdict.failed} if verdict.failed else {})}
+                        if verdict is not None else {})},
+                    "golden exit: window run, fallback quiet")
+                return                     # OPEN from the next report on
         now = time.monotonic()
         free = not session.speaking and entry["pending_utterance"] is None
-        # 1. The encourager: every pause in GOLDEN; in the question phases
-        #    only as the single bridge while the revision runs.
+        # 1. The encourager: every pause in GOLDEN until the window has
+        #    run; in the question phases only as the single bridge while
+        #    the revision runs.
         last = auto["last_encourager_at"]
-        wants_encourager = in_golden or (auto["revision"] is not None and not auto["bridge_used"])
+        wants_encourager = ((in_golden and not auto["golden_window_ran"])
+                            or (auto["revision"] is not None and not auto["bridge_used"]))
         if (wants_encourager and quiet_s >= AUTO_ENCOURAGER_QUIET_S and free
                 and (last is None or now - last >= AUTO_ENCOURAGER_COOLDOWN_S)):
             phrase_id = speech.ENCOURAGER_IDS[auto["encourager_index"] % len(speech.ENCOURAGER_IDS)]
@@ -3278,10 +3356,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         Returns the transition it caused, if any (the verdict audit, in
         maybe_apply_officer, records whether one did).
 
-        GOLDEN (spec §6): a hand-back exits to OPEN at once; otherwise OPEN
-        only when the golden window has run AND the turn has ended — never
-        at a bare timer boundary. Entering OPEN, the D2 revision is asked
-        for at once (the golden exit is itself a turn end).
+        GOLDEN (spec §6 as amended 2026-09-01): a hand-back exits to OPEN
+        at once; otherwise OPEN only once the golden window has run AND
+        the turn has ended — never at a bare timer boundary. After the
+        window a turn end is the first of: finished_thought, handed_back,
+        or quiet of AUTO_EOT_FALLBACK_S — the fallback applies whether or
+        not the officer answered (pilot D3: a healthy "not finished"
+        could hold GOLDEN indefinitely while a failed one exited at 5 s).
+        Entering OPEN, the D2 revision is asked for at once (the golden
+        exit is itself a turn end).
 
         OPEN/CLOSED: a turn end (finished, or handed back, or the silence
         fallback) marks the span; if it is the answer's turn ending, the
@@ -3301,15 +3384,17 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 auto["turn_ended"] = True
                 _request_revision(auto, "golden exit: hand-back")
                 return transition
-            elapsed = auto["golden_spent"] + ctl.seconds_in_phase()
-            if (elapsed >= AUTO_GOLDEN_MINUTES_S and ended
+            elapsed = _golden_elapsed(auto)
+            await _note_golden_window(auto, elapsed, seen_on="verdict", quiet_s=quiet_s)
+            ended_post_window = (ended or verdict.finished_thought
+                                 or quiet_s >= AUTO_EOT_FALLBACK_S)
+            if (auto["golden_window_ran"] and ended_post_window
                     and ctl.is_legal(auto_mode.AutoEvent.GOLDEN_TIMER_ELAPSED)):
-                transition = ctl.golden_timer_elapsed()
-                await auto_transition(transition,
-                                      detail={**detail, "golden_s": round(elapsed, 1)})
-                auto["turn_ended"] = True
-                _request_revision(auto, "golden exit: window run, turn ended")
-                return transition
+                return await _exit_golden(
+                    auto, {**detail, "golden_s": round(elapsed, 1),
+                           "by": ("verdict" if (verdict.finished_thought or verdict.handed_back)
+                                  else "quiet_fallback")},
+                    "golden exit: window run, turn ended")
             return None
         if ctl.phase in auto_mode.QUESTION_PHASES and ended and not auto["turn_ended"]:
             auto["turn_ended"] = True

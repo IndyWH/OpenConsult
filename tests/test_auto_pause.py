@@ -583,6 +583,57 @@ def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeyp
         _stop(s)
 
 
+def test_the_window_runs_correctly_across_two_pauses_the_482_arithmetic(gate, monkeypatch):
+    """Consultation 482: GOLDEN ran 55.7 s, paused, resumed, ran 2.0 s more,
+    paused, resumed — golden_spent 57.7 — and the 90 s window therefore
+    ran out 32.3 s into the third stretch. Pinned on an injected clock:
+    the seconds spent before each pause are kept, auto.golden_window_ran
+    is written once with the summed golden_s, and (owner decision
+    2026-09-01) the post-window fallback quiet then exits to OPEN."""
+    monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 90.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: [CALL], 3: []})
+    clock = {"t": 1000.0}
+    with live(gate) as s:
+        s.ws.portal.call(lambda: setattr(s.auto["controller"], "_clock", lambda: clock["t"]))
+        s.to_golden()
+        clock["t"] += 55.7
+        _fire_pass(s, LONG)                                   # pass 1: ECG → paused
+        assert s.phase.value == "paused_urgent"
+        assert s.auto["golden_spent"] == pytest.approx(55.7)
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        s.commit_transcript("and then it eased a bit")          # a turn ends after the resume
+        s.quiet(3.2)
+        s.probe()
+        assert s.phase.value == "golden", "55.7 s spent: the window has not run"
+        clock["t"] += 2.0
+        _fire_pass(s, LONG + " it is worse now " * 6)          # pass 2: a NEW action → paused again
+        assert s.phase.value == "paused_urgent"
+        assert s.auto["golden_spent"] == pytest.approx(57.7)
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        clock["t"] += 32.0                                     # 89.7 s: not yet
+        s.quiet(6.0)
+        s.probe()
+        assert s.phase.value == "golden"
+        assert s.auto["golden_window_ran"] is False
+        clock["t"] += 0.6                                      # 90.3 s: run, and 7 s quiet → exit
+        s.quiet(7.0)
+        s.probe()
+        assert s.phase.value == "open"
+        _stop(s)
+    ran = _audit("auto.golden_window_ran", s.session_id)
+    assert len(ran) == 1
+    assert ran[0]["golden_s"] == pytest.approx(90.3, abs=0.05)
+    last = _audit("auto.phase", s.session_id)[-1]
+    assert (last["from"], last["to"], last["trigger"]) == ("golden", "open", "golden_timer_elapsed")
+    assert last["detail"]["golden_s"] == pytest.approx(90.3, abs=0.05)
+    assert last["detail"]["by"] == "quiet_fallback"
+
+
 def test_take_over_is_terminal_and_standard_mode_works(gate, monkeypatch):
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
