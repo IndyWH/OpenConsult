@@ -5664,3 +5664,48 @@ absolute floor, and the politeness-abort threshold that shares it, keep
 only ×1.5 headroom there (**watch item**); and the monitor's up-firing
 drivers explain why moving the webcam to the top of the monitor did not
 reduce the echo (the same driver path fires at it either way).
+
+## Solo pilot diagnostic — consultations 482–484, 1 Sept 2026 (REPORT ONLY, 2026-09-02)
+
+**A report exists**, outside the repository:
+`~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_2026-09-01.md`,
+beside the three run logs and `PILOT_DEBRIEF_2026-09-01.md`. It is the
+diagnostic the debrief asked for over the owner's three solo pilot runs
+of auto mode on 1 Sept (the first time 7c ran in a room; face ON in all
+three; `AUTO_MODE_ENABLED=true` during the sitting): the complete
+`auto.*`/`speech.*` audit timeline per run relative to `auto.enabled`,
+the thresholds in force (every value at its code default; the 25 s
+speaker-count bound included), answers to the debrief's F1/F2/F5
+questions from the record, a read-only description of the GOLDEN loop's
+post-window behaviour and the politeness-abort path with file:line
+references, a candidate-defects list (D1–D10) and a
+behaved-as-designed list. Nothing in code, tests, config, flags or the
+database was changed; `help/` untouched.
+
+**The headline, so a reader does not need the report to know what
+happened:** there is no golden timer — the window is a comparison made
+only when an officer verdict is applied (`app/main.py:3301-3302`) — and
+encourager rotation is unconditional for the whole of GOLDEN
+(`main.py:3234`). In 483 the window ran out 19 s before Stop and two
+more encouragers followed with no exit; in 482 it ran out 75 s before
+Stop (golden seconds correctly kept across two urgency pauses) and five
+followed. Because each of our own utterances restarts the client's
+quiet span, the quiet never exceeded 8.3 s in any run, the officer was
+asked only at 3 s and 6 s of each ≈ 8 s span, and its 5 s silence
+fallback is never consulted while it *answers* — so a "not finished"
+officer plus the machine's own "Mm-hm." is a livelock that needs no
+talking patient. Successful officer verdicts are not audited or logged,
+so the record cannot show what the officer said (D2). 484 was stopped
+1.06 s after the window ran and is not evidence either way. There were
+**zero politeness aborts** in the three runs; the one utterance that
+stopped mid-word in 482 was an encourager cut after 450 ms by the
+urgency ratchet re-pausing 2.0 s after RESUME AUTO, not traffic. In 483
+the speaker-count answer arrived 127 s after Stop, 102 s after the 25 s
+bound; it was stored, not applied, and the run-5 ignored-declaration
+visibility and approval block are armed (and were exercised end to end
+in 482, where the answer was 41 s late). The decisions the report leaves
+with the owner are the debrief's seven.
+
+**Commit:** docs-only (this entry). The suite was not run for it — a
+HANDOVER-only change touches no code — per the house rule that a
+docs-only commit need not carry a suite run.
