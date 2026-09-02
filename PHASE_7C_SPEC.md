@@ -273,6 +273,20 @@ ack-resume loop. An alarm still unresolved at Stop flows into the
 review page's acknowledge-gated banner exactly as today; a live ack
 is recorded so the review page can show who acknowledged what, when.
 
+**The one answer's chance, made real (owner decision 2026-09-01,
+pilot defect D4).** In 482 the CDS pass already in flight when RESUME
+AUTO was acknowledged landed 2.0 s later with the same action still
+unarranged and re-paused, cutting an encourager after 450 ms — the
+stutter the owner heard. A pass that was in flight at the resume, or
+was launched before the first turn end that follows the resume, may
+NOT re-pause on actions the doctor has already acknowledged; only a
+pass started after at least one patient answer following the resume
+may re-pause under the ratchet. The suppression is audited as
+`auto.repause_suppressed` with the assessment version. A genuinely
+new action text in such a pass still pauses (widening the pending
+set, as slice 5 pinned), and a re-fire while already `PAUSED_URGENT`
+is untouched.
+
 Confirmed by the owner 2026-08-16 after slice-1 review: an alarm
 re-firing while already PAUSED_URGENT is a legal self-edge — the
 machine stays paused, keeps the prior phase, and the pending

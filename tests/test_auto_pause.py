@@ -193,8 +193,12 @@ CALL = {"action": "Call 999", "reason": "possible STEMI"}
 
 def _engine_with_alarms(engine, script):
     """`script` maps pass number (1-based) → urgent_actions list for that
-    pass; other passes are quiet. Agendas keep their scripted order."""
+    pass; other passes are quiet. Agendas keep their scripted order. A
+    set `engine.gate_event` holds every pass until released, as the
+    harness's own update does."""
     async def update(transcript, previous=None):
+        if engine.gate_event is not None:
+            await engine.gate_event.wait()
         engine.updates.append(transcript)
         questions = engine.agendas.pop(0) if len(engine.agendas) > 1 else engine.agendas[0]
         assessment = _assessment(questions, reasoning=f"pass {len(engine.updates)}")
@@ -447,7 +451,9 @@ def test_resume_returns_to_the_exact_prior_phase_and_the_ratchet_re_arms(gate, m
     turn end. Then the answer's turn end runs the D2 revision as always;
     here it leaves the alarm standing, so the SAME text re-fires and pauses
     again — the ratchet — needing a fresh acknowledgement; both are on the
-    record."""
+    record. (Since 2026-09-01 this also pins the ratchet's condition: the
+    re-pausing pass was started AFTER the answer's turn end — see the
+    482-shape tests below for the passes that may not.)"""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
@@ -559,6 +565,128 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
         assert len(engine.updates) == passes, "no pass ran without an answer"
         assert len(_audit("auto.paused", s.session_id)) == 1
         _stop(s)
+
+
+# --------------------------------------------------------------------------
+# The resume ratchet's one answer's chance (owner decision 2026-09-01, D4)
+
+def _launch_gated_pass(s, engine, *lines):
+    """Commit transcript so a CDS pass launches on the next tick, with the
+    engine gated so it stays IN FLIGHT until the test releases it."""
+    engine.gate_event = asyncio.Event()
+    before = len(engine.updates)
+    s.ws.portal.call(lambda: s.entry["transcript_parts"].extend(lines))
+    s.probe()                                              # the tick launches it
+    assert len(engine.updates) == before, "held in flight"
+
+
+def _release_pass(s, engine):
+    s.ws.portal.call(lambda: engine.gate_event.set())
+    engine.gate_event = None
+    for _ in range(40):
+        s.probe()
+        if s.entry["assessment"] is not None and s.entry["assessment"].get("reasoning", "").endswith(
+                str(len(engine.updates))):
+            s.probe()
+            return
+    raise AssertionError("the released pass did not land")
+
+
+def test_the_482_shape_a_pass_in_flight_at_resume_does_not_re_pause(gate, monkeypatch):
+    """Owner decision 2026-09-01 (pilot D4). 482: paused on v1 (ECG),
+    RESUME AUTO, and the pass already in flight landed 2.0 s later with the
+    ECG still unarranged — re-paused, and cut "Mm-hm." after 450 ms. Now:
+    a pass in flight at the resume may not re-pause on an acknowledged
+    action; the suppression is audited with the assessment version, the
+    machine stays in GOLDEN, and the encourager plays through. Then the
+    one answer's chance runs its course: after a turn end following the
+    resume, a NEW pass with the action still unarranged re-pauses."""
+    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: [ECG], 3: [ECG]})
+    with live(gate) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)                                    # pass 1: ECG → paused
+        assert s.phase.value == "paused_urgent"
+        _launch_gated_pass(s, engine, LONG + " and my arm is heavy " * 8)   # pass 2, in flight
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        s.quiet(5.5)                                           # the encourager, as in 482
+        e = _until(s.ws, {"auto_speak"})
+        assert e["ref_id"] == "go_on"
+        s.ws.send_text(json.dumps({"type": "speak_started",
+                                   "utterance_id": e["utterance_id"], "seq": s.seq + 1}))
+        s.frame(TTS_AMPLITUDE)
+        _until(s.ws, {"ack"})
+        _release_pass(s, engine)                               # pass 2 lands: ECG, unarranged
+        assert s.phase.value == "golden", "the pre-resume pass did not re-pause"
+        assert s.entry["pending_utterance"] is not None, "nothing was cut"
+        s.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": e["utterance_id"],
+                                   "seq": s.seq + 1, "reason": "complete"}))
+        s.probe()
+        # The one answer's chance: the patient answers and stops (a turn
+        # end after the resume); the NEXT pass may re-pause — and does.
+        s.commit_transcript("Nobody has done an ECG yet.")
+        s.quiet(3.2)
+        s.probe()
+        assert s.phase.value == "golden"
+        assert s.auto["repause_block"] is False
+        _fire_pass(s, LONG + " still nothing arranged " * 8)   # pass 3: ECG → paused again
+        assert s.phase.value == "paused_urgent"
+        cid = _stop(s)
+    suppressed = _audit("auto.repause_suppressed", s.session_id)
+    assert len(suppressed) == 1
+    assert suppressed[0]["actions"] == ["Bedside ECG now"]
+    assert suppressed[0]["assessment_version"] == 2 and suppressed[0]["phase"] == "golden"
+    paused = _audit("auto.paused", s.session_id)
+    assert [p["assessment_version"] for p in paused] == [1, 3]
+    rows = _rows(cid)
+    assert next(r for r in rows if r["text"] == "Go on.")["end_reason"] == "complete"
+
+
+def test_a_pass_launched_after_resume_but_before_any_answer_does_not_re_pause_either(gate, monkeypatch):
+    """The block is cleared by a turn end, not by the resume itself: a pass
+    launched after the resume (transcript growth, no turn end judged yet)
+    that re-fires the acknowledged action is suppressed too."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(False, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: [ECG]})
+    with live(gate) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        _fire_pass(s, LONG + " it keeps going on and on " * 8)   # launched AFTER the resume
+        assert s.phase.value == "golden"
+        _stop(s)
+    assert len(_audit("auto.repause_suppressed", s.session_id)) == 1
+    assert len(_audit("auto.paused", s.session_id)) == 1
+
+
+def test_a_genuinely_new_action_from_a_pre_resume_pass_still_pauses(gate, monkeypatch):
+    """The suppression covers only what the doctor acknowledged: a pass in
+    flight at the resume that brings a NEW action pauses again, its
+    pending set widened to everything it carried (slice 5's rule)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: [ECG, CALL]})
+    with live(gate) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)
+        _launch_gated_pass(s, engine, LONG + " and now I cannot breathe " * 8)
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        _release_pass(s, engine)
+        assert s.phase.value == "paused_urgent"
+        assert s.auto["controller"].pending_actions == frozenset({"Bedside ECG now", "Call 999"})
+        _stop(s)
+    assert _audit("auto.repause_suppressed", s.session_id) == []
+    paused = _audit("auto.paused", s.session_id)
+    assert len(paused) == 2 and paused[1]["actions"] == ["Bedside ECG now", "Call 999"]
 
 
 def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeypatch):

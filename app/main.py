@@ -1750,6 +1750,11 @@ def _new_auto_state() -> dict:
         "pause_versions": [],         # assessment_snapshot versions of the alarms in the live pause
         "acks": [],                   # live acknowledgements, for the consultation-linked audit row
         "handover_by_doctor": False,  # slice 6: the doctor's Handover tap started the sequence
+        # Owner decision 2026-09-01 (pilot D4): from RESUME AUTO until the
+        # first turn end that follows it, a CDS pass that lands may not
+        # re-pause on an already-acknowledged action — the one answer's
+        # chance made real. Cleared by that turn end; see maybe_run_cds.
+        "repause_block": False,
     }
 
 
@@ -2138,6 +2143,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     # accumulated state lives in the entry and survives reconnects.
     cds_task: asyncio.Task | None = None
     cds_failures = 0
+    # Phase 7c (owner decision 2026-09-01, pilot D4): whether the CDS pass
+    # in flight was launched before the first post-resume turn end — or was
+    # already in flight when RESUME AUTO was acknowledged. Such a pass may
+    # not re-pause on an already-acknowledged action when it lands.
+    cds_pre_answer = False
     gl_task: asyncio.Task | None = None
     gl_conditions: tuple = ()  # conditions the current guideline panel is for
     face_task: asyncio.Task | None = None  # Phase 7b tick loop, per-connection
@@ -2145,7 +2155,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
 
     async def maybe_run_cds() -> None:
         """Launch/collect the CDS side task without ever blocking transcription."""
-        nonlocal cds_task, cds_failures
+        nonlocal cds_task, cds_failures, cds_pre_answer
         if cds_task is not None and cds_task.done():
             try:
                 entry["assessment"] = cds_task.result()
@@ -2165,8 +2175,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # kept off it, app/face.py); with the gate down or auto
                 # off this is a no-op and today's behaviour stands.
                 if entry["auto"] is not None and entry["assessment"].get("urgent_actions"):
-                    await on_urgent_alarm(entry["assessment"]["urgent_actions"],
-                                          assessment_version)
+                    if not await _repause_suppressed(entry["assessment"]["urgent_actions"],
+                                                     assessment_version, cds_pre_answer):
+                        await on_urgent_alarm(entry["assessment"]["urgent_actions"],
+                                              assessment_version)
                 # Phase 7c (D2): the pass auto mode asked for has landed —
                 # plan the next ask from THIS version only.
                 if entry["auto"] is not None and entry["auto"]["revision"] == "running":
@@ -2251,6 +2263,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             entry["cds_sent_len"] = len(transcript)
             if auto_due:
                 entry["auto"]["revision"] = "running"
+            cds_pre_answer = bool(entry["auto"] is not None and entry["auto"]["repause_block"])
             cds_task = asyncio.create_task(
                 engine.update(transcript, entry["assessment"])
             )
@@ -2768,7 +2781,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await auto_transition(ctl.auto_off())
             _cancel_officer(auto)
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
-                        handover=None, last_issued=None, handover_by_doctor=False)
+                        handover=None, last_issued=None, handover_by_doctor=False,
+                        repause_block=False)
             _reset_golden(auto)
             await websocket.send_json({"type": "auto_toggled", "on": False,
                                        "phase": ctl.phase.value})
@@ -2795,6 +2809,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
           continues in standard mode with all of today's behaviour.
         A refusal is answered (auto_refused), never swallowed.
         """
+        nonlocal cds_pre_answer
         auto = entry["auto"]
         if auto is None:
             await refuse_auto("auto mode is not enabled on this server (AUTO_MODE_ENABLED)")
@@ -2829,6 +2844,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                             {"session_id": session_id, "phase": ctl.phase.value,
                              "actions": covered, "at_audio_s": round(session.audio_seconds, 1)})
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False)
+            # Owner decision 2026-09-01 (pilot D4, the 482 stutter): the
+            # ratchet may only re-pause on a pass started after at least
+            # one answer following this resume. A pass already in flight
+            # now predates it; so does any pass launched before the next
+            # turn end. maybe_run_cds consults both when a pass lands.
+            auto["repause_block"] = True
+            if cds_task is not None and not cds_task.done():
+                cds_pre_answer = True
             if ctl.phase in auto_mode.QUESTION_PHASES:
                 # Owner decision 2026-08-17 (spec §7 as amended): NO immediate
                 # revision. The alarm-bearing pass's agenda is the freshest
@@ -3189,6 +3212,41 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
                                    "phase": ctl.phase.value})
 
+    async def _repause_suppressed(actions: list[dict], assessment_version: int,
+                                  pre_answer: bool) -> bool:
+        """The resume ratchet's one answer's chance, made real (owner
+        decision 2026-09-01, pilot defect D4, spec §7 as amended).
+
+        In 482 the CDS pass in flight when RESUME AUTO was acknowledged
+        landed 2.0 s later with the same "Bedside ECG" still unarranged
+        and re-paused, cutting "Mm-hm." after 450 ms — the stutter the
+        owner heard. Nobody could have arranged anything in 2 s; the
+        pass predated the resume. So: a pass that was in flight at the
+        resume, or was launched before the first turn end after it, may
+        NOT re-pause on actions the doctor has already acknowledged. It
+        is audited instead (auto.repause_suppressed, with the assessment
+        version). A genuinely NEW action text in the same pass still
+        pauses — the widening rule of slice 5 — and a re-fire while
+        already paused is untouched (the block exists only after a
+        resume, in a listening phase).
+        """
+        auto = entry["auto"]
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        if not pre_answer or ctl.phase not in auto_mode.LISTENING_PHASES:
+            return False
+        texts = [str(a.get("action", "")) for a in actions if a.get("action")]
+        if not texts or not set(texts) <= ctl.acknowledged_actions:
+            return False
+        await audit.log(user["id"], "auto.repause_suppressed", None, None,
+                        {"session_id": session_id, "actions": texts,
+                         "assessment_version": assessment_version,
+                         "phase": ctl.phase.value,
+                         "reason": "pass predates the first post-resume turn end",
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        logger.info("Live session %s: re-pause suppressed on v%d (%s): the pass predates "
+                    "the first answer after the resume", session_id, assessment_version, texts)
+        return True
+
     async def on_urgent_alarm(actions: list[dict], assessment_version: int) -> None:
         """The urgency pause (Phase 7c slice 5, spec §7, hard rule 2).
 
@@ -3274,6 +3332,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         transition = auto["controller"].golden_timer_elapsed()
         await auto_transition(transition, detail=detail)
         auto["turn_ended"] = True
+        auto["repause_block"] = False        # a turn has ended (pilot D4)
         _request_revision(auto, why)
         return transition
 
@@ -3427,6 +3486,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                   "officer_ms": verdict.elapsed_ms,
                   **({"officer_failed": verdict.failed} if verdict.failed else {})}
         ended = verdict.handed_back or turn_finished(verdict, quiet_s, AUTO_EOT_FALLBACK_S)
+        if ended and ctl.phase in auto_mode.LISTENING_PHASES:
+            # A patient turn has ended after any resume: the ratchet may
+            # re-pause on passes launched from here on (pilot D4).
+            auto["repause_block"] = False
         if ctl.phase is auto_mode.AutoPhase.GOLDEN:
             if verdict.handed_back and ctl.is_legal(auto_mode.AutoEvent.HAND_BACK):
                 transition = ctl.hand_back()
