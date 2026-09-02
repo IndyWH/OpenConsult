@@ -703,6 +703,62 @@ def test_the_officer_is_not_asked_without_committed_transcript(gate, monkeypatch
 
 
 # ==========================================================================
+# The officer's word, on the record (owner decision 2026-09-01, pilot D2)
+
+def test_every_officer_verdict_is_audited_even_when_it_causes_no_transition(gate):
+    """Owner decision 2026-09-01 (solo pilot diagnostic, defect D2): the
+    1 Sept runs could not show what the officer answered, because only a
+    failure or a transition left a row. Now EVERY verdict is audited as
+    auto.officer_verdict — quiet_s, the golden window elapsed when in
+    GOLDEN, both booleans, the call's milliseconds, the phase, and the
+    transition it produced. The case that matters most is the one that
+    used to vanish: a healthy verdict that causes no transition."""
+    gate.cds_engine.verdicts = [OfficerVerdict(True, False, elapsed_ms=350)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started on Tuesday.")
+        s.quiet(3.4)
+        s.probe()                                        # the tick applies the verdict
+        assert s.phase is AutoPhase.GOLDEN, "the window has not run: no transition"
+        _stop(s)
+    verdicts = _audit("auto.officer_verdict", s.session_id)
+    assert len(verdicts) == 1
+    row = verdicts[0]
+    assert row["finished_thought"] is True and row["handed_back"] is False
+    assert row["failed"] is None and row["elapsed_ms"] == 350
+    assert row["quiet_s"] == 3.4 and row["phase"] == "golden"
+    assert 0.0 <= row["golden_elapsed_s"] < 60.0
+    assert row["transition"] is None
+    assert _audit("auto.officer_failed", s.session_id) == [], "auto.officer_failed is for failures only"
+
+
+def test_a_failed_verdict_and_a_transition_causing_verdict_are_audited_too(gate, monkeypatch):
+    """auto.officer_failed stays exactly as it was (fail-soft visibility);
+    the new row is written beside it, and a verdict that exits GOLDEN
+    carries the transition it caused."""
+    monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
+    gate.cds_engine.verdicts = [OfficerVerdict(False, False, failed="timeout", elapsed_ms=2001),
+                                OfficerVerdict(True, True, elapsed_ms=410)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started on Tuesday.")
+        s.quiet(3.2)
+        s.probe()                                        # the failed verdict
+        assert s.phase is AutoPhase.GOLDEN
+        s.quiet(6.3)
+        s.probe()                                        # re-asked: the hand-back
+        assert s.phase is AutoPhase.OPEN
+        _stop(s)
+    verdicts = _audit("auto.officer_verdict", s.session_id)
+    assert [v["failed"] for v in verdicts] == ["timeout", None]
+    assert verdicts[0]["transition"] is None
+    assert verdicts[1]["handed_back"] is True
+    assert verdicts[1]["transition"] == {"from": "golden", "to": "open", "trigger": "hand_back"}
+    failed = _audit("auto.officer_failed", s.session_id)
+    assert len(failed) == 1 and failed[0]["reason"] == "timeout"
+
+
+# ==========================================================================
 # Auto off
 
 @pytest.mark.parametrize("stage", ["invitation", "golden", "open"])

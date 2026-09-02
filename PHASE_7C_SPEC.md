@@ -328,7 +328,14 @@ and `test_standing_rules.py` extends to the new controls.
 - Audit events: `auto.enabled`, `auto.disabled`, `auto.phase`
   (with from/to/trigger), `auto.paused`, `auto.acknowledged`,
   `auto.resumed`, `auto.takeover`, `auto.handover`,
-  `auto.officer_failed` (fail-soft visibility).
+  `auto.officer_failed` (fail-soft visibility), and
+  `auto.officer_verdict` for EVERY officer verdict — quiet_s, the
+  golden window elapsed when in GOLDEN, finished_thought,
+  handed_back, the failure if any, elapsed_ms, the phase, and the
+  transition it produced or null (owner decision 2026-09-01, after
+  the solo pilot's defect D2: a healthy "not finished" left no trace,
+  so the runs that never left the golden minutes could not be read
+  from the record).
 - New table: `assessment_snapshot` (§7).
 - Every metric in the frozen prereg maps to these sources:
   1 elicitation coverage — final transcript vs marking scheme

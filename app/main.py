@@ -3273,8 +3273,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # being consulted as the quiet grows.
             await apply_officer_verdict(auto["officer_verdict"], quiet_s)
 
-    async def apply_officer_verdict(verdict, quiet_s: float) -> None:
+    async def apply_officer_verdict(verdict, quiet_s: float) -> auto_mode.Transition | None:
         """Turn the officer's word (or its absence) into phase behaviour.
+        Returns the transition it caused, if any (the verdict audit, in
+        maybe_apply_officer, records whether one did).
 
         GOLDEN (spec §6): a hand-back exits to OPEN at once; otherwise OPEN
         only when the golden window has run AND the turn has ended — never
@@ -3294,18 +3296,21 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         ended = verdict.handed_back or turn_finished(verdict, quiet_s, AUTO_EOT_FALLBACK_S)
         if ctl.phase is auto_mode.AutoPhase.GOLDEN:
             if verdict.handed_back and ctl.is_legal(auto_mode.AutoEvent.HAND_BACK):
-                await auto_transition(ctl.hand_back(), detail=detail)
+                transition = ctl.hand_back()
+                await auto_transition(transition, detail=detail)
                 auto["turn_ended"] = True
                 _request_revision(auto, "golden exit: hand-back")
-                return
+                return transition
             elapsed = auto["golden_spent"] + ctl.seconds_in_phase()
             if (elapsed >= AUTO_GOLDEN_MINUTES_S and ended
                     and ctl.is_legal(auto_mode.AutoEvent.GOLDEN_TIMER_ELAPSED)):
-                await auto_transition(ctl.golden_timer_elapsed(),
+                transition = ctl.golden_timer_elapsed()
+                await auto_transition(transition,
                                       detail={**detail, "golden_s": round(elapsed, 1)})
                 auto["turn_ended"] = True
                 _request_revision(auto, "golden exit: window run, turn ended")
-            return
+                return transition
+            return None
         if ctl.phase in auto_mode.QUESTION_PHASES and ended and not auto["turn_ended"]:
             auto["turn_ended"] = True
             if verdict.handed_back:
@@ -3314,7 +3319,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if auto["awaiting_answer"]:
                 auto["awaiting_answer"] = False
                 _request_revision(auto, "answer's turn ended")
-            return
+            return None
         if (ctl.phase is auto_mode.AutoPhase.HANDOVER and auto["handover"] is not None
                 and ended and not auto["turn_ended"]):
             # Slice 6: the doctor's handover from GOLDEN — the anything-else
@@ -3324,11 +3329,25 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if auto["awaiting_answer"]:
                 auto["awaiting_answer"] = False
                 _plan_handover(auto, entry["agenda"].current_version)
+        return None
 
     async def maybe_apply_officer() -> None:
         """Called on the loop's tick, like maybe_run_cds: when the officer
         has answered, audit a failure (auto.officer_failed — fail-soft
-        visibility, spec §11) and apply the verdict."""
+        visibility, spec §11), apply the verdict, and audit the verdict
+        itself.
+
+        EVERY officer verdict is audited as auto.officer_verdict (owner
+        decision 2026-09-01, pilot defect D2): the 1 Sept runs left no
+        record of what the officer answered, because only failures and
+        transitions were written — so the golden minutes that never ended
+        could not be explained from the trail. The row carries the quiet
+        the officer was asked about, the golden window elapsed when in
+        GOLDEN (golden_spent + seconds in phase, read BEFORE the verdict
+        is applied), both booleans, the failure if any, the call's
+        milliseconds, the phase it was applied in, and the transition it
+        produced — or null when it produced none, which is the case the
+        record most needed."""
         auto = entry["auto"]
         if auto is None or auto["officer_task"] is None or not auto["officer_task"].done():
             return
@@ -3348,7 +3367,26 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              "quiet_s": round(quiet_s or 0.0, 1),
                              "elapsed_ms": verdict.elapsed_ms,
                              "fallback_s": AUTO_EOT_FALLBACK_S})
-        await apply_officer_verdict(verdict, quiet_s or 0.0)
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        phase_before = ctl.phase
+        golden_elapsed = (auto["golden_spent"] + ctl.seconds_in_phase()
+                          if phase_before is auto_mode.AutoPhase.GOLDEN else None)
+        transition = await apply_officer_verdict(verdict, quiet_s or 0.0)
+        await audit.log(user["id"], "auto.officer_verdict", None, None,
+                        {"session_id": session_id,
+                         "quiet_s": round(quiet_s or 0.0, 1),
+                         "phase": phase_before.value,
+                         **({"golden_elapsed_s": round(golden_elapsed, 1)}
+                            if golden_elapsed is not None else {}),
+                         "finished_thought": verdict.finished_thought,
+                         "handed_back": verdict.handed_back,
+                         "failed": verdict.failed,
+                         "elapsed_ms": verdict.elapsed_ms,
+                         "transition": ({"from": transition.from_phase.value,
+                                         "to": transition.to_phase.value,
+                                         "trigger": transition.trigger.value}
+                                        if transition is not None else None),
+                         "at_audio_s": round(session.audio_seconds, 1)})
 
     try:
         while True:
