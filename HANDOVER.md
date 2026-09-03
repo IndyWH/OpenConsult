@@ -5709,3 +5709,148 @@ with the owner are the debrief's seven.
 **Commit:** docs-only (this entry). The suite was not run for it — a
 HANDOVER-only change touches no code — per the house rule that a
 docs-only commit need not carry a suite run.
+
+## Solo pilot fix slice — the owner's seven decisions of 1 Sept 2026, built (2026-09-03)
+
+**What landed.** The seven items of the owner's post-pilot decisions
+(recorded in `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DEBRIEF_2026-09-01.md`
+and the diagnostic's D1–D10 beside it), one commit each, the full suite
+green before every commit, `PHASE_7C_SPEC.md` truth-upped in the same
+commit as the code it describes. `AUTO_MODE_ENABLED` is untouched and
+`.env` reads `false`; `PHASE_7C_EVAL_PREREG.md` is untouched — the golden
+window stays 90 s and no metric changes; `help/`, `vendor/` and
+`OPEN_CLOSED_RULE.md` untouched. **Needs a restart to be live** (the
+owner's act, as always). Nothing here advances the gate: enabling auto
+mode still waits on barge-in calibration and the mock-patient review.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `02916b5` | every officer verdict audited as `auto.officer_verdict` (D2) | 945 → 947 |
+| 2 | `a43a224` | `golden_window_ran`, and the post-window exit rule (D1, D3) | 947 → 952 |
+| 3 | `6d93e04` | one "go on" per golden window, after 5 s of quiet (F3) | 952 → 954 |
+| 4 | `ee39abe` | a tapped examination handover ends the auto run (D5) | 954 → 957 |
+| 5 | `53f54cf` | the resume ratchet's one answer's chance, made real (D4) | 957 → 960 |
+| 6 | `9f4a399` | finalisation holds 180 s for the speaker count after an auto run (D6) | 960 → 965 |
+| 7 | `21be175` | the golden window counts down on the phase indicator (D7) | 965 → 967 |
+
+Final suite: **967 passed** (from 945 at `82ac5ae`). Every commit message
+carries the why; this entry carries the decisions and the seams.
+
+**The owner decisions, restated (all 2026-09-01):**
+
+1. **Every officer verdict is on the record** — `auto.officer_verdict`
+   with `quiet_s`, `golden_elapsed_s` when in GOLDEN, `finished_thought`,
+   `handed_back`, `failed`, `elapsed_ms`, `phase`, and the transition it
+   produced or null. `auto.officer_failed` unchanged beside it.
+2. **The window has an end the machine knows about.** `golden_window_ran`
+   is set the first time `golden_spent + seconds in GOLDEN ≥
+   AUTO_GOLDEN_MINUTES_S` is observed on any quiet report or verdict,
+   audited once as `auto.golden_window_ran` (with `golden_s`). Once set:
+   no encourager; GOLDEN → OPEN at the first of a verdict with
+   `finished_thought`/`handed_back`, or quiet ≥ `AUTO_EOT_FALLBACK_S` —
+   on every quiet report, whether or not the officer answered (the
+   transition detail says `by: verdict | quiet_fallback`). Before the
+   window, unchanged; `golden_spent` still counted across a pause (the
+   482 arithmetic 55.7 + 2.0 + 32.6 → 90.3 is pinned on an injected clock).
+3. **Encouragers: at most ONE per golden window, `go_on` only, after
+   `AUTO_ENCOURAGER_MIN_QUIET_S` (new, 5.0 s), never after the window.**
+   The bridge in the question phases keeps one-per-revision and speaks
+   the same phrase. `mm-hm` and `i_see` stay registered, tappable and
+   pre-synthesised (`speech.ENCOURAGER_IDS` unchanged;
+   `speech.ENCOURAGER_ID = "go_on"` is what the flow speaks).
+   **`AUTO_ENCOURAGER_COOLDOWN_S` is retired from both paths** — with
+   one per window and one per revision (~17 s apart) it bound nowhere,
+   and a setting that does nothing is worse than none. It is gone from
+   the code, `.env.example`, the thresholds record and spec §12.
+4. **A tapped examination handover ends the run** in GOLDEN, OPEN or
+   CLOSED: the same `handover_requested` edge, `auto.doctor_handover`
+   with `via=tap` (the control now writes `via=control`),
+   `auto.handover` with `requested_by=doctor`, the client told the run
+   has ended. Slice 4's "a tap in GOLDEN changes no flow state" is
+   superseded for this one phrase.
+5. **The resume ratchet's one answer's chance.** A CDS pass in flight at
+   RESUME AUTO, or launched before the first turn end after it, may not
+   re-pause on already-acknowledged actions; audited
+   `auto.repause_suppressed` with the assessment version. Only a pass
+   started after a post-resume turn end re-pauses. A genuinely new
+   action still pauses (widening, as slice 5 pinned); a re-fire while
+   already paused is untouched. Slice 5's flagged "RESUME is a
+   no-op-and-re-pause until the doctor has dealt with the alarm" is
+   thereby closed for the in-flight pass; the sharpness that remains is
+   the ratchet as designed.
+6. **The speaker-count wait after an auto run is 180 s**
+   (`AUTO_SPEAKER_DECLARATION_WAIT_S`, new) instead of 25 s
+   (`SPEAKER_DECLARATION_WAIT_S`, now in `.env.example` too, unchanged
+   for other consultations). While it holds: the Stop prompt says how
+   long, the live status line says it is waiting for the speaker count,
+   the review page's finalising status says so, and the consultation
+   API carries `awaiting_declaration`. On expiry the run-5
+   ignored-declaration path applies unchanged.
+7. **The phase indicator counts the golden window down** from the
+   server's own numbers (`golden_s` in `speech_config.auto`,
+   `golden_spent` on every `auto_phase` push): counting in GOLDEN,
+   frozen while PAUSED_URGENT, cleared on exit. No new audit event.
+
+**Spec sections touched:** §3 (taps), §5 (the fallback after the window;
+the encourager policy), §6 (the post-window state), §7 (the one answer's
+chance), §10 (tapped handover; the speaker wait; the countdown), §11
+(`auto.officer_verdict`, `auto.golden_window_ran`), §12 (settings: the
+cooldown out, the minimum quiet and the speaker wait in).
+
+**Where the decisions did not fully decide, and what the code does — for
+the owner and Cowork to confirm or overrule:**
+
+- **The window's one encourager is spent at issue**, like the nudge: a
+  politeness-aborted "go on" is not re-issued. The alternative (spend it
+  only when played through) risks the same phrase twice.
+- **The tapped handover ends the run at the tap, not at the phrase's
+  end**: a cut-off handover phrase is still the doctor's decision. A tap
+  while the doctor's own Handover sequence is already under way ends it
+  too (the machine will not say the phrase again).
+- **"A turn end after the resume" is any turn end the officer judges in
+  a listening phase** — in GOLDEN a finished verdict counts even before
+  the window (the patient spoke and stopped). The suppression covers
+  every action acknowledged this session, not only the last pause's.
+- **The auto-run test for the speaker wait is the machine's history
+  having an ENABLE transition** — the same fact the `auto.enabled` row
+  records — read at Stop; the created audit row says `auto_run` and the
+  bound so the consultation carries it. The wait is in-process, as the
+  waiter always was: after a restart no waiter exists and no wait
+  happens, exactly as before.
+- **Tests repinned by decision** (each docstring names it): the
+  golden-encourager tests of slice 3 (phrase, threshold, one per window,
+  aborted-is-spent), the timer-alone hold (now re-asked inside the
+  fallback span), and one slice-3 test — "nothing is spoken in OPEN" —
+  which had been passing vacuously since slice 4 because an unplayed
+  golden encourager blocked the slot; it now pins what OPEN actually
+  says (at most the single bridge, never a rotation). Two structural
+  pins gained the new call arguments (`askSpeakers`, the `auto_phase`
+  handler). Nothing was weakened or deleted.
+- **The pause tests' harness parks `AUTO_ENCOURAGER_MIN_QUIET_S` at 100**
+  beside the old threshold, so tests that do not want an encourager get
+  none; a test that wants one sets it back to 5.0.
+
+**`help/`:** no article is made untrue. `help/02` Step 3 says the
+assistant "encourages" (it still does, once) and Step 4 says the app
+"asks one question — how many people spoke — then rebuilds the
+transcript" (it still does; it now waits longer for the answer after an
+auto run). `help/05`'s held sentence stays held.
+
+**Watch list, carried forward unchanged:**
+
+- **D9** — one officer timeout in 484 at +78.4 (1999 ms) with no CDS
+  pass visibly in flight; fail-soft worked; cause unexplained. Item 1
+  now records every verdict's `elapsed_ms`, so the next occurrence will
+  have neighbours to compare against.
+- **D10** — the politeness abort is a single RMS sample with no duration
+  term (`live.html`, `politeness.shouldAbort`), unexercised: zero aborts
+  on 1 Sept from the top-of-monitor position. The London-traffic
+  question stays open rather than answered.
+- **The felt length of the 90 s window** — re-judge in the next pilot
+  now that the exit works and the indicator counts it down; if still
+  too long, the prereg amendment path (an owner-approved logged
+  amendment, never a silent edit) is how it changes.
+- **The solo-run first-speaker label** — a single cluster already
+  defaults to Patient and is flagged (`transcript.single_voice`);
+  confirmed working in 484. Solo runs still need Swap when diarisation
+  finds two clusters of one voice (482, 483).
