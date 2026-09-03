@@ -29,7 +29,9 @@ from app import (assessment_snapshots, audit, auth, auto_mode, consultations, fa
                  schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app.cds import CDSEngine, OfficerVerdict, turn_finished
-from app.finalize import (expect_declaration, finalize_consultation,
+from app.finalize import (AUTO_SPEAKER_DECLARATION_WAIT_S, declaration_bound,
+                          declaration_pending, expect_declaration,
+                          finalize_consultation, hold_declaration_for,
                           regenerate_note, release_declaration)
 from app import transcript_quality
 from app.live import PROCESS_INTERVAL_S, LiveSession, bytes_to_ms
@@ -951,7 +953,12 @@ async def consultation_state(
         content={**consultation, "turns": turns, "note": note, "plain_text": plain,
                  "live_acknowledgements": live_acks,
                  "letters": letter_rows, "system_utterances": spoken,
-                 "labels": labels}
+                 "labels": labels,
+                 # The pipeline is holding for the doctor's "Who spoke?" answer
+                 # (the bound in force, seconds), or null. In-process state,
+                 # read live: the review page says it is waiting rather than
+                 # "finalising" (owner decision 2026-09-01, pilot D6).
+                 "awaiting_declaration": declaration_pending(cid)}
     )
 
 
@@ -1459,9 +1466,19 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
     cid = await consultations.create_consultation(entry["patient_id"], user["id"])
     if entry["queue_entry_id"] is not None:
         await frontdesk.finish_entry(entry["queue_entry_id"])
+    # Phase 7c (owner decision 2026-09-01, pilot D6): a consultation in
+    # which auto mode was enabled — an auto.enabled row exists for the
+    # session, i.e. the machine's history has an ENABLE transition — waits
+    # longer for the speaker count (see below). Said on the created row so
+    # the consultation carries the fact the session-keyed rows hold.
+    auto_ran = bool(entry.get("auto")) and any(
+        t.trigger is auto_mode.AutoEvent.ENABLE for t in entry["auto"]["controller"].history)
     await audit.log(user["id"], "consultation.created", "consultation", cid,
                     {"patient_id": entry["patient_id"],
-                     **({"connection_lost": True} if connection_lost else {})})
+                     **({"connection_lost": True} if connection_lost else {}),
+                     **({"auto_run": True,
+                         "speaker_wait_s": AUTO_SPEAKER_DECLARATION_WAIT_S}
+                        if auto_ran and not connection_lost else {})})
     wav_path = str(RECORDINGS_DIR / f"consultation_{cid}.wav")
     duration = session.save_recording(wav_path)
     logger.info("Consultation %d: %.1fs of audio saved%s", cid, duration,
@@ -1531,6 +1548,13 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
     # nobody at the screen, so it never registers and never waits.
     if not connection_lost:
         expect_declaration(cid)
+        if auto_ran:
+            # The doctor supervising an auto run is not at the keyboard when
+            # Stop lands (41 s and 127 s late in 482 and 483): the pipeline
+            # waits AUTO_SPEAKER_DECLARATION_WAIT_S for them, not the 25 s.
+            # On expiry the ignored-declaration path applies unchanged.
+            hold_declaration_for(cid, AUTO_SPEAKER_DECLARATION_WAIT_S)
+        entry["speaker_wait_s"] = declaration_bound(cid)
     app_state.finalize_queue.put_nowait((cid, wav_path))
     return cid
 
@@ -3688,7 +3712,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # The Stop button IS the finalisation trigger — no separate step.
         sessions.pop(session_id, None)
         cid = await _complete_session(state, entry, connection_lost=False)
-        await websocket.send_json({"type": "done", "consultation_id": cid})
+        await websocket.send_json({"type": "done", "consultation_id": cid,
+                                   # How long finalisation will wait for the
+                                   # "Who spoke?" answer — the prompt says so.
+                                   "speaker_wait_s": entry.get("speaker_wait_s")})
         await websocket.close()
     except WebSocketDisconnect:
         pass

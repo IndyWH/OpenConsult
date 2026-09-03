@@ -562,7 +562,7 @@ def test_the_speaker_question_is_asked_at_stop_with_three_one_tap_answers():
     # consultation is complete, so it cannot hold it open.
     done = html[html.index("else if (msg.type === 'done')"):]
     done = done[:done.index("\n  }")]
-    assert "askSpeakers(msg.consultation_id)" in done
+    assert "askSpeakers(msg.consultation_id, msg.speaker_wait_s)" in done
 
 
 def test_no_answer_can_hold_the_consultation_open_and_none_leaves_a_dead_tap():

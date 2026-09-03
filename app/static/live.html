@@ -608,6 +608,9 @@
        A doctor-only recording is therefore not supported by design; see
        HANDOVER if that ever becomes a real case. -->
   <span class="what">Who spoke in this consultation?</span>
+  <!-- Owner decision 2026-09-01 (solo pilot, D6): the prompt says how long
+       finalisation is holding for this answer, from the server's `done`. -->
+  <span class="hint" id="spkWait" hidden></span>
   <button class="go" id="spkOne" type="button">Only the patient</button>
   <button class="go" id="spkTwo" type="button">Both of us</button>
   <button id="spkSkip" type="button">Skip</button>
@@ -2105,6 +2108,7 @@ const spkResultWhat = document.getElementById('spkResultWhat');
 // pinned, it dies the moment the doctor leaves the page, and leaving the page
 // is the very next thing they do.
 let speakersOutstanding = false;
+let speakerWaitS = null;      // how long finalisation holds for the answer (server's word)
 
 function showSpeakerResult(text, tone) {
   spkResult.className = 'spkask on' + (tone ? ' ' + tone : '');
@@ -2118,6 +2122,7 @@ async function declareSpeakers(cid, count) {
   spkAsk.classList.remove('on');
   speakersOutstanding = false;
   refreshResultButton();
+  refreshProcessingStatus();
   // Skip POSTS too, rather than staying silent. It carries no count — the
   // default still applies — but it releases the waiting pipeline at once, which
   // is what keeps skipping free. An offer that costs time is not an offer.
@@ -2155,14 +2160,36 @@ async function declareSpeakers(cid, count) {
   }
 }
 
-function askSpeakers(cid) {
+function askSpeakers(cid, waitS) {
   spkResult.classList.remove('on');
   spkAsk.classList.add('on');
   speakersOutstanding = true;
+  speakerWaitS = (typeof waitS === 'number' && waitS > 0) ? waitS : null;
+  const wait = document.getElementById('spkWait');
+  wait.hidden = speakerWaitS === null;
+  wait.textContent = speakerWaitS === null ? ''
+    : 'Finalisation is waiting for this answer (up to ' + describeWait(speakerWaitS) + ').';
   refreshResultButton();
   document.getElementById('spkOne').onclick = () => declareSpeakers(cid, 1);
   document.getElementById('spkTwo').onclick = () => declareSpeakers(cid, 2);
   document.getElementById('spkSkip').onclick = () => declareSpeakers(cid, null);
+}
+
+function describeWait(seconds) {
+  if (seconds >= 120) return Math.round(seconds / 60) + ' minutes';
+  return Math.round(seconds) + ' seconds';
+}
+
+// The status line while finalisation runs: while the speaker question is
+// still outstanding the pipeline is holding for it, and the status says
+// that rather than "processing" (owner decision 2026-09-01, D6).
+let processingStatusOn = false;
+function refreshProcessingStatus() {
+  if (!processingStatusOn) return;
+  setStatus(speakersOutstanding && speakerWaitS !== null
+    ? 'waiting for your answer to “Who spoke?” before identifying speakers (up to '
+      + describeWait(speakerWaitS) + ')…'
+    : 'processing — diarisation and note drafting (usually about a minute)…');
 }
 
 function refreshResultButton() {
@@ -2591,7 +2618,7 @@ function onWsMessage(event) {
       // open. Diarisation reads the count immediately before the audio phase,
       // after MedGemma is unloaded, which is what gives a one-tap answer time
       // to land — and if it does not, the reply says so.
-      askSpeakers(msg.consultation_id);
+      askSpeakers(msg.consultation_id, msg.speaker_wait_s);
       awaitResults(msg.consultation_id);
     } else {
       btn.textContent = 'Start';
@@ -2758,7 +2785,8 @@ const LANDING_MESSAGES = {
 };
 
 async function awaitResults(cid) {
-  setStatus('processing — diarisation and note drafting (usually about a minute)…');
+  processingStatusOn = true;
+  refreshProcessingStatus();
   while (true) {
     await new Promise(r => setTimeout(r, 3000));
     let row = null;
@@ -2772,6 +2800,7 @@ async function awaitResults(cid) {
     const [label, message] = LANDING_MESSAGES[row.status]
       || ['See details', 'finalisation finished (' + row.status + ') — ' +
                         'open the consultation for details'];
+    processingStatusOn = false;
     resultUrl = '/review/' + cid;
     btn.textContent = label;
     btn.disabled = false;

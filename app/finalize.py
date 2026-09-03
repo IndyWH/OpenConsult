@@ -84,18 +84,52 @@ DEFAULT_SPEAKERS = 2
 # did not: the audit row shows the doctor's answer arriving 11 s after the
 # consultation row was created and finding speakers_used already set to 2.
 SPEAKER_DECLARATION_WAIT_S = float(os.getenv("SPEAKER_DECLARATION_WAIT_S", "25"))
+# The same wait for a consultation in which AUTO MODE was enabled (an
+# auto.enabled row exists for the session) — owner decision 2026-09-01, after
+# the solo pilot (defect D6): in two of three auto runs the doctor, alone at
+# the screen, answered 41 s and 127 s after Stop, the 25 s bound had passed,
+# and the answer was stored but not applied. The doctor supervising an auto
+# run is not at the keyboard when Stop lands; the pipeline waits longer for
+# them. On expiry the existing ignored-declaration path applies unchanged.
+AUTO_SPEAKER_DECLARATION_WAIT_S = float(os.getenv("AUTO_SPEAKER_DECLARATION_WAIT_S", "180"))
 
 # Consultations whose doctor is being asked the speaker count right now.
 # Registered at Stop, released by the answer (or by Skip), and abandoned after
 # the bounded wait. Absent means nobody is being asked — a crash-recovery or
 # connection-lost finalisation has no client to answer and must not wait.
 _declaration_waiters: dict[int, asyncio.Event] = {}
+# The bound in force for each waiter, when it is not the default: an auto
+# run's longer wait (hold_declaration_for). In-process, like the waiter — the
+# wait only ever happens in the process that registered it.
+_declaration_bounds: dict[int, float] = {}
 
 
 def expect_declaration(cid: int) -> None:
     """Called at Stop, before the pipeline is queued, so the waiter exists
     before anything could release it."""
     _declaration_waiters[cid] = asyncio.Event()
+
+
+def hold_declaration_for(cid: int, seconds: float) -> None:
+    """Lengthen the bound for a registered waiter (an auto run's
+    AUTO_SPEAKER_DECLARATION_WAIT_S). No waiter, nothing to lengthen."""
+    if cid in _declaration_waiters:
+        _declaration_bounds[cid] = float(seconds)
+
+
+def declaration_bound(cid: int) -> float:
+    """The bound a waiter for `cid` will observe."""
+    return _declaration_bounds.get(cid, SPEAKER_DECLARATION_WAIT_S)
+
+
+def declaration_pending(cid: int) -> float | None:
+    """Is a pipeline (still) waiting for this consultation's speaker count?
+    The bound in force if so, else None — what the review page and the
+    consultation API show as "waiting for the speaker count"."""
+    event = _declaration_waiters.get(cid)
+    if event is None or event.is_set():
+        return None
+    return declaration_bound(cid)
 
 
 def release_declaration(cid: int) -> bool:
@@ -107,22 +141,26 @@ def release_declaration(cid: int) -> bool:
     return True
 
 
-async def await_declaration(cid: int, timeout: float = SPEAKER_DECLARATION_WAIT_S) -> str:
+async def await_declaration(cid: int, timeout: float | None = None) -> str:
     """Block the PIPELINE (never the recording) until the answer arrives.
 
-    Returns why the wait ended, for the log: 'answered', 'timeout', or
-    'not_expected' when no client was ever going to answer.
+    The bound is `timeout` when given, else the waiter's own
+    (declaration_bound: SPEAKER_DECLARATION_WAIT_S, or the auto run's
+    longer one). Returns why the wait ended, for the log: 'answered',
+    'timeout', or 'not_expected' when no client was ever going to answer.
     """
     event = _declaration_waiters.get(cid)
     if event is None:
         return "not_expected"
+    bound = float(timeout) if timeout is not None else declaration_bound(cid)
     try:
-        await asyncio.wait_for(event.wait(), timeout)
+        await asyncio.wait_for(event.wait(), bound)
         return "answered"
     except asyncio.TimeoutError:
         return "timeout"
     finally:
         _declaration_waiters.pop(cid, None)
+        _declaration_bounds.pop(cid, None)
 
 
 async def unload_medgemma() -> None:
@@ -666,11 +704,12 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
         # the MedGemma unload to buy time was measured wrong on 450: the answer
         # arrived 11 s after Stop and found the count already read. The wait is
         # bounded and released instantly by any of the three taps.
+        bound = declaration_bound(cid)
         why = await await_declaration(cid)
         speakers = await consultations.speakers_for_diarisation(
             cid, DEFAULT_SPEAKERS)
         logger.info("Consultation %d: diarising with %d speaker(s) "
-                    "(declaration %s)", cid, speakers, why)
+                    "(declaration %s, bound %.0fs)", cid, speakers, why, bound)
         transcription = await asyncio.to_thread(
             transcribe_and_diarise, wav_path, spans, speakers)
 

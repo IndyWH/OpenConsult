@@ -372,6 +372,18 @@ and `test_standing_rules.py` extends to the new controls.
   already looking — same position class as the urgent panel it
   accompanies.
 - The speaking pill and Esc behave exactly as in 7a.
+- **The speaker-count wait after an auto run** (owner decision
+  2026-09-01, pilot defect D6): finalisation of a consultation in
+  which auto mode was enabled holds for the doctor's "Who spoke?"
+  answer up to `AUTO_SPEAKER_DECLARATION_WAIT_S` rather than the
+  25 s bound — in two of three pilot runs the supervising doctor
+  answered after the bound and the answer was stored, not applied.
+  While it holds, the Stop prompt, the live status line and the
+  review page's finalising status all say they are waiting for the
+  speaker count and for how long; the consultation API carries
+  `awaiting_declaration`. Answering or Skip releases it at once; on
+  expiry the run-5 ignored-declaration visibility and approval block
+  apply unchanged.
 - **A tapped examination handover ends the auto run** (owner decision
   2026-09-01, pilot defect D5). The doctor's one-tap "Thank you — Dr …
   will examine you now" in GOLDEN, OPEN or CLOSED is the handover: the
@@ -433,6 +445,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back |
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
 | `AUTO_STRICT_REVISE` | `true` | D2 posture, flippable for comparison runs |
+| `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 
 Every setting mirrored in `.env.example` with a one-line comment;
 uncalibrated values labelled as guesses naming the run that will

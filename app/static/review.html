@@ -680,6 +680,16 @@ async function refresh() {
   renderHead();
   if (state.status === 'processing' || state.status === 'queued' || state.status === 'live') {
     processingEl.style.display = 'block'; contentEl.style.display = 'none';
+    // Owner decision 2026-09-01 (solo pilot, D6): while the pipeline is
+    // holding for the "Who spoke?" answer, say so — "finalising" was read
+    // as "already done without me" in 483. The bound is the server's.
+    processingEl.innerHTML = state.awaiting_declaration
+      ? '<span class="spinner"></span>Waiting for your answer to “Who spoke in this '
+        + 'consultation?” on the consultation page (up to '
+        + Math.round(state.awaiting_declaration) + ' s) before identifying speakers. '
+        + 'Then: re-transcribing, identifying speakers, drafting the note…'
+      : '<span class="spinner"></span>Finalising: re-transcribing, identifying '
+        + 'speakers, drafting the note… this takes a minute or two.';
     setTimeout(refresh, 3000);
     return;
   }
