@@ -2344,15 +2344,64 @@ const AUTO_PHASE_LABELS = {
   open: 'Open questions', closed: 'Closed questions', paused_urgent: 'Paused — urgent',
   handover: 'Handing over',
 };
+// The golden window on the indicator (owner decision 2026-09-01, pilot
+// D7): "90 seconds" was being counted from the Auto toggle, but the
+// machine's zero is the invitation's end, 11.7 s later in every pilot run,
+// and the window is kept across an urgency pause. The remaining seconds
+// are the SERVER'S arithmetic — golden_s (speech_config.auto) minus the
+// golden_spent it sends with every auto_phase push minus the time since
+// GOLDEN was (re-)entered — counting down in GOLDEN, frozen while
+// PAUSED_URGENT (the pause push's golden_spent already includes the
+// stretch just paused), cleared on any other phase. No new audit event.
+const goldenCountdown = {
+  goldenS: null,     // AUTO_GOLDEN_MINUTES_S, from speech_config.auto
+  spent: 0,          // the server's golden_spent at the last GOLDEN entry
+  enteredAt: null,   // ms when GOLDEN was (re-)entered; null unless counting
+  frozen: null,      // remaining seconds while paused from GOLDEN; else null
+  configure(cfg) {
+    const g = Number(cfg && cfg.golden_s);
+    this.goldenS = g > 0 ? g : null;
+  },
+  onPhase(phase, goldenSpent, now) {
+    if (this.goldenS === null) { this.clear(); return; }
+    const spent = Number(goldenSpent);
+    const known = Number.isFinite(spent) ? spent : this.spent;
+    if (phase === 'golden') {
+      this.spent = known; this.enteredAt = now; this.frozen = null;
+    } else if (phase === 'paused_urgent' && (this.enteredAt !== null || this.frozen !== null)) {
+      this.frozen = this.goldenS - known; this.enteredAt = null;
+    } else {
+      this.clear();
+    }
+  },
+  clear() { this.enteredAt = null; this.frozen = null; },
+  remaining(now) {
+    if (this.frozen !== null) return this.frozen;
+    if (this.enteredAt === null) return null;
+    return this.goldenS - this.spent - (now - this.enteredAt) / 1000;
+  },
+  suffix(now) {
+    const r = this.remaining(now);
+    if (r === null) return '';
+    const s = Math.max(0, Math.round(r));
+    return (this.frozen !== null ? ' · golden window held, ' : ' · ') + s + ' s left';
+  },
+};
+
 function applyAutoPhase(phase) {
   autoPhase = phase || autoPhase;
   const box = document.getElementById('autoPhase');
   const label = AUTO_PHASE_LABELS[autoPhase];
   const show = autoOn && !!label;
   box.hidden = !show;
-  box.textContent = show ? ('Auto mode: ' + label) : '';
+  box.textContent = show ? ('Auto mode: ' + label + goldenCountdown.suffix(performance.now())) : '';
   refreshSpeechControls();
 }
+// The countdown ticks once a second while it is running or held; nothing
+// else on the indicator changes between pushes.
+setInterval(() => {
+  if (autoOn && goldenCountdown.remaining(performance.now()) !== null) applyAutoPhase();
+}, 1000);
 
 const handoverBtn = document.getElementById('handoverBtn');
 handoverBtn.addEventListener('click', () => {
@@ -2498,6 +2547,7 @@ function onWsMessage(event) {
     nudge.windowS = Number(msg.silence_nudge_s) || nudge.windowS;
     if (msg.auto) {                       // Phase 7c, only when enabled server-side
       quietReporter.configure(msg.auto);
+      goldenCountdown.configure(msg.auto);        // the window length, for the indicator
       quietReporter.floor = bargeIn.absFloor;   // the same "this is speech" number
       autoAvailable = true;                     // slice 6: the Auto pill exists
       refreshSpeechControls();
@@ -2557,6 +2607,7 @@ function onWsMessage(event) {
     // starts a fresh quiet span at the moment of confirmation.
     quietReporter.enabled = !!msg.on;
     if (msg.on) quietReporter.activity(performance.now());
+    if (!msg.on) goldenCountdown.clear();
     applyAutoToggle(msg);                       // slice 6: the pill follows the echo
     // Slice 5: the pause banner follows the phase — paused_urgent shows it
     // (with the server's pending list on a reconnect echo), anything else
@@ -2564,7 +2615,10 @@ function onWsMessage(event) {
     if (msg.phase === 'paused_urgent') renderPause(true, msg.pending || pausePending);
     else if (pausedLive) renderPause(false, []);
   }
-  else if (msg.type === 'auto_phase') { applyAutoPhase(msg.phase); }   // slice 6: the indicator
+  else if (msg.type === 'auto_phase') {   // slice 6: the indicator; the countdown follows the same push
+    goldenCountdown.onPhase(msg.phase, msg.golden_spent, performance.now());
+    applyAutoPhase(msg.phase);
+  }
   else if (msg.type === 'auto_pause') {
     // Slice 5: paused (or a widening re-fire). `pending` is EVERY pending
     // action text; the list is replaced, never appended to.

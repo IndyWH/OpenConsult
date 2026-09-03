@@ -367,7 +367,14 @@ and `test_standing_rules.py` extends to the new controls.
 - **Phase indicator** on the status line while auto is on (Golden
   minutes / Open questions / Closed questions / Paused — urgent /
   Handing over), so the supervising doctor always knows what the
-  machine thinks it is doing.
+  machine thinks it is doing. **With the golden window's remaining
+  seconds** (owner decision 2026-09-01, pilot defect D7: "90 seconds"
+  was being counted from the Auto toggle, but the machine's zero is
+  the invitation's end): `AUTO_GOLDEN_MINUTES_S` (sent in
+  `speech_config.auto` as `golden_s`) minus the `golden_spent` the
+  server puts on every `auto_phase` push minus the time since GOLDEN
+  was entered — counting down in GOLDEN, frozen while PAUSED_URGENT,
+  cleared on exit. No new audit event.
 - **Pause banner** (§7) in the sticky row, where the doctor is
   already looking — same position class as the urgent panel it
   accompanies.

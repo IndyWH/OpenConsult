@@ -758,8 +758,10 @@ def test_the_window_runs_correctly_across_two_pauses_the_482_arithmetic(gate, mo
         _fire_pass(s, LONG)                                   # pass 1: ECG → paused
         assert s.phase.value == "paused_urgent"
         assert s.auto["golden_spent"] == pytest.approx(55.7)
-        _ack(s, "resume")
+        seen = _ack(s, "resume")
         assert s.phase.value == "golden"
+        resumed = next(m for m in seen if m.get("type") == "auto_phase" and m["phase"] == "golden")
+        assert resumed["golden_spent"] == pytest.approx(55.7), "the countdown's input (D7)"
         s.commit_transcript("and then it eased a bit")          # a turn ends after the resume
         s.quiet(3.2)
         s.probe()
@@ -906,8 +908,9 @@ def test_every_transition_is_pushed_live_as_auto_phase(gate):
         invitation = next(m for m in seen if m.get("type") == "auto_speak")
         s.play(invitation["utterance_id"])
         seen = s.probe()
-        assert [(m["from"], m["phase"]) for m in seen if m.get("type") == "auto_phase"] == \
-            [("invitation", "golden")]
+        golden = [m for m in seen if m.get("type") == "auto_phase"]
+        assert [(m["from"], m["phase"]) for m in golden] == [("invitation", "golden")]
+        assert golden[0]["golden_spent"] == 0.0, "the push carries the golden seconds spent (D7)"
         _stop(s)
 
 

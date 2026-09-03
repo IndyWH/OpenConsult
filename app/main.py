@@ -2143,6 +2143,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # the gate is up, so the shipped (off) protocol is byte-identical.
         speech_config["auto"] = {
             "enabled": True,
+            "golden_s": AUTO_GOLDEN_MINUTES_S,
             "encourager_quiet_s": AUTO_ENCOURAGER_QUIET_S,
             "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
             "eot_quiet_s": AUTO_EOT_QUIET_S,
@@ -2659,7 +2660,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         await websocket.send_json({"type": "auto_phase",
                                    "phase": transition.to_phase.value,
                                    "from": transition.from_phase.value,
-                                   "trigger": transition.trigger.value})
+                                   "trigger": transition.trigger.value,
+                                   # Owner decision 2026-09-01 (pilot D7): the
+                                   # golden seconds already spent, so the
+                                   # indicator can count the window down
+                                   # from the same arithmetic the server
+                                   # uses (a pause push carries the sum
+                                   # including the stretch just paused).
+                                   "golden_spent": round(entry["auto"]["golden_spent"], 1)})
 
     async def auto_issue(utterance: auto_mode.Utterance, *, phase, trigger: dict,
                          detail: dict | None = None) -> speech.Utterance | None:

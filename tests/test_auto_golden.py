@@ -422,6 +422,7 @@ def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
         first = _collect_until(s.ws, {"auto_toggled"})
         config = next(m for m in first if m["type"] == "speech_config")
         assert config["auto"] == {"enabled": True,
+                                  "golden_s": appmain.AUTO_GOLDEN_MINUTES_S,
                                   "encourager_quiet_s": appmain.AUTO_ENCOURAGER_QUIET_S,
                                   "encourager_min_quiet_s": appmain.AUTO_ENCOURAGER_MIN_QUIET_S,
                                   "eot_quiet_s": appmain.AUTO_EOT_QUIET_S,
