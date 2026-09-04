@@ -5854,3 +5854,88 @@ auto run). `help/05`'s held sentence stays held.
   defaults to Patient and is flagged (`transcript.single_voice`);
   confirmed working in 484. Solo runs still need Swap when diarisation
   finds two clusters of one voice (482, 483).
+
+## Second machine rebuild — Ubuntu reinstalled on a new drive, service restored (2026-09-04)
+
+**Owner-run, Cowork-guided, one terminal step at a time. No code changed.**
+The machine got a fresh Ubuntu 26.04.1 install on a new NVMe root
+(full-disk encrypted). The home folder was copied from the old root;
+`~/.local` and dotfiles deliberately were not, and `/etc` and
+`/var/lib` are new. The old install stays on its own drive as a
+bootable fallback and was mounted read-only at `/mnt/oldroot` for the
+copies below.
+
+**What the copy did not carry, and what was done about each:**
+
+- **The app venv** came across (7.5 GB) but was dead: its interpreter
+  pointed at `~/.local/share/uv/...`, which no longer existed. Deleted
+  and rebuilt: `uv` 0.12.9 installed fresh, `uv python install 3.12`
+  (3.12.14 — the system Python is 3.14 and unusable for this project),
+  `uv sync` from the unchanged lockfile. `torch 2.8.0+cu128, cuda True`.
+- **Piper** reinstalled as a uv tool (now 1.8.0; the 2026-08-15 entry
+  recorded 1.6.1). Voice `en_GB-alba-medium` re-downloaded to
+  `~/.local/share/piper-voices/`; smoke test produced a 91 KB WAV. The
+  absolute paths in `.env` are unchanged and correct.
+- **Ollama** reinstalled user-space at `~/.local/opt/ollama` from the
+  `.tar.zst` asset with the SHA-256 checked against upstream's
+  `sha256sum.txt` (0.33.3). Both models re-pulled:
+  `hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M` and `embeddinggemma`.
+- **The database.** The last dump (2026-08-14) predates everything from
+  the referral-letter work onward, so it was NOT used. Instead the
+  old install's Postgres 18 cluster (`/var/lib/postgresql/18/main`,
+  95 MB, cleanly shut down — no `postmaster.pid`) was copied over the
+  fresh cluster with rsync, ownership and mode restored, and Postgres
+  started. Same major version (18.4 → 18.6, a minor step, no upgrade
+  path needed). `pg_hba.conf` identical old and new; the only
+  `postgresql.conf` differences were the installer's locale defaults
+  (en_US on the old box, en_GB on the new) — the new file was kept.
+  The fresh empty cluster is parked at
+  `/var/lib/postgresql/18/main.fresh-2026-09-04`. Verified:
+  `migrate.py --check` reports no drift; 49 consultations, latest
+  #484 (the 1 Sept solo pilot); 1,301 guideline chunks.
+- **Hugging Face** needed no login: `HF_HOME` now points at the second
+  NVMe (`/mnt/fastdata/huggingface`, set in `~/.profile`), where the
+  cache and token were moved. `hf auth whoami` confirms.
+- **Tailscale** identity restored by copying
+  `/var/lib/tailscale/tailscaled.state` from the old root, so this
+  machine is still `mlrig-1` with the same public URL and Funnel still
+  on — no re-sharing, no admin-console work. Wrinkle recorded: if the
+  fallback install is ever booted online, both claim the same node and
+  the last to connect wins. Harmless for a fallback.
+- **The two systemd units** recreated verbatim from the 2026-08-15
+  entry, with ONE deliberate addition to `consultation-ai.service`:
+  `Environment=HF_HOME=/mnt/fastdata/huggingface`. A systemd service
+  does not read `~/.profile`, and the cache is no longer in the
+  default `~/.cache` location, so without this line finalisation would
+  fail at pyannote. Both units enabled; `postgresql@18-main`, `ollama`
+  and `consultation-ai` all active; `/health` ok with pgvector; Whisper
+  loaded on cuda; the owner signed in as admin over the public URL.
+
+**Suite: 967 collected — 925 passed, 42 failed on the first run, and the
+42 are NOT the rebuild's.** All 42 (`test_barge_in`, `test_cds_first_call`,
+`test_face_ws`, `test_speech_autonomy`, `test_speech_exclusion`) fail
+with `AttributeError: 'StubSpeech' object has no attribute
+'presynthesise_phrases'` at `app/main.py` session start. That path runs
+only when `AUTO_MODE_ENABLED` is true, and the suite reads the live
+`.env` through `load_dotenv()`. `.env` was switched to
+`AUTO_MODE_ENABLED=true` at 07:14 on 3 Sept for the solo pilot — five
+hours AFTER the last commit and its green suite — so the old install
+would have failed identically; nobody had run the suite since. With the
+shell overriding the file (`load_dotenv` never overrides an existing
+variable): `AUTO_MODE_ENABLED=false uv run pytest --lf` → **42 passed**.
+So: 967/967 with the flag off, and the rebuild is verified.
+
+**Docket item from this (a CC slice, owner go-ahead pending):** the
+suite must not depend on the owner's `.env`. Either the pre-7c
+`StubSpeech` classes gain `presynthesise_phrases` (a no-op) or
+`tests/conftest.py` pins `AUTO_MODE_ENABLED` for the run — and the 7c
+tests that need it on should set it themselves. Until that lands, run
+the suite as `AUTO_MODE_ENABLED=false uv run pytest` on a box whose
+`.env` has auto mode on.
+
+**Loose ends, unchanged:** untracked `.claude/settings.local.json`
+still carries the stale `/home/wajir` permission entries from the WSL
+era (plus a generous set of `Bash(...)` allows from the previous
+rebuild); `/mnt/oldroot` is a manual mount and disappears at reboot;
+a deliberate reboot test is still owed on this install, as it was on
+the last.
