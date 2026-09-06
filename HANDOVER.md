@@ -5939,3 +5939,7 @@ era (plus a generous set of `Bash(...)` allows from the previous
 rebuild); `/mnt/oldroot` is a manual mount and disappears at reboot;
 a deliberate reboot test is still owed on this install, as it was on
 the last.
+
+## Solo pilot diagnostic — consultation 485, the first run after the fix slice (REPORT ONLY, 2026-09-07)
+
+**A report exists**, outside the repository: `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_485_2026-09-03.md` (named for 3 Sept as asked; the run itself was 6 Sept, 23:54–23:58 BST) — the full audit/journal timeline of 485 with the fix slice's new events, answers on the politeness abort (none), the golden exit (by `quiet_fallback`, 0.8 s after the window), the post-exit revision (launched without new transcript, landed with an alarm), the planned-then-displaced question, and the two taps; code findings E1–E9 with file:line at `aa0965a` (the headline: the question phases still have no fallback past a healthy "not finished" officer, so the answer to the tapped question never ended a turn); nothing in code, tests, config, flags or the database changed. Docs-only commit; the suite was not run for it.
