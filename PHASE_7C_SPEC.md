@@ -161,6 +161,21 @@ until the mock-patient round:
   indefinitely (consultation 483), while a failing officer exited
   at 5 s. The inversion is closed.
 
+  **One turn-end rule in every phase (owner decision 2026-09-07, after
+  consultation 485, defect E1).** In OPEN and CLOSED — and in the
+  doctor's handover sequence — as already in post-window GOLDEN, quiet
+  of `AUTO_EOT_FALLBACK_S` ends the patient's turn on the quiet report
+  itself, whether or not the officer has answered or answered "not
+  finished"; a verdict of `finished_thought` or `handed_back` still ends
+  it sooner. Every turn end outside GOLDEN is audited as
+  `auto.turn_ended` with `by: verdict | quiet_fallback` (§11). As built
+  in slice 4 the question phases honoured a healthy "not finished"
+  indefinitely: in 485 the patient answered the tapped question and the
+  officer said "not finished" three times across 7 s of silence, so the
+  answer never ended a turn, no revision was requested and no next
+  question came before Stop — the 483 inversion, closed in GOLDEN on
+  1 Sept, was still open one phase later.
+
 **Politeness abort (interruption count ~0 by construction).** The
 server never orders playback into live speech: an `auto_speak` is only
 issued while the quiet window is still open, and the client re-checks
@@ -419,6 +434,11 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.golden_window_ran` (once per run: the window's end, with
   `golden_s`, whichever report or verdict first observed it — owner
   decision 2026-09-01), and
+  `auto.turn_ended` for every turn end judged outside GOLDEN — `by:
+  verdict | quiet_fallback`, `quiet_s`, the phase, whether it was an
+  answer's end (`answer`), and the span's verdict when there was one
+  (owner decision 2026-09-07, pilot 485 E1; the golden exit's own turn
+  end travels in its `auto.phase` detail as before), and
   `auto.officer_verdict` for EVERY officer verdict — quiet_s, the
   golden window elapsed when in GOLDEN, finished_thought,
   handed_back, the failure if any, elapsed_ms, the phase, and the

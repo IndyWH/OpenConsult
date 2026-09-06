@@ -612,7 +612,14 @@ def test_outside_golden_the_only_encourager_is_the_single_bridge(gate):
     5 s of quiet the slot is free, and what OPEN actually says shows: at
     most the single bridge ("go on") while the D2 revision runs, then the
     flow's own asks (here the agenda is empty, so the anything-else
-    phrase) — never a rotation of encouragers."""
+    phrase) — never a rotation of encouragers.
+
+    REPINNED 2026-09-07 (owner decision, pilot 485 E1): with quiet of
+    AUTO_EOT_FALLBACK_S now ending a turn in the question phases too, the
+    anything-else phrase's unanswered turn ends at the 9 s report and its
+    revision earns a second bridge. The property kept is one bridge PER
+    REVISION — never a rotation — so the bound is the number of revisions
+    (the golden exit's plus one per answered turn), not one."""
     gate.cds_engine.verdicts = [OfficerVerdict(True, True)]      # a hand-back
     with live(gate) as s:
         s.enable_to_golden()
@@ -628,7 +635,8 @@ def test_outside_golden_the_only_encourager_is_the_single_bridge(gate):
                     heard.append(m["ref_id"])
                     s.play(m["utterance_id"])
         encouragers = [r for r in heard if r in speech.ENCOURAGER_IDS]
-        assert len(encouragers) <= 1 and set(encouragers) <= {"go_on"}
+        revisions = 1 + len([d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]])
+        assert len(encouragers) <= revisions and set(encouragers) <= {"go_on"}
         assert set(heard) - set(speech.ENCOURAGER_IDS) <= {"anything_else", "examination_handover"}
         _stop(s)
 

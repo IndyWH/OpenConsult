@@ -495,6 +495,83 @@ def test_a_failed_topic_call_asks_verbatim_and_is_audited(gate):
 
 
 # ==========================================================================
+# One turn-end rule in every phase (owner decision 2026-09-07, pilot 485 E1)
+
+def test_the_485_shape_a_not_finished_officer_no_longer_holds_an_answered_question_open(gate):
+    """Owner decision 2026-09-07 (pilot 485, defect E1). In 485 the doctor
+    tapped a question, the patient answered, and the officer said "not
+    finished" three times across 7 s of silence (quiet 3.0, 3.1, 7.1);
+    the answer never ended a turn, no revision was requested, and no next
+    question came before Stop. Now the rule the post-window golden exit
+    already used applies in OPEN and CLOSED too: quiet of
+    AUTO_EOT_FALLBACK_S ends the turn on the report itself, whatever the
+    officer said. The turn end is audited (auto.turn_ended, by
+    quiet_fallback), the revision runs, and the next question is planned
+    and issued."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]   # hand-back, then never finished
+    engine.agendas = [[Q_ONSET], [Q_RADIATE]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about the chest pain?"
+        s.play(first["utterance_id"])
+        s.commit_transcript("Medical camp last year said blood pressure was high.",
+                            "I never followed up.")
+        s.quiet(3.0)
+        s.probe()                                     # officer asked: not finished
+        assert len(engine.asked) == 2 and s.auto["turn_ended"] is False
+        s.quiet(4.9)
+        s.probe()
+        assert s.auto["turn_ended"] is False and s.auto["awaiting_answer"] is True
+        assert len(engine.updates) == 1, "under the fallback span: the answer is still open"
+        s.quiet(5.1)
+        s.probe()
+        assert s.auto["turn_ended"] is True and s.auto["awaiting_answer"] is False
+        # The answer's revision was asked for (the scripted pass may already
+        # have landed on the same tick, in which case its plan is in flight).
+        assert (s.auto["revision"] in ("requested", "running") or len(engine.updates) == 2
+                or s.auto["plan_task"] is not None or s.auto["queued"] is not None)
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == Q_RADIATE, "planned from the fresh agenda and issued"
+        assert len(engine.updates) == 2
+        s.play(nxt["utterance_id"])
+        _stop(s)
+    ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
+    assert len(ended) == 1
+    assert ended[0]["by"] == "quiet_fallback" and ended[0]["quiet_s"] == 5.1
+    assert ended[0]["phase"] == "open" and ended[0]["fallback_s"] == appmain.AUTO_EOT_FALLBACK_S
+    assert ended[0]["finished_thought"] is False, "the span's verdict travels in the record"
+
+
+def test_a_finished_verdict_still_ends_the_answers_turn_before_the_fallback(gate):
+    """The officer's word is not demoted: a finished_thought verdict ends
+    the turn at once (here at 3.2 s, under the 5 s fallback), audited by
+    verdict, and the revision runs from there."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False, elapsed_ms=610)]
+    engine.agendas = [[Q_ONSET], [Q_RADIATE]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.commit_transcript("Father had a heart attack when he was around 60.")
+        s.quiet(3.2)
+        s.probe()
+        assert s.auto["turn_ended"] is True and s.auto["awaiting_answer"] is False
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == Q_RADIATE
+        assert len(engine.updates) == 2
+        _stop(s)
+    ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
+    assert len(ended) == 1
+    assert ended[0]["by"] == "verdict" and ended[0]["quiet_s"] == 3.2
+    assert ended[0]["finished_thought"] is True and ended[0]["officer_ms"] == 610
+
+
+# ==========================================================================
 # The requeue and the doctor's tap
 
 def test_a_politeness_aborted_question_is_requeued_and_reissued(gate):

@@ -545,8 +545,17 @@ def test_after_resume_a_clarifying_answer_that_clears_the_alarm_continues_normal
 def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monkeypatch):
     """After a resume nothing re-fires by itself: no revision runs until an
     answer's turn ends, so the machine cannot bounce pause → ack → pause
-    on its own. Quiet reports and loop ticks alone leave it in OPEN with
-    the alarm-bearing question queued and no new pass."""
+    on its own. Quiet reports under the fallback length and loop ticks
+    alone leave it in OPEN with the alarm-bearing question queued and no
+    new pass.
+
+    REPINNED 2026-09-07 (owner decision, pilot 485 E1): quiet of
+    AUTO_EOT_FALLBACK_S is now itself an answer's turn end in the question
+    phases — silence after the asked question IS the answer running its
+    course — so the reports below stay under 5 s for the "nothing by
+    itself" property, and the tail pins that the one answer's chance ends
+    by silence too: at 5 s the turn ends (audited, by quiet_fallback), the
+    revision runs and the ratchet re-pauses on the still-unarranged ECG."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
@@ -558,13 +567,24 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
         assert s.phase.value == "open"
         for _ in range(12):                                # ticks and quiet, no speech
             s.probe()
-            s.quiet(2.0 + _ * 0.3)
+            s.quiet(2.0 + _ * 0.2)                         # 2.0 … 4.2 s: under the fallback
         # It may have ASKED the alarm-bearing question by now (a verbatim
         # ask narrows OPEN → CLOSED) — but nothing re-fired: no pass, no pause.
         assert s.phase.value in ("open", "closed")
         assert len(engine.updates) == passes, "no pass ran without an answer"
         assert len(_audit("auto.paused", s.session_id)) == 1
+        # The one answer's chance runs out by silence: 5 s of quiet after
+        # the asked question ends its turn, and the next pass may re-pause.
+        s.quiet(5.1)
+        for _ in range(30):
+            s.probe()
+            if s.phase.value == "paused_urgent":
+                break
+        assert s.phase.value == "paused_urgent"
+        assert len(engine.updates) == passes + 1
         _stop(s)
+    ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
+    assert ended and ended[-1]["by"] == "quiet_fallback" and ended[-1]["quiet_s"] == 5.1
 
 
 # --------------------------------------------------------------------------

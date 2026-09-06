@@ -3368,6 +3368,50 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         _request_revision(auto, why)
         return transition
 
+    async def _end_turn(auto: dict, *, by: str, quiet_s: float, verdict=None) -> None:
+        """One turn-end rule in every phase (owner decision 2026-09-07,
+        pilot 485 defect E1). Outside GOLDEN, a patient's turn ends at the
+        first of: an officer verdict that says finished or handed back
+        (`by="verdict"`), or quiet of AUTO_EOT_FALLBACK_S on the report
+        itself, whether or not the officer answered or answered "not
+        finished" (`by="quiet_fallback"`) — the rule the post-window golden
+        exit already used. In 485 the officer said "not finished" three
+        times across 7 s of silence after an answered question; the
+        answer never ended a turn, no revision was requested and no next
+        question came. Every turn end is audited (auto.turn_ended); if it
+        is the answer's end, the D2 revision is requested (question
+        phases) or the handover sequence continues (the doctor's handover
+        from GOLDEN)."""
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        if auto["turn_ended"]:
+            return
+        auto["turn_ended"] = True
+        auto["repause_block"] = False        # a patient turn has ended (pilot D4)
+        answer = bool(auto["awaiting_answer"])
+        if verdict is not None and verdict.handed_back:
+            logger.info("Live session %s: hand-back detected in %s (quiet %.1fs)",
+                        session_id, ctl.phase.value, quiet_s)
+        await audit.log(user["id"], "auto.turn_ended", None, None,
+                        {"session_id": session_id, "phase": ctl.phase.value, "by": by,
+                         "quiet_s": round(quiet_s, 1), "answer": answer,
+                         "fallback_s": AUTO_EOT_FALLBACK_S,
+                         **({"handed_back": verdict.handed_back,
+                             "finished_thought": verdict.finished_thought,
+                             "officer_ms": verdict.elapsed_ms,
+                             **({"officer_failed": verdict.failed} if verdict.failed else {})}
+                            if verdict is not None else {}),
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        if not answer:
+            return
+        auto["awaiting_answer"] = False
+        if ctl.phase in auto_mode.QUESTION_PHASES:
+            _request_revision(auto, f"answer's turn ended ({by})")
+        elif ctl.phase is auto_mode.AutoPhase.HANDOVER and auto["handover"] is not None:
+            # Slice 6: the doctor's handover from GOLDEN — the anything-else
+            # answer has ended; no return path from HANDOVER, so the
+            # examination handover follows directly.
+            _plan_handover(auto, entry["agenda"].current_version)
+
     async def handle_quiet(payload: dict) -> None:
         """A quiet report from the client's reporter (spec §5). Measurement
         is the client's; every decision is here.
@@ -3440,6 +3484,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         if verdict is not None else {})},
                     "golden exit: window run, fallback quiet")
                 return                     # OPEN from the next report on
+        elif (quiet_s >= AUTO_EOT_FALLBACK_S and not auto["turn_ended"]):
+            # 0. Outside GOLDEN the same rule (owner decision 2026-09-07,
+            #    pilot 485 E1): quiet of the fallback length ends the turn
+            #    on the report itself, however the officer answered.
+            await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s,
+                            verdict=auto["officer_verdict"])
         free = not session.speaking and entry["pending_utterance"] is None
         # 1. The encourager (owner decision 2026-09-01). In GOLDEN: at most
         #    ONE per golden window, "go on" only, after
@@ -3507,8 +3557,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         Entering OPEN, the D2 revision is asked for at once (the golden
         exit is itself a turn end).
 
-        OPEN/CLOSED: a turn end (finished, or handed back, or the silence
-        fallback) marks the span; if it is the answer's turn ending, the
+        OPEN/CLOSED (and the doctor's handover sequence): a turn end —
+        finished, or handed back, or quiet of AUTO_EOT_FALLBACK_S whatever
+        the officer said (owner decision 2026-09-07, pilot 485 E1) — marks
+        the span through _end_turn; if it is the answer's turn ending, the
         D2 revision is requested. Anything the machine says is illegal
         from here is simply not fired."""
         auto = entry["auto"]
@@ -3541,24 +3593,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                   else "quiet_fallback")},
                     "golden exit: window run, turn ended")
             return None
-        if ctl.phase in auto_mode.QUESTION_PHASES and ended and not auto["turn_ended"]:
-            auto["turn_ended"] = True
-            if verdict.handed_back:
-                logger.info("Live session %s: hand-back detected in %s (quiet %.1fs)",
-                            session_id, ctl.phase.value, quiet_s)
-            if auto["awaiting_answer"]:
-                auto["awaiting_answer"] = False
-                _request_revision(auto, "answer's turn ended")
-            return None
-        if (ctl.phase is auto_mode.AutoPhase.HANDOVER and auto["handover"] is not None
-                and ended and not auto["turn_ended"]):
-            # Slice 6: the doctor's handover from GOLDEN — the anything-else
-            # answer has ended; no return path from HANDOVER, so the
-            # examination handover follows directly.
-            auto["turn_ended"] = True
-            if auto["awaiting_answer"]:
-                auto["awaiting_answer"] = False
-                _plan_handover(auto, entry["agenda"].current_version)
+        in_handover_seq = (ctl.phase is auto_mode.AutoPhase.HANDOVER
+                           and auto["handover"] is not None)
+        if (ctl.phase in auto_mode.QUESTION_PHASES or in_handover_seq) and not auto["turn_ended"]:
+            # One turn-end rule (owner decision 2026-09-07, pilot 485 E1):
+            # the officer's finished/handed-back word ends it now; quiet of
+            # AUTO_EOT_FALLBACK_S ends it whatever the officer said — here
+            # when the verdict itself arrives past the fallback, and on
+            # every later quiet report in handle_quiet.
+            if verdict.finished_thought or verdict.handed_back:
+                await _end_turn(auto, by="verdict", quiet_s=quiet_s, verdict=verdict)
+            elif quiet_s >= AUTO_EOT_FALLBACK_S:
+                await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s, verdict=verdict)
         return None
 
     async def maybe_apply_officer() -> None:
