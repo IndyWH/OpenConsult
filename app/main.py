@@ -2977,8 +2977,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     # Phase 7c slice 4: the question phases (spec §6, D2 and D3). Vocabulary
     # used below, all held in entry["auto"]:
     #   turn_ended       the current quiet span has been judged the end of a
-    #                    turn (officer, or its silence fallback); reset by a
-    #                    fresh span
+    #                    turn (officer, or its silence fallback); cleared when
+    #                    a question is issued or the PATIENT begins a fresh
+    #                    span — never by our own playback (pilot 485 E2)
     #   awaiting_answer  a question (or the anything-else phrase) has been
     #                    asked and the next turn end is its answer's end
     #   revision         None | "requested" | "running": the D2 strict-revise
@@ -3453,9 +3454,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         if auto["last_quiet_s"] is None or quiet_s < auto["last_quiet_s"]:
             # A fresh quiet span: the patient spoke (or we did) in between.
+            # The officer is re-asked either way; a judged turn end is
+            # cleared only when the PATIENT spoke (owner decision
+            # 2026-09-07, pilot 485 E2): our own utterances — the bridge
+            # encourager above all — restart the client's span too, and in
+            # 485 the bridge 1 s after the golden exit erased the turn end
+            # the exit had set, so the first ask needed a second judgement
+            # in a silent room. The client says what began the span
+            # (`since`: "playback" or "speech"); a report without it is
+            # read as speech, the cautious side.
             auto["officer_last_run_quiet_s"] = None
             auto["officer_verdict"] = None
-            auto["turn_ended"] = False
+            if payload.get("since") != "playback":
+                auto["turn_ended"] = False
         auto["last_quiet_s"] = quiet_s
         in_golden = ctl.phase is auto_mode.AutoPhase.GOLDEN
         in_questions = ctl.phase in auto_mode.QUESTION_PHASES

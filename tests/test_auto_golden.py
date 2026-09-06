@@ -192,6 +192,7 @@ class Session:
     def __init__(self, state, ws, session_id):
         self.state, self.ws, self.session_id = state, ws, session_id
         self.seq = 0
+        self.since = "speech"        # what began the current quiet span (E2)
 
     @property
     def entry(self):
@@ -229,12 +230,13 @@ class Session:
         _until(self.ws, {"ack"})
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
                                       "seq": self.seq + 1, "reason": reason}))
+        self.since = "playback"
 
     def auto(self, on: bool):
         self.ws.send_text(json.dumps({"type": "auto", "on": on}))
 
     def quiet(self, quiet_s: float):
-        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s}))
+        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s, "since": self.since}))
 
     def commit_transcript(self, *lines: str):
         """Give the officer something to judge, without waking the CDS task
@@ -243,6 +245,7 @@ class Session:
             self.entry["transcript_parts"].extend(lines)
             self.entry["cds_sent_len"] = len("\n".join(self.entry["transcript_parts"]))
         self.ws.portal.call(_inject)
+        self.since = "speech"                 # the patient spoke: a fresh span of theirs
 
     def enable_to_golden(self):
         """Disclose, switch auto on, play the invitation through: GOLDEN."""

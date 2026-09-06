@@ -211,6 +211,7 @@ class Session:
         self.state, self.ws, self.session_id = state, ws, session_id
         self.seq = 0
         self.quiet_s = 0.0
+        self.since = "speech"        # what began the current quiet span (E2)
 
     @property
     def entry(self):
@@ -244,6 +245,7 @@ class Session:
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
                                       "seq": self.seq + 1, "reason": reason}))
         self.quiet_s = 0.0                    # our playback ended: a fresh span
+        self.since = "playback"
 
     def abort(self, utterance_id):
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
@@ -256,7 +258,7 @@ class Session:
 
     def quiet(self, quiet_s: float):
         self.quiet_s = quiet_s
-        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s}))
+        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s, "since": self.since}))
 
     def commit_transcript(self, *lines: str):
         def _inject():
@@ -264,6 +266,7 @@ class Session:
             self.entry["cds_sent_len"] = len("\n".join(self.entry["transcript_parts"]))
         self.ws.portal.call(_inject)
         self.quiet_s = 0.0
+        self.since = "speech"                 # the patient spoke: a fresh span of theirs
 
     def seed_agenda(self, *questions):
         """A pre-existing agenda version, as an earlier CDS pass would have
@@ -569,6 +572,79 @@ def test_a_finished_verdict_still_ends_the_answers_turn_before_the_fallback(gate
     assert len(ended) == 1
     assert ended[0]["by"] == "verdict" and ended[0]["quiet_s"] == 3.2
     assert ended[0]["finished_thought"] is True and ended[0]["officer_ms"] == 610
+
+
+# ==========================================================================
+# Our own utterances never erase a judged turn end (owner decision 2026-09-07, E2)
+
+def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):
+    """Owner decision 2026-09-07 (pilot 485, defect E2). The golden exit is
+    a turn end; in 485 the bridge "Go on." 1 s later restarted the client's
+    quiet span and the fresh-span rule cleared turn_ended, so the first ask
+    needed a second judgement in a room where nobody spoke. Now a span
+    that began with OUR playback keeps the judged turn end: golden exit →
+    bridge → the revision lands → the queued question issues on the next
+    report, with the officer never asked again and never saying finished."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET]]
+    engine.gate_event = asyncio.Event()                # hold the revision
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()                                    # the exit: turn_ended True
+        assert s.auto["turn_ended"] is True
+        asked = len(engine.asked)
+        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)
+        s.quiet(3.5)
+        bridge = next(m for m in s.probe() if m.get("type") == "auto_speak")
+        assert bridge["ref_id"] == "go_on"
+        s.play(bridge["utterance_id"])                 # our voice: the client's span restarts
+        s.quiet(2.0)                                   # a fresh span, since=playback
+        s.probe()
+        assert s.auto["turn_ended"] is True, "our own utterance erased nothing"
+        s.ws.portal.call(lambda: engine.gate_event.set())
+        for _ in range(30):                            # the pass lands, the plan is prepared
+            s.probe()
+            if s.auto["queued"] is not None:
+                break
+            time.sleep(0.03)
+        assert s.auto["queued"] is not None
+        s.quiet(2.6)                                   # under the officer's 3 s
+        ask = next(m for m in s.probe() if m.get("type") == "auto_speak")
+        assert ask["text"] == "Can you tell me more about the chest pain?"
+        assert len(engine.asked) == asked, "no second judgement was needed"
+        assert s.auto["turn_ended"] is False, "cleared at issue, and only there"
+        s.play(ask["utterance_id"])
+        _stop(s)
+
+
+def test_the_patients_own_voice_still_reopens_the_turn(gate):
+    """The other half of E2: a fresh span the PATIENT began (since=speech)
+    clears the judged turn end as before, so a plan landing while they
+    talk again waits for a new judgement — err toward waiting."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET]]
+    engine.gate_event = asyncio.Event()
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        assert s.auto["turn_ended"] is True
+        s.commit_transcript("Oh, and one more thing about the pain and")
+        s.quiet(2.0)                                   # since=speech
+        s.probe()
+        assert s.auto["turn_ended"] is False, "the patient spoke: the turn is open again"
+        s.ws.portal.call(lambda: engine.gate_event.set())
+        for _ in range(30):
+            s.probe()
+            if s.auto["queued"] is not None:
+                break
+            time.sleep(0.03)
+        s.quiet(2.6)
+        assert all(m.get("type") != "auto_speak" for m in s.probe()), "waits for a judgement"
+        s.quiet(4.0)                                   # officer: not finished → still waits
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
+        _stop(s)
 
 
 # ==========================================================================

@@ -176,6 +176,18 @@ until the mock-patient round:
   question came before Stop — the 483 inversion, closed in GOLDEN on
   1 Sept, was still open one phase later.
 
+  **Our own utterances never erase a judged turn end (owner decision
+  2026-09-07, defect E2).** Every quiet report carries what began its
+  span — `since: "speech"` (room energy at or above the floor) or
+  `since: "playback"` (our own utterance ending). A fresh span re-asks
+  the officer either way, but a judged turn end (`turn_ended`) is cleared
+  only when the patient began the span or when a question is issued;
+  the bridge encourager, the golden encourager and any other auto
+  utterance leave it standing. In 485 the bridge 1 s after the golden
+  exit erased the exit's own turn end, so the first ask needed a second
+  judgement in a silent room — which, under the officer's "not finished"
+  tie-break, might never have come.
+
 **Politeness abort (interruption count ~0 by construction).** The
 server never orders playback into live speech: an `auto_speak` is only
 issued while the quiet window is still open, and the client re-checks

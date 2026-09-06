@@ -189,6 +189,7 @@ class Session:
         self.state, self.ws, self.session_id = state, ws, session_id
         self.seq = 0
         self.quiet_s = 0.0
+        self.since = "speech"        # what began the current quiet span (E2)
 
     @property
     def entry(self):
@@ -222,6 +223,7 @@ class Session:
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
                                       "seq": self.seq + 1, "reason": reason}))
         self.quiet_s = 0.0                    # our playback ended: a fresh span
+        self.since = "playback"
 
     def abort(self, utterance_id):
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
@@ -234,7 +236,7 @@ class Session:
 
     def quiet(self, quiet_s: float):
         self.quiet_s = quiet_s
-        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s}))
+        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s, "since": self.since}))
 
     def commit_transcript(self, *lines: str):
         def _inject():
@@ -242,6 +244,7 @@ class Session:
             self.entry["cds_sent_len"] = len("\n".join(self.entry["transcript_parts"]))
         self.ws.portal.call(_inject)
         self.quiet_s = 0.0
+        self.since = "speech"                 # the patient spoke: a fresh span of theirs
 
     def seed_agenda(self, *questions):
         """A pre-existing agenda version, as an earlier CDS pass would have

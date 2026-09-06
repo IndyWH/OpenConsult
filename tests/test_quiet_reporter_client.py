@@ -147,13 +147,21 @@ def test_the_reporter_is_fed_by_the_existing_rms_loop_at_the_speech_floor():
 
 def test_every_activity_source_resets_the_reporter():
     """The nudge's activity sources, all of them: transcript movement
-    (final and changed partial) and our own playback ending."""
+    (final and changed partial) and our own playback ending.
+
+    REPINNED 2026-09-07 (owner decision, pilot 485 E2): our playback ending
+    still resets the reporter, and now names itself as the cause
+    ('playback'), which every report of that span carries as `since` so the
+    server never lets our own voice erase a judged turn end. Every other
+    source stays speech."""
     assert LIVE.count("quietReporter.activity(performance.now())") >= 3
     final_block = LIVE[LIVE.index("if (msg.type === 'final') {"):LIVE.index("else if (msg.type === 'partial')")]
     assert "quietReporter.activity(performance.now())" in final_block
     stop = LIVE[LIVE.index("function stopSpeaking(reason, cutLatencyMs) {"):]
     stop = stop[:stop.index("\n}")]
-    assert "quietReporter.activity(performance.now())" in stop
+    assert "quietReporter.activity(performance.now(), 'playback')" in stop
+    assert LIVE.count("'playback')") == 1, "our own playback is the only 'playback' cause"
+    assert "since: quietReporter.since" in LIVE, "every report says what began its span"
 
 
 def test_the_reporter_is_configured_and_enabled_by_the_server_only():

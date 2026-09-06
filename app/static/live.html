@@ -879,7 +879,8 @@ async function initMic() {
     if (rms >= quietReporter.floor) quietReporter.activity(now);
     const quietS = quietReporter.poll(now, speaking !== null || pendingSpeakText !== '');
     if (quietS !== null && recording && ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({type: 'quiet', quiet_s: Math.round(quietS * 10) / 10}));
+      ws.send(JSON.stringify({type: 'quiet', quiet_s: Math.round(quietS * 10) / 10,
+                              since: quietReporter.since}));
     }
     const level = Math.min(1, rms * 8);
     barEls.forEach((bar, k) => {
@@ -1417,6 +1418,7 @@ const quietReporter = {
   thresholds: [],        // seconds, ascending, from speech_config.auto
   floor: 0.02,           // "this is speech": bargeIn.absFloor, copied at configure
   quietSince: null,      // ms of the last activity; null = not tracking
+  since: 'speech',       // what began this span: 'speech' (room energy) or 'playback' (our own voice)
   crossed: 0,            // thresholds already reported in this quiet span
   lastReportAt: null,    // ms of the last report in this span
   configure(cfg) {
@@ -1424,7 +1426,14 @@ const quietReporter = {
                  cfg.eot_quiet_s, cfg.eot_fallback_s];
     this.thresholds = [...new Set(raw.map(Number).filter(v => v > 0))].sort((a, b) => a - b);
   },
-  activity(now) { this.quietSince = now; this.crossed = 0; this.lastReportAt = null; },
+  // `cause` travels with every report of the span it began (owner decision
+  // 2026-09-07, pilot 485 E2): the server must know whether a fresh span
+  // followed the patient's voice or our own, because our own must not
+  // erase a turn end it has already judged.
+  activity(now, cause) {
+    this.quietSince = now; this.crossed = 0; this.lastReportAt = null;
+    this.since = cause === 'playback' ? 'playback' : 'speech';
+  },
   // Called at the meter's rate. Returns the quiet duration to report (s),
   // or null. `busy` is our own playback or a request in flight.
   poll(now, busy) {
@@ -1618,7 +1627,7 @@ function stopSpeaking(reason, cutLatencyMs) {
   } else {
     nudge.activity(performance.now());
   }
-  quietReporter.activity(performance.now());   // our voice is not the patient's
+  quietReporter.activity(performance.now(), 'playback');   // our voice is not the patient's
 }
 
 async function onSpeakReady(msg) {
