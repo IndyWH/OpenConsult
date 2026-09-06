@@ -316,10 +316,13 @@ def test_the_public_surface_exposes_exactly_three_utterance_types_and_no_free_te
 
 def test_the_module_is_pure_stdlib():
     """§3: no FastAPI, no DB, no other app module, no threads, no timers.
-    Checked from the module's own globals, not by reading the source."""
+    Checked from the module's own globals, not by reading the source.
+    (2026-09-07: the action matcher, owner decision E3, brought `re` and
+    difflib's SequenceMatcher — stdlib both, no new dependency; the
+    property is unchanged.)"""
     imported_modules = {v.__name__ for v in vars(auto_mode).values()
                         if isinstance(v, types.ModuleType)}
-    assert imported_modules <= {"time"}
+    assert imported_modules <= {"time", "re"}
     for value in vars(auto_mode).values():
         module = getattr(value, "__module__", "") or ""
         assert not module.startswith("app.") or module == "app.auto_mode", value
@@ -535,3 +538,55 @@ def test_history_keeps_every_transition_in_order_and_seconds_in_phase_follows_th
     ]
     assert [t.at for t in c.history] == [1000.0, 1003.0, 1004.5, 1094.5]
     assert c.seconds_in_phase() == 0.0
+
+
+# --------------------------------------------------------------------------
+# The ratchet's notion of "the same action" (owner decision 2026-09-07, E3)
+
+ADMIT = "Consider hospital admission"
+REFER = "Immediate referral to hospital"
+SPECIALIST = "Same-day specialist referral"
+
+
+def test_normalisation_strips_case_punctuation_whitespace_and_the_stop_words():
+    assert auto_mode.normalise_action("  Bedside ECG, now!  ") == frozenset({"ecg"})
+    assert auto_mode.normalise_action("Consider hospital admission") == frozenset({"hospital", "admission"})
+    assert auto_mode.normalise_action("Same-day specialist referral") == frozenset({"specialist", "referral"})
+    assert auto_mode.normalise_action("") == frozenset()
+
+
+def test_the_485_rewordings_of_the_hospital_action_match_at_the_default_threshold():
+    """The three wordings the CDS produced in 485, each against the one
+    before it: the same decision in new words scores at or above 0.6."""
+    assert auto_mode.action_similarity(ADMIT, REFER) >= 0.6
+    assert auto_mode.action_similarity(REFER, SPECIALIST) >= 0.6
+    assert auto_mode.match_action(REFER, [ADMIT, "Bedside ECG"], 0.6) == (ADMIT, auto_mode.action_similarity(ADMIT, REFER))
+
+
+def test_an_exact_text_scores_one_and_wins_outright():
+    assert auto_mode.action_similarity("Bedside ECG", "Bedside ECG") == 1.0
+    assert auto_mode.match_action("Bedside ECG", [ADMIT, "Bedside ECG"], 0.6) == ("Bedside ECG", 1.0)
+    assert auto_mode.action_similarity("Bedside ECG now", "12-lead ECG") == 1.0, "same tokens after the stop words"
+
+
+def test_a_genuinely_new_action_matches_nothing():
+    """No shared token, no match — letters alone never make two actions the
+    same: "Bedside ECG" then "IV access", and the pilot's pairs that are
+    different decisions."""
+    assert auto_mode.action_similarity("Bedside ECG", "IV access") == 0.0
+    assert auto_mode.match_action("IV access", ["Bedside ECG", ADMIT], 0.6) is None
+    assert auto_mode.action_similarity("Bedside ECG", "Bedside glucose") == 0.0, "'bedside' is a place, not the action"
+    assert auto_mode.action_similarity("Bedside ECG now", "Call 999") == 0.0
+    assert auto_mode.action_similarity("", "Bedside ECG") == 0.0
+
+
+def test_the_threshold_is_the_callers_and_bounds_the_match():
+    score = auto_mode.action_similarity(ADMIT, REFER)
+    assert 0.6 <= score < 1.0
+    assert auto_mode.match_action(REFER, [ADMIT], score) == (ADMIT, score)
+    assert auto_mode.match_action(REFER, [ADMIT], round(score + 0.01, 3)) is None
+
+
+def test_the_matcher_is_pure_and_symmetric():
+    assert auto_mode.action_similarity(ADMIT, REFER) == auto_mode.action_similarity(REFER, ADMIT)
+    assert auto_mode.action_similarity(ADMIT, REFER) == auto_mode.action_similarity(ADMIT, REFER)

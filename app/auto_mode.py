@@ -66,9 +66,11 @@ no numbers in it.
 
 from __future__ import annotations
 
+import re
 import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from difflib import SequenceMatcher
 from enum import Enum
 
 __all__ = [
@@ -459,3 +461,87 @@ class AutoModeController:
         self._paused_from = None
         self._paused_at = None
         self._pending_actions = frozenset()
+
+
+# --- the ratchet's notion of "the same action" (owner decision 2026-09-07) --
+#
+# Pilot 485, defect E3: the CDS re-worded the hospital action on every
+# pass — "Consider hospital admission", "Immediate referral to hospital",
+# "Same-day specialist referral" — and the ratchet, keyed on exact text,
+# read each as genuinely new and re-paused three times, once 8 s after a
+# RESUME on a pass that was in flight at the resume, once cutting the
+# doctor's own tapped question. The ratchet now matches actions by
+# meaning, not wording: lower-cased, punctuation and whitespace stripped,
+# a small stop-word list removed, and a token-set similarity at or above
+# AUTO_ACTION_MATCH_THRESHOLD (the wiring's setting; default 0.6). Pure,
+# stdlib only (difflib) — no new dependency — so the rule is testable
+# without a session, and every match the wiring acts on is audited
+# (auto.action_matched) with both texts and the score.
+
+# Words that carry urgency, hedging, place or verb but not WHICH action:
+# stripping them is what lets "Consider hospital admission" meet
+# "Immediate referral to hospital". Small on purpose; the owner tunes it.
+ACTION_STOP_WORDS = frozenset({
+    # articles, prepositions, conjunctions
+    "a", "an", "the", "to", "for", "of", "and", "or", "with", "in", "at", "on", "by",
+    # urgency and hedging
+    "consider", "immediate", "immediately", "urgent", "urgently", "now", "today",
+    "same", "day", "sameday", "asap", "prompt", "promptly", "early",
+    # verbs that say "do it", not what
+    "arrange", "obtain", "perform", "do", "give", "start", "check", "order",
+    "request", "refer", "send", "get", "carry", "out",
+    # place words
+    "bedside",
+})
+
+_TOKEN_RE = re.compile(r"[a-z0-9]+")
+
+
+def normalise_action(text: str) -> frozenset[str]:
+    """The tokens an action text is compared by: lower-case, punctuation and
+    whitespace stripped, the stop words removed."""
+    tokens = _TOKEN_RE.findall(str(text).casefold())
+    return frozenset(t for t in tokens if t not in ACTION_STOP_WORDS)
+
+
+def action_similarity(a: str, b: str) -> float:
+    """Token-set similarity in [0, 1]: 1.0 for the same token set, 0.0 when
+    the two share no token at all (so nothing matches on letters alone),
+    otherwise the token-set ratio — the shared tokens against each side's
+    shared-plus-own tokens, the best of the three pairings — computed
+    with difflib.SequenceMatcher on the sorted, space-joined tokens."""
+    ta, tb = normalise_action(a), normalise_action(b)
+    if not ta or not tb:
+        return 0.0
+    if ta == tb:
+        return 1.0
+    shared = ta & tb
+    if not shared:
+        return 0.0
+    sect = " ".join(sorted(shared))
+    only_a = " ".join(sorted(ta - tb))
+    only_b = " ".join(sorted(tb - ta))
+    t1 = sect
+    t2 = (sect + " " + only_a).strip()
+    t3 = (sect + " " + only_b).strip()
+
+    def ratio(x: str, y: str) -> float:
+        return SequenceMatcher(None, x, y).ratio()
+
+    return round(max(ratio(t1, t2), ratio(t1, t3), ratio(t2, t3)), 3)
+
+
+def match_action(candidate: str, known: Iterable[str],
+                 threshold: float) -> tuple[str, float] | None:
+    """The known action `candidate` is the same as, if any: the best-scoring
+    known text at or above `threshold` (an exact text scores 1.0 and wins
+    outright). None when nothing known is close enough — a genuinely new
+    action."""
+    best: tuple[str, float] | None = None
+    for text in known:
+        score = 1.0 if str(text) == str(candidate) else action_similarity(candidate, text)
+        if score >= threshold and (best is None or score > best[1]):
+            best = (str(text), score)
+            if score >= 1.0:
+                break
+    return best

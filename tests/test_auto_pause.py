@@ -709,6 +709,74 @@ def test_a_genuinely_new_action_from_a_pre_resume_pass_still_pauses(gate, monkey
     assert len(paused) == 2 and paused[1]["actions"] == ["Bedside ECG now", "Call 999"]
 
 
+ADMIT = {"action": "Consider hospital admission", "reason": "suspected unstable angina"}
+REFER = {"action": "Immediate referral to hospital", "reason": "suspected angina/ACS"}
+IV = {"action": "IV access", "reason": "in case of deterioration"}
+
+
+def test_the_485_shape_a_reworded_action_after_resume_does_not_re_pause(gate, monkeypatch):
+    """Owner decision 2026-09-07 (pilot 485, defect E3). 485: RESUME AUTO
+    covered "Bedside ECG" and "Consider hospital admission"; the pass in
+    flight at the resume landed 8 s later with "Bedside ECG" and
+    "Immediate referral to hospital" — the same decision in new words — and
+    the text-keyed ratchet re-paused. Now the reworded action matches the
+    acknowledged one by meaning, the pass is suppressed inside the one
+    answer's chance, and every comparison is on the record
+    (auto.action_matched with both texts and the score)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(False, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG, ADMIT], 2: [ECG, REFER]})
+    with live(gate) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)                                    # pass 1: ECG + admission → paused
+        assert s.phase.value == "paused_urgent"
+        _launch_gated_pass(s, engine, LONG + " and my arm is heavy " * 8)   # pass 2, in flight
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        _release_pass(s, engine)                               # pass 2: ECG + referral (reworded)
+        assert s.phase.value == "golden", "the reworded action did not re-pause"
+        _stop(s)
+    suppressed = _audit("auto.repause_suppressed", s.session_id)
+    assert len(suppressed) == 1
+    assert suppressed[0]["actions"] == ["Bedside ECG now", "Immediate referral to hospital"]
+    assert suppressed[0]["matched"] == ["Bedside ECG now", "Consider hospital admission"]
+    matched = _audit("auto.action_matched", s.session_id)
+    assert len(matched) == 2
+    reworded = next(m for m in matched if m["candidate"] == "Immediate referral to hospital")
+    assert reworded["matched"] == "Consider hospital admission"
+    assert reworded["exact"] is False and 0.6 <= reworded["score"] < 1.0
+    assert reworded["threshold"] == appmain.AUTO_ACTION_MATCH_THRESHOLD == 0.6
+    exact = next(m for m in matched if m["candidate"] == "Bedside ECG now")
+    assert exact["exact"] is True and exact["score"] == 1.0
+    assert len(_audit("auto.paused", s.session_id)) == 1
+
+
+def test_a_genuinely_new_action_bedside_ecg_then_iv_access_still_pauses_and_widens(gate, monkeypatch):
+    """The matcher never turns a new action into an old one: "IV access"
+    shares no token with "Bedside ECG now", so the pass pauses and the
+    pending set widens to both (slice 5's rule), with no action_matched
+    row written."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(False, False)]
+    engine.agendas = [["Q?"]]
+    _engine_with_alarms(engine, {1: [ECG], 2: [ECG, IV]})
+    with live(gate) as s:
+        s.to_golden()
+        _fire_pass(s, LONG)
+        _launch_gated_pass(s, engine, LONG + " and I feel faint " * 8)
+        _ack(s, "resume")
+        assert s.phase.value == "golden"
+        _release_pass(s, engine)
+        assert s.phase.value == "paused_urgent"
+        assert s.auto["controller"].pending_actions == frozenset({"Bedside ECG now", "IV access"})
+        _stop(s)
+    assert _audit("auto.action_matched", s.session_id) == []
+    assert _audit("auto.repause_suppressed", s.session_id) == []
+    paused = _audit("auto.paused", s.session_id)
+    assert len(paused) == 2 and paused[1]["actions"] == ["Bedside ECG now", "IV access"]
+
+
 def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeypatch):
     """A pause does not restart the golden window: the seconds spent before
     it count. With a 0 s window, the resumed GOLDEN exits at the next turn

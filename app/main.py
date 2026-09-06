@@ -1451,6 +1451,12 @@ AUTO_PRESYNTH = os.getenv("AUTO_PRESYNTH", "true").lower() != "false"
 # questions only from the fresh agenda. Flippable so the mock-patient round
 # can compare postures as a recorded per-run threshold (slice 4).
 AUTO_STRICT_REVISE = os.getenv("AUTO_STRICT_REVISE", "true").lower() != "false"
+# The ratchet matches actions by meaning, not wording (owner decision
+# 2026-09-07, pilot 485 E3): a re-fired action is the same pending action
+# when its normalised token-set similarity to an already-pending or
+# already-acknowledged action reaches this (app/auto_mode.py,
+# match_action). Recorded per run with the other thresholds.
+AUTO_ACTION_MATCH_THRESHOLD = float(os.getenv("AUTO_ACTION_MATCH_THRESHOLD", "0.6"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1813,6 +1819,7 @@ def _thresholds_in_force() -> dict:
         "topic_timeout_s": cds_module.AUTO_TOPIC_TIMEOUT_S,
         "presynth": AUTO_PRESYNTH,
         "strict_revise": AUTO_STRICT_REVISE,
+        "action_match_threshold": AUTO_ACTION_MATCH_THRESHOLD,
         "politeness_floor_rms": speech.BARGE_IN_RMS_THRESHOLD,
     }
 
@@ -3258,20 +3265,43 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         resume, or was launched before the first turn end after it, may
         NOT re-pause on actions the doctor has already acknowledged. It
         is audited instead (auto.repause_suppressed, with the assessment
-        version). A genuinely NEW action text in the same pass still
-        pauses — the widening rule of slice 5 — and a re-fire while
-        already paused is untouched (the block exists only after a
-        resume, in a listening phase).
+        version). A genuinely NEW action in the same pass still pauses —
+        the widening rule of slice 5 — and a re-fire while already paused
+        is untouched (the block exists only after a resume, in a listening
+        phase). "The same action" is judged by meaning (owner decision
+        2026-09-07, pilot 485 E3): auto_mode.match_action against the
+        pending and acknowledged texts, every match audited as
+        auto.action_matched with both texts and the score.
         """
         auto = entry["auto"]
         ctl: auto_mode.AutoModeController = auto["controller"]
         if not pre_answer or ctl.phase not in auto_mode.LISTENING_PHASES:
             return False
         texts = [str(a.get("action", "")) for a in actions if a.get("action")]
-        if not texts or not set(texts) <= ctl.acknowledged_actions:
+        if not texts:
             return False
+        # "The same action" is matched by meaning, not wording (owner
+        # decision 2026-09-07, pilot 485 E3): the CDS re-worded the hospital
+        # action on every pass and the text-keyed ratchet re-paused each
+        # time. Every action must match something already pending or
+        # acknowledged; one genuinely new action and the pass pauses,
+        # widening the pending set as slice 5 pinned.
+        known = ctl.acknowledged_actions | ctl.pending_actions
+        matches = [(text, auto_mode.match_action(text, known, AUTO_ACTION_MATCH_THRESHOLD))
+                   for text in texts]
+        if any(match is None for _, match in matches):
+            return False
+        for text, (matched, score) in matches:
+            await audit.log(user["id"], "auto.action_matched", None, None,
+                            {"session_id": session_id, "candidate": text, "matched": matched,
+                             "score": score, "exact": text == matched,
+                             "threshold": AUTO_ACTION_MATCH_THRESHOLD,
+                             "assessment_version": assessment_version,
+                             "phase": ctl.phase.value,
+                             "at_audio_s": round(session.audio_seconds, 1)})
         await audit.log(user["id"], "auto.repause_suppressed", None, None,
                         {"session_id": session_id, "actions": texts,
+                         "matched": [matched for _, (matched, _score) in matches],
                          "assessment_version": assessment_version,
                          "phase": ctl.phase.value,
                          "reason": "pass predates the first post-resume turn end",

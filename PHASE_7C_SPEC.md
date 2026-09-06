@@ -314,6 +314,24 @@ new action text in such a pass still pauses (widening the pending
 set, as slice 5 pinned), and a re-fire while already `PAUSED_URGENT`
 is untouched.
 
+**The ratchet matches actions by meaning, not wording (owner decision
+2026-09-07, pilot 485 defect E3).** In 485 the CDS re-worded the hospital
+action on every pass — "Consider hospital admission", "Immediate referral
+to hospital", "Same-day specialist referral" — and a ratchet keyed on
+exact text read each as genuinely new: three pauses, one 8 s after a
+RESUME on a pass in flight at the resume, one cutting the doctor's own
+tapped question. A candidate action is now the same pending action if a
+normalised comparison matches an already-pending or already-acknowledged
+action: lower-cased, punctuation and whitespace stripped, a small
+stop-word list removed (urgency and hedging words, "do it" verbs,
+articles, "bedside"), and a token-set similarity at or above
+`AUTO_ACTION_MATCH_THRESHOLD` (default 0.6; `app/auto_mode.py`,
+`match_action`, stdlib only). A reworded action does not re-pause inside
+the one answer's chance; only a genuinely new action does, and it still
+widens the pending set as slice 5 pinned. Every comparison that
+suppresses a re-pause is audited as `auto.action_matched` with both
+texts and the score (§11). Two texts sharing no token never match.
+
 Confirmed by the owner 2026-08-16 after slice-1 review: an alarm
 re-firing while already PAUSED_URGENT is a legal self-edge — the
 machine stays paused, keeps the prior phase, and the pending
@@ -446,6 +464,9 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.golden_window_ran` (once per run: the window's end, with
   `golden_s`, whichever report or verdict first observed it — owner
   decision 2026-09-01), and
+  `auto.action_matched` for every comparison that suppresses a re-pause
+  — `candidate`, `matched`, `score`, `exact`, the threshold and the
+  assessment version (owner decision 2026-09-07, pilot 485 E3),
   `auto.turn_ended` for every turn end judged outside GOLDEN — `by:
   verdict | quiet_fallback`, `quiet_s`, the phase, whether it was an
   answer's end (`answer`), and the span's verdict when there was one
@@ -484,6 +505,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back |
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
 | `AUTO_STRICT_REVISE` | `true` | D2 posture, flippable for comparison runs |
+| `AUTO_ACTION_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot E3): the ratchet's token-set similarity for "the same action" |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 
 Every setting mirrored in `.env.example` with a one-line comment;
