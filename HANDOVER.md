@@ -6090,3 +6090,135 @@ there is the owner's call.
 ## Solo pilot diagnostic — consultation 486, the second run after fix slice 2 (REPORT ONLY, 2026-09-07)
 
 **A report exists**, outside the repository: `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_486.md` — the full timeline of 486 (7 Sept, 07:33–07:44, script 01, slice-2 code live), the per-question latency table (Q1–Q6 mean 27.7 s of which the CDS revision is 74 %; Q7 198.6 s behind a runaway assessment call that held Ollama's single slot for 180 s), the stale question (the agenda kept an asked question at the top across four versions; the pass saw the answer and kept it on the model's literal reading), the "restarts" (auto mode was never restarted — the eight RESUME taps were the ratchet re-pausing on every post-answer pass, as designed), candidate defects F1–F9 with file:line at `94e5eb9`, and what behaved as designed (E1–E4 all visibly working). Nothing in code, tests, config, flags or the database changed. Docs-only commit; the suite was not run for it.
+
+## Solo pilot fix slice 3 — the owner's four decisions after consultation 486, built (2026-09-07)
+
+**What landed.** The four items of the owner's decisions after
+consultation 486 (report
+`~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_486.md`,
+findings F1–F5), one commit each, the full suite green before every
+commit, `PHASE_7C_SPEC.md` truth-upped in the same commit as the code it
+describes. `AUTO_MODE_ENABLED` is untouched and `.env` reads `false`;
+`PHASE_7C_EVAL_PREREG.md`, `help/`, `vendor/` and `OPEN_CLOSED_RULE.md`
+untouched. **Needs a restart to be live** (the owner's act). Nothing
+here advances the gate.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `0589fbb` | an acknowledged action does not re-pause; the standing strip (F1) | 987 → 989 |
+| 2 | `1e39dfc` | a turn must start before it can end; one re-ask at the grace (F5) | 989 → 992 |
+| 3 | `606de26` | cap runaway generation; the assessment call's own timeout (F3) | 992 → 999 |
+| 4 | `80a3481` | no question is asked twice; the cone by meaning (F4, first half) | 999 → 1002 |
+
+Final suite: **1002 passed** (from 987 at `75fac19`). Every commit
+message carries the why; this entry carries the decisions and the seams.
+
+**The owner decisions, restated (all 2026-09-07):**
+
+1. **An acknowledged action does not re-pause.** After RESUME AUTO or
+   TAKE OVER, a later pass whose every action matches (E3) something
+   pending or acknowledged pauses nothing; each skip is audited
+   `auto.repause_skipped_acknowledged` (both texts, score, exact,
+   threshold, version). The acknowledged-but-open actions stay on the
+   live page's standing strip inside the urgent panel (`auto_standing`,
+   pushed on every pass landing and acknowledgement, on change) until
+   the pass lists nothing (arranged latches, as today) or the
+   consultation ends. A genuinely new action still pauses and widens as
+   slice 5 pinned. (486: eight RESUME taps in one run.)
+2. **A turn must start before it can end.** After an auto question,
+   quiet counts toward a turn end — by fallback or verdict — only once
+   the client has reported a span the patient began. No speech inside
+   `AUTO_NO_ANSWER_GRACE_S` (new, 12 s) → the same question re-asked once
+   (`auto.reask_no_answer`); past a second grace the ordinary path
+   proceeds, so silence never traps the run. (486: the 5 s rule ended an
+   answer 10.6 s before the patient began it.)
+3. **Runaway generation is capped.** Every model call carries
+   `num_predict` — `CDS_ASSESSMENT_MAX_TOKENS` 1500,
+   `CDS_URGENCY_MAX_TOKENS` 1000, `CDS_AFFECT_MAX_TOKENS` 800,
+   `AUTO_OFFICER_MAX_TOKENS` 64, `AUTO_TOPIC_MAX_TOKENS` 48 — and the
+   assessment call's own timeout is `CDS_ASSESSMENT_TIMEOUT_S` (new,
+   60 s; was the generic 180). A cap hit or timeout is `cds.runaway`
+   (call, reason, tokens, elapsed, cap/timeout, failures, version kept)
+   and a failed pass: the previous assessment is kept, the urgency
+   check still runs on its own call and its alarm still counts, and a
+   revision auto mode was waiting for is answered from the agenda it
+   already has. (486: a 7,211-token assessment call held the single
+   Ollama slot for 180 s; the patient waited 3 min 18 s.)
+4. **No question is asked twice; the cone by meaning.** An asked-and-
+   answered memory of question texts; a planned question whose
+   normalised text equals one in it is skipped (`auto.reask_suppressed`)
+   and the next item taken; the F5 re-ask is exempt; a spent agenda hands
+   over. The cone's opened-topics set matches by meaning at
+   `AUTO_TOPIC_MATCH_THRESHOLD` (new, 0.6). (486: the risk-factors
+   question asked twice; "this chest pain" and "the pain" opened twice.)
+
+**Spec sections touched:** §5 (a turn must start before it can end;
+runaway caps), §6 (no question twice; the cone's identity), §7
+(acknowledged actions do not re-pause; the strip; aliases), §11
+(`auto.repause_skipped_acknowledged`, `auto.reask_no_answer`,
+`cds.runaway`, `auto.reask_suppressed`), §12 (the new settings).
+
+**Where the decisions did not fully decide, and what the code does —
+for the owner and Cowork to confirm or overrule:**
+
+- **F1's chain.** A re-wording that matched joins the acknowledged set
+  as an alias (`auto["action_aliases"]`), so 486's chain (admission →
+  referral → specialist referral → admission) stays one action; without
+  it the third wording would have paused. The pure controller's
+  acknowledged set is untouched; its ratchet test
+  (`test_the_same_action_refiring_after_a_resume_pauses_again…`) still
+  pins that the machine accepts the event — the wiring no longer fires
+  it for a matched action.
+- **F1 at RESUME:** the strip is pushed at the acknowledgement itself
+  (the pending texts are the latest assessment's), not only at the next
+  pass. It is not carried on the reconnect echo; a reconnect shows it at
+  the next pass landing.
+- **F5's re-ask** goes through `auto_issue` with the same utterance and
+  `trigger.reask: true`; it needs the slot free (`free`), otherwise it
+  waits for the next report. A doctor-tapped question is not covered by
+  the grace (the decision names auto questions). The officer is still
+  asked at 3 s while awaiting speech — wasteful, harmless; its verdict
+  cannot end the turn.
+- **F3's runaway on the first pass:** there is no previous assessment
+  to keep, so a minimal one carries the urgency check's own result and
+  the alarm still pauses. The generic pass-failure log now names the
+  exception class (486's message was empty). Runaway rows for the
+  officer and topic calls are audited from their failed verdicts. The
+  assessment call is bounded end to end (`asyncio.wait_for` plus the
+  HTTP timeout), like the officer.
+- **F4's "matches"** is exact equality of normalised token sets (score
+  1.0), not the 0.6 similarity used for actions and topics: two
+  questions on one topic are legitimately different questions, and a
+  looser bound would merge "Have you ever had chest pain like this
+  before?" with a question about its character. A looser bound is the
+  owner's to set; the audit row carries the score either way. A spent
+  agenda (every item asked and answered) now hands over — the
+  anything-else phrase, then the examination handover — which is the
+  logical consequence and is worth watching in the next run.
+- **Tests repinned by decision** (each docstring names it): the slice-5
+  "ratchet re-arms" tail, the no-ack-resume-loop tail (twice: F1 and
+  F5) and the 482-shape tail no longer expect a second pause; four
+  harness stubs of `_chat` accept the engine's new keyword arguments.
+  Nothing weakened or deleted.
+
+**`help/`:** no article is made untrue. `help/02` still says the
+assistant "asks aloud, one question at a time" and that an alarm
+"pauses the assistant's" run — both still true; an alarm on an
+already-acknowledged action no longer pauses it, and that is a nuance
+the owner may want a clause for.
+
+**Watch list, carried forward:**
+
+- **The CDS reading its own parenthetical literally** ("other risk
+  factors (e.g., diabetes, high cholesterol)" kept as unanswered after
+  the patient named smoking, blood pressure and family history) —
+  prompt-level; to revisit with the standing question queue. Item 4
+  stops the second asking; it does not change what the model believes.
+- **D10** — the politeness abort is a single RMS sample, still
+  unexercised: zero aborts in 482–486.
+- **Banner visibility** — the doctor read eight RESUME taps as
+  "restarting auto mode"; with F1 there will be far fewer pauses, and
+  the standing strip is new on the page — to watch in the next pilot.
+- **The felt length of the 90 s window** — 486 exited by hand-back at
+  63.8 s, so still untested since the exit was fixed; the prereg
+  amendment path if too long.
