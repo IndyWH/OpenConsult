@@ -673,6 +673,80 @@ def test_twelve_seconds_of_no_speech_re_asks_exactly_once_and_continued_silence_
 
 
 # ==========================================================================
+# Cap runaway generation (owner decision 2026-09-07, pilot 486 F3)
+
+def test_a_runaway_revision_is_audited_keeps_the_previous_assessment_and_the_flow_asks_from_the_agenda_in_hand(gate):
+    """In 486 a runaway held the flow for 3 min 18 s in "preparing". Now a
+    pass that hits its cap or timeout is audited cds.runaway (tokens,
+    elapsed), the previous assessment and agenda version are kept, and a
+    revision auto mode was waiting for is answered from the agenda it
+    already has — the question comes, the flow is never held."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    async def runaway(transcript, previous=None):
+        engine.updates.append(transcript)
+        exc = appmain.cds.CDSRunaway("assessment", reason="cap", tokens=1500, elapsed_ms=37210, cap=1500)
+        exc.urgency = {"urgency_check": {"time_critical_possible": False,
+                                         "already_done_or_arranged": False, "reason": "quiet"},
+                       "urgent_actions": []}
+        raise exc
+    engine.update = runaway
+    with live(gate) as s:
+        s.to_golden()
+        s.seed_agenda(Q_SLEEP)                          # the agenda in hand
+        version = s.entry["agenda"].current_version
+        s.to_open()                                     # the revision is requested…
+        ask = s.wait_for_auto_speak()                   # …fails at its cap, and the ask still comes
+        assert ask["text"] == "Can you tell me more about your sleep?"
+        assert s.entry["agenda"].current_version == version, "no new agenda version: the previous kept"
+        assert len(engine.updates) == 1
+        s.play(ask["utterance_id"])
+        _stop(s)
+    rows = _audit("cds.runaway", s.session_id)
+    assert len(rows) == 1
+    assert rows[0]["call"] == "assessment" and rows[0]["reason"] == "cap"
+    assert rows[0]["tokens"] == 1500 and rows[0]["elapsed_ms"] == 37210 and rows[0]["cap"] == 1500
+    assert rows[0]["kept_assessment_version"] == version and rows[0]["failures"] == 1
+
+
+def test_a_runaway_passs_own_urgency_call_still_pauses(gate):
+    """The alarm is never lost to a runaway: the urgency check ran on its
+    own call, and its actions pause auto mode exactly as a landed pass's
+    would; the acknowledgement then plans from the agenda in hand."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    async def runaway(transcript, previous=None):
+        engine.updates.append(transcript)
+        exc = appmain.cds.CDSRunaway("assessment", reason="timeout", tokens=None,
+                                     elapsed_ms=60000, timeout_s=60.0)
+        exc.urgency = {"urgency_check": {"time_critical_possible": True,
+                                         "already_done_or_arranged": False, "reason": "red flags"},
+                       "urgent_actions": [{"action": "Bedside ECG", "reason": "exclude ACS"}]}
+        raise exc
+    engine.update = runaway
+    with live(gate) as s:
+        s.to_golden()
+        s.seed_agenda(Q_SLEEP)
+        s.to_open()
+        for _ in range(40):
+            s.probe()
+            if s.phase is AutoPhase.PAUSED_URGENT:
+                break
+            time.sleep(0.02)
+        assert s.phase is AutoPhase.PAUSED_URGENT
+        assert s.auto["controller"].pending_actions == frozenset({"Bedside ECG"})
+        assert s.entry["assessment"]["urgent_actions"] == [{"action": "Bedside ECG", "reason": "exclude ACS"}]
+        s.ws.send_text(json.dumps({"type": "auto_ack", "resolution": "resume"}))
+        _until(s.ws, {"auto_acknowledged"})
+        ask = s.wait_for_auto_speak()
+        assert ask["text"] == "Can you tell me more about your sleep?"
+        _stop(s)
+    rows = _audit("cds.runaway", s.session_id)
+    assert len(rows) == 1 and rows[0]["reason"] == "timeout" and rows[0]["timeout_s"] == 60.0
+    assert len(_audit("auto.paused", s.session_id)) == 1
+
+
+# ==========================================================================
 # Our own utterances never erase a judged turn end (owner decision 2026-09-07, E2)
 
 def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):

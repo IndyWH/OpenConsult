@@ -176,6 +176,24 @@ until the mock-patient round:
   recorded (`stale: true`, no transition) and not applied — a "finished"
   from before their new words never ends the turn they re-opened.
 
+  **Runaway generation is capped (owner decision 2026-09-07, after
+  consultation 486, finding F3).** Every model call — assessment,
+  urgency, affect, officer, topic — carries a maximum output
+  (`num_predict`): `CDS_ASSESSMENT_MAX_TOKENS` (1500, about three times
+  the ≈ 500 a normal pass produces), `CDS_URGENCY_MAX_TOKENS` (1000),
+  `CDS_AFFECT_MAX_TOKENS` (800), `AUTO_OFFICER_MAX_TOKENS` (64),
+  `AUTO_TOPIC_MAX_TOKENS` (48); and the assessment call's own timeout is
+  `CDS_ASSESSMENT_TIMEOUT_S` (60 s; it was the generic 180 s). In 486
+  one assessment call generated 7,211+ tokens for the whole 180 s on
+  Ollama's single slot, five deferred officer calls died behind it and
+  the patient waited 3 min 18 s. A call that hits its cap or timeout is
+  audited `cds.runaway` with tokens and elapsed and is a failed pass:
+  the previous assessment is kept, the urgency check still runs on its
+  own call so an alarm is never lost, a revision auto mode was waiting
+  for is answered from the agenda it already has (the flow is never
+  held by a pass that cannot land), and deferred officer calls fall to
+  their E4 bound as designed.
+
   **After the golden window has run, the fallback applies whether
   or not the officer answered** (owner decision 2026-09-01, pilot
   defect D3): quiet of `AUTO_EOT_FALLBACK_S` ends the turn on the
@@ -546,6 +564,10 @@ and `test_standing_rules.py` extends to the new controls.
   flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
   decision 2026-09-07, pilot 485 E4; the verdict row that follows carries
   `deferred`, or `stale: true` if the patient spoke again meanwhile),
+  `cds.runaway` when a model call hits its output cap or its timeout —
+  the call, the reason (`cap` | `timeout`), tokens, elapsed_ms, the cap
+  or timeout, the failure count and the assessment version kept (owner
+  decision 2026-09-07, pilot 486 F3),
   `auto.reask_no_answer` when an auto question is re-asked once for want
   of any patient speech inside `AUTO_NO_ANSWER_GRACE_S` — the text, the
   quiet, the grace and the new utterance id (owner decision 2026-09-07,
@@ -597,6 +619,9 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
 | `AUTO_STRICT_REVISE` | `true` | D2 posture, flippable for comparison runs |
 | `AUTO_ACTION_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot E3): the ratchet's token-set similarity for "the same action" |
+| `CDS_ASSESSMENT_MAX_TOKENS` / `CDS_URGENCY_MAX_TOKENS` / `CDS_AFFECT_MAX_TOKENS` | `1500` / `1000` / `800` | Owner decision 2026-09-07 (pilot F3): output caps on the pass's three calls |
+| `AUTO_OFFICER_MAX_TOKENS` / `AUTO_TOPIC_MAX_TOKENS` | `64` / `48` | The short calls' caps |
+| `CDS_ASSESSMENT_TIMEOUT_S` | `60` | The assessment call's own timeout (was 180) |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 

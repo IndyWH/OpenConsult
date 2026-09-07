@@ -134,7 +134,7 @@ def test_an_unusable_phrase_is_a_failed_verdict_so_the_caller_asks_verbatim(monk
 
 
 def test_topic_for_never_raises_whatever_chat_does(monkeypatch):
-    async def exploding(self, system, user, schema, *, timeout=180.0):
+    async def exploding(self, system, user, schema, *, timeout=180.0, **kwargs):
         raise RuntimeError("model process died")
     monkeypatch.setattr(CDSEngine, "_chat", exploding)
     verdict = asyncio.run(CDSEngine().topic_for(QUESTION))

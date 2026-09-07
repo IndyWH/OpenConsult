@@ -170,6 +170,26 @@ def test_a_timeout_is_a_failed_verdict_named_timeout(monkeypatch):
     assert verdict.elapsed_ms < 900
 
 
+def test_the_officer_carries_its_output_cap_and_a_cap_hit_is_a_failed_verdict(monkeypatch):
+    """Owner decision 2026-09-07 (pilot 486 F3): every model call carries
+    num_predict. The officer's is AUTO_OFFICER_MAX_TOKENS (its answer is
+    ~24 tokens); a reply Ollama stopped for length is a CDSRunaway inside
+    the engine and a failed verdict at the boundary — fail-soft, as every
+    officer failure is."""
+    seen = _capture(monkeypatch, {"finished_thought": True, "handed_back": False})
+    asyncio.run(CDSEngine().end_of_turn(TRANSCRIPT))
+    assert seen["json"]["options"]["num_predict"] == cds.AUTO_OFFICER_MAX_TOKENS == 64
+    # A length stop: the transport answers with done_reason "length".
+    async def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"message": {"content": "{\"finished_thought\": tr"},
+                                         "done_reason": "length", "eval_count": 64})
+    monkeypatch.setattr(cds.httpx, "AsyncClient",
+                        lambda **kw: _REAL_CLIENT(transport=httpx.MockTransport(handler), **kw))
+    verdict = asyncio.run(CDSEngine().end_of_turn(TRANSCRIPT))
+    assert verdict.failed is not None and verdict.failed.startswith("CDSRunaway")
+    assert (verdict.finished_thought, verdict.handed_back) == (False, False)
+
+
 def test_a_callers_bound_stretches_the_officer_past_its_own_timeout(monkeypatch):
     """Owner decision 2026-09-07 (pilot 485 E4): while a CDS pass is in
     flight the wiring passes AUTO_OFFICER_MAX_WAIT_S as the bound, and the
@@ -191,7 +211,7 @@ def test_a_callers_bound_stretches_the_officer_past_its_own_timeout(monkeypatch)
 def test_end_of_turn_never_raises_whatever_chat_does(monkeypatch):
     """Belt and braces at the method boundary: any exception class from the
     call layer is absorbed into a failed verdict."""
-    async def exploding(self, system, user, schema, *, timeout=180.0):
+    async def exploding(self, system, user, schema, *, timeout=180.0, **kwargs):
         raise RuntimeError("model process died")
     monkeypatch.setattr(CDSEngine, "_chat", exploding)
     verdict = asyncio.run(CDSEngine().end_of_turn(TRANSCRIPT))

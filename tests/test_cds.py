@@ -87,7 +87,7 @@ def test_an_affect_failure_cannot_cost_the_clinical_output(monkeypatch):
         "urgent_actions": [{"action": "Bedside ECG", "reason": "exclude ACS"}],
     }
 
-    async def fake_chat(self, system, user, schema):
+    async def fake_chat(self, system, user, schema, **kwargs):
         if system is cds.AFFECT_PROMPT:
             raise httpx.ConnectError("affect call is down")
         return dict(urgency_reply if system is cds.URGENCY_PROMPT

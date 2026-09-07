@@ -97,6 +97,37 @@ AUTO_OFFICER_MAX_WAIT_S = float(os.getenv("AUTO_OFFICER_MAX_WAIT_S", "30.0"))
 # An UNCALIBRATED GUESS; the mock-patient round is the run that informs it.
 AUTO_TOPIC_TIMEOUT_S = float(os.getenv("AUTO_TOPIC_TIMEOUT_S", "2.0"))
 
+# Cap runaway generation (owner decision 2026-09-07, pilot 486 F3). In 486
+# an assessment call generated 7,211+ tokens at 40 t/s for the full 180 s
+# of the client timeout (a normal pass produces 500–620), holding Ollama's
+# single slot while five deferred officer calls died behind it and the
+# patient waited 3 min 18 s. Every model call now carries a maximum
+# output (num_predict) — about three times the recorded normal for the
+# long calls, small caps for the short ones — and the assessment call's
+# own timeout is 60 s, not 180. A call that hits its cap or timeout is a
+# CDSRunaway: the pass fails, the previous assessment is kept, and the
+# urgency check still runs on its own call (the alarm is never lost).
+CDS_ASSESSMENT_MAX_TOKENS = int(os.getenv("CDS_ASSESSMENT_MAX_TOKENS", "1500"))
+CDS_URGENCY_MAX_TOKENS = int(os.getenv("CDS_URGENCY_MAX_TOKENS", "1000"))
+CDS_AFFECT_MAX_TOKENS = int(os.getenv("CDS_AFFECT_MAX_TOKENS", "800"))
+AUTO_OFFICER_MAX_TOKENS = int(os.getenv("AUTO_OFFICER_MAX_TOKENS", "64"))
+AUTO_TOPIC_MAX_TOKENS = int(os.getenv("AUTO_TOPIC_MAX_TOKENS", "48"))
+CDS_ASSESSMENT_TIMEOUT_S = float(os.getenv("CDS_ASSESSMENT_TIMEOUT_S", "60.0"))
+
+
+class CDSRunaway(Exception):
+    """A model call hit its output cap or its timeout (pilot 486 F3). For
+    the assessment call, `urgency` carries the urgency check's own
+    result — bookkept exactly as a landed pass would have it — so the
+    caller can keep the previous assessment and still act on an alarm."""
+
+    def __init__(self, call: str, *, reason: str, tokens: int | None,
+                 elapsed_ms: int, cap: int | None = None, timeout_s: float | None = None) -> None:
+        super().__init__(f"{call} call {reason}: {tokens} tokens in {elapsed_ms} ms")
+        self.call, self.reason, self.tokens = call, reason, tokens
+        self.elapsed_ms, self.cap, self.timeout_s = elapsed_ms, cap, timeout_s
+        self.urgency: dict | None = None
+
 ASR_CAVEAT = """\
 You receive a rough LIVE TRANSCRIPT produced by speech recognition: it has \
 no speaker labels and may garble words, especially medication names — \
@@ -518,7 +549,8 @@ class CDSEngine:
         try:
             reply = await asyncio.wait_for(
                 self._chat(TOPIC_PROMPT, topic_message(question), TOPIC_SCHEMA,
-                           timeout=AUTO_TOPIC_TIMEOUT_S),
+                           timeout=AUTO_TOPIC_TIMEOUT_S, num_predict=AUTO_TOPIC_MAX_TOKENS,
+                           call="topic"),
                 timeout=AUTO_TOPIC_TIMEOUT_S)
             raw = reply["topic"]
         except asyncio.TimeoutError:
@@ -564,7 +596,7 @@ class CDSEngine:
         try:
             reply = await asyncio.wait_for(
                 self._chat(OFFICER_PROMPT, officer_message(transcript), OFFICER_SCHEMA,
-                           timeout=bound),
+                           timeout=bound, num_predict=AUTO_OFFICER_MAX_TOKENS, call="officer"),
                 timeout=bound)
             finished = bool(reply["finished_thought"])
             handed_back = bool(reply["handed_back"])
@@ -586,7 +618,23 @@ class CDSEngine:
         return OfficerVerdict(finished, handed_back, elapsed_ms=elapsed)
 
     async def _chat(self, system: str, user: str, schema: dict, *,
-                    timeout: float = 180.0) -> dict:
+                    timeout: float = 180.0, num_predict: int | None = None,
+                    call: str = "chat") -> dict:
+        """One model call. `num_predict` caps the output (owner decision
+        2026-09-07, pilot 486 F3); a reply Ollama stopped for length
+        (`done_reason: "length"`) is a CDSRunaway, never a parsed answer —
+        truncated JSON would not parse anyway, and a cap hit is a fault to
+        record, not a value to use."""
+        started = time.perf_counter()
+        options = {
+            # Greedy + fixed seed: an alarm must not be a coin flip,
+            # and evaluations must be reproducible.
+            "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
+            "seed": int(os.getenv("CDS_SEED", "42")),
+            "num_ctx": CDS_NUM_CTX,
+        }
+        if num_predict is not None:
+            options["num_predict"] = int(num_predict)
         async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
                 f"{self.base_url}/api/chat",
@@ -599,17 +647,19 @@ class CDSEngine:
                     "format": schema,
                     "stream": False,
                     "keep_alive": "30m",  # avoid a 30 s reload stall mid-consultation
-                    "options": {
-                        # Greedy + fixed seed: an alarm must not be a coin flip,
-                        # and evaluations must be reproducible.
-                        "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
-                        "seed": int(os.getenv("CDS_SEED", "42")),
-                        "num_ctx": CDS_NUM_CTX,
-                    },
+                    "options": options,
                 },
             )
             response.raise_for_status()
-        return json.loads(response.json()["message"]["content"])
+        body = response.json()
+        if num_predict is not None and body.get("done_reason") == "length":
+            elapsed = round(1000 * (time.perf_counter() - started))
+            tokens = body.get("eval_count")
+            logger.warning("%s call hit its output cap (%s tokens, num_predict=%d) after %d ms",
+                           call, tokens, num_predict, elapsed)
+            raise CDSRunaway(call, reason="cap", tokens=tokens, elapsed_ms=elapsed,
+                             cap=num_predict)
+        return json.loads(body["message"]["content"])
 
     async def update(self, transcript: str, previous: dict | None = None) -> dict:
         """One CDS pass: transcript so far + previous assessment → new assessment.
@@ -637,10 +687,44 @@ class CDSEngine:
 
         transcript_text = f"LIVE TRANSCRIPT SO FAR:\n{transcript}"
 
-        assessment = await self._chat(
-            ASSESSMENT_PROMPT, f"{prev_text}\n\n{transcript_text}", ASSESSMENT_SCHEMA
-        )
-        urgency = await self._chat(URGENCY_PROMPT, transcript_text, URGENCY_SCHEMA)
+        runaway: CDSRunaway | None = None
+        started = time.perf_counter()
+        try:
+            # Bounded end to end, like the officer: asyncio.wait_for around
+            # the call and the same value as the HTTP timeout beneath it.
+            assessment = await asyncio.wait_for(
+                self._chat(
+                    ASSESSMENT_PROMPT, f"{prev_text}\n\n{transcript_text}", ASSESSMENT_SCHEMA,
+                    timeout=CDS_ASSESSMENT_TIMEOUT_S, num_predict=CDS_ASSESSMENT_MAX_TOKENS,
+                    call="assessment"),
+                timeout=CDS_ASSESSMENT_TIMEOUT_S)
+        except CDSRunaway as exc:
+            runaway = exc
+        except (httpx.TimeoutException, asyncio.TimeoutError):
+            elapsed = round(1000 * (time.perf_counter() - started))
+            logger.warning("Assessment call timed out after %d ms (CDS_ASSESSMENT_TIMEOUT_S=%.0f)",
+                           elapsed, CDS_ASSESSMENT_TIMEOUT_S)
+            runaway = CDSRunaway("assessment", reason="timeout", tokens=None,
+                                 elapsed_ms=elapsed, timeout_s=CDS_ASSESSMENT_TIMEOUT_S)
+        # The urgency check runs on its own call whatever became of the
+        # assessment: a runaway must never cost the doctor the alarm.
+        urgency = await self._chat(URGENCY_PROMPT, transcript_text, URGENCY_SCHEMA,
+                                   num_predict=CDS_URGENCY_MAX_TOKENS, call="urgency")
+        if runaway is not None:
+            arranged = urgency["already_done_or_arranged"] or bool(
+                previous and previous.get("urgency_check", {}).get("already_done_or_arranged")
+            )
+            runaway.urgency = {
+                "urgency_check": {
+                    "time_critical_possible": urgency["time_critical_possible"],
+                    "already_done_or_arranged": arranged,
+                    "reason": urgency["reasoning"],
+                },
+                "urgent_actions": (urgency["urgent_actions"]
+                                   if urgency["time_critical_possible"] and not arranged
+                                   else []),
+            }
+            raise runaway
 
         # Third call, LAST and FAIL-SOFT. It sees the transcript and
         # nothing else — no previous answer to anchor on, no differentials,
@@ -656,7 +740,8 @@ class CDSEngine:
         # failure falls back to neutral with a warning.
         try:
             affect = await self._chat(
-                AFFECT_PROMPT, affect_message(transcript), AFFECT_SCHEMA)
+                AFFECT_PROMPT, affect_message(transcript), AFFECT_SCHEMA,
+                num_predict=CDS_AFFECT_MAX_TOKENS, call="affect")
             assessment["patient_affect"] = affect["patient_affect"]
         except Exception as exc:  # noqa: BLE001 - the clinical pass survives
             logger.warning("Affect call failed, falling back to neutral: %s", exc)

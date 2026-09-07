@@ -2283,9 +2283,58 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 if entry["face"] is not None:
                     entry["face"].on_affect(
                         entry["assessment"].get("patient_affect"))
+            except cds.CDSRunaway as exc:
+                # Cap runaway generation (owner decision 2026-09-07, pilot
+                # 486 F3): the pass failed at its cap or its timeout. On the
+                # record with tokens and elapsed; the previous assessment is
+                # kept; the urgency check ran on its own call and its alarm
+                # still counts; a revision auto mode was waiting for is
+                # answered from the agenda it already has, so the flow is
+                # never held by a pass that cannot land. Deferred officer
+                # calls fall to their E4 bound as designed.
+                cds_failures += 1
+                await audit.log(user["id"], "cds.runaway", None, None,
+                                {"session_id": session_id, "call": exc.call, "reason": exc.reason,
+                                 "tokens": exc.tokens, "elapsed_ms": exc.elapsed_ms,
+                                 "cap": exc.cap, "timeout_s": exc.timeout_s,
+                                 "failures": cds_failures,
+                                 "kept_assessment_version": entry["agenda"].current_version,
+                                 "at_audio_s": round(session.audio_seconds, 1)})
+                logger.warning("CDS pass failed (%d): runaway — %s", cds_failures, exc)
+                if exc.urgency is not None:
+                    if entry["assessment"] is None:
+                        # A runaway on the very first pass: nothing to keep,
+                        # but the alarm still counts — a minimal assessment
+                        # carries the urgency check's own result.
+                        entry["assessment"] = {"reasoning": "", "differentials": [],
+                                               "questions_to_ask": [], "signs_to_check": [],
+                                               "patient_affect": "neutral"}
+                    entry["assessment"]["urgency_check"] = exc.urgency["urgency_check"]
+                    entry["assessment"]["urgent_actions"] = exc.urgency["urgent_actions"]
+                    await websocket.send_json({"type": "cds", "assessment": entry["assessment"]})
+                    if entry["auto"] is not None and exc.urgency["urgent_actions"]:
+                        if not await _repause_suppressed(exc.urgency["urgent_actions"],
+                                                         entry["agenda"].current_version,
+                                                         cds_pre_answer):
+                            await on_urgent_alarm(exc.urgency["urgent_actions"],
+                                                  entry["agenda"].current_version)
+                    if entry["auto"] is not None:
+                        await _push_standing(entry["agenda"].current_version)
+                if entry["auto"] is not None and entry["auto"]["revision"] == "running":
+                    auto = entry["auto"]
+                    auto["revision"] = None
+                    auto["bridge_used"] = False
+                    if auto["controller"].phase in auto_mode.QUESTION_PHASES:
+                        _plan_from_agenda(auto, entry["agenda"].current_version,
+                                          why="revision failed (runaway), asking from the agenda in hand")
+                if cds_failures >= CDS_MAX_FAILURES:
+                    await websocket.send_json(
+                        {"type": "cds_unavailable",
+                         "detail": "CDS engine unreachable; transcription continues."}
+                    )
             except Exception as exc:  # noqa: BLE001 - degrade, don't crash the stream
                 cds_failures += 1
-                logger.warning("CDS pass failed (%d): %s", cds_failures, exc)
+                logger.warning("CDS pass failed (%d): %s: %s", cds_failures, type(exc).__name__, exc)
                 if cds_failures >= CDS_MAX_FAILURES:
                     await websocket.send_json(
                         {"type": "cds_unavailable",
@@ -3126,6 +3175,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         verdict = await engine.topic_for(text)
         topic = verdict.topic
         open_form = False
+        if verdict.failed is not None and verdict.failed.startswith("CDSRunaway"):
+            await audit.log(user["id"], "cds.runaway", None, None,
+                            {"session_id": session_id, "call": "topic", "reason": "cap",
+                             "detail": verdict.failed, "elapsed_ms": verdict.elapsed_ms,
+                             "cap": cds.AUTO_TOPIC_MAX_TOKENS,
+                             "at_audio_s": round(session.audio_seconds, 1)})
         if verdict.failed is not None:
             await audit.log(user["id"], "auto.topic_failed", None, None,
                             {"session_id": session_id, "reason": verdict.failed,
@@ -3907,6 +3962,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              **({"deferred": deferred} if deferred is not None else {}),
                              "at_audio_s": round(session.audio_seconds, 1)})
             return
+        if verdict.failed is not None and verdict.failed.startswith("CDSRunaway"):
+            await audit.log(user["id"], "cds.runaway", None, None,
+                            {"session_id": session_id, "call": "officer", "reason": "cap",
+                             "detail": verdict.failed, "elapsed_ms": verdict.elapsed_ms,
+                             "cap": cds.AUTO_OFFICER_MAX_TOKENS,
+                             "at_audio_s": round(session.audio_seconds, 1)})
         if verdict.failed is not None:
             await audit.log(user["id"], "auto.officer_failed", None, None,
                             {"session_id": session_id, "reason": verdict.failed,

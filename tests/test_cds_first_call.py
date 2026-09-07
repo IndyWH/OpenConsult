@@ -219,7 +219,7 @@ def test_urgency_rides_the_same_update_assessment_first():
     engine = CDSEngine()
     order: list[str] = []
 
-    async def fake_chat(self, system, user, schema):
+    async def fake_chat(self, system, user, schema, **kwargs):
         if system == ASSESSMENT_PROMPT:
             order.append("assessment")
             return {k: v for k, v in EMPTY_ASSESSMENT.items()
