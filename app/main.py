@@ -1464,6 +1464,11 @@ AUTO_ACTION_MATCH_THRESHOLD = float(os.getenv("AUTO_ACTION_MATCH_THRESHOLD", "0.
 # this grace the question is re-asked once; past a second grace the
 # ordinary turn-end path proceeds, so silence can never trap the run.
 AUTO_NO_ANSWER_GRACE_S = float(os.getenv("AUTO_NO_ANSWER_GRACE_S", "12.0"))
+# The D3 cone's topic identity (owner decision 2026-09-07, pilot 486 F4):
+# two topic strings are one topic when their normalised token-set
+# similarity (the E3 normaliser) reaches this — "this chest pain" and
+# "the pain" opened the chest pain twice in 486.
+AUTO_TOPIC_MATCH_THRESHOLD = float(os.getenv("AUTO_TOPIC_MATCH_THRESHOLD", "0.6"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1773,7 +1778,11 @@ def _new_auto_state() -> dict:
         "bridge_used": False,
         "queued": None,               # the prepared next utterance (a plan dict)
         "plan_task": None,            # topic call + pre-synthesis in flight
-        "opened_topics": set(),       # D3: case-folded topics asked open-form
+        "opened_topics": set(),       # D3: case-folded topics asked open-form (matched by meaning, F4)
+        # No question is asked twice (pilot 486 F4): the agenda texts asked
+        # and answered this session, and the one asked and awaiting.
+        "asked_answered": [],
+        "asked_open": None,
         "handover": None,             # None | "anything_else" | "final"
         "anything_else_done": False,  # at most once per session
         "last_issued": None,          # the last queued utterance issued, for requeue
@@ -1840,6 +1849,7 @@ def _thresholds_in_force() -> dict:
         "strict_revise": AUTO_STRICT_REVISE,
         "action_match_threshold": AUTO_ACTION_MATCH_THRESHOLD,
         "no_answer_grace_s": AUTO_NO_ANSWER_GRACE_S,
+        "topic_match_threshold": AUTO_TOPIC_MATCH_THRESHOLD,
         "politeness_floor_rms": speech.BARGE_IN_RMS_THRESHOLD,
     }
 
@@ -3129,13 +3139,38 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         auto["handover"] = None
         auto["handover_by_doctor"] = False   # a refill returned the flow to the questions
-        # The top question — but not the same words twice in a row when
-        # there is any other to ask (re-asking is allowed and logged, a
-        # ping-pong on identical text is bad manners).
-        index = 0
+        # No question is asked twice (owner decision 2026-09-07, pilot 486
+        # F4): a question whose normalised text (the E3 normaliser) equals
+        # one already asked and answered this session is skipped — audited
+        # auto.reask_suppressed — and the next agenda item taken. In 486
+        # the agenda kept an asked question at the top across four
+        # versions and it was asked twice. The deliberate re-ask for want
+        # of an answer (F5) does not come this way and is exempt. If every
+        # item has been asked, the agenda is spent: the handover sequence.
+        candidates = []
+        for i, q in enumerate(questions):
+            prior = auto_mode.match_action(q, auto["asked_answered"], 1.0)
+            if prior is None:
+                candidates.append(i)
+                continue
+            asyncio.create_task(audit.log(
+                user["id"], "auto.reask_suppressed", None, None,
+                {"session_id": session_id, "candidate": q, "matched": prior[0],
+                 "score": prior[1], "agenda_version": version, "index": i,
+                 "at_audio_s": round(session.audio_seconds, 1)}))
+            logger.info("Live session %s: v%d[%d] already asked and answered, skipped: %r",
+                        session_id, version, i, q)
+        if not candidates:
+            _plan_handover(auto, version)
+            return
+        # The top remaining question — but not the same words twice in a
+        # row when there is any other to ask (a question asked but not yet
+        # answered, e.g. politeness-aborted; a ping-pong on identical text
+        # is bad manners).
+        index = candidates[0]
         last = auto.get("last_asked_text")
-        if last is not None and questions[0] == last and len(questions) > 1:
-            index = 1
+        if last is not None and questions[index] == last and len(candidates) > 1:
+            index = candidates[1]
         auto["plan_task"] = asyncio.create_task(
             _prepare_question(auto, version, index, questions[index], why))
 
@@ -3186,7 +3221,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                             {"session_id": session_id, "reason": verdict.failed,
                              "agenda_version": version, "index": index,
                              "elapsed_ms": verdict.elapsed_ms})
-        elif topic.casefold() not in auto["opened_topics"]:
+        elif auto_mode.match_action(topic.casefold(), auto["opened_topics"],
+                                    AUTO_TOPIC_MATCH_THRESHOLD) is None:
+            # A NEW topic by meaning, not by string (owner decision
+            # 2026-09-07, pilot 486 F4): "this chest pain" and "the pain"
+            # are one topic.
             open_form = True
         if open_form:
             utterance = auto_mode.TemplateUtterance("tell_me_more", topic)
@@ -3239,6 +3278,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["reasked"] = False
         if plan["kind"] == "question":
             auto["last_asked_text"] = plan["question"]
+            auto["asked_open"] = plan["question"]      # answered at the answer's turn end (F4)
             if plan["open_form"]:
                 auto["opened_topics"].add(plan["topic"].casefold())
             auto["awaiting_answer"] = True
@@ -3277,6 +3317,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["queued"] = {k: v for k, v in last.items() if k != "utterance_id"}
             auto["awaiting_answer"] = False
             auto["awaiting_speech"] = False    # nothing was asked; no answer is awaited (F5)
+            auto["asked_open"] = None          # and nothing to count as asked (F4)
             logger.info("Live session %s: auto %s politeness-aborted, requeued",
                         session_id, last["kind"])
             return
@@ -3343,6 +3384,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["awaiting_answer"] = True
             auto["turn_ended"] = False
             auto["last_asked_text"] = utterance.text
+            auto["asked_open"] = utterance.text        # the doctor's ask counts too (F4)
 
     async def _end_run_by_tapped_handover(auto: dict, utterance: speech.Utterance) -> None:
         """The tapped handover phrase IS the handover: the same edge the
@@ -3612,6 +3654,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if not answer:
             return
         auto["awaiting_answer"] = False
+        if auto.get("asked_open"):
+            auto["asked_answered"].append(auto["asked_open"])   # asked and answered (F4)
+            auto["asked_open"] = None
         if ctl.phase in auto_mode.QUESTION_PHASES:
             _request_revision(auto, f"answer's turn ended ({by})")
         elif ctl.phase is auto_mode.AutoPhase.HANDOVER and auto["handover"] is not None:

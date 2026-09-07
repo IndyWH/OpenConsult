@@ -747,6 +747,90 @@ def test_a_runaway_passs_own_urgency_call_still_pauses(gate):
 
 
 # ==========================================================================
+# No question is asked twice; the cone by meaning (owner decision 2026-09-07, F4)
+
+Q_RISK = "Do you have any other risk factors for heart disease? (e.g., diabetes, high cholesterol)"
+Q_PAIN_BEFORE = "Have you ever had chest pain like this before?"
+
+
+def test_the_486_risk_factors_question_is_not_asked_again_after_it_was_asked_and_answered(gate):
+    """Owner decision 2026-09-07 (pilot 486 F4). The agenda kept the
+    risk-factors question at the top across four versions and it was
+    asked twice — the patient objected aloud. Now a planned question
+    whose normalised text was already asked and answered is skipped
+    (audited auto.reask_suppressed) and the next item taken."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.topics[Q_RISK] = "heart disease risk factors"
+    engine.agendas = [[Q_RISK], [Q_RISK, Q_ONSET]]        # v2 keeps the asked one at the top
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about heart disease risk factors?"
+        s.play(first["utterance_id"])
+        s.turn_end("Well, I smoke, and my blood pressure was high at a camp.")
+        assert s.auto["asked_answered"] == [Q_RISK]
+        second = s.wait_for_auto_speak()
+        assert second["text"] == "Can you tell me more about the chest pain?", "v2[1], not the asked v2[0]"
+        s.play(second["utterance_id"])
+        _stop(s)
+    rows = _audit("auto.reask_suppressed", s.session_id)
+    assert len(rows) == 1
+    assert rows[0]["candidate"] == Q_RISK and rows[0]["matched"] == Q_RISK and rows[0]["score"] == 1.0
+    assert rows[0]["agenda_version"] == 2 and rows[0]["index"] == 0
+
+
+def test_the_two_cone_re_asks_collapse_to_one_topic(gate):
+    """"this chest pain" and "the pain" were two topics in 486, so the
+    chest pain was opened twice. With the cone's identity matched by
+    meaning (AUTO_TOPIC_MATCH_THRESHOLD), the second question on the same
+    topic is asked verbatim, not opened again."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.topics[Q_ONSET] = "this chest pain"
+    engine.topics[Q_PAIN_BEFORE] = "the pain"
+    engine.agendas = [[Q_ONSET], [Q_PAIN_BEFORE]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about this chest pain?"
+        s.play(first["utterance_id"])
+        s.turn_end("It is in the centre, like a tightness.")
+        second = s.wait_for_auto_speak()
+        assert second["text"] == Q_PAIN_BEFORE, "one topic: asked verbatim, not opened again"
+        assert s.phase is AutoPhase.CLOSED
+        _stop(s)
+    assert appmain.AUTO_TOPIC_MATCH_THRESHOLD == 0.6
+    assert _audit("auto.reask_suppressed", s.session_id) == []
+
+
+def test_a_genuinely_new_question_passes_and_a_spent_agenda_hands_over(gate):
+    """A new text is asked as before, with no suppression row; an agenda
+    made only of questions already asked and answered is spent, and the
+    handover sequence follows."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET], [Q_SLEEP], [Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday night.")
+        second = s.wait_for_auto_speak()
+        assert second["text"] == "Can you tell me more about your sleep?", "new: passes"
+        s.play(second["utterance_id"])
+        s.turn_end("Badly, with the pain.")
+        third = s.wait_for_auto_speak()
+        assert third["ref_id"] == "anything_else", "both asked and answered: the agenda is spent"
+        _stop(s)
+    rows = _audit("auto.reask_suppressed", s.session_id)
+    assert sorted(r["candidate"] for r in rows) == sorted([Q_ONSET, Q_SLEEP])
+
+
+# ==========================================================================
 # Our own utterances never erase a judged turn end (owner decision 2026-09-07, E2)
 
 def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):

@@ -312,6 +312,23 @@ soft (D1), the question is asked verbatim and simply codes as
 whatever it is under the frozen open/closed rule. (A global
 OPEN→CLOSED switch was declined as clinically cruder.)
 
+**No question is asked twice (owner decision 2026-09-07, after
+consultation 486, finding F4, first half).** The session keeps an
+asked-and-answered memory of question texts (an agenda question asked
+by the machine or tapped by the doctor joins it when its answer's turn
+ends; a politeness-aborted ask does not). A planned question whose
+normalised text (the E3 normaliser, exact token-set equality) matches
+one already asked and answered is skipped and the next agenda item
+taken, audited `auto.reask_suppressed` with both texts and the score;
+the deliberate re-ask for want of an answer (§5) is exempt. If every
+item on the agenda has been asked, the agenda counts as spent and the
+handover sequence follows. In 486 the agenda kept "Do you have any
+other risk factors…" at the top across four versions and it was asked
+twice. **The cone's topic identity** (D3 above) uses the same
+normaliser with its own threshold, `AUTO_TOPIC_MATCH_THRESHOLD`
+(default 0.6): "this chest pain" and "the pain" are one topic, and the
+chest pain is opened once.
+
 **HANDOVER.** When the agenda is empty after a revision, or the
 doctor taps Handover: speak the anything-else follow-up once, take
 the answer, then the examination-handover phrase, and auto mode ends
@@ -564,6 +581,10 @@ and `test_standing_rules.py` extends to the new controls.
   flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
   decision 2026-09-07, pilot 485 E4; the verdict row that follows carries
   `deferred`, or `stale: true` if the patient spoke again meanwhile),
+  `auto.reask_suppressed` when a planned question is skipped because its
+  normalised text was already asked and answered — `candidate`,
+  `matched`, `score`, the agenda version and index (owner decision
+  2026-09-07, pilot 486 F4),
   `cds.runaway` when a model call hits its output cap or its timeout —
   the call, the reason (`cap` | `timeout`), tokens, elapsed_ms, the cap
   or timeout, the failure count and the assessment version kept (owner
@@ -622,6 +643,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `CDS_ASSESSMENT_MAX_TOKENS` / `CDS_URGENCY_MAX_TOKENS` / `CDS_AFFECT_MAX_TOKENS` | `1500` / `1000` / `800` | Owner decision 2026-09-07 (pilot F3): output caps on the pass's three calls |
 | `AUTO_OFFICER_MAX_TOKENS` / `AUTO_TOPIC_MAX_TOKENS` | `64` / `48` | The short calls' caps |
 | `CDS_ASSESSMENT_TIMEOUT_S` | `60` | The assessment call's own timeout (was 180) |
+| `AUTO_TOPIC_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot F4): the cone's token-set similarity for "the same topic" |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 
