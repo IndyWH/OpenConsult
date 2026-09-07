@@ -98,9 +98,11 @@ class ScriptedEngine:
         self.updates: list[str] = []
         self.topic_calls: list[str] = []
         self.gate_event: asyncio.Event | None = None
+        self.timeouts: list[float | None] = []   # the bound each ask came with (E4)
 
-    async def end_of_turn(self, transcript):
+    async def end_of_turn(self, transcript, *, timeout_s=None):
         self.asked.append(transcript)
+        self.timeouts.append(timeout_s)
         return self.verdicts.pop(0) if len(self.verdicts) > 1 else self.verdicts[0]
 
     async def topic_for(self, question):

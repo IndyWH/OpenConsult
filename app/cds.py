@@ -86,6 +86,11 @@ CDS_NUM_CTX = int(os.getenv("CDS_NUM_CTX", "16384"))
 # judging, then fall back (silence-based, in app/main.py's wiring). An
 # UNCALIBRATED GUESS; the mock-patient round is the run that informs it.
 AUTO_OFFICER_TIMEOUT_S = float(os.getenv("AUTO_OFFICER_TIMEOUT_S", "2.0"))
+# A busy model is a wait, not a failure (owner decision 2026-09-07, pilot
+# 485 E4): while a CDS pass is in flight the officer's call is bounded by
+# this instead — the model serves one request at a time, and in 485 every
+# one of the seven officer timeouts fell inside a pass's call windows.
+AUTO_OFFICER_MAX_WAIT_S = float(os.getenv("AUTO_OFFICER_MAX_WAIT_S", "30.0"))
 # Phase 7c (PHASE_7C_SPEC.md §4, decision D1): the topic call's own
 # timeout — the tiny call that names what an agenda question is about so
 # it can be asked open-form; on timeout the question is asked verbatim.
@@ -538,31 +543,36 @@ class CDSEngine:
         self.model = model or CDS_MODEL
         self.base_url = (base_url or OLLAMA_URL).rstrip("/")
 
-    async def end_of_turn(self, transcript: str) -> OfficerVerdict:
+    async def end_of_turn(self, transcript: str, *,
+                          timeout_s: float | None = None) -> OfficerVerdict:
         """The end-of-turn officer (Phase 7c, spec §5). NEVER RAISES.
 
-        Bounded by AUTO_OFFICER_TIMEOUT_S end to end (asyncio.wait_for
-        around the call, and the same value as the HTTP timeout beneath
-        it). Any failure — connection, HTTP status, malformed reply,
-        timeout — comes back as a failed verdict with both booleans False,
-        for the caller to fall back on silence and audit
+        Bounded end to end (asyncio.wait_for around the call, and the same
+        value as the HTTP timeout beneath it) by AUTO_OFFICER_TIMEOUT_S —
+        or by `timeout_s` when the caller passes one: the wiring stretches
+        the bound to AUTO_OFFICER_MAX_WAIT_S while a CDS pass is in flight
+        (owner decision 2026-09-07, pilot 485 E4: a busy model is a wait,
+        not a failure). Any failure — connection, HTTP status, malformed
+        reply, timeout — comes back as a failed verdict with both booleans
+        False, for the caller to fall back on silence and audit
         (auto.officer_failed). A detected hand-back is logged here, as the
         prereg requires for scoring, and again by the caller in its
         transition record.
         """
+        bound = float(timeout_s) if timeout_s is not None else AUTO_OFFICER_TIMEOUT_S
         started = time.perf_counter()
         try:
             reply = await asyncio.wait_for(
                 self._chat(OFFICER_PROMPT, officer_message(transcript), OFFICER_SCHEMA,
-                           timeout=AUTO_OFFICER_TIMEOUT_S),
-                timeout=AUTO_OFFICER_TIMEOUT_S)
+                           timeout=bound),
+                timeout=bound)
             finished = bool(reply["finished_thought"])
             handed_back = bool(reply["handed_back"])
         except asyncio.TimeoutError:
             elapsed = round(1000 * (time.perf_counter() - started))
-            logger.warning("End-of-turn officer timed out after %d ms "
-                           "(AUTO_OFFICER_TIMEOUT_S=%.1f); falling back to silence",
-                           elapsed, AUTO_OFFICER_TIMEOUT_S)
+            logger.warning("End-of-turn officer timed out after %d ms (bound %.1f s%s); "
+                           "falling back to silence", elapsed, bound,
+                           "" if timeout_s is None else ", stretched for a CDS pass in flight")
             return OfficerVerdict(False, False, failed="timeout", elapsed_ms=elapsed)
         except Exception as exc:  # noqa: BLE001 - fail-soft by contract
             elapsed = round(1000 * (time.perf_counter() - started))

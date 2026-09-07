@@ -28,6 +28,7 @@ from app import (assessment_snapshots, audit, auth, auto_mode, consultations, fa
                  frontdesk, letters, monitor, ratelimit, raw_segments, retention,
                  schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
+from app import cds
 from app.cds import CDSEngine, OfficerVerdict, turn_finished
 from app.finalize import (AUTO_SPEAKER_DECLARATION_WAIT_S, declaration_bound,
                           declaration_pending, expect_declaration,
@@ -1753,6 +1754,9 @@ def _new_auto_state() -> dict:
         "last_quiet_s": None,         # to notice a fresh quiet span
         "officer_task": None,         # the in-flight end-of-turn call, if any
         "officer_quiet_s": None,      # the quiet the running officer was asked about
+        "officer_deferred": None,     # the CDS pass version the running officer waits behind (E4)
+        "officer_span": 0,            # the patient span the running officer was asked in
+        "span_seq": 0,                # bumps on every fresh span the PATIENT began
         "officer_last_run_quiet_s": None,   # per span: re-run when quiet grows by EOT
         "officer_verdict": None,      # the last verdict in this span
         "warm_task": None,
@@ -1816,6 +1820,7 @@ def _thresholds_in_force() -> dict:
         "eot_quiet_s": AUTO_EOT_QUIET_S,
         "eot_fallback_s": AUTO_EOT_FALLBACK_S,
         "officer_timeout_s": cds_module.AUTO_OFFICER_TIMEOUT_S,
+        "officer_max_wait_s": cds_module.AUTO_OFFICER_MAX_WAIT_S,
         "topic_timeout_s": cds_module.AUTO_TOPIC_TIMEOUT_S,
         "presynth": AUTO_PRESYNTH,
         "strict_revise": AUTO_STRICT_REVISE,
@@ -2977,6 +2982,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 task.cancel()
             auto[key] = None
         auto["officer_quiet_s"] = None
+        auto["officer_deferred"] = None
         auto["queued"] = None
         auto["revision"] = None
 
@@ -3497,6 +3503,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["officer_verdict"] = None
             if payload.get("since") != "playback":
                 auto["turn_ended"] = False
+                auto["span_seq"] += 1        # the patient's span moved on (E4: a late verdict is stale)
         auto["last_quiet_s"] = quiet_s
         in_golden = ctl.phase is auto_mode.AutoPhase.GOLDEN
         in_questions = ctl.phase in auto_mode.QUESTION_PHASES
@@ -3577,7 +3584,29 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     OfficerVerdict(False, False, failed="no committed transcript"), quiet_s)
             else:
                 auto["officer_quiet_s"] = quiet_s
-                auto["officer_task"] = asyncio.create_task(engine.end_of_turn(transcript))
+                auto["officer_span"] = auto["span_seq"]
+                if cds_task is not None and not cds_task.done():
+                    # A busy model is a wait, not a failure (owner decision
+                    # 2026-09-07, pilot 485 E4): the model serves one request
+                    # at a time, and in 485 all seven officer timeouts fell
+                    # inside a CDS pass's call windows — the officer was
+                    # blind for the whole of every revision. While a pass is
+                    # in flight the officer's bound stretches to cover it,
+                    # capped by AUTO_OFFICER_MAX_WAIT_S; the deferral is
+                    # audited with the version the pass will land as, and
+                    # the verdict is applied when it arrives.
+                    pass_version = entry["agenda"].current_version + 1
+                    auto["officer_deferred"] = pass_version
+                    await audit.log(user["id"], "auto.officer_deferred", None, None,
+                                    {"session_id": session_id, "quiet_s": round(quiet_s, 1),
+                                     "phase": ctl.phase.value, "pass_version": pass_version,
+                                     "max_wait_s": cds.AUTO_OFFICER_MAX_WAIT_S,
+                                     "at_audio_s": round(session.audio_seconds, 1)})
+                    auto["officer_task"] = asyncio.create_task(
+                        engine.end_of_turn(transcript, timeout_s=cds.AUTO_OFFICER_MAX_WAIT_S))
+                else:
+                    auto["officer_deferred"] = None
+                    auto["officer_task"] = asyncio.create_task(engine.end_of_turn(transcript))
         elif auto["officer_verdict"] is not None and auto["officer_verdict"].failed is not None:
             # A failed officer earlier in this span: the silence rule keeps
             # being consulted as the quiet grows.
@@ -3669,14 +3698,31 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if auto is None or auto["officer_task"] is None or not auto["officer_task"].done():
             return
         task, quiet_s = auto["officer_task"], auto["officer_quiet_s"]
+        deferred, asked_in_span = auto["officer_deferred"], auto["officer_span"]
         auto["officer_task"] = None
         auto["officer_quiet_s"] = None
+        auto["officer_deferred"] = None
         try:
             verdict = task.result()
         except asyncio.CancelledError:
             return
         except Exception as exc:  # noqa: BLE001 - end_of_turn never raises; belt and braces
             logger.warning("Live session %s: officer task failed unexpectedly: %s", session_id, exc)
+            return
+        if asked_in_span != auto["span_seq"]:
+            # The patient spoke again while the officer was out (a deferred
+            # call can be out for many seconds): its word is about a pause
+            # that no longer exists. Recorded, never applied — a "finished"
+            # from before their new words must not end the turn they have
+            # re-opened. Err toward waiting.
+            await audit.log(user["id"], "auto.officer_verdict", None, None,
+                            {"session_id": session_id, "quiet_s": round(quiet_s or 0.0, 1),
+                             "phase": auto["controller"].phase.value, "stale": True,
+                             "finished_thought": verdict.finished_thought,
+                             "handed_back": verdict.handed_back, "failed": verdict.failed,
+                             "elapsed_ms": verdict.elapsed_ms, "transition": None,
+                             **({"deferred": deferred} if deferred is not None else {}),
+                             "at_audio_s": round(session.audio_seconds, 1)})
             return
         if verdict.failed is not None:
             await audit.log(user["id"], "auto.officer_failed", None, None,
@@ -3699,6 +3745,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          "handed_back": verdict.handed_back,
                          "failed": verdict.failed,
                          "elapsed_ms": verdict.elapsed_ms,
+                         **({"deferred": deferred} if deferred is not None else {}),
                          "transition": ({"from": transition.from_phase.value,
                                          "to": transition.to_phase.value,
                                          "trigger": transition.trigger.value}

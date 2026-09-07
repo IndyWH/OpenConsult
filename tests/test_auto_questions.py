@@ -120,9 +120,11 @@ class ScriptedEngine:
         self.updates: list[str] = []
         self.topic_calls: list[str] = []
         self.gate_event: asyncio.Event | None = None
+        self.timeouts: list[float | None] = []   # the bound each ask came with (E4)
 
-    async def end_of_turn(self, transcript):
+    async def end_of_turn(self, transcript, *, timeout_s=None):
         self.asked.append(transcript)
+        self.timeouts.append(timeout_s)
         return self.verdicts.pop(0) if len(self.verdicts) > 1 else self.verdicts[0]
 
     async def topic_for(self, question):
@@ -645,6 +647,108 @@ def test_the_patients_own_voice_still_reopens_the_turn(gate):
         s.quiet(4.0)                                   # officer: not finished → still waits
         assert all(m.get("type") != "auto_speak" for m in s.probe())
         _stop(s)
+
+
+# ==========================================================================
+# A busy model is a wait, not a failure (owner decision 2026-09-07, E4)
+
+def test_an_officer_asked_during_a_cds_pass_is_deferred_not_failed_and_its_verdict_applied_after(gate):
+    """Owner decision 2026-09-07 (pilot 485, defect E4). In 485 all seven
+    officer timeouts fell inside a CDS pass's call windows — the model
+    serves one request at a time, so the officer's 2 s budget expired in
+    the queue and the officer was blind for the whole of every revision.
+    Now an officer asked while a pass is in flight is called with the
+    stretched bound (AUTO_OFFICER_MAX_WAIT_S), the deferral is audited
+    with the version the pass will land as, no auto.officer_failed is
+    written, and the verdict is applied when it arrives — here it ends
+    the answer's turn by verdict after the pass has landed."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_ONSET], [Q_RADIATE]]
+    engine.gate_event = asyncio.Event()                # every pass held until released
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()                                    # hand-back: no pass in flight yet
+        assert engine.timeouts == [None], "no pass in flight: the 2 s default"
+        # A queued request behind the pass: the officer answers only once the
+        # pass is released, like a request Ollama serves after the CDS call.
+        async def queued_officer(transcript, *, timeout_s=None):
+            engine.asked.append(transcript)
+            engine.timeouts.append(timeout_s)
+            await engine.gate_event.wait()
+            return OfficerVerdict(True, False, elapsed_ms=12000)
+        engine.end_of_turn = queued_officer
+        s.commit_transcript("Nobody has done an ECG yet.")   # the patient speaks during the pass
+        s.quiet(2.0)                                   # a fresh span of theirs
+        s.probe()
+        s.quiet(3.1)
+        s.probe()                                      # officer asked while the pass is in flight
+        assert s.auto["officer_task"] is not None and not s.auto["officer_task"].done()
+        assert engine.timeouts[-1] == appmain.cds.AUTO_OFFICER_MAX_WAIT_S
+        for _ in range(6):                             # ticks pass; nothing fails
+            s.probe()
+            time.sleep(0.02)
+        assert s.auto["officer_task"] is not None, "still waiting, not failed"
+        assert _audit("auto.officer_failed", s.session_id) == []
+        deferred = _audit("auto.officer_deferred", s.session_id)
+        assert len(deferred) == 1 and deferred[0]["quiet_s"] == 3.1 and deferred[0]["phase"] == "open"
+        assert deferred[0]["max_wait_s"] == appmain.cds.AUTO_OFFICER_MAX_WAIT_S
+        s.ws.portal.call(lambda: engine.gate_event.set())   # the pass lands; the officer answers
+        for _ in range(30):
+            s.probe()
+            if s.auto["officer_task"] is None and s.auto["queued"] is not None:
+                break
+            time.sleep(0.03)
+        assert s.auto["officer_task"] is None, "the deferred verdict arrived and was applied"
+        assert deferred[0]["pass_version"] == s.entry["assessment"]["assessment_version"]
+        _stop(s)
+    verdicts = _audit("auto.officer_verdict", s.session_id)
+    late = next(v for v in verdicts if v.get("deferred") is not None)
+    assert late["failed"] is None and late["finished_thought"] is True
+    assert late["deferred"] == deferred[0]["pass_version"] and late["elapsed_ms"] == 12000
+    assert late.get("stale") is None, "the patient did not speak again: applied, not stale"
+
+
+def test_a_deferred_verdict_from_a_span_the_patient_has_left_is_recorded_but_not_applied(gate):
+    """The other edge of a long wait: if the patient speaks again while the
+    officer is out, its word is about a pause that no longer exists. It is
+    audited (stale: true, no transition) and not applied — a "finished"
+    from before their new words never ends the turn they re-opened."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_ONSET]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()                # the exit's own turn end permits the ask
+        s.play(first["utterance_id"])
+        held = asyncio.Event()                         # the officer's answer, held like a queued request
+        async def queued_officer(transcript, *, timeout_s=None):
+            engine.asked.append(transcript)
+            await held.wait()
+            return OfficerVerdict(True, False)
+        engine.end_of_turn = queued_officer
+        engine.gate_event = held
+        s.commit_transcript("Well, it started on Tuesday")
+        s.quiet(2.0)
+        s.probe()
+        s.quiet(3.2)
+        s.probe()                                      # the officer is out
+        assert s.auto["officer_task"] is not None
+        s.commit_transcript("and then again on Thursday, and")   # the patient goes on
+        s.quiet(2.0)                                   # a fresh span of THEIRS
+        s.probe()
+        s.ws.portal.call(lambda: engine.gate_event.set())
+        for _ in range(20):
+            s.probe()
+            if s.auto["officer_task"] is None:
+                break
+            time.sleep(0.02)
+        assert s.auto["turn_ended"] is False, "a stale 'finished' ended nothing"
+        assert s.auto["awaiting_answer"] is True
+        _stop(s)
+    stale = [v for v in _audit("auto.officer_verdict", s.session_id) if v.get("stale")]
+    assert len(stale) == 1 and stale[0]["finished_thought"] is True and stale[0]["transition"] is None
 
 
 # ==========================================================================

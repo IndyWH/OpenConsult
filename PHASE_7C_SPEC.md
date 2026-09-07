@@ -151,6 +151,22 @@ until the mock-patient round:
   timer — and never to ask. Section 5's earlier "outside GOLDEN"
   wording was imprecise (recorded 2026-08-16 at slice-3 review).
 
+  **A busy model is a wait, not a failure (owner decision 2026-09-07,
+  pilot 485 defect E4).** Ollama serves the one model one request at a
+  time, and in 485 all seven officer timeouts fell inside a CDS pass's
+  call windows (healthy calls took 618–833 ms) — the officer was blind
+  for the whole of every revision, and only its fail-soft silence rule
+  let the flow reach a turn end in OPEN at all. While a CDS pass is in
+  flight the officer's bound stretches to `AUTO_OFFICER_MAX_WAIT_S`
+  (default 30 s) instead of `AUTO_OFFICER_TIMEOUT_S`; the deferral is
+  audited as `auto.officer_deferred` with the version the pass will
+  land as, and the verdict is applied when it arrives (its
+  `auto.officer_verdict` row carries `deferred`). With no pass in flight
+  the 2 s bound and `auto.officer_failed` are unchanged. A verdict that
+  arrives after the patient has begun a fresh span of their own is
+  recorded (`stale: true`, no transition) and not applied — a "finished"
+  from before their new words never ends the turn they re-opened.
+
   **After the golden window has run, the fallback applies whether
   or not the officer answered** (owner decision 2026-09-01, pilot
   defect D3): quiet of `AUTO_EOT_FALLBACK_S` ends the turn on the
@@ -464,6 +480,10 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.golden_window_ran` (once per run: the window's end, with
   `golden_s`, whichever report or verdict first observed it — owner
   decision 2026-09-01), and
+  `auto.officer_deferred` when an officer is asked while a CDS pass is in
+  flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
+  decision 2026-09-07, pilot 485 E4; the verdict row that follows carries
+  `deferred`, or `stale: true` if the patient spoke again meanwhile),
   `auto.action_matched` for every comparison that suppresses a re-pause
   — `candidate`, `matched`, `score`, `exact`, the threshold and the
   assessment version (owner decision 2026-09-07, pilot 485 E3),
@@ -502,7 +522,8 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_ENCOURAGER_MIN_QUIET_S` | `5.0` | Owner decision 2026-09-01: the golden window's one encourager, after this much quiet |
 | `AUTO_EOT_QUIET_S` | `3.0` | Uncalibrated guess |
 | `AUTO_EOT_FALLBACK_S` | `5.0` | Officer fail-soft silence |
-| `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back |
+| `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back — with no CDS pass in flight |
+| `AUTO_OFFICER_MAX_WAIT_S` | `30` | Owner decision 2026-09-07 (pilot E4): the officer's bound while a CDS pass is in flight |
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
 | `AUTO_STRICT_REVISE` | `true` | D2 posture, flippable for comparison runs |
 | `AUTO_ACTION_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot E3): the ratchet's token-set similarity for "the same action" |

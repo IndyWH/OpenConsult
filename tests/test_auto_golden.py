@@ -100,9 +100,11 @@ class FakeEngine:
     def __init__(self):
         self.verdicts: list[OfficerVerdict] = [OfficerVerdict(False, False)]
         self.asked: list[str] = []
+        self.timeouts: list[float | None] = []   # the bound each ask came with (E4)
 
-    async def end_of_turn(self, transcript: str) -> OfficerVerdict:
+    async def end_of_turn(self, transcript: str, *, timeout_s=None) -> OfficerVerdict:
         self.asked.append(transcript)
+        self.timeouts.append(timeout_s)
         if len(self.verdicts) > 1:
             return self.verdicts.pop(0)
         return self.verdicts[0]

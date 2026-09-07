@@ -170,6 +170,24 @@ def test_a_timeout_is_a_failed_verdict_named_timeout(monkeypatch):
     assert verdict.elapsed_ms < 900
 
 
+def test_a_callers_bound_stretches_the_officer_past_its_own_timeout(monkeypatch):
+    """Owner decision 2026-09-07 (pilot 485 E4): while a CDS pass is in
+    flight the wiring passes AUTO_OFFICER_MAX_WAIT_S as the bound, and the
+    call that would have timed out at AUTO_OFFICER_TIMEOUT_S waits for the
+    model instead — the HTTP client and the wait_for both take the caller's
+    bound. Without a bound the 2 s default and the timeout verdict are
+    unchanged (the tests above)."""
+    monkeypatch.setattr(cds, "AUTO_OFFICER_TIMEOUT_S", 0.05)
+    seen = _capture(monkeypatch, {"finished_thought": True, "handed_back": False}, sleep_s=0.3)
+    verdict = asyncio.run(CDSEngine().end_of_turn(TRANSCRIPT, timeout_s=2.0))
+    assert verdict.failed is None and verdict.finished_thought is True
+    assert seen["client_kwargs"]["timeout"] == 2.0
+    assert verdict.elapsed_ms >= 250
+    late = asyncio.run(CDSEngine().end_of_turn(TRANSCRIPT))           # no bound: the default
+    assert late.failed == "timeout"
+    assert cds.AUTO_OFFICER_MAX_WAIT_S == 30.0, "the shipped default"
+
+
 def test_end_of_turn_never_raises_whatever_chat_does(monkeypatch):
     """Belt and braces at the method boundary: any exception class from the
     call layer is absorbed into a failed verdict."""
