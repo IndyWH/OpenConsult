@@ -339,6 +339,31 @@ new action text in such a pass still pauses (widening the pending
 set, as slice 5 pinned), and a re-fire while already `PAUSED_URGENT`
 is untouched.
 
+**An acknowledged action does not re-pause (owner decision 2026-09-07,
+after consultation 486, finding F1).** Once the doctor has acknowledged
+a pending action — RESUME AUTO or TAKE OVER — a later pass that
+re-issues the same action (same by the normalised match below) does
+not pause the flow again. In 486 every one of seven post-answer passes
+re-issued the acknowledged "Bedside ECG" with the hospital action
+re-worded five ways, and the ratchet as first written paused on each:
+eight RESUME taps, every question planned from the resume handler.
+Nothing about the alarm clears silently: the acknowledged-but-open
+actions stay on the live page in a persistent strip inside the urgent
+panel (`auto_standing`, pushed on every pass landing and every
+acknowledgement) until the transcript shows them arranged (the pass
+then lists nothing — `arranged` latches, as today) or the consultation
+ends. A genuinely new action — no match against pending or
+acknowledged — still pauses and widens the pending set, as slice 5
+pinned. A re-wording that matched joins the acknowledged set as an
+alias of what it matched, so a chain of re-wordings (486: admission →
+referral → specialist referral → admission) stays one action. Every
+skipped re-pause is audited
+`auto.repause_skipped_acknowledged` with both texts and the score; the
+one answer's chance below keeps its own `auto.repause_suppressed` row
+for the in-flight case. The sentence "a re-fire of the same action
+after a resume pauses again and needs a fresh acknowledgement" above is
+superseded by this paragraph.
+
 **The ratchet matches actions by meaning, not wording (owner decision
 2026-09-07, pilot 485 defect E3).** In 485 the CDS re-worded the hospital
 action on every pass — "Consider hospital admission", "Immediate referral
@@ -506,6 +531,10 @@ and `test_standing_rules.py` extends to the new controls.
   flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
   decision 2026-09-07, pilot 485 E4; the verdict row that follows carries
   `deferred`, or `stale: true` if the patient spoke again meanwhile),
+  `auto.repause_skipped_acknowledged` for every acknowledged action a
+  later pass re-issued without a pause — `candidate`, `matched`,
+  `score`, `exact`, the threshold and the version (owner decision
+  2026-09-07, pilot 486 F1),
   `auto.action_matched` for every comparison that suppresses a re-pause
   — `candidate`, `matched`, `score`, `exact`, the threshold and the
   assessment version (owner decision 2026-09-07, pilot 485 E3),

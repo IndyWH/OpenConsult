@@ -334,3 +334,25 @@ def test_the_guarded_taps_confirmation_keeps_all_three_standing_rules():
     plan = live[live.index("else if (msg.type === 'auto_plan')"):]
     plan = plan[:plan.index("\n  }")]
     assert "clearTapConfirm()" in plan, "a moot choice is taken away, not left to be clicked"
+
+
+# ------------------------ Solo pilot slice 3 (2026-09-07): the standing strip
+
+def test_the_standing_strip_lives_in_the_alarms_home_and_never_clears_itself():
+    """F1 (owner decision 2026-09-07): an acknowledged action no longer
+    re-pauses auto mode, so it must not clear silently either. The strip
+    sits inside the urgent panel in the sticky row (rule 3), says in words
+    what it is (rule 2), and is written only from the server's push — the
+    page never empties it on its own (rule 1's cousin: nothing about the
+    alarm disappears without the record saying so)."""
+    live = _page("live.html")
+    left = live[live.index('id="stickyLeft"'):live.index('id="stickyRight"')]
+    urgent = left[left.index('id="urgentBox"'):]
+    assert 'id="standingStrip"' in urgent and urgent.index('id="standingStrip"') < urgent.index('id="pauseBanner"')
+    fn = live[live.index("function renderStanding(actions) {"):]
+    fn = fn[:fn.index("\n}")]
+    assert "'Acknowledged, still open: '" in fn
+    assert "will not pause on these again" in fn
+    assert "strip.hidden = true" in fn and "if (!actions.length)" in fn
+    assert live.count("renderStanding(") == 2, "written from the auto_standing push and nowhere else"
+    assert "else if (msg.type === 'auto_standing') { renderStanding(msg.actions || []); }" in live

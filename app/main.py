@@ -1784,6 +1784,8 @@ def _new_auto_state() -> dict:
         "golden_window_ran": False,
         "pause_versions": [],         # assessment_snapshot versions of the alarms in the live pause
         "acks": [],                   # live acknowledgements, for the consultation-linked audit row
+        "standing_sent": None,        # the acknowledged-but-open actions last pushed (auto_standing, F1)
+        "action_aliases": set(),      # re-wordings matched to an acknowledged action (F1: the chain holds)
         "handover_by_doctor": False,  # slice 6: the doctor's Handover tap started the sequence
         # Owner decision 2026-09-01 (pilot D4): from RESUME AUTO until the
         # first turn end that follows it, a CDS pass that lands may not
@@ -2217,6 +2219,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                                      assessment_version, cds_pre_answer):
                         await on_urgent_alarm(entry["assessment"]["urgent_actions"],
                                               assessment_version)
+                if entry["auto"] is not None:
+                    await _push_standing(assessment_version)
                 # Phase 7c (D2): the pass auto mode asked for has landed —
                 # plan the next ask from THIS version only.
                 if entry["auto"] is not None and entry["auto"]["revision"] == "running":
@@ -2940,6 +2944,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # could be given.
                 _plan_from_agenda(auto, entry["agenda"].current_version,
                                   why="resumed after pause")
+            await _push_standing(entry["agenda"].current_version)
         else:
             transition = ctl.acknowledge_and_take_over()
             await auto_transition(transition, detail={"actions": covered})
@@ -3317,7 +3322,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         """
         auto = entry["auto"]
         ctl: auto_mode.AutoModeController = auto["controller"]
-        if not pre_answer or ctl.phase not in auto_mode.LISTENING_PHASES:
+        if ctl.phase not in auto_mode.LISTENING_PHASES:
             return False
         texts = [str(a.get("action", "")) for a in actions if a.get("action")]
         if not texts:
@@ -3328,11 +3333,37 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # time. Every action must match something already pending or
         # acknowledged; one genuinely new action and the pass pauses,
         # widening the pending set as slice 5 pinned.
-        known = ctl.acknowledged_actions | ctl.pending_actions
+        known = ctl.acknowledged_actions | ctl.pending_actions | auto["action_aliases"]
         matches = [(text, auto_mode.match_action(text, known, AUTO_ACTION_MATCH_THRESHOLD))
                    for text in texts]
         if any(match is None for _, match in matches):
             return False
+        # A matched re-wording joins the acknowledged set as an alias of
+        # what it matched, so a chain of re-wordings (486: admission →
+        # referral → specialist referral → admission) stays one action.
+        auto["action_aliases"].update(text for text, _ in matches)
+        if not pre_answer:
+            # An acknowledged action does not re-pause (owner decision
+            # 2026-09-07, pilot 486 F1). In 486 every one of seven
+            # post-answer passes re-issued the acknowledged "Bedside ECG"
+            # (with the hospital action re-worded five ways) and the ratchet
+            # paused on each: eight RESUME taps, every question planned
+            # from the resume handler. Once the doctor has acknowledged an
+            # action, its re-fire — same by the E3 match — pauses nothing;
+            # it stays on the live page's standing strip (auto_standing)
+            # until the transcript shows it arranged or the consultation
+            # ends. Every skipped re-pause is on the record.
+            for text, (matched, score) in matches:
+                await audit.log(user["id"], "auto.repause_skipped_acknowledged", None, None,
+                                {"session_id": session_id, "candidate": text, "matched": matched,
+                                 "score": score, "exact": text == matched,
+                                 "threshold": AUTO_ACTION_MATCH_THRESHOLD,
+                                 "assessment_version": assessment_version,
+                                 "phase": ctl.phase.value,
+                                 "at_audio_s": round(session.audio_seconds, 1)})
+            logger.info("Live session %s: re-pause skipped on v%d (%s): every action is "
+                        "already acknowledged", session_id, assessment_version, texts)
+            return True
         for text, (matched, score) in matches:
             await audit.log(user["id"], "auto.action_matched", None, None,
                             {"session_id": session_id, "candidate": text, "matched": matched,
@@ -3351,6 +3382,39 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         logger.info("Live session %s: re-pause suppressed on v%d (%s): the pass predates "
                     "the first answer after the resume", session_id, assessment_version, texts)
         return True
+
+    def _standing_actions() -> list[str]:
+        """The acknowledged-but-open actions: every urgent action the LATEST
+        assessment still lists that matches (E3) something the doctor has
+        acknowledged. Empty once the transcript shows them arranged (the
+        pass then lists nothing — `arranged` latches in app/cds.py) or
+        when nothing acknowledged is still open."""
+        auto = entry["auto"]
+        if auto is None or entry["assessment"] is None:
+            return []
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        texts = [str(a.get("action", "")) for a in entry["assessment"].get("urgent_actions", [])
+                 if a.get("action")]
+        known = ctl.acknowledged_actions | auto["action_aliases"]
+        return [t for t in texts if auto_mode.match_action(t, known, AUTO_ACTION_MATCH_THRESHOLD)]
+
+    async def _push_standing(assessment_version: int | None) -> None:
+        """The persistent pending-actions strip (owner decision 2026-09-07,
+        pilot 486 F1): with re-pauses on acknowledged actions gone, the
+        alarm must not clear silently — the live page keeps the
+        acknowledged-but-open actions in view (auto_standing, in the urgent
+        panel) until the transcript shows them arranged or the consultation
+        ends. Pushed on every pass landing and every acknowledgement, only
+        when the list changes."""
+        auto = entry["auto"]
+        if auto is None:
+            return
+        standing = _standing_actions()
+        if standing == auto["standing_sent"]:
+            return
+        auto["standing_sent"] = standing
+        await websocket.send_json({"type": "auto_standing", "actions": standing,
+                                   "assessment_version": assessment_version})
 
     async def on_urgent_alarm(actions: list[dict], assessment_version: int) -> None:
         """The urgency pause (Phase 7c slice 5, spec §7, hard rule 2).

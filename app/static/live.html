@@ -116,6 +116,11 @@
   .pausebanner button:disabled { opacity: .5; cursor: not-allowed; }
   /* Phase 7c slice 6: the auto-mode phase indicator on the status line. */
   .autophase { font-weight: 600; color: var(--green); }
+  .urgent .standing {
+    margin: .3rem 0 0; font-size: .8rem; color: var(--ink);
+    border-top: 1px dashed var(--line); padding-top: .3rem;
+  }
+  .urgent .standing b { font-weight: 600; }
   /* The guarded tap's confirmation (owner decision 2026-09-07): inline,
      beside the control the doctor just tapped — where they are looking. */
   .tapconfirm {
@@ -463,6 +468,12 @@
     <div class="urgent" id="urgentBox">
       <h2 class="pane-label">⚠ Urgent actions</h2>
       <ul id="urgentList"></ul>
+      <!-- Solo pilot slice 3 (owner decision 2026-09-07, F1): the standing
+           strip. An acknowledged action no longer re-pauses auto mode, so
+           it must not clear silently either: the acknowledged-but-open
+           actions stay here, in the alarm's home, until the transcript
+           shows them arranged or the consultation ends. -->
+      <p class="standing" id="standingStrip" hidden aria-live="polite"></p>
       <!-- Phase 7c slice 5: the auto-mode pause banner (spec §7, §10).
            Shown only while the machine is PAUSED_URGENT. Lists EVERY
            pending action text — all of them, never only the latest — and
@@ -2548,6 +2559,24 @@ const pauseTakeOver = urgentBoxEl.querySelector('#pauseTakeOver');
 let pausedLive = false;          // server-confirmed PAUSED_URGENT
 let pausePending = [];           // every pending action text, server's list
 
+// The standing strip (owner decision 2026-09-07, pilot 486 F1): the
+// server's list of acknowledged actions the latest assessment still holds
+// open. Never cleared by this page on its own — only by the server's next
+// push (an empty list once the transcript shows them arranged) or by the
+// consultation ending.
+function renderStanding(actions) {
+  const strip = document.getElementById('standingStrip');
+  if (!strip) return;
+  strip.innerHTML = '';
+  if (!actions.length) { strip.hidden = true; return; }
+  strip.appendChild(el('b', null, 'Acknowledged, still open: '));
+  strip.appendChild(document.createTextNode(actions.join(' · ')));
+  strip.appendChild(document.createTextNode(' — auto mode will not pause on these again; they clear when the transcript shows them arranged.'));
+  strip.hidden = false;
+  alarmLive = true;
+  updateStickyRow(alarmLive, faceOn);
+}
+
 function renderPause(paused, pending) {
   pausedLive = !!paused;
   pausePending = Array.isArray(pending) ? pending.slice() : [];
@@ -2711,6 +2740,7 @@ function onWsMessage(event) {
     applyAutoPhase(autoPhase);
   }
   else if (msg.type === 'speak_confirm') { showTapConfirm(msg); }   // the guarded tap
+  else if (msg.type === 'auto_standing') { renderStanding(msg.actions || []); }   // F1: the strip
   else if (msg.type === 'auto_pause') {
     // Slice 5: paused (or a widening re-fire). `pending` is EVERY pending
     // action text; the list is replaced, never appended to.
