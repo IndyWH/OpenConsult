@@ -5943,3 +5943,146 @@ the last.
 ## Solo pilot diagnostic — consultation 485, the first run after the fix slice (REPORT ONLY, 2026-09-07)
 
 **A report exists**, outside the repository: `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_485_2026-09-03.md` (named for 3 Sept as asked; the run itself was 6 Sept, 23:54–23:58 BST) — the full audit/journal timeline of 485 with the fix slice's new events, answers on the politeness abort (none), the golden exit (by `quiet_fallback`, 0.8 s after the window), the post-exit revision (launched without new transcript, landed with an alarm), the planned-then-displaced question, and the two taps; code findings E1–E9 with file:line at `aa0965a` (the headline: the question phases still have no fallback past a healthy "not finished" officer, so the answer to the tapped question never ended a turn); nothing in code, tests, config, flags or the database changed. Docs-only commit; the suite was not run for it.
+
+## Solo pilot fix slice 2 — the owner's five decisions of 7 Sept 2026, built (2026-09-07)
+
+**What landed.** The five items of the owner's decisions after
+consultation 485 (the first run after the fix slice; report
+`~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_485_2026-09-03.md`,
+candidate defects E1–E4 plus the doctor's-side item), one commit each,
+the full suite green before every commit, `PHASE_7C_SPEC.md` truth-upped
+in the same commit as the code it describes. `AUTO_MODE_ENABLED` is
+untouched and `.env` reads `false`; `PHASE_7C_EVAL_PREREG.md`, `help/`,
+`vendor/` and `OPEN_CLOSED_RULE.md` untouched. **Needs a restart to be
+live** (the owner's act). Nothing here advances the gate.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `60185d8` | one turn-end rule in every phase (E1) | 967 → 969 |
+| 2 | `b6b4763` | our own utterances never erase a judged turn end (E2) | 969 → 971 |
+| 3 | `bd567e4` | the ratchet matches actions by meaning, not wording (E3) | 971 → 979 |
+| 4 | `fb05398` | a busy model is a wait, not a failure (E4) | 979 → 982 |
+| 5 | `94e5eb9` | a visible thinking state and a guarded tap | 982 → 987 |
+
+Final suite: **987 passed** (from 967 at `700c450`). Every commit
+message carries the why; this entry carries the decisions and the seams.
+
+**The owner decisions, restated (all 2026-09-07):**
+
+1. **One turn-end rule in every phase.** In OPEN and CLOSED (and the
+   doctor's handover sequence), as already in post-window GOLDEN, quiet
+   of `AUTO_EOT_FALLBACK_S` ends the patient's turn on the quiet report
+   itself, whether or not the officer answered or answered "not
+   finished"; a finished/handed-back verdict still ends it sooner. Every
+   turn end outside GOLDEN is audited `auto.turn_ended` with
+   `by: verdict | quiet_fallback`, `quiet_s`, `phase`, `answer`, and the
+   span's verdict when there was one. (485: three "not finished" across
+   7 s of silence after an answered question; no revision, no next
+   question.)
+2. **Our own utterances never erase a judged turn end.** Every quiet
+   report now carries `since: "speech" | "playback"` — what began its
+   span. A fresh span re-asks the officer either way; `turn_ended` is
+   cleared only when the PATIENT began the span or when a question is
+   issued. (485: the bridge "Go on." 1 s after the golden exit erased
+   the exit's own turn end.)
+3. **The ratchet matches actions by meaning.** `app/auto_mode.py`
+   gains `normalise_action` / `action_similarity` / `match_action`
+   (stdlib only): lower-case, punctuation and whitespace stripped, a
+   small stop-word list removed, token-set similarity ≥
+   `AUTO_ACTION_MATCH_THRESHOLD` (new, default 0.6, in `.env.example`
+   and the per-run thresholds record). Inside the one answer's chance a
+   reworded action does not re-pause; a genuinely new one does and
+   widens the pending set as slice 5 pinned. Every comparison that
+   suppresses a re-pause is audited `auto.action_matched` (both texts,
+   score, exact, threshold, version). (485: "Consider hospital
+   admission" → "Immediate referral to hospital" → "Same-day specialist
+   referral", three pauses.)
+4. **A busy model is a wait, not a failure.** While a CDS pass is in
+   flight the officer's bound stretches to `AUTO_OFFICER_MAX_WAIT_S`
+   (new, default 30 s, in `.env.example` and the thresholds record); the
+   deferral is audited `auto.officer_deferred` with the version the pass
+   will land as, and the verdict is applied when it arrives (its row
+   carries `deferred`). No pass in flight → the 2 s bound and
+   `auto.officer_failed` unchanged. (485: 7 of 7 timeouts inside CDS
+   pass windows; D9 explained.)
+5. **The doctor's side.** The phase indicator shows "preparing a
+   question…" from the moment a revision is requested until the question
+   is issued (or the handover sequence starts), from a new `auto_plan`
+   push (`preparing` → `queued` with text → `idle`, on change). A tap
+   while a question is planned or queued is answered with
+   `speak_confirm` and displaces nothing; the page shows the queued text
+   beside the tapped control with *Ask yours instead* (the same tap with
+   `confirm_displace: true`) and *Let Alba ask*; `auto.doctor_tap`
+   records `confirmed` true/false and the displaced text; a cancelled tap
+   leaves the queue untouched. Taps with nothing planned are unchanged.
+
+**Spec sections touched:** §3 (the guarded tap), §5 (one turn-end rule;
+`since`; the officer's stretched bound), §7 (matching by meaning), §10
+(the thinking state; the confirmation), §11 (`auto.turn_ended`,
+`auto.action_matched`, `auto.officer_deferred`, `deferred`/`stale` on
+verdict rows, `confirmed` on tap rows), §12 (the two new settings).
+
+**Where the decisions did not fully decide, and what the code does —
+for the owner and Cowork to confirm or overrule:**
+
+- **E2's literal rule was "turn_ended is cleared only when a question is
+  issued".** As built, the PATIENT's own voice beginning a fresh span
+  still clears it (the client says which it was); only our playback is
+  exempt. Reason: a plan landing while the patient has started a new
+  thought would otherwise issue at the first 1.75 s report without any
+  judgement — the spec's "err toward waiting" tie-break. A report with no
+  `since` (an old client) is read as speech.
+- **A late officer verdict from a span the patient has left is recorded
+  (`stale: true`) and not applied.** New with E4: a 30 s deferral can
+  return after the patient has spoken again, and a "finished" from
+  before their new words must not end the turn they re-opened. Before
+  this slice a stale verdict was applied (the 1 Sept report noted it
+  "helps rather than hinders" — true at 2 s, not at 30 s).
+- **The matcher's stop-word list** (`auto_mode.ACTION_STOP_WORDS`) is
+  small and hand-written: articles, urgency/hedging words (consider,
+  immediate, urgent, now, same-day…), "do it" verbs (arrange, obtain,
+  refer, send…) and "bedside". Two texts sharing no token never match,
+  whatever the letters. Chains are not followed: a reworded action that
+  was suppressed is not itself added to the acknowledged set, so a third
+  wording is compared against the acknowledged ones only. The threshold
+  is the owner's to tune; 0.6 is what the 485 pairs clear (0.615–0.64).
+- **"Planned" for the guarded tap includes a running revision** — the
+  indicator already says preparing, so the tap gets the same answer
+  ("the machine is preparing a question", no text yet). **The tapped
+  examination handover is exempt** from the confirmation: it ends the
+  run, and there is nothing for the machine to ask after it.
+- **The thinking state is derived, not evented:** on every loop tick
+  from the wiring's own state (revision / plan task / queued), pushed
+  only on change. Latency is one tick (an audio frame, ≈ 0.1–0.2 s).
+- **Tests repinned by decision** (each docstring names it): "outside
+  GOLDEN the only encourager is the single bridge" (now one bridge per
+  revision, bounded by revisions); "no ack-resume loop without an
+  answer" (reports kept under 5 s; the tail pins that 5 s of silence
+  after the asked question IS the answer's end); the slice-4 tap test
+  (confirm before displacing); the client-page reporter pin (the stop
+  path names 'playback'); the pure module's stdlib pin (admits `re`).
+  The three harness engines accept the officer's bound and the three
+  harness clients send `since`. Nothing weakened or deleted.
+- **E1's fallback in the handover sequence** (the anything-else answer
+  from a GOLDEN handover) applies too, through the same helper.
+
+**`help/`:** no article is made untrue. Worth the owner's eye:
+`help/02` step 5 says "Tap the small speaker icon and the assistant asks
+that question" — still true; with auto mode on and a question in
+preparation the tap now first shows the one-click choice. A clause
+there is the owner's call.
+
+**Watch list, carried forward:**
+
+- **The doctor twice perceived an urgency pause as a traffic
+  interruption** (1 Sept "stopped midway"; 6 Sept "traffic interrupted
+  Alba early / restart") — the pause banner's visibility in the room,
+  to watch in the next pilot.
+- **D10** — the politeness abort is a single RMS sample, still
+  unexercised: zero aborts in 482–485.
+- **The felt length of the 90 s window** — re-judge now that the exit
+  works and the indicator counts it down (485: 43.5 s of unbroken
+  silence in GOLDEN after the second resume, nothing from Alba by
+  decision); the prereg amendment path if still too long.
+- **The solo-run first-speaker label** — working as designed (single
+  cluster → Patient, flagged; 484 and 485).
