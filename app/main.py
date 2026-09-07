@@ -1469,6 +1469,22 @@ AUTO_NO_ANSWER_GRACE_S = float(os.getenv("AUTO_NO_ANSWER_GRACE_S", "12.0"))
 # similarity (the E3 normaliser) reaches this — "this chest pain" and
 # "the pain" opened the chest pain twice in 486.
 AUTO_TOPIC_MATCH_THRESHOLD = float(os.getenv("AUTO_TOPIC_MATCH_THRESHOLD", "0.6"))
+# The standing question queue (AGENDA_QUEUE_SPEC.md, owner-approved
+# 2026-09-07). Slice 1 lands the pure module (app/agenda_queue.py) inert;
+# nothing reads these four yet — the wiring (slice 2) and the re-ranker
+# (slice 3) will. The module's own defaults are the same numbers.
+# D-D: at most this many PENDING questions; the lowest-ranked excess is
+# dropped and audited queue_capped.
+AUTO_QUEUE_MAX = int(os.getenv("AUTO_QUEUE_MAX", "8"))
+# D-A: a pending question absent from this many CONSECUTIVE passes is
+# dropped (audited queue_dropped_absent); absence from one pass is kept.
+AUTO_QUEUE_ABSENT_PASSES = int(os.getenv("AUTO_QUEUE_ABSENT_PASSES", "3"))
+# §3: the re-ranker call's timeout; on timeout the current order stands
+# (auto.rerank_failed). Used from slice 3.
+AUTO_RERANK_TIMEOUT_S = float(os.getenv("AUTO_RERANK_TIMEOUT_S", "2.0"))
+# D-B: the re-ranker sees the last this-many transcript turns since the
+# previous full pass, capped by characters. Used from slice 3.
+AUTO_RERANK_CONTEXT_TURNS = int(os.getenv("AUTO_RERANK_CONTEXT_TURNS", "6"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
