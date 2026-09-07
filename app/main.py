@@ -1458,6 +1458,12 @@ AUTO_STRICT_REVISE = os.getenv("AUTO_STRICT_REVISE", "true").lower() != "false"
 # already-acknowledged action reaches this (app/auto_mode.py,
 # match_action). Recorded per run with the other thresholds.
 AUTO_ACTION_MATCH_THRESHOLD = float(os.getenv("AUTO_ACTION_MATCH_THRESHOLD", "0.6"))
+# A turn must start before it can end (owner decision 2026-09-07, pilot 486
+# F5): after an auto question, quiet counts toward a turn end only once
+# the client has reported patient speech since it. With no speech inside
+# this grace the question is re-asked once; past a second grace the
+# ordinary turn-end path proceeds, so silence can never trap the run.
+AUTO_NO_ANSWER_GRACE_S = float(os.getenv("AUTO_NO_ANSWER_GRACE_S", "12.0"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1786,6 +1792,11 @@ def _new_auto_state() -> dict:
         "acks": [],                   # live acknowledgements, for the consultation-linked audit row
         "standing_sent": None,        # the acknowledged-but-open actions last pushed (auto_standing, F1)
         "action_aliases": set(),      # re-wordings matched to an acknowledged action (F1: the chain holds)
+        # A turn must start before it can end (pilot 486 F5): after an auto
+        # question, no turn end until the client reports patient speech;
+        # one re-ask at AUTO_NO_ANSWER_GRACE_S, then the ordinary path.
+        "awaiting_speech": False,
+        "reasked": False,
         "handover_by_doctor": False,  # slice 6: the doctor's Handover tap started the sequence
         # Owner decision 2026-09-01 (pilot D4): from RESUME AUTO until the
         # first turn end that follows it, a CDS pass that lands may not
@@ -1828,6 +1839,7 @@ def _thresholds_in_force() -> dict:
         "presynth": AUTO_PRESYNTH,
         "strict_revise": AUTO_STRICT_REVISE,
         "action_match_threshold": AUTO_ACTION_MATCH_THRESHOLD,
+        "no_answer_grace_s": AUTO_NO_ANSWER_GRACE_S,
         "politeness_floor_rms": speech.BARGE_IN_RMS_THRESHOLD,
     }
 
@@ -3022,6 +3034,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["officer_deferred"] = None
         auto["queued"] = None
         auto["revision"] = None
+        auto["awaiting_speech"] = False
 
     # ------------------------------------------------------------------
     # Phase 7c slice 4: the question phases (spec §6, D2 and D3). Vocabulary
@@ -3167,6 +3180,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["queued"] = None
         auto["last_issued"] = {**plan, "utterance_id": prepared.utterance_id}
         auto["turn_ended"] = False       # the next turn end is the answer's
+        auto["awaiting_speech"] = plan["kind"] != "handover"   # F5: a turn must start before it can end
+        auto["reasked"] = False
         if plan["kind"] == "question":
             auto["last_asked_text"] = plan["question"]
             if plan["open_form"]:
@@ -3206,6 +3221,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if reason == "politeness_abort":
             auto["queued"] = {k: v for k, v in last.items() if k != "utterance_id"}
             auto["awaiting_answer"] = False
+            auto["awaiting_speech"] = False    # nothing was asked; no answer is awaited (F5)
             logger.info("Live session %s: auto %s politeness-aborted, requeued",
                         session_id, last["kind"])
             return
@@ -3447,7 +3463,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await cancel_auto_playback(entry, websocket, "urgency_pause")
             _cancel_officer(auto)          # also drops the queue and any plan
             auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
-                        revision=None, last_issued=None)
+                        revision=None, last_issued=None, awaiting_speech=False, reasked=False)
         auto["pause_versions"].append(assessment_version)
         await auto_transition(transition, detail={"actions": texts, "pending": pending,
                                                   "assessment_version": assessment_version,
@@ -3604,6 +3620,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if payload.get("since") != "playback":
                 auto["turn_ended"] = False
                 auto["span_seq"] += 1        # the patient's span moved on (E4: a late verdict is stale)
+                auto["awaiting_speech"] = False   # the patient has spoken since the question (F5)
         auto["last_quiet_s"] = quiet_s
         in_golden = ctl.phase is auto_mode.AutoPhase.GOLDEN
         in_questions = ctl.phase in auto_mode.QUESTION_PHASES
@@ -3632,10 +3649,44 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                         if verdict is not None else {})},
                     "golden exit: window run, fallback quiet")
                 return                     # OPEN from the next report on
-        elif (quiet_s >= AUTO_EOT_FALLBACK_S and not auto["turn_ended"]):
+        elif auto["awaiting_speech"] and quiet_s >= AUTO_NO_ANSWER_GRACE_S:
+            # 0. A turn must start before it can end (owner decision
+            #    2026-09-07, pilot 486 F5). The patient has said nothing
+            #    since the question: inside the grace nothing ends; at the
+            #    grace the question is re-asked once (audited); at a second
+            #    grace the ordinary path below proceeds, so silence never
+            #    traps the run.
+            free = not session.speaking and entry["pending_utterance"] is None
+            last = auto.get("last_issued")
+            if not auto["reasked"] and last is not None and free:
+                prepared = await auto_issue(last["utterance"], phase=ctl.phase,
+                                            trigger={"quiet_s": round(quiet_s, 1), "reask": True},
+                                            detail=({"topic": last.get("topic"),
+                                                     "open_form": last.get("open_form")}
+                                                    if last.get("kind") == "question" else None))
+                if prepared is not None:
+                    auto["reasked"] = True
+                    auto["last_issued"] = {**last, "utterance_id": prepared.utterance_id}
+                    await audit.log(user["id"], "auto.reask_no_answer", None, None,
+                                    {"session_id": session_id, "phase": ctl.phase.value,
+                                     "quiet_s": round(quiet_s, 1), "text": last.get("text"),
+                                     "grace_s": AUTO_NO_ANSWER_GRACE_S,
+                                     "utterance_id": prepared.utterance_id,
+                                     "at_audio_s": round(session.audio_seconds, 1)})
+                    logger.info("Live session %s: no answer in %.0f s — re-asked once: %r",
+                                session_id, AUTO_NO_ANSWER_GRACE_S, last.get("text"))
+                    return                 # the re-ask's playback starts a fresh span
+            elif auto["reasked"]:
+                auto["awaiting_speech"] = False   # the second grace: the ordinary path proceeds
+                if quiet_s >= AUTO_EOT_FALLBACK_S and not auto["turn_ended"]:
+                    await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s,
+                                    verdict=auto["officer_verdict"])
+        elif (quiet_s >= AUTO_EOT_FALLBACK_S and not auto["turn_ended"]
+              and not auto["awaiting_speech"]):
             # 0. Outside GOLDEN the same rule (owner decision 2026-09-07,
             #    pilot 485 E1): quiet of the fallback length ends the turn
-            #    on the report itself, however the officer answered.
+            #    on the report itself, however the officer answered — once
+            #    the patient has spoken since the question (F5).
             await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s,
                             verdict=auto["officer_verdict"])
         free = not session.speaking and entry["pending_utterance"] is None
@@ -3765,8 +3816,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return None
         in_handover_seq = (ctl.phase is auto_mode.AutoPhase.HANDOVER
                            and auto["handover"] is not None)
-        if (ctl.phase in auto_mode.QUESTION_PHASES or in_handover_seq) and not auto["turn_ended"]:
+        if ((ctl.phase in auto_mode.QUESTION_PHASES or in_handover_seq) and not auto["turn_ended"]
+                and not auto["awaiting_speech"]):
             # One turn-end rule (owner decision 2026-09-07, pilot 485 E1):
+            # gated by F5 — no turn end until the patient has spoken since
+            # the question; the grace path in handle_quiet is the way out.
             # the officer's finished/handed-back word ends it now; quiet of
             # AUTO_EOT_FALLBACK_S ends it whatever the officer said — here
             # when the verdict itself arrives past the fallback, and on

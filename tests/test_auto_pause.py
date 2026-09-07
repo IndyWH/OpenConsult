@@ -571,7 +571,13 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
 
     REPINNED again 2026-09-07 (owner decision, pilot 486 F1): that
     revision re-issues the acknowledged ECG and no longer re-pauses — the
-    skip is audited and the machine stays in its phase."""
+    skip is audited and the machine stays in its phase.
+
+    REPINNED once more 2026-09-07 (owner decision, pilot 486 F5): a turn
+    must start before it can end — silence after the asked question no
+    longer ends its turn until the patient has spoken since it. So the
+    tail now plays the question, has the patient answer, and lets 5 s of
+    quiet after THAT end the turn."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
@@ -589,9 +595,18 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
         assert s.phase.value in ("open", "closed")
         assert len(engine.updates) == passes, "no pass ran without an answer"
         assert len(_audit("auto.paused", s.session_id)) == 1
-        # The one answer's chance runs out by silence: 5 s of quiet after
-        # the asked question ends its turn and the next pass runs — and
-        # re-issues the acknowledged ECG without pausing (F1).
+        # Silence alone ends nothing now (F5): the question is played, the
+        # patient answers, and 5 s of quiet after the answer ends the turn;
+        # the next pass runs — and re-issues the acknowledged ECG without
+        # pausing (F1).
+        if s.entry["pending_utterance"] is not None:
+            s.play(s.entry["pending_utterance"].utterance_id)
+        s.quiet(5.1)
+        s.probe()
+        assert len(engine.updates) == passes, "no speech since the question: no turn end (F5)"
+        s.commit_transcript("Nobody has done an ECG.")
+        s.quiet(2.0)
+        s.probe()
         s.quiet(5.1)
         for _ in range(30):
             s.probe()

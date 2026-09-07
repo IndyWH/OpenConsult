@@ -201,6 +201,21 @@ until the mock-patient round:
   question came before Stop — the 483 inversion, closed in GOLDEN on
   1 Sept, was still open one phase later.
 
+  **A turn must start before it can end (owner decision 2026-09-07,
+  after consultation 486, finding F5).** After an auto question is
+  issued, quiet counts toward a turn end only once the client has
+  reported patient speech since that question (the reporter already
+  says what began each span; the server keeps a spoke-since-question
+  flag per issued question). In 486 the 5 s rule ended the "answer" of
+  a question 10.6 s before the patient began it, so the revision ran on
+  a transcript without the answer and "Go on." was said into the gap.
+  If no patient speech arrives within `AUTO_NO_ANSWER_GRACE_S` (default
+  12 s) the question is re-asked once (audited `auto.reask_no_answer`;
+  a deliberate re-ask, exempt from the no-question-twice rule of §6);
+  if silence continues past a second grace the ordinary turn-end path
+  proceeds, so silence can never trap the run. A politeness-aborted
+  question asked nothing and awaits nothing.
+
   **Our own utterances never erase a judged turn end (owner decision
   2026-09-07, defect E2).** Every quiet report carries what began its
   span — `since: "speech"` (room energy at or above the floor) or
@@ -531,6 +546,10 @@ and `test_standing_rules.py` extends to the new controls.
   flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
   decision 2026-09-07, pilot 485 E4; the verdict row that follows carries
   `deferred`, or `stale: true` if the patient spoke again meanwhile),
+  `auto.reask_no_answer` when an auto question is re-asked once for want
+  of any patient speech inside `AUTO_NO_ANSWER_GRACE_S` — the text, the
+  quiet, the grace and the new utterance id (owner decision 2026-09-07,
+  pilot 486 F5),
   `auto.repause_skipped_acknowledged` for every acknowledged action a
   later pass re-issued without a pause — `candidate`, `matched`,
   `score`, `exact`, the threshold and the version (owner decision
@@ -578,6 +597,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
 | `AUTO_STRICT_REVISE` | `true` | D2 posture, flippable for comparison runs |
 | `AUTO_ACTION_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot E3): the ratchet's token-set similarity for "the same action" |
+| `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 
 Every setting mirrored in `.env.example` with a one-line comment;

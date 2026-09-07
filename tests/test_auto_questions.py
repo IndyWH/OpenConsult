@@ -577,6 +577,102 @@ def test_a_finished_verdict_still_ends_the_answers_turn_before_the_fallback(gate
 
 
 # ==========================================================================
+# A turn must start before it can end (owner decision 2026-09-07, pilot 486 F5)
+
+def _script_first_question(gate):
+    """The officer: a hand-back to leave GOLDEN, then never finished — so
+    only the rules under test can end a turn. Two agendas."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET], [Q_RADIATE]]
+    return engine
+
+
+def _ask_first(s):
+    """GOLDEN → OPEN by hand-back, the first question issued and played."""
+    s.to_golden()
+    s.to_open()
+    ask = s.wait_for_auto_speak()
+    assert ask["text"] == "Can you tell me more about the chest pain?"
+    s.play(ask["utterance_id"])
+    assert s.auto["awaiting_speech"] is True and s.auto["awaiting_answer"] is True
+    return ask
+
+
+def test_quiet_after_a_question_with_no_speech_ends_no_turn(gate):
+    """Owner decision 2026-09-07 (pilot 486 F5): in 486 the 5 s rule ended
+    the "answer" of a question 10.6 s before the patient began it, and the
+    revision ran without the answer. Now silence after an auto question
+    counts toward a turn end only once the patient has spoken since it."""
+    engine = _script_first_question(gate)
+    with live(gate) as s:
+        _ask_first(s)
+        for q in (3.0, 5.1, 8.0, 11.0):                # since=playback: nobody has spoken
+            s.quiet(q)
+            assert all(m.get("type") != "auto_speak" for m in s.probe())
+        assert s.auto["turn_ended"] is False and s.auto["awaiting_answer"] is True
+        assert len(engine.updates) == 1, "no revision ran on an unanswered question"
+        assert not [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
+        _stop(s)
+
+
+def test_speech_then_five_seconds_of_quiet_ends_the_turn_as_before(gate):
+    engine = _script_first_question(gate)
+    with live(gate) as s:
+        _ask_first(s)
+        s.quiet(4.0)
+        s.probe()
+        s.commit_transcript("It started on Tuesday, in the night.")   # the patient speaks
+        s.quiet(2.0)                                     # since=speech
+        s.probe()
+        assert s.auto["awaiting_speech"] is False
+        s.quiet(5.1)
+        s.probe()
+        assert s.auto["turn_ended"] is True and s.auto["awaiting_answer"] is False
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == Q_RADIATE
+        assert len(engine.updates) == 2
+        _stop(s)
+    ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
+    assert len(ended) == 1 and ended[0]["by"] == "quiet_fallback"
+    assert _audit("auto.reask_no_answer", s.session_id) == []
+
+
+def test_twelve_seconds_of_no_speech_re_asks_exactly_once_and_continued_silence_proceeds(gate):
+    """At AUTO_NO_ANSWER_GRACE_S with no patient speech the question is
+    re-asked once (audited); after the re-ask a second grace of silence
+    lets the ordinary turn-end path proceed, so silence never traps the
+    run — and no third asking happens."""
+    _script_first_question(gate)
+    with live(gate) as s:
+        ask = _ask_first(s)
+        s.quiet(11.9)
+        assert all(m.get("type") != "auto_speak" for m in s.probe()), "under the grace: nothing"
+        s.quiet(12.1)
+        again = next(m for m in s.probe() if m.get("type") == "auto_speak")
+        assert again["text"] == ask["text"] and again["utterance_id"] != ask["utterance_id"]
+        assert s.auto["reasked"] is True and s.auto["awaiting_speech"] is True
+        s.play(again["utterance_id"])                   # its playback starts a fresh span
+        for q in (5.1, 8.0, 11.9):
+            s.quiet(q)
+            assert all(m.get("type") != "auto_speak" for m in s.probe()), "still no turn end, no third ask"
+        assert s.auto["turn_ended"] is False
+        s.quiet(12.2)                                    # the second grace: the ordinary path
+        s.probe()
+        assert s.auto["awaiting_speech"] is False and s.auto["turn_ended"] is True
+        assert s.auto["awaiting_answer"] is False, "the answer's (silent) turn ended"
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == Q_RADIATE, "the flow went on"
+        _stop(s)
+    reasks = _audit("auto.reask_no_answer", s.session_id)
+    assert len(reasks) == 1
+    assert reasks[0]["text"] == ask["text"] and reasks[0]["quiet_s"] == 12.1
+    assert reasks[0]["grace_s"] == appmain.AUTO_NO_ANSWER_GRACE_S == 12.0
+    ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
+    assert len(ended) == 1 and ended[0]["by"] == "quiet_fallback" and ended[0]["quiet_s"] == 12.2
+
+
+# ==========================================================================
 # Our own utterances never erase a judged turn end (owner decision 2026-09-07, E2)
 
 def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):
