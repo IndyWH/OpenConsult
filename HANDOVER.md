@@ -6086,3 +6086,7 @@ there is the owner's call.
   decision); the prereg amendment path if still too long.
 - **The solo-run first-speaker label** — working as designed (single
   cluster → Patient, flagged; 484 and 485).
+
+## Solo pilot diagnostic — consultation 486, the second run after fix slice 2 (REPORT ONLY, 2026-09-07)
+
+**A report exists**, outside the repository: `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_486.md` — the full timeline of 486 (7 Sept, 07:33–07:44, script 01, slice-2 code live), the per-question latency table (Q1–Q6 mean 27.7 s of which the CDS revision is 74 %; Q7 198.6 s behind a runaway assessment call that held Ollama's single slot for 180 s), the stale question (the agenda kept an asked question at the top across four versions; the pass saw the answer and kept it on the model's literal reading), the "restarts" (auto mode was never restarted — the eight RESUME taps were the ratchet re-pausing on every post-answer pass, as designed), candidate defects F1–F9 with file:line at `94e5eb9`, and what behaved as designed (E1–E4 all visibly working). Nothing in code, tests, config, flags or the database changed. Docs-only commit; the suite was not run for it.
