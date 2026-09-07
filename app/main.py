@@ -24,8 +24,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi import Depends
 from pydantic import BaseModel
 
-from app import (assessment_snapshots, audit, auth, auto_mode, consultations, face,
-                 frontdesk, letters, monitor, ratelimit, raw_segments, retention,
+from app import (agenda_queue, assessment_snapshots, audit, auth, auto_mode, consultations,
+                 face, frontdesk, letters, monitor, ratelimit, raw_segments, retention,
                  schema, speech, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app import cds
@@ -1470,14 +1470,17 @@ AUTO_NO_ANSWER_GRACE_S = float(os.getenv("AUTO_NO_ANSWER_GRACE_S", "12.0"))
 # "the pain" opened the chest pain twice in 486.
 AUTO_TOPIC_MATCH_THRESHOLD = float(os.getenv("AUTO_TOPIC_MATCH_THRESHOLD", "0.6"))
 # The standing question queue (AGENDA_QUEUE_SPEC.md, owner-approved
-# 2026-09-07). Slice 1 lands the pure module (app/agenda_queue.py) inert;
-# nothing reads these four yet — the wiring (slice 2) and the re-ranker
-# (slice 3) will. The module's own defaults are the same numbers.
+# 2026-09-07). Slice 1 landed the pure module (app/agenda_queue.py); slice
+# 2 wires it: one AgendaQueue per auto session, built from the two numbers
+# below (the topic threshold is AUTO_TOPIC_MATCH_THRESHOLD above), and
+# every CDS pass that lands while auto mode is on merges into it. The
+# re-ranker (slice 3) will read the two after. The module's own defaults
+# are the same numbers.
 # D-D: at most this many PENDING questions; the lowest-ranked excess is
-# dropped and audited queue_capped.
+# dropped and audited auto.queue_capped.
 AUTO_QUEUE_MAX = int(os.getenv("AUTO_QUEUE_MAX", "8"))
 # D-A: a pending question absent from this many CONSECUTIVE passes is
-# dropped (audited queue_dropped_absent); absence from one pass is kept.
+# dropped (audited auto.queue_dropped_absent); absence from one pass is kept.
 AUTO_QUEUE_ABSENT_PASSES = int(os.getenv("AUTO_QUEUE_ABSENT_PASSES", "3"))
 # §3: the re-ranker call's timeout; on timeout the current order stands
 # (auto.rerank_failed). Used from slice 3.
@@ -1777,6 +1780,14 @@ def _new_auto_state() -> dict:
     ever built when AUTO_MODE_ENABLED is true."""
     return {
         "controller": auto_mode.AutoModeController(clock=time.monotonic),
+        # The standing question queue (AGENDA_QUEUE_SPEC.md, slice 2): one
+        # per session, alive as long as the entry is. Every pass that lands
+        # while auto mode is on merges into it (maybe_run_cds); it is the
+        # session's asked-memory too, so it survives a toggle off and on —
+        # a question asked in an earlier run of this session is still asked.
+        "queue": agenda_queue.AgendaQueue(max_pending=AUTO_QUEUE_MAX,
+                                          absent_passes=AUTO_QUEUE_ABSENT_PASSES,
+                                          topic_threshold=AUTO_TOPIC_MATCH_THRESHOLD),
         "golden_encourager_used": False,   # the window's ONE encourager, spent at issue
         "last_quiet_s": None,         # to notice a fresh quiet span
         "officer_task": None,         # the in-flight end-of-turn call, if any
@@ -1866,6 +1877,8 @@ def _thresholds_in_force() -> dict:
         "action_match_threshold": AUTO_ACTION_MATCH_THRESHOLD,
         "no_answer_grace_s": AUTO_NO_ANSWER_GRACE_S,
         "topic_match_threshold": AUTO_TOPIC_MATCH_THRESHOLD,
+        "queue_max": AUTO_QUEUE_MAX,
+        "queue_absent_passes": AUTO_QUEUE_ABSENT_PASSES,
         "politeness_floor_rms": speech.BARGE_IN_RMS_THRESHOLD,
     }
 
@@ -2247,6 +2260,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 entry["assessment_snapshots"].append(assessment_snapshots.snapshot_of(
                     entry["assessment"], assessment_version,
                     datetime.now(timezone.utc), session.audio_seconds))
+                # The standing question queue (AGENDA_QUEUE_SPEC.md §2, §5):
+                # every pass that lands while auto mode is on merges its
+                # questions into the session's queue — whether or not auto
+                # mode asked for the pass — before anything else reads it,
+                # so an alarm-bearing pass has merged by the time RESUME
+                # AUTO asks from the head. The merge itself is synchronous;
+                # its audit rows are written after the alarm handling below
+                # so the pause is never delayed by the record.
+                queue_events = (_merge_pass(assessment_version, entry["assessment"])
+                                if entry["auto"] is not None else ())
                 # Phase 7c slice 5 (spec §7, hard rule 2): a non-empty
                 # urgent_actions while auto mode is listening pauses it.
                 # Nothing here touches the face (the alarm is deliberately
@@ -2259,6 +2282,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                               assessment_version)
                 if entry["auto"] is not None:
                     await _push_standing(assessment_version)
+                if queue_events:
+                    await _audit_queue_events(queue_events)
                 # Phase 7c (D2): the pass auto mode asked for has landed —
                 # plan the next ask from THIS version only.
                 if entry["auto"] is not None and entry["auto"]["revision"] == "running":
@@ -3526,6 +3551,41 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                  if a.get("action")]
         known = ctl.acknowledged_actions | auto["action_aliases"]
         return [t for t in texts if auto_mode.match_action(t, known, AUTO_ACTION_MATCH_THRESHOLD)]
+
+    async def _audit_queue_events(events, extra: dict | None = None) -> None:
+        """Every state change the queue reports goes on the record as
+        auto.<kind> — queue_merged, queue_dropped_absent, queue_capped,
+        queue_consumed, queue_answered, ... (spec §7) — with the module's
+        flat details, the session and the audio time."""
+        for event in events:
+            await audit.log(user["id"], f"auto.{event.kind}", None, None,
+                            {"session_id": session_id, **dict(event.details),
+                             **(extra or {}),
+                             "at_audio_s": round(session.audio_seconds, 1)})
+
+    def _merge_pass(assessment_version: int, assessment: dict) -> tuple:
+        """A CDS pass has landed and been versioned: merge its
+        questions_to_ask into the standing queue (spec §2) — pending
+        matches refreshed, asked or answered matches DISCARDED (the
+        never-re-enter guarantee), the rest appended; then D-A absence,
+        the baseline order and the D-D cap, all inside the module. Only
+        while auto mode is on: with the machine OFF, or its run ended, the
+        pass is the doctor's panel and nothing more, and the queue is left
+        exactly as it was. Returns the queue's events for the caller to
+        audit — auto.queue_merged with the counts (added / refreshed /
+        discarded / dropped_absent / capped) and the version, plus a row
+        per drop."""
+        auto = entry["auto"]
+        if auto is None or not _auto_on(auto["controller"]):
+            return ()
+        questions = [str(q) for q in (assessment or {}).get("questions_to_ask", []) or []]
+        events = auto["queue"].merge(assessment_version, questions)
+        merged = events[0]
+        logger.info("Live session %s: queue merged v%d — added %d, refreshed %d, discarded %d, "
+                    "dropped_absent %d, capped %d, pending %d", session_id, assessment_version,
+                    merged["added"], merged["refreshed"], merged["discarded"],
+                    merged["dropped_absent"], merged["capped"], merged["pending"])
+        return events
 
     async def _push_standing(assessment_version: int | None) -> None:
         """The persistent pending-actions strip (owner decision 2026-09-07,
