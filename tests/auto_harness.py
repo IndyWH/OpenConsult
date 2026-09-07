@@ -49,6 +49,9 @@ Q_ONSET = "When did the chest pain first start?"
 Q_SLEEP = "How have you been sleeping?"
 Q_TABLETS = "Have you missed any of your tablets?"
 
+# Long enough that one injected line clears CDS_MIN_NEW_CHARS on its own.
+PASS_FILLER = "The patient describes the pain in detail, at length, over several sentences here. " * 3
+
 
 def _tone(samples: int, amplitude: int) -> bytes:
     t = np.arange(samples)
@@ -250,8 +253,27 @@ class Session:
 
     def seed_agenda(self, *questions):
         """A pre-existing agenda version, as an earlier CDS pass would have
-        left it — without running the engine."""
+        left it — without running the engine, so NOT merged into the
+        standing queue (a seed is a panel the machine never saw land)."""
         return self.ws.portal.call(lambda: self.entry["agenda"].record(_assessment(questions)))
+
+    def land_pass(self, *lines: str, tries: int = 60):
+        """Let a CDS pass run on transcript growth — not one auto mode asked
+        for — and wait for it to land (and, with the machine on, merge into
+        the standing queue). commit_transcript moves the sent-length marker
+        so passes never fire from it; here the marker is left behind, as
+        live transcription leaves it. Returns the new agenda version."""
+        before = self.entry["agenda"].current_version
+        filler = lines or (PASS_FILLER,)
+        def _inject():
+            self.entry["transcript_parts"].extend(filler)
+        self.ws.portal.call(_inject)
+        for _ in range(tries):
+            self.probe()
+            if self.entry["agenda"].current_version > before:
+                return self.entry["agenda"].current_version
+            time.sleep(0.03)
+        raise AssertionError("no CDS pass landed")
 
     def to_golden(self):
         self.disclose()

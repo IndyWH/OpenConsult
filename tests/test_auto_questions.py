@@ -70,6 +70,7 @@ Q_RADIATE = "Does the pain radiate to your jaw or arm?"
 Q_ONSET = "When did the chest pain first start?"
 Q_SLEEP = "How have you been sleeping?"
 Q_TABLETS = "Have you missed any of your tablets?"
+PASS_FILLER = "The patient describes the pain in detail, at length, over several sentences here. " * 3
 
 
 def _tone(samples: int, amplitude: int) -> bytes:
@@ -272,8 +273,25 @@ class Session:
 
     def seed_agenda(self, *questions):
         """A pre-existing agenda version, as an earlier CDS pass would have
-        left it — without running the engine."""
+        left it — without running the engine, so NOT merged into the
+        standing queue (a seed is a panel the machine never saw land)."""
         return self.ws.portal.call(lambda: self.entry["agenda"].record(_assessment(questions)))
+
+    def land_pass(self, *lines: str, tries: int = 60):
+        """Let a CDS pass run on transcript growth — not one auto mode asked
+        for — and wait for it to land (and, with the machine on, merge into
+        the standing queue). As in tests/auto_harness.py."""
+        before = self.entry["agenda"].current_version
+        filler = lines or (PASS_FILLER,)
+        def _inject():
+            self.entry["transcript_parts"].extend(filler)
+        self.ws.portal.call(_inject)
+        for _ in range(tries):
+            self.probe()
+            if self.entry["agenda"].current_version > before:
+                return self.entry["agenda"].current_version
+            time.sleep(0.03)
+        raise AssertionError("no CDS pass landed")
 
     def to_golden(self):
         self.disclose()
@@ -417,20 +435,29 @@ def test_the_bridge_encourager_is_at_most_one_while_the_pass_runs(gate, monkeypa
 
 def test_ask_from_current_when_strict_revise_is_off_and_the_posture_is_recorded(gate, monkeypatch):
     """AUTO_STRICT_REVISE=false is the comparison posture: no post-answer
-    pass is waited for — the ask comes from the agenda as it stands — and
-    the posture is on the run's record (auto.enabled thresholds) so the
-    mock-patient round can tell the two apart."""
+    pass is waited for — the ask comes from the standing queue as it
+    stands — and the posture is on the run's record (auto.enabled
+    thresholds) so the mock-patient round can tell the two apart.
+
+    REPINNED 2026-09-07 (owner decision: the standing question queue,
+    AGENDA_QUEUE_SPEC.md §5): "the agenda as it stands" is the queue, and
+    the queue holds what PASSES merged while the machine was on — so the
+    current agenda is landed as a pass in the golden minutes rather than
+    seeded behind the machine's back. The property kept: with the flag
+    off, the golden exit's ask comes from what is already in hand and no
+    further pass runs for it."""
     monkeypatch.setattr(appmain, "AUTO_STRICT_REVISE", False)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True)]
-    engine.agendas = [[Q_ONSET]]                       # what a pass WOULD return
+    engine.agendas = [[Q_SLEEP], [Q_ONSET]]            # in hand; what a further pass WOULD return
     with live(gate) as s:
         s.to_golden()
-        s.seed_agenda(Q_SLEEP)                         # the current agenda
+        s.land_pass()                                  # the current agenda, merged
+        assert [i.text for i in s.auto["queue"].pending] == [Q_SLEEP]
         s.to_open()
         ask = s.wait_for_auto_speak()
         assert ask["text"] == "Can you tell me more about your sleep?"
-        assert engine.updates == [], "no pass was waited for"
+        assert len(engine.updates) == 1, "no further pass was waited for"
         _stop(s)
     enabled = _audit("auto.enabled", s.session_id)[0]
     assert enabled["thresholds"]["strict_revise"] is False
@@ -683,7 +710,11 @@ def test_a_runaway_revision_is_audited_keeps_the_previous_assessment_and_the_flo
     already has — the question comes, the flow is never held."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_SLEEP]]
+    healthy = engine.update
     async def runaway(transcript, previous=None):
+        if not engine.updates:
+            return await healthy(transcript, previous)    # the first pass lands: the agenda in hand
         engine.updates.append(transcript)
         exc = appmain.cds.CDSRunaway("assessment", reason="cap", tokens=1500, elapsed_ms=37210, cap=1500)
         exc.urgency = {"urgency_check": {"time_critical_possible": False,
@@ -693,13 +724,16 @@ def test_a_runaway_revision_is_audited_keeps_the_previous_assessment_and_the_flo
     engine.update = runaway
     with live(gate) as s:
         s.to_golden()
-        s.seed_agenda(Q_SLEEP)                          # the agenda in hand
-        version = s.entry["agenda"].current_version
+        # REPINNED 2026-09-07 (the standing question queue): "the agenda in
+        # hand" is the queue, so the pass that brings Q_SLEEP lands — and
+        # merges — in the golden minutes rather than being seeded behind
+        # the machine's back.
+        version = s.land_pass()
         s.to_open()                                     # the revision is requested…
         ask = s.wait_for_auto_speak()                   # …fails at its cap, and the ask still comes
         assert ask["text"] == "Can you tell me more about your sleep?"
         assert s.entry["agenda"].current_version == version, "no new agenda version: the previous kept"
-        assert len(engine.updates) == 1
+        assert len(engine.updates) == 2
         s.play(ask["utterance_id"])
         _stop(s)
     rows = _audit("cds.runaway", s.session_id)
@@ -715,7 +749,11 @@ def test_a_runaway_passs_own_urgency_call_still_pauses(gate):
     would; the acknowledgement then plans from the agenda in hand."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_SLEEP]]
+    healthy = engine.update
     async def runaway(transcript, previous=None):
+        if not engine.updates:
+            return await healthy(transcript, previous)    # the first pass lands: the agenda in hand
         engine.updates.append(transcript)
         exc = appmain.cds.CDSRunaway("assessment", reason="timeout", tokens=None,
                                      elapsed_ms=60000, timeout_s=60.0)
@@ -726,7 +764,7 @@ def test_a_runaway_passs_own_urgency_call_still_pauses(gate):
     engine.update = runaway
     with live(gate) as s:
         s.to_golden()
-        s.seed_agenda(Q_SLEEP)
+        s.land_pass()          # REPINNED 2026-09-07 (the queue): the agenda in hand is what merged
         s.to_open()
         for _ in range(40):
             s.probe()
@@ -756,9 +794,16 @@ Q_PAIN_BEFORE = "Have you ever had chest pain like this before?"
 def test_the_486_risk_factors_question_is_not_asked_again_after_it_was_asked_and_answered(gate):
     """Owner decision 2026-09-07 (pilot 486 F4). The agenda kept the
     risk-factors question at the top across four versions and it was
-    asked twice — the patient objected aloud. Now a planned question
-    whose normalised text was already asked and answered is skipped
-    (audited auto.reask_suppressed) and the next item taken."""
+    asked twice — the patient objected aloud.
+
+    REPINNED 2026-09-07 (owner decision: the queue is the asked-memory,
+    AGENDA_QUEUE_SPEC.md §2). The asked-and-answered list and the
+    auto.reask_suppressed skip are retired: the question's queue item is
+    ANSWERED at its turn end, and v2's copy of it is DISCARDED at the
+    merge (auto.queue_merged discarded 1, naming it) — it is never
+    pending again, so it is never planned again. The property kept: the
+    second ask is v2's other question, and the risk-factors question is
+    asked exactly once."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.topics[Q_RISK] = "heart disease risk factors"
@@ -770,15 +815,19 @@ def test_the_486_risk_factors_question_is_not_asked_again_after_it_was_asked_and
         assert first["text"] == "Can you tell me more about heart disease risk factors?"
         s.play(first["utterance_id"])
         s.turn_end("Well, I smoke, and my blood pressure was high at a camp.")
-        assert s.auto["asked_answered"] == [Q_RISK]
+        risk = s.auto["queue"].find(Q_RISK)
+        assert risk.status.value == "answered"
         second = s.wait_for_auto_speak()
-        assert second["text"] == "Can you tell me more about the chest pain?", "v2[1], not the asked v2[0]"
+        assert second["text"] == "Can you tell me more about the chest pain?", "v2's other question, not the asked one"
+        assert risk.status.value == "answered" and [i.text for i in s.auto["queue"].pending] == []
         s.play(second["utterance_id"])
         _stop(s)
-    rows = _audit("auto.reask_suppressed", s.session_id)
-    assert len(rows) == 1
-    assert rows[0]["candidate"] == Q_RISK and rows[0]["matched"] == Q_RISK and rows[0]["score"] == 1.0
-    assert rows[0]["agenda_version"] == 2 and rows[0]["index"] == 0
+    assert _audit("auto.reask_suppressed", s.session_id) == [], "retired: the queue discards instead"
+    merges = _audit("auto.queue_merged", s.session_id)
+    assert [m["version"] for m in merges] == [1, 2]
+    assert merges[1]["discarded"] == 1 and merges[1]["added"] == 1
+    assert merges[1]["discarded_items"] == [{"id": risk.id, "text": Q_RISK, "status": "answered"}]
+    assert [c["text"] for c in _audit("auto.queue_consumed", s.session_id)] == [Q_RISK, Q_ONSET]
 
 
 def test_the_two_cone_re_asks_collapse_to_one_topic(gate):
@@ -803,13 +852,16 @@ def test_the_two_cone_re_asks_collapse_to_one_topic(gate):
         assert s.phase is AutoPhase.CLOSED
         _stop(s)
     assert appmain.AUTO_TOPIC_MATCH_THRESHOLD == 0.6
-    assert _audit("auto.reask_suppressed", s.session_id) == []
+    assert all(m["discarded"] == 0 for m in _audit("auto.queue_merged", s.session_id)), \
+        "two different questions on one topic: neither is a re-ask"
 
 
 def test_a_genuinely_new_question_passes_and_a_spent_agenda_hands_over(gate):
-    """A new text is asked as before, with no suppression row; an agenda
-    made only of questions already asked and answered is spent, and the
-    handover sequence follows."""
+    """A new text is asked as before; a pass made only of questions already
+    asked and answered leaves the queue with nothing pending — spent —
+    and the handover sequence follows. REPINNED 2026-09-07 (owner
+    decision: the queue is the asked-memory): the evidence is the merge's
+    discards, not a suppression row."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET], [Q_SLEEP], [Q_ONSET, Q_SLEEP]]
@@ -826,8 +878,10 @@ def test_a_genuinely_new_question_passes_and_a_spent_agenda_hands_over(gate):
         third = s.wait_for_auto_speak()
         assert third["ref_id"] == "anything_else", "both asked and answered: the agenda is spent"
         _stop(s)
-    rows = _audit("auto.reask_suppressed", s.session_id)
-    assert sorted(r["candidate"] for r in rows) == sorted([Q_ONSET, Q_SLEEP])
+    assert _audit("auto.reask_suppressed", s.session_id) == []
+    third_merge = _audit("auto.queue_merged", s.session_id)[2]
+    assert third_merge["version"] == 3 and third_merge["discarded"] == 2 and third_merge["pending"] == 0
+    assert sorted(d["text"] for d in third_merge["discarded_items"]) == sorted([Q_ONSET, Q_SLEEP])
 
 
 # ==========================================================================

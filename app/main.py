@@ -1806,10 +1806,11 @@ def _new_auto_state() -> dict:
         "queued": None,               # the prepared next utterance (a plan dict)
         "plan_task": None,            # topic call + pre-synthesis in flight
         "opened_topics": set(),       # D3: case-folded topics asked open-form (matched by meaning, F4)
-        # No question is asked twice (pilot 486 F4): the agenda texts asked
-        # and answered this session, and the one asked and awaiting.
-        "asked_answered": [],
-        "asked_open": None,
+        # No question is asked twice (pilot 486 F4): the asked-memory IS the
+        # queue's asked/answered status (owner decision 2026-09-07, the
+        # standing question queue). This is the queue item whose answer the
+        # machine is waiting for — marked answered at its turn end.
+        "asked_item_id": None,
         "handover": None,             # None | "anything_else" | "final"
         "anything_else_done": False,  # at most once per session
         "last_issued": None,          # the last queued utterance issued, for requeue
@@ -2375,9 +2376,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     auto = entry["auto"]
                     auto["revision"] = None
                     auto["bridge_used"] = False
-                    if auto["controller"].phase in auto_mode.QUESTION_PHASES:
-                        _plan_from_agenda(auto, entry["agenda"].current_version,
-                                          why="revision failed (runaway), asking from the agenda in hand")
+                    if (auto["controller"].phase in auto_mode.QUESTION_PHASES
+                            and not _plan_from_queue(
+                                auto, why="revision failed (runaway), asking from the queue in hand")):
+                        _plan_handover(auto, entry["agenda"].current_version)
                 if cds_failures >= CDS_MAX_FAILURES:
                     await websocket.send_json(
                         {"type": "cds_unavailable",
@@ -3053,9 +3055,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # revision as D2 always does — clearing the alarm, or
                 # re-pausing under the ratchet. Replaces slice 5's
                 # immediate re-revision, which re-paused before any answer
-                # could be given.
-                _plan_from_agenda(auto, entry["agenda"].current_version,
-                                  why="resumed after pause")
+                # could be given. The alarm-bearing pass has merged into the
+                # standing queue (maybe_run_cds), so the ask is its head;
+                # a queue with nothing pending after that pass is spent and
+                # the handover sequence follows, as before the queue.
+                if not _plan_from_queue(auto, why="resumed after pause"):
+                    _plan_handover(auto, entry["agenda"].current_version)
             await _push_standing(entry["agenda"].current_version)
         else:
             transition = ctl.acknowledge_and_take_over()
@@ -3135,6 +3140,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["queued"] = None
         auto["revision"] = None
         auto["awaiting_speech"] = False
+        # A question cut by a pause, auto off or a handover keeps its ASKED
+        # status in the queue — never asked again — but no answer is
+        # awaited for it.
+        auto["asked_item_id"] = None
 
     # ------------------------------------------------------------------
     # Phase 7c slice 4: the question phases (spec §6, D2 and D3). Vocabulary
@@ -3145,8 +3154,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     #                    span — never by our own playback (pilot 485 E2)
     #   awaiting_answer  a question (or the anything-else phrase) has been
     #                    asked and the next turn end is its answer's end
-    #   revision         None | "requested" | "running": the D2 strict-revise
-    #                    CDS pass that must land before the next ask
+    #   revision         None | "requested" | "running": the D2 post-answer
+    #                    CDS pass in flight
+    #   queue            the standing question queue (AGENDA_QUEUE_SPEC.md):
+    #                    what Alba asks from, and the asked-memory
+    #   asked_item_id    the queue item whose answer is awaited
     #   queued           the prepared next utterance (a plan dict), waiting
     #                    for a quiet report that permits it
     #   opened_topics    D3: topics already asked open-form, case-folded
@@ -3156,64 +3168,73 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     def _request_revision(auto: dict, why: str) -> None:
         """D2: ask for a fresh CDS pass now (maybe_run_cds launches it,
         bypassing CDS_MIN_NEW_CHARS) and ask only from what it returns.
-        Non-strict runs plan from the current agenda instead — unless it
-        is empty, when the fresh pass is still needed before handover can
-        be concluded (agenda-empty counts only on a post-answer revision)."""
+        Non-strict runs plan from the standing queue instead — unless it
+        has nothing pending, when the fresh pass is still needed before
+        handover can be concluded (empty counts only on a post-answer
+        revision)."""
         auto["bridge_used"] = False
-        if AUTO_STRICT_REVISE or not (entry["agenda"].current and entry["agenda"].current.questions):
-            auto["revision"] = "requested"
-            logger.info("Live session %s: auto revision requested (%s)", session_id, why)
-        else:
-            _plan_from_agenda(auto, entry["agenda"].current_version, why=f"{why} (ask-from-current)")
+        if not AUTO_STRICT_REVISE and _plan_from_queue(auto, why=f"{why} (ask-from-current)"):
+            return
+        auto["revision"] = "requested"
+        logger.info("Live session %s: auto revision requested (%s)", session_id, why)
 
-    def _plan_from_agenda(auto: dict, version: int, *, why: str) -> None:
-        """Choose the next utterance from agenda version `version` and
+    def _agenda_ref(item) -> tuple[int, int] | None:
+        """Where the whitelist finds a queue item's words: the (assessment
+        version, index) of its text in the versioned AgendaLog — the pass
+        that last listed it first (exactly, else the pass's own wording of
+        it, which is equal after normalisation), then the pass that first
+        proposed it. None only if both have aged out of the log's history,
+        which D-A (three absent passes drop) should make impossible."""
+        log = entry["agenda"]
+        for version in dict.fromkeys((item.last_seen_version, item.first_version)):
+            snapshot = log.get(version)
+            if snapshot is None:
+                continue
+            for i, q in enumerate(snapshot.questions):
+                if q.strip() == item.text:
+                    return version, i
+            for i, q in enumerate(snapshot.questions):
+                if agenda_queue.question_key(q) == item.key:
+                    return version, i
+        return None
+
+    def _plan_from_queue(auto: dict, *, why: str) -> bool:
+        """Choose the next question from the standing queue's head and
         prepare it in the background: the topic call (D1), then
-        pre-synthesis (§9, AUTO_PRESYNTH). Empty agenda → the handover
-        sequence (§6 as amended). Never plans while a plan is in flight."""
+        pre-synthesis (§9, AUTO_PRESYNTH). Returns True when a plan is
+        under way (new, or already in flight); False when the queue has
+        nothing pending — the caller applies the empty rules (spec §5).
+
+        No question is asked twice (owner decision 2026-09-07, pilot 486
+        F4, and the standing question queue): the guarantee lives in the
+        queue — an asked or answered question is DISCARDED at the merge
+        and is never pending again — so there is nothing to skip here.
+        The deliberate re-ask for want of an answer (F5) does not come
+        this way and is exempt. One manner rule stays: not the same words
+        twice in a row when there is any other to ask — a question asked
+        but not heard (politeness-aborted, requeued at its rank) is not
+        planned again straight after itself."""
         if auto["plan_task"] is not None and not auto["plan_task"].done():
-            return
-        snapshot = entry["agenda"].get(version)
-        questions = list(snapshot.questions) if snapshot else []
-        if not questions:
-            _plan_handover(auto, version)
-            return
+            return True
+        queue: agenda_queue.AgendaQueue = auto["queue"]
+        while True:
+            pending = queue.pending
+            if not pending:
+                return False
+            item = pending[0]
+            last = auto.get("last_asked_text")
+            if last is not None and item.text == last and len(pending) > 1:
+                item = pending[1]
+            ref = _agenda_ref(item)
+            if ref is not None:
+                break
+            logger.error("Live session %s: queue item %s (%r, v%d) resolves to no agenda "
+                         "version — dropped", session_id, item.id, item.text, item.first_version)
+            asyncio.create_task(_audit_queue_events((queue.drop(item.id, "unresolvable"),)))
         auto["handover"] = None
         auto["handover_by_doctor"] = False   # a refill returned the flow to the questions
-        # No question is asked twice (owner decision 2026-09-07, pilot 486
-        # F4): a question whose normalised text (the E3 normaliser) equals
-        # one already asked and answered this session is skipped — audited
-        # auto.reask_suppressed — and the next agenda item taken. In 486
-        # the agenda kept an asked question at the top across four
-        # versions and it was asked twice. The deliberate re-ask for want
-        # of an answer (F5) does not come this way and is exempt. If every
-        # item has been asked, the agenda is spent: the handover sequence.
-        candidates = []
-        for i, q in enumerate(questions):
-            prior = auto_mode.match_action(q, auto["asked_answered"], 1.0)
-            if prior is None:
-                candidates.append(i)
-                continue
-            asyncio.create_task(audit.log(
-                user["id"], "auto.reask_suppressed", None, None,
-                {"session_id": session_id, "candidate": q, "matched": prior[0],
-                 "score": prior[1], "agenda_version": version, "index": i,
-                 "at_audio_s": round(session.audio_seconds, 1)}))
-            logger.info("Live session %s: v%d[%d] already asked and answered, skipped: %r",
-                        session_id, version, i, q)
-        if not candidates:
-            _plan_handover(auto, version)
-            return
-        # The top remaining question — but not the same words twice in a
-        # row when there is any other to ask (a question asked but not yet
-        # answered, e.g. politeness-aborted; a ping-pong on identical text
-        # is bad manners).
-        index = candidates[0]
-        last = auto.get("last_asked_text")
-        if last is not None and questions[index] == last and len(candidates) > 1:
-            index = candidates[1]
-        auto["plan_task"] = asyncio.create_task(
-            _prepare_question(auto, version, index, questions[index], why))
+        auto["plan_task"] = asyncio.create_task(_prepare_question(auto, item, ref, why))
+        return True
 
     def _plan_handover(auto: dict, version: int) -> None:
         """§6 as amended: agenda empty on a fresh post-answer revision →
@@ -3242,14 +3263,33 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         except Exception as exc:  # noqa: BLE001 - a fault surfaces at issue time as speak_refused
             logger.info("Live session %s: pre-synthesis skipped: %s", session_id, exc)
 
-    async def _prepare_question(auto: dict, version: int, index: int, text: str, why: str) -> None:
+    async def _prepare_question(auto: dict, item, ref: tuple[int, int], why: str) -> None:
         """D3, the topic-scoped cone: a NEW topic is asked open-form through
         the tell_me_more template; a topic already opened this session is
         asked verbatim. The topic call is fail-soft — no usable topic means
         verbatim, audited auto.topic_failed. Then pre-synthesise, so the ask
-        is a cache hit when the quiet report permits it."""
+        is a cache hit when the quiet report permits it. The plan remembers
+        the queue item's id: THAT item is consumed at issue, whatever the
+        head is by then, because the prepared audio is for its words."""
+        version, index = ref
+        text = item.text
+        queue: agenda_queue.AgendaQueue = auto["queue"]
         verdict = await engine.topic_for(text)
+        current = queue.get(item.id)
+        if current is None or not current.pending:
+            # Consumed by a doctor's tap, or dropped by a merge, while the
+            # topic call ran: nothing to queue for it. Plan the new head
+            # instead (this task is the one _plan_from_queue would wait on,
+            # so it steps aside first).
+            logger.info("Live session %s: planned item %s is no longer pending (%s) — replanning",
+                        session_id, item.id, current.status.value if current else "gone")
+            auto["plan_task"] = None
+            if auto["controller"].phase in auto_mode.QUESTION_PHASES:
+                _plan_from_queue(auto, why=f"{why}; replanned")
+            return
         topic = verdict.topic
+        if topic:
+            queue.set_topic(item.id, topic)
         open_form = False
         if verdict.failed is not None and verdict.failed.startswith("CDSRunaway"):
             await audit.log(user["id"], "cds.runaway", None, None,
@@ -3276,10 +3316,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             spoken = text
         auto["queued"] = {"utterance": utterance, "kind": "question", "text": spoken,
                           "agenda_version": version, "index": index, "question": text,
-                          "topic": topic, "open_form": open_form}
+                          "item_id": item.id, "topic": topic, "open_form": open_form}
         auto["handover"] = None
-        logger.info("Live session %s: auto question planned from v%d[%d] (%s, %s): %r",
-                    session_id, version, index, why, "open" if open_form else "verbatim", spoken)
+        logger.info("Live session %s: auto question planned from queue %s (v%d[%d]; %s, %s): %r",
+                    session_id, item.id, version, index, why,
+                    "open" if open_form else "verbatim", spoken)
         if AUTO_PRESYNTH:
             await _presynth(spoken)
 
@@ -3291,12 +3332,24 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         topic-scoped rule keeps working in CLOSED, so a genuinely new topic
         arriving late still gets its one open ask there."""
         ctl: auto_mode.AutoModeController = auto["controller"]
+        queue: agenda_queue.AgendaQueue = auto["queue"]
         plan = auto["queued"]
         verdict = auto.get("officer_verdict")
         trigger = {"quiet_s": round(quiet_s, 1),
                    "handed_back": bool(verdict.handed_back) if verdict else False}
         detail = None
         if plan["kind"] == "question":
+            item = queue.get(plan["item_id"])
+            if item is None or not item.pending:
+                # The planned item was consumed by a doctor's tap or dropped
+                # by a merge since the plan: its audio is for words the
+                # queue no longer offers. Plan the head instead.
+                logger.info("Live session %s: queued item %s is no longer pending (%s) — replanning",
+                            session_id, plan["item_id"], item.status.value if item else "gone")
+                auto["queued"] = None
+                if not _plan_from_queue(auto, why="queued item gone at issue"):
+                    _plan_handover(auto, entry["agenda"].current_version)
+                return
             detail = {"topic": plan["topic"], "open_form": plan["open_form"]}
             if (not plan["open_form"] and ctl.phase is auto_mode.AutoPhase.OPEN
                     and ctl.is_legal(auto_mode.AutoEvent.NARRATIVE_EXHAUSTED)):
@@ -3308,9 +3361,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 logger.error("Live session %s: question refused by the machine: %s", session_id, exc)
                 auto["queued"] = None
                 return
+            # Consume THIS item by id (spec §2, §5) — not whatever is head by
+            # now — before the slot is taken; if the issue fails the item
+            # goes straight back to its rank.
+            consumed = queue.consume(plan["item_id"], by="auto")
         prepared = await auto_issue(plan["utterance"], phase=ctl.phase, trigger=trigger,
                                     detail=detail)
         if prepared is None:
+            if plan["kind"] == "question":
+                await _audit_queue_events((queue.requeue(plan["item_id"]),), {"issue": "failed"})
             return                     # in flight or a fault: try again on the next report
         auto["queued"] = None
         auto["last_issued"] = {**plan, "utterance_id": prepared.utterance_id}
@@ -3319,7 +3378,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["reasked"] = False
         if plan["kind"] == "question":
             auto["last_asked_text"] = plan["question"]
-            auto["asked_open"] = plan["question"]      # answered at the answer's turn end (F4)
+            auto["asked_item_id"] = plan["item_id"]    # answered at the answer's turn end (F4)
+            await _audit_queue_events((consumed,), {"utterance_id": prepared.utterance_id})
             if plan["open_form"]:
                 auto["opened_topics"].add(plan["topic"].casefold())
             auto["awaiting_answer"] = True
@@ -3330,9 +3390,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["awaiting_answer"] = False   # nothing follows but the exam
 
     async def on_fresh_agenda(version: int) -> None:
-        """maybe_run_cds landed the pass auto mode asked for (D2): plan the
-        next ask from THIS version — the only agenda the strict posture
-        asks from — or, if it is empty, the handover sequence."""
+        """maybe_run_cds landed the pass auto mode asked for (D2), and it
+        has merged into the standing queue: plan the next ask from the
+        queue's head — or, if nothing is pending after a post-answer
+        revision, the handover sequence (spec §5, §6 as amended). A plan
+        already under way (or a question already queued) is left alone:
+        the merge may have changed the head, which is fine."""
         auto = entry["auto"]
         if auto is None or auto["revision"] != "running":
             return
@@ -3340,7 +3403,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["bridge_used"] = False
         if auto["controller"].phase not in auto_mode.QUESTION_PHASES:
             return
-        _plan_from_agenda(auto, version, why="post-answer revision")
+        if auto["queued"] is not None:
+            return
+        if not _plan_from_queue(auto, why="post-answer revision"):
+            _plan_handover(auto, version)
 
     async def on_auto_utterance_ended(utterance: speech.Utterance, reason: str) -> None:
         """The lifecycle end of an AUTO utterance, from handle_speak_ended.
@@ -3358,7 +3424,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["queued"] = {k: v for k, v in last.items() if k != "utterance_id"}
             auto["awaiting_answer"] = False
             auto["awaiting_speech"] = False    # nothing was asked; no answer is awaited (F5)
-            auto["asked_open"] = None          # and nothing to count as asked (F4)
+            auto["asked_item_id"] = None       # and nothing to count as asked (F4)
+            if last["kind"] == "question":
+                # The queue item goes back to pending at its rank (spec §2
+                # as built): the question was never put to the patient.
+                # The prepared plan is kept for the re-issue — the audio is
+                # cached — and consumes the item again when it plays.
+                item = auto["queue"].get(last.get("item_id"))
+                if item is not None and item.status is agenda_queue.ItemStatus.ASKED:
+                    await _audit_queue_events((auto["queue"].requeue(item.id),),
+                                              {"utterance_id": utterance.utterance_id})
             logger.info("Live session %s: auto %s politeness-aborted, requeued",
                         session_id, last["kind"])
             return
@@ -3425,7 +3500,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["awaiting_answer"] = True
             auto["turn_ended"] = False
             auto["last_asked_text"] = utterance.text
-            auto["asked_open"] = utterance.text        # the doctor's ask counts too (F4)
+            # The doctor's ask counts too (F4): a tapped question that is a
+            # pending queue item consumes it (D-E, by=tap) and its answer
+            # marks it answered; a re-tap of the item already asked (the
+            # aborted one) is awaited the same way.
+            queue: agenda_queue.AgendaQueue = auto["queue"]
+            item = queue.find(utterance.text)
+            auto["asked_item_id"] = None
+            if item is not None and item.pending:
+                await _audit_queue_events((queue.consume(item.id, by="tap"),),
+                                          {"utterance_id": utterance.utterance_id})
+                auto["asked_item_id"] = item.id
+            elif item is not None and item.status is agenda_queue.ItemStatus.ASKED:
+                auto["asked_item_id"] = item.id
 
     async def _end_run_by_tapped_handover(auto: dict, utterance: speech.Utterance) -> None:
         """The tapped handover phrase IS the handover: the same edge the
@@ -3730,9 +3817,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if not answer:
             return
         auto["awaiting_answer"] = False
-        if auto.get("asked_open"):
-            auto["asked_answered"].append(auto["asked_open"])   # asked and answered (F4)
-            auto["asked_open"] = None
+        item_id, auto["asked_item_id"] = auto.get("asked_item_id"), None
+        if item_id is not None:
+            # Asked and answered (F4, the F5 rule: the turn started with the
+            # patient's speech and has ended): the queue item is ANSWERED,
+            # and every later pass's copy of it is discarded at the merge.
+            item = auto["queue"].get(item_id)
+            if item is not None and item.status is agenda_queue.ItemStatus.ASKED:
+                await _audit_queue_events((auto["queue"].answered(item_id),))
         if ctl.phase in auto_mode.QUESTION_PHASES:
             _request_revision(auto, f"answer's turn ended ({by})")
         elif ctl.phase is auto_mode.AutoPhase.HANDOVER and auto["handover"] is not None:

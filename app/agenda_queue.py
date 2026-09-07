@@ -1,11 +1,11 @@
-"""The standing question queue — pure, unwired, inert.
+"""The standing question queue — pure.
 
 AGENDA_QUEUE_SPEC.md §2 (the queue), with owner decisions D-A (absence
 from three consecutive passes drops), D-D (a cap of eight pending) and
-D-E (a doctor tap consumes the tapped item). Slice 1 of the build (§9):
-this module lands UNUSED. Nothing in the running app imports it yet;
-the wiring is slice 2 and the re-ranker slice 3. AUTO_MODE_ENABLED is
-untouched.
+D-E (a doctor tap consumes the tapped item). Slice 1 of the build (§9)
+landed this module inert; slice 2 wired it (app/main.py: one queue per
+auto session, passes merge, Alba asks from the head); the re-ranker is
+slice 3. AUTO_MODE_ENABLED is untouched.
 
 WHAT THIS MODULE IS
 -------------------
@@ -42,16 +42,17 @@ EVENTS
 Every state change returns one or more `QueueEvent` records — small,
 flat, ready to be audited by the wiring: `queue_merged` (added /
 refreshed / discarded, version), `queue_dropped_absent`, `queue_capped`,
-`queue_consumed`, `queue_answered`, `queue_reranked` (with the ids the
-re-ranker named that were IGNORED — the no-invention guard, §3).
+`queue_consumed`, `queue_requeued` (a politeness-aborted ask back to
+pending at its rank), `queue_dropped` (the wiring gave up on an item),
+`queue_answered`, `queue_reranked` (with the ids the re-ranker named
+that were IGNORED — the no-invention guard, §3).
 
 NUMBERS
 -------
 The defaults here (cap 8, three absent passes, topic threshold 0.6)
 are the spec's; the owner-tunable settings AUTO_QUEUE_MAX,
 AUTO_QUEUE_ABSENT_PASSES and AUTO_TOPIC_MATCH_THRESHOLD are read by the
-wiring in slice 2 and passed in at construction. This module reads no
-environment.
+wiring and passed in at construction. This module reads no environment.
 """
 
 from __future__ import annotations
@@ -372,6 +373,45 @@ class AgendaQueue:
         return QueueEvent("queue_consumed", now, {
             "id": item.id, "text": item.text, "topic": item.topic, "by": by,
             "rank": rank, "version": item.last_seen_version,
+            "pending": len(self._order)})
+
+    def requeue(self, item_id: str) -> QueueEvent:
+        """An ASKED question was never actually put to the patient — the
+        politeness abort declined to play it because the patient had
+        resumed speaking (PHASE_7C_SPEC.md §5) — so it goes back to
+        PENDING at the rank it held when it was consumed (or the tail if
+        the pending set has shrunk below that). Nothing else about it
+        changes: same id, same first_version, same text. Raises unless
+        the item is ASKED."""
+        item = self._items.get(item_id)
+        if item is None or item.status is not ItemStatus.ASKED:
+            raise AgendaQueueError(f"requeue({item_id!r}): not an asked item")
+        now = self._clock()
+        position = min(max(item.rank, 0), len(self._order))
+        self._order.insert(position, item_id)
+        item.status = ItemStatus.PENDING
+        item.asked_at = None
+        item.updated_at = now
+        self._renumber()
+        return QueueEvent("queue_requeued", now, {
+            "id": item.id, "text": item.text, "rank": item.rank,
+            "pending": len(self._order)})
+
+    def drop(self, item_id: str, reason: str) -> QueueEvent:
+        """The wiring gives up on a PENDING item for a reason of its own
+        (today: its text can no longer be resolved to a recorded agenda
+        version, so the whitelist cannot speak it). Audited like every
+        other drop; the item is DROPPED and, like any dropped item, a
+        fresh proposal if a later pass raises it again. Raises unless the
+        item is PENDING."""
+        item = self._items.get(item_id)
+        if item is None or item.status is not ItemStatus.PENDING:
+            raise AgendaQueueError(f"drop({item_id!r}): not a pending item")
+        now = self._clock()
+        self._drop(item, str(reason or "wiring"), now)
+        self._renumber()
+        return QueueEvent("queue_dropped", now, {
+            "id": item.id, "text": item.text, "reason": item.drop_reason,
             "pending": len(self._order)})
 
     def answered(self, item_id: str) -> QueueEvent:

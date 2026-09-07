@@ -222,6 +222,57 @@ def test_a_doctor_tap_consumes_the_tapped_item_not_the_head():
     assert ids(q.pending) == ["q1", "q2"]
 
 
+def test_a_politeness_aborted_ask_is_requeued_at_its_rank_and_is_still_the_same_item():
+    """Slice 2: the abort declined to play the question, so it was never
+    asked — requeue(id) puts the ASKED item back to PENDING at the rank
+    it held, same id and first_version, and it can be consumed again.
+    Requeue of anything not ASKED raises."""
+    q = make()
+    q.merge(1, [RISK, DURATION, BREATH])
+    q.consume()                                   # q1 asked from rank 0
+    taken = q.consume()                           # q2 asked from rank 0 (the new head)
+    assert ids(q.pending) == ["q3"]
+    ev = q.requeue(taken["id"])
+    assert ev.kind == "queue_requeued" and ev["id"] == "q2" and ev["rank"] == 0
+    assert ids(q.pending) == ["q2", "q3"]
+    item = q.get("q2")
+    assert item.status is ItemStatus.PENDING and item.asked_at is None
+    assert item.first_version == 1
+    # A rank beyond the pending set's end lands at the tail, not out of range.
+    q.consume("q3")
+    q.consume("q2")
+    assert ids(q.pending) == []
+    q.merge(2, [NAUSEA])
+    ev = q.requeue("q3")                          # held rank 1 (of the old order); only one pending now
+    assert ev["rank"] == 1 and ids(q.pending) == ["q4", "q3"]
+    with pytest.raises(AgendaQueueError):
+        q.requeue("q4")                           # pending, not asked
+    q.answered("q2")
+    with pytest.raises(AgendaQueueError):
+        q.requeue("q2")                           # answered, not asked
+    # And the guarantee still holds for the requeued item once it is
+    # finally asked and answered: a later pass's copy is discarded.
+    q.consume("q3")
+    q.answered("q3")
+    merged = q.merge(3, [BREATH])[0]
+    assert merged["discarded"] == 1 and ids(q.pending) == ["q4"]
+
+
+def test_the_wiring_can_drop_a_pending_item_with_its_reason():
+    """Slice 2: drop(id, reason) — for an item the wiring cannot speak
+    (its text no longer resolves to a recorded agenda version). Audited
+    queue_dropped with the reason; a dropped item is a fresh proposal if
+    raised again (the slice-1 reading); anything not pending raises."""
+    q = make()
+    q.merge(1, [RISK, DURATION])
+    ev = q.drop("q1", "unresolvable")
+    assert ev.kind == "queue_dropped" and ev["reason"] == "unresolvable" and ev["pending"] == 1
+    assert q.get("q1").status is ItemStatus.DROPPED and ids(q.pending) == ["q2"]
+    with pytest.raises(AgendaQueueError):
+        q.drop("q1", "again")
+    assert q.merge(2, [RISK])[0]["added"] == 1
+
+
 def test_consume_and_answered_refuse_what_the_state_does_not_permit():
     """Raised, never swallowed: consume on nothing pending, consume of a
     non-pending id, answered of an item that was never asked."""

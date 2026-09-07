@@ -28,27 +28,6 @@ pytestmark = needs_db
 Q_RISK = "Do you have any other risk factors for heart disease? (e.g., diabetes, high cholesterol)"
 Q_NAUSEA = "Have you felt sick or been vomiting?"
 
-# Long enough that one injected line clears CDS_MIN_NEW_CHARS on its own.
-FILLER = "The patient describes the pain in detail, at length, over several sentences here. " * 3
-
-
-def land_pass(s, *lines: str, tries: int = 60):
-    """Let a CDS pass run on transcript growth — NOT one auto mode asked
-    for — and wait for it to land. The harness's commit_transcript moves
-    the sent-length marker so passes never fire from it; here the
-    marker is left behind, as live transcription leaves it."""
-    before = s.entry["agenda"].current_version
-    def _inject():
-        s.entry["transcript_parts"].extend(lines or (FILLER,))
-    s.ws.portal.call(_inject)
-    for _ in range(tries):
-        s.probe()
-        if s.entry["agenda"].current_version > before:
-            return s.entry["agenda"].current_version
-        time.sleep(0.03)
-    raise AssertionError("no CDS pass landed")
-
-
 def wait_for_pass(s, count: int, tries: int = 60):
     engine = s.state.cds_engine
     for _ in range(tries):
@@ -80,7 +59,7 @@ def test_a_pass_that_lands_while_auto_mode_is_on_merges_into_the_sessions_queue(
         assert queue.absent_passes == appmain.AUTO_QUEUE_ABSENT_PASSES == 3
         assert queue.topic_threshold == appmain.AUTO_TOPIC_MATCH_THRESHOLD
         s.to_golden()
-        version = land_pass(s)
+        version = s.land_pass()
         assert s.phase.value == "golden", "a pass in the golden minutes: nothing asked"
         assert pending_texts(s) == [Q_ONSET, Q_RADIATE]
         assert queue.last_version == version
@@ -105,7 +84,7 @@ def test_a_pass_that_lands_while_auto_mode_is_off_does_not_touch_the_queue(gate)
     with live(gate) as s:
         s.disclose()
         assert s.phase.value == "off"
-        land_pass(s)
+        s.land_pass()
         assert s.entry["assessment"]["questions_to_ask"] == [Q_ONSET, Q_RADIATE], "the pass landed"
         assert s.auto["queue"].items == ()
         assert s.auto["queue"].last_version is None
@@ -121,8 +100,8 @@ def test_the_merge_row_carries_the_counts_of_a_second_pass(gate):
     engine.agendas = [[Q_ONSET, Q_RADIATE], [Q_SLEEP, Q_ONSET, Q_TABLETS]]
     with live(gate) as s:
         s.to_golden()
-        land_pass(s)
-        v2 = land_pass(s)
+        s.land_pass()
+        v2 = s.land_pass()
         assert pending_texts(s) == [Q_SLEEP, Q_ONSET, Q_TABLETS, Q_RADIATE]
         radiate = s.auto["queue"].find(Q_RADIATE)
         assert radiate.absent_count == 1 and radiate.status is ItemStatus.PENDING
@@ -132,3 +111,123 @@ def test_the_merge_row_carries_the_counts_of_a_second_pass(gate):
     assert (rows[1]["added"], rows[1]["refreshed"], rows[1]["discarded"],
             rows[1]["dropped_absent"], rows[1]["capped"]) == (2, 1, 0, 0, 0)
     assert rows[1]["pending"] == 4
+
+
+# ==========================================================================
+# Item 2: Alba asks from the queue, not from the agenda snapshot
+
+def test_the_486_case_end_to_end_an_answered_question_proposed_again_is_never_planned_again(gate):
+    """The 486 defect through the wiring: Q asked from the queue head and
+    answered; the next pass proposes it again at the top (the model's
+    literal reading of its own parenthetical); the merge discards it and
+    the plan takes the new head. Consumed by id, answered at the turn
+    end, the whole life on the audit trail."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.topics[Q_RISK] = "heart disease risk factors"
+    engine.topics[Q_NAUSEA] = "nausea"
+    engine.agendas = [[Q_RISK, Q_ONSET], [Q_RISK, Q_NAUSEA, Q_ONSET], [Q_RISK, Q_ONSET]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about heart disease risk factors?"
+        risk = queue.find(Q_RISK)
+        assert risk.status is ItemStatus.ASKED and pending_texts(s) == [Q_ONSET]
+        s.play(first["utterance_id"])
+        s.turn_end("I smoke, and my blood pressure was high once.")
+        assert risk.status is ItemStatus.ANSWERED
+        second = s.wait_for_auto_speak()          # pass 2 merged: Q_RISK discarded, Q_NAUSEA new head
+        assert second["text"] == "Can you tell me more about nausea?"
+        assert queue.find(Q_NAUSEA).status is ItemStatus.ASKED
+        assert pending_texts(s) == [Q_ONSET]
+        s.play(second["utterance_id"])
+        s.turn_end("No, not sick.")
+        third = s.wait_for_auto_speak()           # pass 3 proposes Q_RISK a third time: discarded again
+        assert third["text"] == "Can you tell me more about the chest pain?"
+        assert risk.status is ItemStatus.ANSWERED
+        s.play(third["utterance_id"])
+        assert "asked_answered" not in s.auto and "asked_open" not in s.auto, "retired"
+        _stop(s)
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert [c["text"] for c in consumed] == [Q_RISK, Q_NAUSEA, Q_ONSET]
+    assert all(c["by"] == "auto" for c in consumed)
+    assert [c["id"] for c in consumed] == [risk.id, "q3", "q2"], "consumed by id: the planned item, not whatever is head"
+    answered = _audit("auto.queue_answered", s.session_id)
+    assert [a["text"] for a in answered] == [Q_RISK, Q_NAUSEA]
+    merges = _audit("auto.queue_merged", s.session_id)
+    assert [(m["version"], m["discarded"]) for m in merges] == [(1, 0), (2, 1), (3, 1)]
+    assert all(d["text"] == Q_RISK for m in merges[1:] for d in m["discarded_items"])
+    assert _audit("auto.reask_suppressed", s.session_id) == [], "retired with the asked-answered list"
+
+
+def test_the_f5_deliberate_re_ask_is_exempt_and_the_answer_still_marks_the_item_answered(gate, monkeypatch):
+    """A question with no patient speech inside AUTO_NO_ANSWER_GRACE_S is
+    re-asked once (slice 3, F5) — the same item, still ASKED, not a plan
+    and not a consume; when the answer finally comes the item is
+    answered once and a later pass's copy is discarded."""
+    monkeypatch.setattr(appmain, "AUTO_NO_ANSWER_GRACE_S", 4.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET], [Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        ask = s.wait_for_auto_speak()
+        s.play(ask["utterance_id"])
+        item = queue.find(Q_ONSET)
+        assert item.status is ItemStatus.ASKED
+        s.quiet(4.2)                                   # no speech since the question: the one re-ask
+        seen = s.probe()
+        again = next(m for m in seen if m.get("type") == "auto_speak")
+        assert again["text"] == ask["text"] and again["utterance_id"] != ask["utterance_id"]
+        assert item.status is ItemStatus.ASKED, "the re-ask is not a consume"
+        s.play(again["utterance_id"])
+        s.turn_end("Tuesday, I think.")
+        assert item.status is ItemStatus.ANSWERED
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        _stop(s)
+    assert len(_audit("auto.reask_no_answer", s.session_id)) == 1
+    assert [c["text"] for c in _audit("auto.queue_consumed", s.session_id)] == [Q_ONSET, Q_SLEEP]
+    assert [a["text"] for a in _audit("auto.queue_answered", s.session_id)] == [Q_ONSET]
+    assert _audit("auto.queue_merged", s.session_id)[1]["discarded"] == 1
+
+
+def test_a_politeness_aborted_question_goes_back_to_pending_at_its_rank_and_is_asked_again(gate):
+    """The abort declined to play the question: the item is requeued at
+    its rank (auto.queue_requeued), the prepared plan is kept, and at the
+    next permitting quiet the same question is asked — consumed again —
+    and its answer marks it answered. Asked but not heard is not asked."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_RADIATE], [Q_SLEEP]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        ask = s.wait_for_auto_speak()
+        item = queue.find(Q_ONSET)
+        assert item.status is ItemStatus.ASKED and pending_texts(s) == [Q_RADIATE]
+        s.abort(ask["utterance_id"])
+        s.probe()
+        assert item.status is ItemStatus.PENDING and pending_texts(s) == [Q_ONSET, Q_RADIATE], \
+            "back to pending at its rank — the head"
+        assert s.auto["queued"] is not None and s.auto["queued"]["item_id"] == item.id
+        assert s.auto["asked_item_id"] is None
+        s.turn_end("Sorry — it woke me up.")        # the resumed turn ends; no answer was awaited
+        again = s.wait_for_auto_speak()
+        assert again["text"] == ask["text"]
+        assert item.status is ItemStatus.ASKED
+        s.play(again["utterance_id"])
+        s.turn_end("Tuesday night.")
+        assert item.status is ItemStatus.ANSWERED
+        _stop(s)
+    requeued = _audit("auto.queue_requeued", s.session_id)
+    assert len(requeued) == 1 and requeued[0]["id"] == item.id and requeued[0]["rank"] == 0
+    assert requeued[0]["utterance_id"] == ask["utterance_id"]
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert [c["id"] for c in consumed] == [item.id, item.id], "consumed twice: once per issue"
+    assert [a["id"] for a in _audit("auto.queue_answered", s.session_id)] == [item.id]

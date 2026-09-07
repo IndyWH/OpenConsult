@@ -313,21 +313,27 @@ whatever it is under the frozen open/closed rule. (A global
 OPEN→CLOSED switch was declined as clinically cruder.)
 
 **No question is asked twice (owner decision 2026-09-07, after
-consultation 486, finding F4, first half).** The session keeps an
-asked-and-answered memory of question texts (an agenda question asked
-by the machine or tapped by the doctor joins it when its answer's turn
-ends; a politeness-aborted ask does not). A planned question whose
-normalised text (the E3 normaliser, exact token-set equality) matches
-one already asked and answered is skipped and the next agenda item
-taken, audited `auto.reask_suppressed` with both texts and the score;
-the deliberate re-ask for want of an answer (§5) is exempt. If every
-item on the agenda has been asked, the agenda counts as spent and the
-handover sequence follows. In 486 the agenda kept "Do you have any
-other risk factors…" at the top across four versions and it was asked
-twice. **The cone's topic identity** (D3 above) uses the same
-normaliser with its own threshold, `AUTO_TOPIC_MATCH_THRESHOLD`
-(default 0.6): "this chest pain" and "the pain" are one topic, and the
-chest pain is opened once.
+consultation 486, finding F4, first half; the asked-memory became the
+standing question queue the same day, `AGENDA_QUEUE_SPEC.md` §2).** The
+machine asks from the session's standing queue, not from the agenda
+snapshot: every pass that lands while the machine is on merges its
+`questions_to_ask` into the queue, and a question that matches — the E3
+normaliser, exact token-set equality — an item already ASKED or
+ANSWERED is discarded at the merge, whatever the pass says, so it is
+never pending again and never planned again. An item is ASKED when its
+question is issued (consumed by id: the planned item, not whatever is
+head by then) or when the doctor taps it, and ANSWERED when its
+answer's turn ends; a politeness-aborted ask goes back to pending at
+its rank, and the deliberate re-ask for want of an answer (§5) is the
+same item, still asked. If nothing is pending after a post-answer
+revision has merged, the queue is spent and the handover sequence
+follows. In 486 the agenda kept "Do you have any other risk factors…"
+at the top across four versions and it was asked twice. (The slice-3
+asked-and-answered list and `auto.reask_suppressed` are retired.)
+**The cone's topic identity** (D3 above) uses the same normaliser with
+its own threshold, `AUTO_TOPIC_MATCH_THRESHOLD` (default 0.6): "this
+chest pain" and "the pain" are one topic, and the chest pain is opened
+once.
 
 **HANDOVER.** When the agenda is empty after a revision, or the
 doctor taps Handover: speak the anything-else follow-up once, take
@@ -581,10 +587,17 @@ and `test_standing_rules.py` extends to the new controls.
   flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
   decision 2026-09-07, pilot 485 E4; the verdict row that follows carries
   `deferred`, or `stale: true` if the patient spoke again meanwhile),
-  `auto.reask_suppressed` when a planned question is skipped because its
-  normalised text was already asked and answered — `candidate`,
-  `matched`, `score`, the agenda version and index (owner decision
-  2026-09-07, pilot 486 F4),
+  the standing queue's events (`AGENDA_QUEUE_SPEC.md` §7), each with the
+  module's flat details and the session: `auto.queue_merged` on every
+  pass that lands while the machine is on (added, refreshed, discarded
+  with the items, dropped_absent, capped, pending, the version),
+  `auto.queue_dropped_absent`, `auto.queue_capped`, `auto.queue_consumed`
+  (the item, `by: auto | tap`, the utterance id), `auto.queue_answered`,
+  `auto.queue_requeued` (a politeness-aborted ask back at its rank) and
+  `auto.queue_dropped` (the wiring gave an item up, with the reason) —
+  `auto.reask_suppressed` (slice 3) is retired, the discard at the merge
+  having taken its place (owner decision 2026-09-07, pilot 486 F4 and the
+  standing question queue),
   `cds.runaway` when a model call hits its output cap or its timeout —
   the call, the reason (`cap` | `timeout`), tokens, elapsed_ms, the cap
   or timeout, the failure count and the assessment version kept (owner
