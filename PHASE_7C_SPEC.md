@@ -72,7 +72,16 @@ Doctor taps still work in auto mode. A tap cancels any queued auto
 utterance, speaks the tapped question, and is logged as a doctor
 intervention (hard rule 5); the controller treats the answer that
 follows like any other. A tapped examination handover ends the run
-(§10, owner decision 2026-09-01).
+(§10, owner decision 2026-09-01). **A tap while a question is planned
+or queued does not displace it silently** (owner decision 2026-09-07,
+after consultation 485): the server answers with `speak_confirm`
+carrying the queued question's text, the page shows a one-click choice
+beside the tapped control — *ask yours instead* (the same tap re-sent
+with `confirm_displace`) or *let Alba ask* — and a cancelled tap leaves
+the queue untouched; the `auto.doctor_tap` row records `confirmed`
+(true or false) and the displaced text. Taps with nothing planned are
+unchanged. The tapped examination handover is exempt: it ends the run,
+and there is nothing for the machine to ask after it.
 
 ## 4. What the system may say — the utterance whitelist
 
@@ -436,6 +445,16 @@ and `test_standing_rules.py` extends to the new controls.
   server puts on every `auto_phase` push minus the time since GOLDEN
   was entered — counting down in GOLDEN, frozen while PAUSED_URGENT,
   cleared on exit. No new audit event.
+- **The thinking state on the indicator** (owner decision 2026-09-07,
+  pilot 485, item 5): "preparing a question" from the moment a revision
+  is requested until the question is issued (or the handover sequence
+  starts), from the server's `auto_plan` push (`preparing` → `queued`
+  with the text → `idle`, sent on change, derived from the wiring's own
+  state on every tick). In 485 the doctor tapped his own question 0.9 s
+  after the machine had queued one, with nothing on screen to say so.
+- **The guarded tap** (§3): the confirmation is shown inline beside the
+  control the doctor tapped, in words, with the reason on each button;
+  a choice made moot (the question issued or dropped) is taken away.
 - **Pause banner** (§7) in the sticky row, where the doctor is
   already looking — same position class as the urgent panel it
   accompanies.
@@ -480,6 +499,9 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.golden_window_ran` (once per run: the window's end, with
   `golden_s`, whichever report or verdict first observed it — owner
   decision 2026-09-01), and
+  `auto.doctor_tap` gains `confirmed` (owner decision 2026-09-07: true
+  when the doctor confirmed displacing a planned or queued question,
+  false when nothing was planned) beside `displaced`,
   `auto.officer_deferred` when an officer is asked while a CDS pass is in
   flight — `quiet_s`, the phase, `pass_version`, `max_wait_s` (owner
   decision 2026-09-07, pilot 485 E4; the verdict row that follows carries

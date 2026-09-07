@@ -778,6 +778,14 @@ def test_a_politeness_aborted_question_is_requeued_and_reissued(gate):
 
 
 def test_a_doctors_tap_displaces_the_queued_ask_and_is_audited(gate):
+    """REPINNED 2026-09-07 (owner decision, pilot 485 item 5): a tap over a
+    queued question is first answered with speak_confirm and displaces
+    nothing; the doctor's "ask yours instead" is the same tap with
+    confirm_displace, which is what displaces and is audited (confirmed
+    true, the displaced text). The property kept: the confirmed tap
+    displaces the queued auto ask, is audited as an intervention naming
+    what it displaced, and the answer that follows is treated like any
+    other."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True)]
     engine.agendas = [[Q_ONSET], [Q_RADIATE]]
@@ -794,8 +802,13 @@ def test_a_doctors_tap_displaces_the_queued_ask_and_is_audited(gate):
         version = s.entry["agenda"].current_version
         s.ws.send_text(json.dumps({"type": "speak", "ref": {
             "kind": "cds_question", "assessment_version": version, "index": 0}}))
+        confirm = _until(s.ws, {"speak_confirm", "speak_ready"})
+        assert confirm["type"] == "speak_confirm", "a tap over a queued question asks first"
+        assert s.auto["queued"] is not None, "nothing displaced yet"
+        s.ws.send_text(json.dumps({"type": "speak", "confirm_displace": True, "ref": {
+            "kind": "cds_question", "assessment_version": version, "index": 0}}))
         ready = _until(s.ws, {"speak_ready"})
-        assert s.auto["queued"] is None, "the tap displaced the queued auto ask"
+        assert s.auto["queued"] is None, "the confirmed tap displaced the queued auto ask"
         s.play(ready["utterance_id"])
         # The answer that follows is treated like any other: its turn end
         # triggers the revision, and the next ask is from the fresh agenda.
@@ -808,6 +821,120 @@ def test_a_doctors_tap_displaces_the_queued_ask_and_is_audited(gate):
     assert taps[0]["displaced"] == {"kind": "question",
                                     "text": "Can you tell me more about the chest pain?"}
     assert taps[0]["ref_kind"] == "cds_question" and taps[0]["phase"] == "open"
+    assert taps[0]["confirmed"] is True
+
+
+# ==========================================================================
+# The doctor's side: the thinking state and the guarded tap (owner decision 2026-09-07, item 5)
+
+def _plans(messages):
+    return [(m["state"], m["text"]) for m in messages if m.get("type") == "auto_plan"]
+
+
+def test_the_indicator_is_told_preparing_then_queued_then_idle(gate):
+    """The phase indicator's thinking state follows auto_plan pushes: from
+    the moment the revision is requested (the golden exit) "preparing";
+    once the question is prepared "queued" with its text; "idle" when it
+    is issued. Pushed only on change, so the sequence is exact."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_ONSET]]
+    engine.gate_event = asyncio.Event()
+    with live(gate) as s:
+        s.to_golden()
+        seen = []
+        s.commit_transcript("It started on Tuesday.", "That's all really.")
+        s.quiet(3.1)
+        seen += s.probe()                                  # the exit: revision requested
+        assert s.phase is AutoPhase.OPEN
+        seen += s.probe()
+        assert _plans(seen) == [("preparing", None)]
+        s.ws.portal.call(lambda: engine.gate_event.set())
+        for _ in range(30):
+            seen += s.probe()
+            if s.auto["queued"] is not None:
+                break
+            time.sleep(0.03)
+        seen += s.probe()
+        assert _plans(seen) == [("preparing", None), ("queued", "Can you tell me more about the chest pain?")]
+        s.quiet(3.5)
+        seen += s.probe()                                  # issued
+        seen += s.probe()
+        assert _plans(seen)[-1] == ("idle", None)
+        assert any(m.get("type") == "auto_speak" for m in seen)
+        _stop(s)
+
+
+def test_a_cancelled_tap_leaves_the_queue_intact_and_the_question_issues_at_the_next_quiet(gate):
+    """The guarded tap's other branch: the doctor taps over a queued
+    question, is asked, and does nothing (or chooses "let Alba ask" — a
+    client-side choice that sends nothing). No auto.doctor_tap row, the
+    queue untouched, and the machine's question issues at the next quiet."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_ONSET]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        for _ in range(30):
+            s.probe()
+            if s.auto["queued"] is not None:
+                break
+            time.sleep(0.03)
+        queued_text = s.auto["queued"]["text"]
+        version = s.entry["agenda"].current_version
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": version, "index": 0}}))
+        confirm = _until(s.ws, {"speak_confirm", "speak_ready", "speak_refused"})
+        assert confirm["type"] == "speak_confirm"
+        assert confirm["queued"] == {"kind": "question", "text": queued_text}
+        assert confirm["ref"] == {"kind": "cds_question", "assessment_version": version, "index": 0}
+        assert s.auto["queued"] is not None and s.auto["queued"]["text"] == queued_text
+        assert s.entry["pending_utterance"] is None, "nothing was prepared for the doctor's tap"
+        ask = s.wait_for_auto_speak()
+        assert ask["text"] == queued_text, "the machine's question, at the next quiet"
+        s.play(ask["utterance_id"])
+        _stop(s)
+    assert _audit("auto.doctor_tap", s.session_id) == []
+
+
+def test_a_tap_while_the_question_is_still_being_prepared_is_guarded_too(gate):
+    """"Planned or queued": with the revision running and nothing queued
+    yet, the confirmation says a question is being prepared (queued null)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True)]
+    engine.agendas = [[Q_ONSET]]
+    engine.gate_event = asyncio.Event()                    # the revision never lands
+    with live(gate) as s:
+        s.to_golden()
+        s.seed_agenda(Q_SLEEP)
+        s.to_open()
+        assert s.auto["revision"] in ("requested", "running") and s.auto["queued"] is None
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": 1, "index": 0}}))
+        confirm = _until(s.ws, {"speak_confirm", "speak_ready", "speak_refused"})
+        assert confirm["type"] == "speak_confirm" and confirm["queued"] is None
+        assert "preparing" in confirm["detail"]
+        _stop(s)
+
+
+def test_a_tap_with_nothing_planned_is_unchanged_and_audited_unconfirmed(gate):
+    """Nothing planned or queued: the tap speaks at once, as before, and its
+    row says confirmed false with nothing displaced."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(False, False)]
+    with live(gate) as s:
+        s.to_golden()
+        s.seed_agenda(Q_SLEEP)
+        assert s.auto["queued"] is None and s.auto["plan_task"] is None
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": 1, "index": 0}}))
+        ready = _until(s.ws, {"speak_ready", "speak_confirm"})
+        assert ready["type"] == "speak_ready"
+        s.play(ready["utterance_id"])
+        _stop(s)
+    taps = _audit("auto.doctor_tap", s.session_id)
+    assert len(taps) == 1 and taps[0]["confirmed"] is False and taps[0]["displaced"] is None
 
 
 # ==========================================================================

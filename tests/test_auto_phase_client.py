@@ -32,6 +32,7 @@ def _extract(start_marker: str, end_marker: str) -> str:
 _HARNESS = """
 %(labels)s
 %(countdown)s
+%(plan)s
 %(apply)s
 const box = {hidden: true, textContent: ''};
 const document = {getElementById(id) { return id === 'autoPhase' ? box : null; }};
@@ -44,6 +45,14 @@ for (const p of ['disclosure', 'invitation', 'golden', 'open', 'closed', 'paused
 }
 applyAutoPhase('taken_over');
 out.taken_over = {hidden: box.hidden, text: box.textContent};
+// The thinking state (owner decision 2026-09-07): shown in the question
+// phases while a question is being prepared, never in GOLDEN.
+autoPlan = {state: 'preparing', text: null};
+applyAutoPhase('open');
+out.thinkingOpen = box.textContent;
+applyAutoPhase('golden');
+out.thinkingGolden = box.textContent;
+autoPlan = {state: 'idle', text: null};
 autoOn = false;
 applyAutoPhase('golden');
 out.offGolden = {hidden: box.hidden, text: box.textContent};
@@ -57,13 +66,16 @@ console.log(JSON.stringify({out, refreshed}));
 def test_the_indicator_names_the_phase_and_hides_when_off():
     labels = _extract("const AUTO_PHASE_LABELS = {", "\n};")
     countdown = _extract("const goldenCountdown = {", "\n};")
+    plan = _extract("let autoPlan = {", ";")
     apply = _extract("function applyAutoPhase(phase) {", "\n}")
     result = subprocess.run([NODE, "-e", _HARNESS % {"labels": labels, "apply": apply,
-                                                     "countdown": countdown}],
+                                                     "countdown": countdown, "plan": plan}],
                             capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     got = json.loads(result.stdout)["out"]
     assert got["golden"] == {"hidden": False, "text": "Auto mode: Golden minutes"}
+    assert got["thinkingOpen"] == "Auto mode: Open questions · preparing a question…"
+    assert got["thinkingGolden"] == "Auto mode: Golden minutes", "no thinking state in GOLDEN"
     assert got["open"]["text"] == "Auto mode: Open questions"
     assert got["closed"]["text"] == "Auto mode: Closed questions"
     assert got["paused_urgent"]["text"] == "Auto mode: Paused — urgent"
@@ -105,6 +117,7 @@ def test_the_handover_control_shows_only_while_listening_and_sends_the_message()
 _COUNTDOWN_HARNESS = """
 %(labels)s
 %(countdown)s
+%(plan)s
 %(apply)s
 const box = {hidden: true, textContent: ''};
 const document = {getElementById(id) { return id === 'autoPhase' ? box : null; }};
@@ -144,9 +157,10 @@ def test_the_countdown_after_a_pause_and_resume_equals_the_server_arithmetic():
     at 32.3 s in — exactly what the server audited."""
     labels = _extract("const AUTO_PHASE_LABELS = {", "\n};")
     countdown = _extract("const goldenCountdown = {", "\n};")
+    plan = _extract("let autoPlan = {", ";")
     apply = _extract("function applyAutoPhase(phase) {", "\n}")
     result = subprocess.run([NODE, "-e", _COUNTDOWN_HARNESS % {
-        "labels": labels, "countdown": countdown, "apply": apply}],
+        "labels": labels, "countdown": countdown, "apply": apply, "plan": plan}],
         capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     got = json.loads(result.stdout)

@@ -116,6 +116,19 @@
   .pausebanner button:disabled { opacity: .5; cursor: not-allowed; }
   /* Phase 7c slice 6: the auto-mode phase indicator on the status line. */
   .autophase { font-weight: 600; color: var(--green); }
+  /* The guarded tap's confirmation (owner decision 2026-09-07): inline,
+     beside the control the doctor just tapped — where they are looking. */
+  .tapconfirm {
+    margin: .3rem 0 .4rem 2.1rem; padding: .45rem .6rem; border: 1px solid var(--plum);
+    border-radius: .5rem; background: var(--panel); font-size: .82rem; color: var(--ink);
+  }
+  .tapconfirm .what { display: block; margin-bottom: .35rem; }
+  .tapconfirm button {
+    border: 1px solid var(--plum); background: var(--panel); color: var(--plum);
+    border-radius: 999px; padding: .15rem .6rem; font-size: .78rem; font-weight: 600;
+    cursor: pointer; margin-right: .4rem;
+  }
+  .tapconfirm button.mine { background: var(--plum); color: #fff; }
   .facepane {
     background: var(--panel); border: 1px solid var(--line);
     border-radius: var(--radius); padding: .8rem 1rem;
@@ -2397,14 +2410,78 @@ const goldenCountdown = {
   },
 };
 
+// The thinking state (owner decision 2026-09-07, pilot 485, item 5): the
+// server's auto_plan push — "preparing" from the moment a revision is
+// requested, "queued" (with the text) once the question is ready, "idle"
+// when it is issued or the handover sequence starts. The indicator says
+// "preparing a question" for both live states; the text feeds the guarded
+// tap's confirmation (showTapConfirm).
+let autoPlan = {state: 'idle', text: null};
+
 function applyAutoPhase(phase) {
   autoPhase = phase || autoPhase;
   const box = document.getElementById('autoPhase');
   const label = AUTO_PHASE_LABELS[autoPhase];
   const show = autoOn && !!label;
   box.hidden = !show;
-  box.textContent = show ? ('Auto mode: ' + label + goldenCountdown.suffix(performance.now())) : '';
+  const thinking = (show && autoPlan.state !== 'idle' && ['open', 'closed'].includes(autoPhase))
+    ? ' · preparing a question…' : '';
+  box.textContent = show ? ('Auto mode: ' + label + goldenCountdown.suffix(performance.now()) + thinking) : '';
   refreshSpeechControls();
+}
+
+// The guarded tap (owner decision 2026-09-07): the server answers a tap
+// over a planned or queued question with speak_confirm instead of
+// speaking. The choice is shown INLINE, beside the control the doctor
+// tapped (standing rule 3: where they are looking), in words (rule 2), and
+// either button acts or the panel simply closes — nothing is swallowed
+// (rule 1). "Ask yours instead" re-sends the same reference with
+// confirm_displace: true; "Let Alba ask" leaves the machine's queue alone.
+function clearTapConfirm() {
+  document.querySelectorAll('.tapconfirm').forEach(n => n.remove());
+}
+
+function controlForRef(ref) {
+  if (!ref) return null;
+  if (ref.kind === 'cds_question') {
+    return document.querySelector(
+      `#qList .say[data-version="${ref.assessment_version}"][data-index="${ref.index}"]`);
+  }
+  if (ref.kind === 'phrase') return document.querySelector(`.phrase[data-phrase="${ref.id}"]`);
+  return null;
+}
+
+function showTapConfirm(msg) {
+  pendingSpeakText = '';                      // the tap did not go through; the controls come back
+  refreshSpeechControls();
+  clearTapConfirm();
+  const control = controlForRef(msg.ref);
+  const panel = document.createElement('div');
+  panel.className = 'tapconfirm';
+  const what = document.createElement('span');
+  what.className = 'what';
+  what.textContent = msg.queued && msg.queued.text
+    ? 'Alba is about to ask: \u201c' + msg.queued.text + '\u201d'
+    : 'Alba is preparing a question.';
+  panel.appendChild(what);
+  const mine = document.createElement('button');
+  mine.type = 'button'; mine.className = 'mine'; mine.textContent = 'Ask yours instead';
+  mine.title = 'Drop the machine\'s question and ask the one you tapped';
+  mine.addEventListener('click', () => {
+    clearTapConfirm();
+    const label = control ? (control.closest('li.qrow')
+      ? control.closest('li.qrow').querySelector('.qtext').textContent : control.textContent.trim()) : '';
+    requestSpeak(msg.ref, label, {confirm_displace: true});
+  });
+  const theirs = document.createElement('button');
+  theirs.type = 'button'; theirs.textContent = 'Let Alba ask';
+  theirs.title = 'Keep the machine\'s question; yours is not spoken';
+  theirs.addEventListener('click', clearTapConfirm);
+  panel.appendChild(mine);
+  panel.appendChild(theirs);
+  const row = control ? (control.closest('li.qrow') || control.parentElement) : null;
+  if (row && row.parentElement) row.parentElement.insertBefore(panel, row.nextSibling);
+  else document.getElementById('autoPhase').after(panel);
 }
 // The countdown ticks once a second while it is running or held; nothing
 // else on the indicator changes between pushes.
@@ -2628,6 +2705,12 @@ function onWsMessage(event) {
     goldenCountdown.onPhase(msg.phase, msg.golden_spent, performance.now());
     applyAutoPhase(msg.phase);
   }
+  else if (msg.type === 'auto_plan') {    // the thinking state (owner decision 2026-09-07)
+    autoPlan = {state: msg.state || 'idle', text: msg.text || null};
+    if (autoPlan.state === 'idle') clearTapConfirm();   // the choice is moot once it is asked or dropped
+    applyAutoPhase(autoPhase);
+  }
+  else if (msg.type === 'speak_confirm') { showTapConfirm(msg); }   // the guarded tap
   else if (msg.type === 'auto_pause') {
     // Slice 5: paused (or a widening re-fire). `pending` is EVERY pending
     // action text; the list is replaced, never appended to.

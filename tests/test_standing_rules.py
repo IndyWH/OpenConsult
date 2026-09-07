@@ -298,3 +298,39 @@ def test_the_handover_control_keeps_all_three_standing_rules():
     refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
     refused = refused[:refused.index("\n  }")]
     assert "showSpeakError(msg.detail);" in refused
+
+
+# ---------------------------- Solo pilot slice 2 (2026-09-07): the guarded tap
+
+def test_the_guarded_taps_confirmation_keeps_all_three_standing_rules():
+    """The guarded tap and the thinking state (PHASE_7C_SPEC.md §3, §10 as
+    amended 2026-09-07, pilot 485 item 5):
+
+    1. Never swallow: the server answers a tap over a planned or queued
+       question with speak_confirm, and the page shows the choice — it
+       never drops the tap silently; "Ask yours instead" re-sends the same
+       reference with confirm_displace, "Let Alba ask" closes the panel.
+    2. In words, with reasons on both buttons; the queued text is shown.
+    3. Where the doctor is looking: the panel is inserted beside the
+       control that was tapped, not in a banner elsewhere; and the phase
+       indicator says "preparing a question" while the machine thinks.
+    """
+    live = _page("live.html")
+    dispatch = live[live.index("else if (msg.type === 'speak_confirm')"):]
+    dispatch = dispatch[:dispatch.index("\n")]
+    assert "showTapConfirm(msg)" in dispatch                                   # rule 1
+    fn = live[live.index("function showTapConfirm(msg) {"):]
+    fn = fn[:fn.index("\n}")]
+    assert "'Ask yours instead'" in fn and "'Let Alba ask'" in fn              # rule 2: words
+    assert "mine.title = " in fn and "theirs.title = " in fn                   # rule 2: reasons
+    assert "Alba is about to ask" in fn and "msg.queued.text" in fn            # the queued text shown
+    assert "requestSpeak(msg.ref, label, {confirm_displace: true});" in fn     # rule 1: the same tap, confirmed
+    assert "pendingSpeakText = '';" in fn, "the controls come back — the tap did not go through"
+    assert "row.parentElement.insertBefore(panel, row.nextSibling)" in fn      # rule 3: beside the control
+    assert "function controlForRef(ref)" in live
+    indicator = live[live.index("function applyAutoPhase(phase) {"):]
+    indicator = indicator[:indicator.index("\n}")]
+    assert "preparing a question" in indicator and "autoPlan.state !== 'idle'" in indicator
+    plan = live[live.index("else if (msg.type === 'auto_plan')"):]
+    plan = plan[:plan.index("\n  }")]
+    assert "clearTapConfirm()" in plan, "a moot choice is taken away, not left to be clicked"

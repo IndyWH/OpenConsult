@@ -1772,6 +1772,7 @@ def _new_auto_state() -> dict:
         "anything_else_done": False,  # at most once per session
         "last_issued": None,          # the last queued utterance issued, for requeue
         "last_asked_text": None,
+        "plan_state": ("idle", None), # what the client was last told (auto_plan): the thinking state
         # Slice 5: golden seconds spent BEFORE a pause, so the window is not
         # restarted by a resume (seconds_in_phase resets on every transition).
         "golden_spent": 0.0,
@@ -2384,6 +2385,37 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if cage is not None:
                 await refuse_speech(cage)
                 return
+        confirmed = bool(payload.get("confirm_displace"))
+        if via == "tap" and entry["auto"] is not None and not confirmed:
+            # The guarded tap (owner decision 2026-09-07, pilot 485, item 5):
+            # a doctor's tap while the machine has a question planned or
+            # queued does not displace it silently. In 485 the doctor tapped
+            # 0.9 s after the machine had queued its own open question and
+            # never knew. The tap is answered with speak_confirm — the
+            # queued text shown, "ask yours instead" (the same tap with
+            # confirm_displace) or "let Alba ask" — and the queue is left
+            # untouched. A tapped examination handover is exempt: it ends
+            # the run, and there is nothing for the machine to ask after
+            # it. Taps with nothing planned are unchanged.
+            auto = entry["auto"]
+            # "Planned" is everything the indicator shows as preparing: the
+            # revision the ask will come from, the topic call and synthesis,
+            # or the question itself sitting queued.
+            planned = (auto["queued"] is not None
+                       or (auto["plan_task"] is not None and not auto["plan_task"].done())
+                       or (auto["revision"] is not None
+                           and auto["controller"].phase in auto_mode.QUESTION_PHASES))
+            ref = payload.get("ref") or {}
+            if (planned and auto["controller"].phase is not auto_mode.AutoPhase.OFF
+                    and not (ref.get("kind") == "phrase" and ref.get("id") == "examination_handover")):
+                queued = auto["queued"]
+                await websocket.send_json({
+                    "type": "speak_confirm", "ref": ref,
+                    "queued": ({"kind": queued["kind"], "text": queued["text"]}
+                               if queued is not None else None),
+                    "detail": ("the machine is about to ask: " + queued["text"]
+                               if queued is not None else "the machine is preparing a question")})
+                return
         try:
             utterance = await asyncio.to_thread(
                 functools.partial(
@@ -2411,7 +2443,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if via == "tap" and entry["auto"] is not None:
             # Phase 7c: a doctor's tap while auto mode is on is an
             # intervention — audited, and it displaces the queued auto ask.
-            await on_doctor_tap(utterance)
+            await on_doctor_tap(utterance, confirmed=confirmed)
         # Auto-on at Disclosure (owner decision 2026-07-28): the SPOKEN
         # disclosure switches the face on — the "in my own words" tick
         # does not (the owner named the button). Never after a manual
@@ -3194,11 +3226,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
                                            "phase": ctl.phase.value})
 
-    async def on_doctor_tap(utterance: speech.Utterance) -> None:
+    async def on_doctor_tap(utterance: speech.Utterance, *, confirmed: bool = False) -> None:
         """A doctor's tap while auto mode is on (spec §3, hard rule 5): the
         queued auto utterance is cancelled, the tap is audited as an
-        intervention naming what it displaced, and the answer that follows
-        is treated like any other — its turn end triggers the revision.
+        intervention naming what it displaced and whether the doctor
+        confirmed the displacement (owner decision 2026-09-07: a tap over a
+        planned or queued question is answered with speak_confirm first,
+        handle_speak), and the answer that follows is treated like any
+        other — its turn end triggers the revision.
 
         A tapped EXAMINATION HANDOVER in GOLDEN, OPEN or CLOSED ends the
         auto run exactly as the Handover control does (owner decision
@@ -3220,6 +3255,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          "utterance_id": utterance.utterance_id,
                          "displaced": ({"kind": displaced["kind"], "text": displaced["text"]}
                                        if displaced else None),
+                         "confirmed": confirmed,
                          "at_audio_s": round(session.audio_seconds, 1)})
         if (utterance.ref_kind == "phrase"
                 and utterance.ref_detail.get("id") == "examination_handover"
@@ -3677,6 +3713,35 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s, verdict=verdict)
         return None
 
+    async def maybe_push_plan_state() -> None:
+        """The visible thinking state (owner decision 2026-09-07, pilot 485,
+        item 5): the phase indicator shows "preparing a question" from the
+        moment a revision is requested until the question is issued (or the
+        handover sequence starts). Derived from the wiring's own truth on
+        every tick — a revision requested or running, a plan in flight, or
+        a question queued — and pushed as auto_plan only when it changes;
+        the queued text travels so the guarded tap's confirmation can show
+        it. In 485 the doctor tapped his own question 0.9 s after the
+        machine had queued one, with nothing on screen to say so."""
+        auto = entry["auto"]
+        if auto is None:
+            return
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        plan_running = auto["plan_task"] is not None and not auto["plan_task"].done()
+        if ctl.phase not in auto_mode.QUESTION_PHASES or auto["handover"] is not None:
+            state: tuple[str, str | None] = ("idle", None)
+        elif auto["queued"] is not None and auto["queued"]["kind"] == "question":
+            state = ("queued", auto["queued"]["text"])
+        elif auto["revision"] is not None or plan_running:
+            state = ("preparing", None)
+        else:
+            state = ("idle", None)
+        if state == auto["plan_state"]:
+            return
+        auto["plan_state"] = state
+        await websocket.send_json({"type": "auto_plan", "state": state[0], "text": state[1],
+                                   "phase": ctl.phase.value})
+
     async def maybe_apply_officer() -> None:
         """Called on the loop's tick, like maybe_run_cds: when the officer
         has answered, audit a failure (auto.officer_failed — fail-soft
@@ -3842,6 +3907,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await websocket.send_json({"type": "ack", "seq": last_acked})
 
             await maybe_run_cds()
+            await maybe_push_plan_state()   # the indicator's thinking state follows the tick
             await maybe_run_guidelines()
 
         # Client pressed stop: transcribe the tail end and finish cleanly.
