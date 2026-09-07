@@ -6222,3 +6222,123 @@ the owner may want a clause for.
 - **The felt length of the 90 s window** — 486 exited by hand-back at
   63.8 s, so still untested since the exit was fixed; the prereg
   amendment path if too long.
+
+## Standing question queue — slice 1 of 7, the pure module, built (2026-09-07)
+
+**What landed.** The owner-approved spec for the standing question
+queue (`AGENDA_QUEUE_SPEC.md`, the owner's proposal after consultation
+486: 27.7 s mean from turn end to Alba speaking, 74 % of it the full CDS
+pass; a question asked twice; two re-asks in substance) and the first of
+its seven build slices (spec §9): the pure `AgendaQueue` module, its
+tests, and the four settings. One commit per item, the full suite green
+before every commit. `AUTO_MODE_ENABLED` is untouched and `.env` reads
+`false`; `PHASE_7C_EVAL_PREREG.md`, `PHASE_7C_SPEC.md`, `help/`,
+`vendor/` and `OPEN_CLOSED_RULE.md` untouched. **Nothing here needs a
+restart**: nothing in the running app imports the module or reads the
+settings.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 0 | `7266af9` | `AGENDA_QUEUE_SPEC.md` copied verbatim into the repo root (the `PHASE_7C_SPEC.md` precedent: the spec lives with the code and is kept truth-current) | 1002 |
+| 1 | `63fb06a` | `app/agenda_queue.py` — the pure module, inert | 1002 |
+| 2 | `6685214` | `tests/test_agenda_queue.py` — 23 tests, each docstring naming its property | 1002 → 1025 |
+| 3 | `691a38f` | `AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES`, `AUTO_RERANK_TIMEOUT_S`, `AUTO_RERANK_CONTEXT_TURNS` in `app/main.py` and `.env.example`, read by nothing yet | 1025 |
+
+Final suite: **1025 passed** (from 1002 at `e5e959a`).
+
+**What is inert, and why.** The module is a plain in-memory queue —
+stdlib plus the existing E3 normaliser from `app/auto_mode.py`, an
+injected clock, no FastAPI, no database, no model calls (a test pins the
+import surface). The live flow still replaces the agenda wholesale on
+every pass and asks from `entry["agenda"]` as slice 3 of the solo pilot
+fixes left it; the queue becomes the flow's agenda in slice 2, when
+pass completion merges into it, the ask comes from its head, and the
+asked-and-answered memory (`auto["asked_answered"]`, F4) becomes the
+queue's asked/answered status. The four settings duplicate the module's
+defaults so the numbers are in `.env.example` from the start; they are
+not in the per-run thresholds record until they are live.
+
+**What the module does (spec §2, as built):**
+
+- `merge(pass_version, questions)` — three outcomes per question:
+  match a PENDING item → refresh (`last_seen_version`, `absent_count`
+  reset); match an ASKED or ANSWERED item → **discard**, so an asked
+  question can never re-enter, whatever the pass says — the guarantee is
+  the item's status, not a prompt; match nothing → append. Then D-A
+  (unmentioned pending items count an absence; three consecutive →
+  dropped, `queue_dropped_absent`), the baseline order (the pass's own
+  order for what it listed, then the unlisted survivors in their previous
+  order), and D-D (cap at eight pending, lowest ranks dropped,
+  `queue_capped`). Returns the events in order, `queue_merged` first
+  with added / refreshed / discarded / duplicates counts and ids.
+- `consume(item_id=None, by="auto")` — the head, or the tapped item
+  (D-E), becomes ASKED. `answered(id)` — ANSWERED. Both raise
+  `AgendaQueueError` on a state that does not permit them.
+- `apply_rerank(order_ids, drop_ids, ms=)` — pending items only. **Any
+  id that is not a known pending item is ignored** and listed in the
+  event's `ignored` (the no-invention guard, §3): the re-ranker cannot
+  add, resurrect or touch an asked question. Unmentioned pending items
+  keep their previous relative order after the ones named.
+- Question identity: exact equality of E3 token sets (the F4 rule);
+  `question_key` falls back to bare tokens when a text is all stop
+  words so nothing carries the empty key. Topic identity:
+  `pending_on_topic(topic)` at the topic threshold by meaning.
+- `snapshot()` is the JSON-ready view slice 4's panel will show.
+
+**Where the spec did not decide, and what the code does — for the
+owner and Cowork to confirm or overrule:**
+
+- **A DROPPED item does not match.** Spec §2 names three outcomes
+  (pending → refresh, asked/answered → discard, nothing → append) and
+  none for dropped. As built, a question dropped for absence, by the cap
+  or by the re-ranker is a fresh proposal if a later pass raises it
+  again: a new id, that pass as `first_version`. The alternative — a
+  re-ranker drop ("the patient addressed it") treated like answered —
+  would extend the never-re-enter guarantee to a model's judgement
+  rather than to a fact of the session. A test pins the chosen reading
+  and is the place to repin.
+- **A refresh keeps the first wording.** The match is on normalised
+  token sets, so the pass's wording can differ only in case,
+  punctuation and stop words; the item keeps the text first proposed
+  (which pre-synthesis may already hold as audio).
+- **A question listed twice in one pass counts once** (`duplicates` in
+  the event).
+- **`answered` is its own event** (`queue_answered`), beyond the five
+  the spec's §7 lists, because every state change returns one.
+- **Items 1 and 2 are separate commits**, as the build prompt asked
+  (one commit per item); CLAUDE.md's "tests land with the behaviour
+  they pin" would have put them together.
+
+**The slices ahead (spec §9):**
+
+2. Wiring — pass completion → `merge`; ask-from-queue (§5: pending →
+   topic call → verbatim → pre-synthesis → issue at the next quiet; a
+   running pass never blocks the ask); the empty rules (empty + pass
+   running → one bridge; empty + no pass → request one; empty on a
+   fresh post-answer revision → handover); F4's asked-memory becomes the
+   queue's asked status; the queue events audited as `auto.queue_*`.
+3. Re-ranker — the stateless call in the affect/topic shape, D-B's
+   context (`AUTO_RERANK_CONTEXT_TURNS`, capped by characters),
+   `AUTO_RERANK_TIMEOUT_S` fail-soft to the current order
+   (`auto.rerank_failed`), skipped while a full pass is in flight (D-F),
+   `apply_rerank` with its no-invention guard, audited
+   `auto.queue_reranked`.
+4. Panel and taps — the questions-to-ask panel shows the queue (pending
+   in order, asked struck through, dropped hidden and expandable); a tap
+   consumes that item (D-E); the preparing state covers re-rank plus
+   synthesis. `help/` flagged for the owner's wording.
+5. Cadence flag (D-C: (a) now, (b) full pass every second answer
+   behind a flag) and the pin that the urgency check runs on its own
+   call at every answered turn whatever the cadence; HANDOVER,
+   `PHASE_7C_SPEC.md` §5, §6, §9 truth-ups, `help/` flags.
+6. GPU discipline (§7a, D-G) — `model.call` audit (kind, queued_ms,
+   run_ms, tokens, outcome); the resident live set as an invariant with
+   `model.load_during_live`; the priority scheduler (urgency, then the
+   short conversational calls, then the full pass, then speculation);
+   the second Ollama slot as a measurement experiment only.
+7. Speculative pass during the patient's answer, behind a flag, once
+   the queue's own effect is measured against the 486 baseline (turn
+   end → Alba speaking, per question; mean 27.7 s to beat).
+
+**`help/`:** nothing is made untrue by this slice; nothing on the page
+changes until slice 4.
