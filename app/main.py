@@ -1479,20 +1479,20 @@ AUTO_TOPIC_MATCH_THRESHOLD = float(os.getenv("AUTO_TOPIC_MATCH_THRESHOLD", "0.6"
 # 2 wires it: one AgendaQueue per auto session, built from the two numbers
 # below (the topic threshold is AUTO_TOPIC_MATCH_THRESHOLD above), and
 # every CDS pass that lands while auto mode is on merges into it. The
-# re-ranker (slice 3) will read the two after. The module's own defaults
-# are the same numbers.
+# module's own defaults are the same numbers.
 # D-D: at most this many PENDING questions; the lowest-ranked excess is
 # dropped and audited auto.queue_capped.
 AUTO_QUEUE_MAX = int(os.getenv("AUTO_QUEUE_MAX", "8"))
 # D-A: a pending question absent from this many CONSECUTIVE passes is
 # dropped (audited auto.queue_dropped_absent); absence from one pass is kept.
 AUTO_QUEUE_ABSENT_PASSES = int(os.getenv("AUTO_QUEUE_ABSENT_PASSES", "3"))
-# §3: the re-ranker call's timeout; on timeout the current order stands
-# (auto.rerank_failed). Used from slice 3.
-AUTO_RERANK_TIMEOUT_S = float(os.getenv("AUTO_RERANK_TIMEOUT_S", "2.0"))
-# D-B: the re-ranker sees the last this-many transcript turns since the
-# previous full pass, capped by characters. Used from slice 3.
+# §3, D-B: the re-ranker (slice 3) sees the last this-many committed
+# transcript turns since the last full pass landed, capped by characters
+# (cut from the front, so the most recent words survive — cds.rerank_excerpt).
+# Its timeout and output cap live with the call in app/cds.py
+# (AUTO_RERANK_TIMEOUT_S, AUTO_RERANK_MAX_TOKENS).
 AUTO_RERANK_CONTEXT_TURNS = int(os.getenv("AUTO_RERANK_CONTEXT_TURNS", "6"))
+AUTO_RERANK_MAX_CHARS = int(os.getenv("AUTO_RERANK_MAX_CHARS", "1500"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:

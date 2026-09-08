@@ -60,7 +60,8 @@ import json
 import logging
 import os
 import time
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import dataclass, field
 
 import httpx
 
@@ -113,6 +114,16 @@ CDS_AFFECT_MAX_TOKENS = int(os.getenv("CDS_AFFECT_MAX_TOKENS", "800"))
 AUTO_OFFICER_MAX_TOKENS = int(os.getenv("AUTO_OFFICER_MAX_TOKENS", "64"))
 AUTO_TOPIC_MAX_TOKENS = int(os.getenv("AUTO_TOPIC_MAX_TOKENS", "48"))
 CDS_ASSESSMENT_TIMEOUT_S = float(os.getenv("CDS_ASSESSMENT_TIMEOUT_S", "60.0"))
+
+# The standing question queue's re-ranker (AGENDA_QUEUE_SPEC.md §3, slice
+# 3): the short call after each answered turn that re-orders the pending
+# questions and drops the ones the patient has just addressed. Its own
+# timeout — on timeout the current order stands (auto.rerank_failed) — and
+# its output cap: the reply is at most eight ids and a one-word reason per
+# drop, so 200 tokens is about three times a full reply. Both UNCALIBRATED
+# GUESSES; the next solo run informs them.
+AUTO_RERANK_TIMEOUT_S = float(os.getenv("AUTO_RERANK_TIMEOUT_S", "2.0"))
+AUTO_RERANK_MAX_TOKENS = int(os.getenv("AUTO_RERANK_MAX_TOKENS", "200"))
 
 
 class CDSRunaway(Exception):
@@ -534,8 +545,189 @@ class TopicVerdict:
     elapsed_ms: int = 0
 
 
+# ----------------------------------------- the re-ranker (standing queue)
+#
+# AGENDA_QUEUE_SPEC.md §3. A stateless call in the topic call's shape: the
+# pending questions with their ids and the transcript since the last full
+# pass landed (D-B: at most AUTO_RERANK_CONTEXT_TURNS turns, capped by
+# characters — both the wiring's settings, applied by rerank_excerpt) in;
+# the ids still worth asking, best first, and the ids to drop with a
+# one-word reason each, out. It never writes a question: the whitelist
+# (PHASE_7C_SPEC.md §4) is untouched because nothing it returns is text
+# that could be spoken, only ids — and the queue's apply_rerank ignores
+# any id that is not a known pending item, so it cannot invent, resurrect
+# or touch an asked question either. Fail-soft: a timeout, an error or a
+# malformed reply is a failed verdict and the current order stands.
+
+RERANK_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "order": {"type": "array", "items": {"type": "string"}},
+        "drop": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {"id": {"type": "string"}, "reason": {"type": "string"}},
+                "required": ["id", "reason"],
+            },
+        },
+    },
+    "required": ["order", "drop"],
+}
+
+RERANK_PROMPT = """\
+You are helping a doctor keep a short list of questions still worth asking \
+a patient, part-way through a consultation. You are given the list — each \
+question with an id — and what the patient has said since the list was last \
+revised.
+Return the ids still worth asking, in the best order for this moment: the \
+question that follows most naturally from what the patient has just said \
+comes first.
+Drop any question the patient has already addressed in the excerpt. A \
+question counts as answered when its SUBJECT was addressed, even if not every \
+example in it was named — "any other risk factors (e.g. diabetes, high \
+cholesterol)?" is answered once the patient has spoken about their risk \
+factors, whether or not diabetes came up. Give each dropped id a one-word \
+reason (for example: answered, addressed, volunteered).
+Never write a new question. Use only the ids you were given — an id you were \
+not given is ignored — and name each id at most once, in the order or in the \
+drops. Answer with JSON only.\
+"""
+
+
+def rerank_excerpt(turns, *, max_turns: int, max_chars: int) -> str:
+    """The re-ranker's excerpt (D-B): the last `max_turns` non-empty turns
+    of `turns` — the committed transcript lines since the last full pass
+    landed — joined one per line, and if still longer than `max_chars`
+    cut from the FRONT so the most recent words survive (the thing being
+    judged is what the patient has just said). Pure."""
+    lines = [str(t).strip() for t in turns if str(t).strip()]
+    if max_turns > 0:
+        lines = lines[-max_turns:]
+    text = "\n".join(lines)
+    if max_chars > 0 and len(text) > max_chars:
+        text = "…" + text[-max_chars:]
+    return text
+
+
+def rerank_message(pending, excerpt: str) -> str:
+    """The user message: the pending questions with their ids, then the
+    excerpt in a labelled block at the END, where the model attends most
+    (the officer's and affect call's construction)."""
+    listed = "\n".join(f"{item_id}: {str(text).strip()}" for item_id, text in pending)
+    return (f"THE QUESTIONS STILL ON THE LIST (id: question):\n{listed}\n\n"
+            f"WHAT THE PATIENT HAS SAID SINCE THE LIST WAS LAST REVISED:\n"
+            f"{excerpt.strip() or '(nothing new)'}")
+
+
+def one_word(reason) -> str:
+    """The re-ranker's reason, held to one word for the audit row: the
+    first alphabetic word, lower case; "addressed" when there is none."""
+    if isinstance(reason, str):
+        for token in reason.replace("_", " ").split():
+            word = "".join(ch for ch in token if ch.isalpha())
+            if word:
+                return word.casefold()
+    return "addressed"
+
+
+@dataclass(frozen=True)
+class RerankVerdict:
+    """What the re-ranker said — or that it did not answer.
+
+    `order_ids` are the ids still worth asking, best first; `drop_ids`
+    maps each id to drop to its one-word reason. When `failed` names a
+    failure (a timeout, an error, a runaway cap, a malformed reply) both
+    are empty and the caller leaves the current order standing and audits
+    (auto.rerank_failed). `outcome` is the model.call vocabulary — ok |
+    timeout | cap | malformed | error; `run_ms` is the server's own total
+    for the call when it reported one, and `tokens` its prompt and output
+    counts — the shape slice 6's model.call audit extends to every call.
+    Nothing here raises into a live session.
+    """
+
+    order_ids: tuple[str, ...] = ()
+    drop_ids: Mapping[str, str] = field(default_factory=dict)
+    failed: str | None = None
+    elapsed_ms: int = 0
+    outcome: str = "ok"
+    run_ms: int | None = None
+    tokens: Mapping[str, int | None] | None = None
+
+
+def parse_rerank_reply(reply) -> tuple[tuple[str, ...], dict[str, str]]:
+    """The reply's shape, checked: `order` a list of strings, `drop` a list
+    of {id, reason} objects. Anything else raises ValueError (a malformed
+    reply is a failed verdict). Ids are de-duplicated in first-seen order;
+    whether an id is a real pending item is the queue's business."""
+    if not isinstance(reply, dict):
+        raise ValueError(f"reply is not an object: {type(reply).__name__}")
+    order_raw, drop_raw = reply.get("order"), reply.get("drop")
+    if not isinstance(order_raw, list) or not isinstance(drop_raw, list):
+        raise ValueError("order and drop must both be lists")
+    order: list[str] = []
+    for item_id in order_raw:
+        if not isinstance(item_id, str):
+            raise ValueError(f"order holds a non-string id: {item_id!r}")
+        if item_id.strip() and item_id.strip() not in order:
+            order.append(item_id.strip())
+    drops: dict[str, str] = {}
+    for entry in drop_raw:
+        if not isinstance(entry, dict) or not isinstance(entry.get("id"), str):
+            raise ValueError(f"drop entry is not {{id, reason}}: {entry!r}")
+        item_id = entry["id"].strip()
+        if item_id and item_id not in drops:
+            drops[item_id] = one_word(entry.get("reason"))
+    return tuple(order), drops
+
+
 class CDSEngine:
     """Stateless client: callers hold the assessment and pass it back in."""
+
+    async def rerank(self, pending, excerpt: str) -> RerankVerdict:
+        """The re-ranker (AGENDA_QUEUE_SPEC.md §3). NEVER RAISES.
+
+        `pending` is the queue's pending items as (id, text) pairs, head
+        first; `excerpt` the transcript since the last full pass landed,
+        already bounded by rerank_excerpt. Bounded by AUTO_RERANK_TIMEOUT_S
+        end to end (asyncio.wait_for and the HTTP timeout beneath it) with
+        AUTO_RERANK_MAX_TOKENS as the output cap. A timeout, an error, a
+        cap hit or a malformed reply comes back as a failed verdict; the
+        caller leaves the order standing and audits auto.rerank_failed.
+        """
+        started = time.perf_counter()
+        pairs = [(str(item_id), str(text)) for item_id, text in pending]
+        try:
+            reply, meta = await asyncio.wait_for(
+                self._chat_raw(RERANK_PROMPT, rerank_message(pairs, excerpt), RERANK_SCHEMA,
+                               timeout=AUTO_RERANK_TIMEOUT_S, num_predict=AUTO_RERANK_MAX_TOKENS,
+                               call="rerank"),
+                timeout=AUTO_RERANK_TIMEOUT_S)
+        except asyncio.TimeoutError:
+            elapsed = round(1000 * (time.perf_counter() - started))
+            logger.warning("Re-ranker timed out after %d ms (AUTO_RERANK_TIMEOUT_S=%.1f); "
+                           "the current order stands", elapsed, AUTO_RERANK_TIMEOUT_S)
+            return RerankVerdict(failed="timeout", elapsed_ms=elapsed, outcome="timeout")
+        except CDSRunaway as exc:
+            return RerankVerdict(failed=f"CDSRunaway: {exc}", elapsed_ms=exc.elapsed_ms,
+                                 outcome="cap", tokens={"prompt": None, "output": exc.tokens})
+        except Exception as exc:  # noqa: BLE001 - fail-soft by contract
+            elapsed = round(1000 * (time.perf_counter() - started))
+            malformed = isinstance(exc, (json.JSONDecodeError, KeyError, TypeError, ValueError))
+            logger.warning("Re-ranker failed (%s: %s); the current order stands",
+                           type(exc).__name__, exc)
+            return RerankVerdict(failed=f"{type(exc).__name__}: {exc}", elapsed_ms=elapsed,
+                                 outcome="malformed" if malformed else "error")
+        elapsed = round(1000 * (time.perf_counter() - started))
+        try:
+            order, drops = parse_rerank_reply(reply)
+        except ValueError as exc:
+            logger.info("Re-ranker reply malformed (%s); the current order stands", exc)
+            return RerankVerdict(failed=f"malformed: {exc}", elapsed_ms=elapsed,
+                                 outcome="malformed", run_ms=meta.get("run_ms"),
+                                 tokens=meta.get("tokens"))
+        return RerankVerdict(order, drops, elapsed_ms=elapsed, run_ms=meta.get("run_ms"),
+                             tokens=meta.get("tokens"))
 
     async def topic_for(self, question: str) -> TopicVerdict:
         """The topic call (Phase 7c, spec §4 D1). NEVER RAISES.
@@ -620,11 +812,23 @@ class CDSEngine:
     async def _chat(self, system: str, user: str, schema: dict, *,
                     timeout: float = 180.0, num_predict: int | None = None,
                     call: str = "chat") -> dict:
-        """One model call. `num_predict` caps the output (owner decision
-        2026-09-07, pilot 486 F3); a reply Ollama stopped for length
-        (`done_reason: "length"`) is a CDSRunaway, never a parsed answer —
-        truncated JSON would not parse anyway, and a cap hit is a fault to
-        record, not a value to use."""
+        """One model call, parsed. `num_predict` caps the output (owner
+        decision 2026-09-07, pilot 486 F3); a reply Ollama stopped for
+        length (`done_reason: "length"`) is a CDSRunaway, never a parsed
+        answer — truncated JSON would not parse anyway, and a cap hit is a
+        fault to record, not a value to use."""
+        reply, _meta = await self._chat_raw(system, user, schema, timeout=timeout,
+                                            num_predict=num_predict, call=call)
+        return reply
+
+    async def _chat_raw(self, system: str, user: str, schema: dict, *,
+                        timeout: float = 180.0, num_predict: int | None = None,
+                        call: str = "chat") -> tuple[dict, dict]:
+        """One model call: the parsed reply AND what the server said about
+        the call — `tokens` {prompt, output} and `run_ms` (Ollama's own
+        total_duration, when reported) — the numbers the model.call audit
+        wants (AGENDA_QUEUE_SPEC.md §7a; the re-ranker first, every call
+        in slice 6)."""
         started = time.perf_counter()
         options = {
             # Greedy + fixed seed: an alarm must not be a coin flip,
@@ -659,7 +863,11 @@ class CDSEngine:
                            call, tokens, num_predict, elapsed)
             raise CDSRunaway(call, reason="cap", tokens=tokens, elapsed_ms=elapsed,
                              cap=num_predict)
-        return json.loads(body["message"]["content"])
+        total_ns = body.get("total_duration")
+        meta = {"tokens": {"prompt": body.get("prompt_eval_count"), "output": body.get("eval_count")},
+                "run_ms": (round(total_ns / 1_000_000) if isinstance(total_ns, (int, float))
+                           else None)}
+        return json.loads(body["message"]["content"]), meta
 
     async def update(self, transcript: str, previous: dict | None = None) -> dict:
         """One CDS pass: transcript so far + previous assessment → new assessment.
