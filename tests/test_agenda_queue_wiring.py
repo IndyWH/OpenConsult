@@ -977,3 +977,62 @@ def test_the_re_rank_is_not_run_with_one_pending_item_and_a_dropped_item_may_re_
     assert len(engine.rerank_calls) == 1, "the second answer had nothing to order"
     assert len(_audit("auto.queue_reranked", s.session_id)) == 1
     assert _audit("auto.rerank_skipped", s.session_id) == []
+
+
+# ==========================================================================
+# Slice 3, item 5: GPU priority, the minimum the re-ranker needs (§7a; D-G is
+# slice 6) — a re-ranker call is never issued while a full pass holds Ollama's
+# single slot, and every call is on the record as model.call
+
+MODEL_CALL_KEYS = {"session_id", "kind", "model", "queued_ms", "run_ms", "elapsed_ms",
+                   "tokens", "outcome", "pass_in_flight", "at_audio_s"}
+
+
+def test_a_re_ranker_call_is_never_issued_while_a_pass_is_running_and_every_call_is_a_model_call_row(gate):
+    """§7a, by construction (item 4: the re-rank runs only when no pass is
+    in flight), pinned from the engine's side: across three answers — the
+    second ending while the pass for the first is HELD mid-flight — the
+    engine sees no re-rank call while one of its passes is running, the
+    held answer is a recorded skip, and each of the two calls that were
+    issued has exactly one model.call row (kind=rerank, queued_ms,
+    run_ms, elapsed_ms, tokens, outcome, pass_in_flight=false — the
+    shape slice 6 extends to the officer, topic, assessment, urgency and
+    affect calls). The attack reaches its target: the pass was in flight
+    when the second answer ended."""
+    import asyncio
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE, Q_NAUSEA]]
+    with live(gate) as s:
+        _first_answer_setup(s, engine)                 # the exit's pass (v1) has landed
+        hold = s.ws.portal.call(asyncio.Event)         # unset: every pass from here is held
+        engine.gate_event = hold
+        s.turn_end("Tuesday.")                         # no pass in flight: re-rank 1; v2 requested, then held
+        first = s.wait_for_auto_speak()
+        assert len(engine.rerank_calls) == 1
+        s.play(first["utterance_id"])
+        _probe_until(s, lambda: engine.pass_in_flight)
+        assert engine.pass_in_flight is True, "v2 is running when the second answer ends"
+        s.turn_end("Badly.")                           # a pass in flight: skipped, planned at once
+        second = s.wait_for_auto_speak()
+        assert len(engine.rerank_calls) == 1, "no call issued behind the running pass"
+        assert engine.pass_in_flight is True
+        s.play(second["utterance_id"])
+        s.ws.portal.call(hold.set)                     # the held passes land
+        wait_for_pass(s, 3)
+        _probe_until(s, lambda: not engine.pass_in_flight and s.auto["revision"] is None)
+        s.turn_end("Sometimes.")                       # free again: re-rank 2
+        s.wait_for_auto_speak()
+        assert len(engine.rerank_calls) == 2
+        _stop(s)
+    assert engine.rerank_during_pass == [False, False]
+    skipped = _audit("auto.rerank_skipped", s.session_id)
+    assert [r["reason"] for r in skipped] == ["pass_in_flight"] and skipped[0]["pass_version"] == 2
+    calls = _audit("model.call", s.session_id)
+    assert len(calls) == 2 == len(engine.rerank_calls)
+    for call in calls:
+        assert set(call) == MODEL_CALL_KEYS, sorted(call)
+        assert call["kind"] == "rerank" and call["outcome"] == "ok"
+        assert call["pass_in_flight"] is False
+        assert call["queued_ms"] >= 0 and call["run_ms"] == call["elapsed_ms"] == 5
+        assert call["tokens"] is None, "the scripted engine reports none; Ollama's counts travel here"
