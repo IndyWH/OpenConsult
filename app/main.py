@@ -1819,6 +1819,11 @@ def _new_auto_state() -> dict:
         "handover": None,             # None | "anything_else" | "final"
         "anything_else_done": False,  # at most once per session
         "last_issued": None,          # the last queued utterance issued, for requeue
+        # The number to beat (AGENDA_QUEUE_SPEC.md §7): the monotonic time of
+        # the turn end that permitted the next ask, so every auto question
+        # carries turn_end_to_issue_ms and, at the client's speak_started,
+        # turn_end_to_speech_ms (auto.question_latency).
+        "turn_ended_at": None,
         "last_asked_text": None,
         "plan_state": ("idle", None), # what the client was last told (auto_plan): the thinking state
         # Slice 5: golden seconds spent BEFORE a pause, so the window is not
@@ -2633,6 +2638,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # transcript exclusion also tells the face we started talking.
         if entry["face"] is not None:
             entry["face"].on_system_speech_started()
+        await _note_question_latency(utterance)
         # The client's declared seq is a cross-check only. The server's own
         # byte count is what says where in the file playback began, and
         # trusting the client here would put the guarantee in its hands.
@@ -3394,6 +3400,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     _plan_handover(auto, entry["agenda"].current_version)
                 return
             detail = {"topic": plan["topic"], "open_form": plan["open_form"]}
+            issued_at = time.monotonic()      # the issue instant: one reading for all three numbers
+            if auto["turn_ended_at"] is not None:
+                # The number to beat, per question (spec §7): from the turn
+                # end that permitted this ask (auto.turn_ended, or the
+                # golden exit's) to the issue — the decision to speak;
+                # synthesis and transport are in issue_to_speech_ms.
+                # 486 baseline: 27.7 s mean.
+                detail["turn_end_to_issue_ms"] = int(
+                    round((issued_at - auto["turn_ended_at"]) * 1000))
             if (not plan["open_form"] and ctl.phase is auto_mode.AutoPhase.OPEN
                     and ctl.is_legal(auto_mode.AutoEvent.NARRATIVE_EXHAUSTED)):
                 await auto_transition(ctl.narrative_exhausted(),
@@ -3415,7 +3430,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await _audit_queue_events((queue.requeue(plan["item_id"]),), {"issue": "failed"})
             return                     # in flight or a fault: try again on the next report
         auto["queued"] = None
-        auto["last_issued"] = {**plan, "utterance_id": prepared.utterance_id}
+        auto["last_issued"] = {**plan, "utterance_id": prepared.utterance_id,
+                               "issued_at": issued_at if plan["kind"] == "question" else time.monotonic(),
+                               "turn_ended_at": auto["turn_ended_at"],
+                               "turn_end_to_issue_ms": (detail or {}).get("turn_end_to_issue_ms")}
         auto["turn_ended"] = False       # the next turn end is the answer's
         auto["awaiting_speech"] = plan["kind"] != "handover"   # F5: a turn must start before it can end
         auto["reasked"] = False
@@ -3431,6 +3449,32 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["awaiting_answer"] = True
         elif plan["kind"] == "handover":
             auto["awaiting_answer"] = False   # nothing follows but the exam
+
+    async def _note_question_latency(utterance: speech.Utterance) -> None:
+        """The number to beat (AGENDA_QUEUE_SPEC.md §7): turn end → Alba
+        speaking, per question. The client's speak_started is the moment
+        playback actually began (the same report that opens the exclusion
+        window), so it is the far end of the measurement; the near end is
+        the turn end that permitted the ask. Audited auto.question_latency
+        for every auto QUESTION whose issue followed a turn end, with
+        turn_end_to_issue_ms, issue_to_speech_ms and turn_end_to_speech_ms.
+        486 baseline: 27.7 s mean."""
+        auto = entry["auto"]
+        if auto is None:
+            return
+        last = auto.get("last_issued")
+        if (last is None or last.get("utterance_id") != utterance.utterance_id
+                or last.get("kind") != "question" or last.get("turn_ended_at") is None):
+            return
+        now = time.monotonic()
+        await audit.log(user["id"], "auto.question_latency", None, None,
+                        {"session_id": session_id, "utterance_id": utterance.utterance_id,
+                         "text": last.get("text"), "queue_item": last.get("item_id"),
+                         "turn_end_to_issue_ms": last.get("turn_end_to_issue_ms"),
+                         "issue_to_speech_ms": int(round((now - last["issued_at"]) * 1000)),
+                         "turn_end_to_speech_ms": int(round((now - last["turn_ended_at"]) * 1000)),
+                         "phase": auto["controller"].phase.value,
+                         "at_audio_s": round(session.audio_seconds, 1)})
 
     async def on_fresh_agenda(version: int) -> None:
         """maybe_run_cds landed the pass auto mode asked for (D2), and it
@@ -3828,6 +3872,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         transition = auto["controller"].golden_timer_elapsed()
         await auto_transition(transition, detail=detail)
         auto["turn_ended"] = True
+        auto["turn_ended_at"] = time.monotonic()
         auto["repause_block"] = False        # a turn has ended (pilot D4)
         _request_revision(auto, why)
         return transition
@@ -3850,6 +3895,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if auto["turn_ended"]:
             return
         auto["turn_ended"] = True
+        auto["turn_ended_at"] = time.monotonic()   # the zero of the number to beat (spec §7)
         auto["repause_block"] = False        # a patient turn has ended (pilot D4)
         answer = bool(auto["awaiting_answer"])
         if verdict is not None and verdict.handed_back:
@@ -4134,6 +4180,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 transition = ctl.hand_back()
                 await auto_transition(transition, detail=detail)
                 auto["turn_ended"] = True
+                auto["turn_ended_at"] = time.monotonic()
                 _request_revision(auto, "golden exit: hand-back")
                 return transition
             elapsed = _golden_elapsed(auto)

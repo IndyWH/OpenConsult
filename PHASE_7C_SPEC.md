@@ -606,6 +606,12 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.reask_suppressed` (slice 3) is retired, the discard at the merge
   having taken its place (owner decision 2026-09-07, pilot 486 F4 and the
   standing question queue),
+  the number to beat (`AGENDA_QUEUE_SPEC.md` §7): every auto question's
+  `speech.requested` row and `system_utterance.ref_detail` carry
+  `turn_end_to_issue_ms` from the turn end that permitted it, and
+  `auto.question_latency` is written at the client's `speak_started` for
+  that question with `turn_end_to_issue_ms`, `issue_to_speech_ms` and
+  `turn_end_to_speech_ms` (486 baseline: 27.7 s mean turn end → speaking),
   `cds.runaway` when a model call hits its output cap or its timeout —
   the call, the reason (`cap` | `timeout`), tokens, elapsed_ms, the cap
   or timeout, the failure count and the assessment version kept (owner

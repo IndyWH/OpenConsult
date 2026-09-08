@@ -568,3 +568,51 @@ def test_resume_after_an_urgency_pause_asks_from_the_queue_head_the_alarm_bearin
     consumed = _audit("auto.queue_consumed", s.session_id)
     assert [c["text"] for c in consumed] == [Q_ONSET, Q_NAUSEA]
     assert consumed[1]["version"] == 2
+
+
+# ==========================================================================
+# Item 5: the number to beat, per question, on the record
+
+def test_every_auto_question_carries_its_turn_end_to_issue_and_turn_end_to_speech_latency(gate):
+    """AGENDA_QUEUE_SPEC.md §7: on a question issued after an answered turn
+    the issue's detail carries turn_end_to_issue_ms measured from the
+    auto.turn_ended that permitted it, and the client's speak_started
+    writes auto.question_latency with turn_end_to_speech_ms ≥ the issue
+    number. Correct = non-negative, bounded by the test's own clock
+    around the same interval, and consistent between the two rows."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        t0 = time.monotonic()
+        s.turn_end("Tuesday night.")
+        second = s.wait_for_auto_speak()
+        issued_bound_ms = (time.monotonic() - t0) * 1000
+        s.play(second["utterance_id"])
+        spoken_bound_ms = (time.monotonic() - t0) * 1000
+        s.probe()
+        cid = _stop(s)
+    from auto_harness import _rows
+    row = next(r for r in _rows(cid) if r["text"] == "Can you tell me more about your sleep?")
+    issue_ms = row["ref_detail"]["turn_end_to_issue_ms"]
+    assert 0 <= issue_ms <= issued_bound_ms
+    import os, psycopg
+    with psycopg.connect(os.environ["DATABASE_URL"]) as conn:     # speech.requested rows carry no session_id
+        requested = conn.execute(
+            "SELECT detail FROM audit_event WHERE action = 'speech.requested'"
+            " AND detail->>'utterance_id' = %s", (second["utterance_id"],)).fetchall()
+    assert len(requested) == 1 and requested[0][0]["ref_detail"]["turn_end_to_issue_ms"] == issue_ms
+    latency = _audit("auto.question_latency", s.session_id)
+    ours = [l for l in latency if l["utterance_id"] == second["utterance_id"]]
+    assert len(ours) == 1
+    assert ours[0]["turn_end_to_issue_ms"] == issue_ms
+    assert issue_ms <= ours[0]["turn_end_to_speech_ms"] <= spoken_bound_ms
+    assert ours[0]["turn_end_to_speech_ms"] == pytest.approx(
+        issue_ms + ours[0]["issue_to_speech_ms"], abs=2)
+    assert ours[0]["queue_item"] == "q2" and ours[0]["text"] == row["text"]
+    # The first question followed the golden exit's turn end and has its own row too.
+    assert any(l["utterance_id"] == first["utterance_id"] for l in latency)

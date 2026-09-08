@@ -401,6 +401,9 @@ def test_strict_revise_asks_only_from_the_fresh_agenda(gate):
         cid = _stop(s)
     rows = _rows(cid)
     row = next(r for r in rows if r["ref_kind"] == "template")
+    # The number to beat travels on every question's detail (slice 2 of
+    # the standing queue); its value is timing, pinned in its own test.
+    assert row["ref_detail"].pop("turn_end_to_issue_ms") >= 0
     assert row["ref_detail"] == {"template_id": "tell_me_more", "topic": "the chest pain",
                                  "via": "auto", "phase": "open",
                                  "trigger": {"quiet_s": row["ref_detail"]["trigger"]["quiet_s"],
