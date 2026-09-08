@@ -2935,6 +2935,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              # The thresholds in force, recorded per run.
                              "thresholds": _thresholds_in_force()})
             await auto_transition(ctl.enable())
+            # Owner decision 2026-09-08: the questions the CDS has already
+            # proposed are in the queue from the toggle, so the first ask
+            # does not wait for a fresh pass (a no-op on an empty agenda).
+            await _seed_queue()
             if not entry["disclosed"]:
                 prepared = await auto_issue(auto_mode.PhraseUtterance("disclosure"),
                                             phase=ctl.phase, trigger={"via": "auto_enable"})
@@ -3768,6 +3772,29 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     merged["added"], merged["refreshed"], merged["discarded"],
                     merged["dropped_absent"], merged["capped"], merged["pending"])
         return events
+
+    async def _seed_queue() -> None:
+        """Seed the queue at toggle-on (owner decision 2026-09-08). When the
+        doctor switches auto mode on and the current agenda already holds
+        questions_to_ask — passes landed while the machine was OFF are the
+        doctor's panel and never merged — they are merged at once as a
+        pass with the current agenda version, so the first ask after the
+        golden exit comes from the queue's head rather than waiting for
+        the exit's own pass. Audited auto.queue_merged with seeded=true.
+        An empty agenda (auto pressed at the very start) is a no-op. The
+        queue is also the asked-memory and lives for the session, so at a
+        toggle off and on the seed's copy of an asked question is
+        discarded like any pass's — asked stays asked."""
+        auto = entry["auto"]
+        current = entry["agenda"].current
+        if auto is None or current is None or not current.questions:
+            return
+        events = auto["queue"].merge(current.version, list(current.questions))
+        merged = events[0]
+        logger.info("Live session %s: queue seeded at toggle-on from v%d — added %d, refreshed %d, "
+                    "discarded %d, pending %d", session_id, current.version, merged["added"],
+                    merged["refreshed"], merged["discarded"], merged["pending"])
+        await _audit_queue_events(events, {"seeded": True})
 
     async def _push_standing(assessment_version: int | None) -> None:
         """The persistent pending-actions strip (owner decision 2026-09-07,

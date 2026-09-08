@@ -42,6 +42,18 @@ def pending_texts(s):
     return [i.text for i in s.auto["queue"].pending]
 
 
+def _toggle_on_through_the_invitation(s):
+    """The tap's half of to_golden(): auto on after the disclosure was given
+    by hand, the invitation played through, the machine in GOLDEN."""
+    from auto_harness import _collect_until
+    s.toggle(True)
+    seen = _collect_until(s.ws, {"auto_toggled"})
+    invitation = next(m for m in seen if m.get("type") == "auto_speak")
+    s.play(invitation["utterance_id"])
+    s.probe()
+    assert s.phase.value == "golden"
+
+
 # ==========================================================================
 # Item 1: one queue per session; every pass that lands while auto mode is on merges
 
@@ -474,47 +486,52 @@ def test_a_tap_on_a_pending_item_consumes_it_by_tap_and_alba_continues_from_the_
 
 def test_a_tap_on_a_novel_question_is_recorded_asked_and_a_later_pass_proposing_it_is_discarded(gate):
     """D-E, the other half: the doctor taps a question from a panel version
-    the queue never merged (landed before the machine was on). It is
-    recorded asked (auto.queue_asked_externally, by=tap), its answer
-    marks it answered, and when the next pass proposes the same words
-    they are discarded at the merge — never asked by Alba."""
+    the queue never held. Since the toggle-on seed (owner decision
+    2026-09-08) the CURRENT agenda is in the queue from the toggle, so the
+    never-held question comes from an older version the seed did not
+    take. It is recorded asked (auto.queue_asked_externally, by=tap), its
+    answer marks it answered, and when the next pass proposes the same
+    words they are discarded at the merge — never asked by Alba."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
-    engine.agendas = [[Q_NAUSEA], [Q_ONSET], [Q_NAUSEA, Q_SLEEP]]
+    engine.agendas = [[Q_NAUSEA], [Q_ONSET], [Q_SLEEP], [Q_NAUSEA, Q_SLEEP]]
     with live(gate) as s:
         queue = s.auto["queue"]
         s.disclose()
-        stale = s.land_pass()                          # v1 lands with the machine OFF: not merged
+        stale = s.land_pass()                          # v1 [Q_NAUSEA], machine OFF: not merged
+        current = s.land_pass()                        # v2 [Q_ONSET], OFF: the agenda the toggle seeds from
         assert queue.items == ()
-        s.toggle(True)
-        from auto_harness import _collect_until, _until
-        seen = _collect_until(s.ws, {"auto_toggled"})
-        invitation = next(m for m in seen if m.get("type") == "auto_speak")
-        s.play(invitation["utterance_id"])
-        s.probe()
-        assert s.phase.value == "golden"
-        s.to_open()                                    # v2 [Q_ONSET] merges
-        first = s.wait_for_auto_speak()
+        _toggle_on_through_the_invitation(s)
+        assert pending_texts(s) == [Q_ONSET] and queue.find(Q_NAUSEA) is None, "v1's question was never held"
+        s.to_open()
+        first = s.wait_for_auto_speak()                # the seeded head, planned at the exit
+        assert first["text"] == "Can you tell me more about the chest pain?"
         s.play(first["utterance_id"])
+        wait_for_pass(s, 3)                            # v3 [Q_SLEEP] has landed: nothing in preparation
         import json
+        from auto_harness import _until
         s.ws.send_text(json.dumps({"type": "speak", "ref": {
-            "kind": "cds_question", "assessment_version": stale, "index": 0}}))   # Q_NAUSEA, never merged
+            "kind": "cds_question", "assessment_version": stale, "index": 0}}))   # Q_NAUSEA, never held
         ready = _until(s.ws, {"speak_ready"})
         recorded = queue.find(Q_NAUSEA)
         assert recorded is not None and recorded.status is ItemStatus.ASKED
-        assert recorded.rank == -1 and not queue.has_pending
+        assert recorded.rank == -1 and pending_texts(s) == [Q_SLEEP]
         s.play(ready["utterance_id"])
         s.turn_end("No, not sick at all.")
         assert recorded.status is ItemStatus.ANSWERED
-        nxt = s.wait_for_auto_speak()                  # v3 proposes Q_NAUSEA again: discarded
+        nxt = s.wait_for_auto_speak()
         assert nxt["text"] == "Can you tell me more about your sleep?"
+        wait_for_pass(s, 4)                            # v4 proposes Q_NAUSEA again: discarded
+        assert recorded.status is ItemStatus.ANSWERED and queue.find(Q_NAUSEA) is recorded
         _stop(s)
     ext = _audit("auto.queue_asked_externally", s.session_id)
     assert len(ext) == 1 and ext[0]["text"] == Q_NAUSEA and ext[0]["by"] == "tap"
     assert ext[0]["version"] == stale and ext[0]["utterance_id"] == ready["utterance_id"]
     merges = _audit("auto.queue_merged", s.session_id)
-    assert merges[-1]["version"] == 3 and merges[-1]["discarded"] == 1
-    assert merges[-1]["discarded_items"][0]["text"] == Q_NAUSEA
+    assert merges[0]["version"] == current and merges[0]["seeded"] is True
+    v4 = next(m for m in merges if m["version"] == 4)
+    nausea = next(d for d in v4["discarded_items"] if d["text"] == Q_NAUSEA)
+    assert nausea["id"] == recorded.id and nausea["status"] == "answered"
     assert Q_NAUSEA not in [c["text"] for c in _audit("auto.queue_consumed", s.session_id)]
 
 
@@ -616,3 +633,95 @@ def test_every_auto_question_carries_its_turn_end_to_issue_and_turn_end_to_speec
     assert ours[0]["queue_item"] == "q2" and ours[0]["text"] == row["text"]
     # The first question followed the golden exit's turn end and has its own row too.
     assert any(l["utterance_id"] == first["utterance_id"] for l in latency)
+
+
+# ==========================================================================
+# Slice 3, item 1: the queue is seeded at toggle-on (owner decision 2026-09-08)
+
+def test_toggle_on_with_a_non_empty_agenda_seeds_the_queue_and_the_first_ask_needs_no_pass(gate):
+    """Owner decision 2026-09-08: a pass that landed while the machine was
+    OFF is the doctor's panel and never merged — but at toggle-on the
+    current agenda's questions are merged at once as a pass with the
+    current version (auto.queue_merged, seeded=true). With every later
+    pass held, the golden exit's ask comes from the seeded head: the
+    first question no longer waits for the exit's own pass."""
+    import asyncio
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.disclose()
+        version = s.land_pass()                        # machine OFF: the panel only
+        assert s.auto["queue"].items == ()
+        gate_event = s.ws.portal.call(asyncio.Event)
+        engine.gate_event = gate_event                 # hold every pass from here
+        passes_before = len(engine.updates)
+        _toggle_on_through_the_invitation(s)
+        assert pending_texts(s) == [Q_ONSET, Q_SLEEP], "seeded at the toggle"
+        assert s.auto["queue"].last_version == version
+        s.to_open()                                    # the hand-back: the exit's turn end
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about the chest pain?"
+        assert len(engine.updates) == passes_before, "asked with no pass landed since the toggle"
+        assert s.auto["queue"].find(Q_ONSET).status is ItemStatus.ASKED
+        s.ws.portal.call(gate_event.set)
+        _stop(s)
+    rows = _audit("auto.queue_merged", s.session_id)
+    assert rows[0]["seeded"] is True
+    assert rows[0]["version"] == version and rows[0]["added"] == 2 and rows[0]["pending"] == 2
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert consumed[0]["text"] == Q_ONSET and consumed[0]["version"] == version
+
+
+def test_toggle_on_with_an_empty_agenda_seeds_nothing_and_the_golden_window_is_unchanged(gate):
+    """Auto pressed at the very start: no agenda yet, so the seed is a
+    no-op — no items, no auto.queue_merged row — and the golden window
+    begins exactly as before, at the invitation's speak_ended, with
+    nothing spent and the window not run."""
+    with live(gate) as s:
+        s.to_golden()
+        assert s.auto["queue"].items == () and s.auto["queue"].last_version is None
+        assert s.auto["golden_spent"] == 0.0 and s.auto["golden_window_ran"] is False
+        assert s.auto["queued"] is None and s.auto["plan_task"] is None
+        _stop(s)
+    assert _audit("auto.queue_merged", s.session_id) == []
+    phases = _audit("auto.phase", s.session_id)
+    golden = [p for p in phases if p["to"] == "golden"]
+    assert len(golden) == 1 and golden[0]["from"] == "invitation"
+    assert golden[0]["trigger"] == "invitation_completed"
+
+
+def test_toggle_off_and_on_keeps_asked_items_asked_and_the_seed_discards_them(gate):
+    """The queue survives a toggle off and on as the asked-memory (slice-2
+    decision, kept): the seed at the second toggle-on is a merge like any
+    other, so the current agenda's copy of a question asked in the first
+    run is DISCARDED, not re-added, and only the unasked question is
+    pending for the new run."""
+    from auto_harness import _until
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        item = queue.find(Q_ONSET)
+        assert item.status is ItemStatus.ASKED
+        wait_for_pass(s, 1)                            # the exit's pass: v1 is [Q_ONSET, Q_SLEEP]
+        s.toggle(False)
+        assert _until(s.ws, {"auto_toggled"})["on"] is False
+        assert s.phase.value == "off" and item.status is ItemStatus.ASKED
+        s.toggle(True)                                 # disclosure given, invitation done: GOLDEN at the toggle
+        assert _until(s.ws, {"auto_toggled"})["on"] is True
+        assert s.phase.value == "golden"
+        assert item.status is ItemStatus.ASKED, "asked stays asked across the toggle"
+        assert pending_texts(s) == [Q_SLEEP]
+        _stop(s)
+    merges = _audit("auto.queue_merged", s.session_id)
+    seeded = [m for m in merges if m.get("seeded")]
+    assert len(seeded) == 1
+    assert seeded[0]["version"] == 1 and seeded[0]["discarded"] == 1 and seeded[0]["refreshed"] == 1
+    assert seeded[0]["discarded_items"] == [{"id": item.id, "text": Q_ONSET, "status": "asked"}]
+    assert all("seeded" not in m for m in merges if m is not seeded[0])
