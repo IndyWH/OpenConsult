@@ -14,10 +14,11 @@ re-asks of an answered question — by construction, not by prompt.
 ## 1. What changes
 Today the agenda is replaced wholesale by every pass, and in strict mode
 Alba cannot ask until the replacement lands. New: one persistent queue
-per session. Passes merge into it; Alba consumes from its head; a tiny
-re-ranker keeps it current between passes. The urgency check, the
-transcript-exclusion guarantee, the pause banner and the note pipeline
-are untouched.
+per session. Passes merge into it (and the current agenda seeds it when
+auto mode is switched on — owner decision 2026-09-08); Alba consumes
+from its head; a tiny re-ranker keeps it current between passes. The
+urgency check, the transcript-exclusion guarantee, the pause banner and
+the note pipeline are untouched.
 
 ## 2. The queue
 Each item: id, text, normalised key (the E3 normaliser), topic
@@ -55,19 +56,49 @@ Operations:
 Baseline order without a re-rank: the latest pass's own order for the
 items it listed, then the unlisted pending items in their previous order.
 
-## 3. The re-ranker
-A stateless call in the affect/topic-call shape. Input: the pending
-texts (ids attached) and the transcript since the last full pass,
-bounded (D-B). Instruction: return the ids still worth asking, in the
-best order for this moment; drop any the patient has already addressed
-in the excerpt — a question counts as answered when its subject was
-addressed, even if not every example in it was named (the parenthetical
-lesson); never write a new question. Output: ordered ids + drop list.
-Timeout AUTO_RERANK_TIMEOUT_S (2 s), fail-soft to the current order,
-audited auto.rerank_failed. Guarantee, code-enforced: any output that is
-not a known pending id is ignored — the re-ranker cannot invent.
+## 3. The re-ranker (BUILT, slice 3, 2026-09-08)
+A stateless call in the affect/topic-call shape — `CDSEngine.rerank` in
+`app/cds.py`, NEVER RAISES. Input: the pending texts (ids attached, head
+first) and the committed transcript since the last full pass LANDED,
+bounded (D-B): at most AUTO_RERANK_CONTEXT_TURNS (6) turns, cut to
+AUTO_RERANK_MAX_CHARS (1500, an uncalibrated guess) from the front so the
+most recent words survive. Instruction, in the prompt text: return the
+ids still worth asking, in the best order for this moment; drop any the
+patient has already addressed in the excerpt — a question counts as
+answered when its subject was addressed, even if not every example in it
+was named (the parenthetical lesson); never write a new question; use
+only the ids given. Output, by JSON schema: ordered ids + a drop list
+with a one-word reason each (held to one word in code). Timeout
+AUTO_RERANK_TIMEOUT_S (2 s) end to end, output cap AUTO_RERANK_MAX_TOKENS
+(200; a cap hit is a failed call, never a truncated answer), fail-soft to
+the current order, audited auto.rerank_failed with the reason and
+elapsed_ms. Guarantee, code-enforced in `AgendaQueue.apply_rerank`: any
+output that is not a known pending id is ignored and listed in the audit
+row — the re-ranker cannot invent, resurrect or touch an asked question.
+A drop marks the item dropped with the re-ranker's reason; a dropped item
+is a fresh proposal if a later pass raises it again (slice-1 decision).
 
-When: after each answered turn, unless a full pass is in flight (D-F).
+When: after each answered turn end, if at least two items are pending
+(one is nothing to order: no call, no row) and no full pass is in flight
+(D-F: skipped, audited auto.rerank_skipped with reason pass_in_flight
+and the version the pass will land as; the ask is planned from the head
+at once). No committed turn since the last landed pass is also a skip
+(reason no_new_turns). Otherwise the next ask is planned AFTER the
+verdict — the head Alba asks next is chosen after what the patient just
+said — so the re-ranker holds the ask by at most its timeout; the full
+pass requested at the same turn end launches behind it on Ollama's
+single slot, never ahead of it. The verdict is applied and the plan made
+in the same step the call returns, before any audit write. If a question
+was planned while the call was out (the pass landing first — its merge
+supersedes the verdict and the merged head is planned at once; a doctor's
+tap; RESUME), the planned item is protected — not dropped, kept first —
+and the verdict shapes the rest of the queue (`protected` and
+`protected_dropped_by_verdict` on the audit row). A doctor's tap, a
+pause, auto off and a handover cancel a re-rank in flight.
+
+Every re-ranker call is audited model.call (§7a) with kind=rerank,
+queued_ms, run_ms, elapsed_ms, tokens {prompt, output}, outcome,
+pass_in_flight — the shape slice 6 extends to the other calls.
 
 ## 4. Cadence (D-C)
 (a) Full pass on every answer as now; the queue makes asking
@@ -119,9 +150,13 @@ question the doctor sees may already be asked or dropped in the queue.
 The tap guard and the tapped examination handover are unchanged.
 
 ## 7. Audit and the number to beat
-auto.queue_merged (added / refreshed / discarded, version),
-auto.queue_reranked (order, drops, ms), auto.queue_consumed (item, by
-auto or tap), auto.rerank_failed, auto.queue_capped. Built (slice 2)
+auto.queue_merged (added / refreshed / discarded, version; seeded=true
+for the merge at toggle-on), auto.queue_reranked (before, order, drops
+with reasons, ignored, unmentioned, ms, excerpt_turns, excerpt_chars,
+protected), auto.queue_consumed (item, by auto or tap),
+auto.rerank_failed (reason, outcome, elapsed_ms), auto.rerank_skipped
+(pass_in_flight | no_new_turns), auto.queue_capped, and model.call for
+every re-ranker call (§3, §7a). Built (slice 2)
 with the rest the module reports: auto.queue_dropped_absent,
 auto.queue_answered, auto.queue_requeued, auto.queue_dropped,
 auto.queue_asked_externally — each with the module's flat details, the
@@ -196,7 +231,12 @@ rather than impressions.
    2026-09-08 (six commits; HANDOVER entry of that date), with the
    tap's half of D-E, the per-question latency numbers and the D-C (a)
    cadence pin pulled forward from slices 4 and 5.
-3. Re-ranker call, fail-soft, no-invention guard, audit.
+3. Re-ranker call, fail-soft, no-invention guard, audit. BUILT
+   2026-09-08 (six commits; HANDOVER entry of that date), with two owner
+   decisions of 8 Sept from slice 2's findings — the queue is seeded from
+   the current agenda at toggle-on; possessives are stop words in the
+   shared normaliser (`your tablets` and `your sleep` are two topics) —
+   and the model.call audit for the re-ranker pulled forward from slice 6.
 4. Panel and taps.
 5. Cadence flag, urgency-cadence pin, HANDOVER, spec truth-ups, help/
    flags.

@@ -6587,3 +6587,243 @@ still shapes what the model believes; D10 (the politeness abort) is
 still unexercised in the room — and now moves a queue item, so the
 next abort in a real run is worth reading in the trail; banner
 visibility; the felt length of the 90 s window.
+
+## Standing question queue — slice 3 of 7, the re-ranker, built (2026-09-08)
+
+**What landed.** Slice 3 of the owner-approved standing question queue
+(`AGENDA_QUEUE_SPEC.md` §3, D-B, D-F, §7, §9 item 3; owner's prompt of
+8 Sept, six items, one commit each), plus the two owner decisions of
+8 Sept taken from slice 2's findings. `AUTO_MODE_ENABLED` is untouched
+and `.env` reads `false`; `PHASE_7C_EVAL_PREREG.md`, `help/`, `vendor/`
+and `OPEN_CLOSED_RULE.md` untouched. **Needs a restart to be live** (the
+owner's act) — and, as with slice 2, live only behind the flag: with the
+flag down `entry["auto"]` is `None` and nothing here runs. The stop-word
+change (item 2) is in the shared normaliser, which only auto mode and
+the queue read.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `99022a9` | the queue is seeded from the current agenda at toggle-on (owner decision 2026-09-08); `auto.queue_merged` with `seeded: true` | 1043 → 1046 |
+| 2 | `10523d5` | possessives are stop words (owner decision 2026-09-08); the two-topic pin; every ratchet test unchanged | 1046 → 1047 |
+| 3 | `7166bca` | `CDSEngine.rerank` — the call in the topic call's shape, schema, prompt, excerpt builder, `AUTO_RERANK_MAX_TOKENS` and `AUTO_RERANK_MAX_CHARS`; 19 stubbed-chat tests | 1047 → 1066 |
+| 4 | `e8d6753` | the wiring: after each answered turn, fail-soft, the no-invention guard, the race; `auto.queue_reranked`, `auto.rerank_failed`, `auto.rerank_skipped`, `model.call` | 1066 → 1072 |
+| 5 | `6776250` | GPU priority, the minimum: the pin that a re-ranker call is never issued while a pass runs, and every call is a `model.call` row | 1072 → 1073 |
+| 6 | (this commit) | `AGENDA_QUEUE_SPEC.md` §1, §3, §7, §9 and `PHASE_7C_SPEC.md` §6, §7, §9, §10, §11, §12 truth-ups; this entry; `help/` flags | 1073 |
+
+Final suite: **1073 passed** (from 1043 at `473daea`), run as
+`AUTO_MODE_ENABLED=false uv run pytest`. Commits 1–3 are independent and
+were verified by their own files each and by one full run with all
+three in the tree (1066); commits 4 and 5 each had their own full run
+green before them. Every commit message carries the why; this entry
+carries the decisions and the seams.
+
+**The two owner decisions, restated (2026-09-08):**
+
+1. **Seed the queue at toggle-on.** When the doctor switches auto mode
+   on and the current agenda already holds `questions_to_ask`, they are
+   merged into the queue at once as a pass with the current agenda
+   version, so the first ask after the golden exit comes from the
+   queue's head and does not wait for the exit's own pass. An empty
+   agenda at toggle-on is a no-op. The queue still lives for the session
+   across a toggle off and on as the asked-memory (slice-2 decision,
+   kept): the seed's copy of an asked question is discarded like any
+   pass's, so asked stays asked.
+2. **Possessives and articles are stop words.** your, my, his, her,
+   their, our, its join `ACTION_STOP_WORDS` (the articles were already
+   there). "your tablets" and "your sleep" now share no token (0.0; it
+   was 0.636, above the 0.6 topic threshold, so the tablets were asked
+   verbatim once sleep had been opened). The normaliser is shared by
+   the ratchet, the queue's exact match and the cone: the whole suite
+   was re-run and every existing ratchet test is unchanged — the 485
+   pairs still score 0.64 and 0.778; no threshold arithmetic moved.
+
+**What is now live behind the flag (after a restart).**
+
+- The toggle seeds the queue (`_seed_queue`, after `ctl.enable()`).
+- After each ANSWERED turn end in the question phases, if at least two
+  items are pending and no full pass is in flight, `CDSEngine.rerank`
+  runs on the pending (id, text) pairs and the committed turns since the
+  last LANDED pass (at most `AUTO_RERANK_CONTEXT_TURNS`, cut to
+  `AUTO_RERANK_MAX_CHARS` from the front), and **the next ask is planned
+  after its verdict** — the head Alba asks next is chosen after what the
+  patient just said. Bounded by `AUTO_RERANK_TIMEOUT_S` (2 s) with
+  `AUTO_RERANK_MAX_TOKENS` (200) as the cap; a timeout, error, cap hit or
+  malformed reply leaves the order standing (`auto.rerank_failed`; a cap
+  hit is also `cds.runaway`). The verdict is applied through
+  `AgendaQueue.apply_rerank`: pending items only, unknown ids ignored and
+  listed (`auto.queue_reranked`: before, order, drops with the
+  re-ranker's one-word reasons, ignored, unmentioned, ms, excerpt size,
+  the protected item). A drop marks the item dropped; it re-enters
+  afresh if a later pass raises it (slice-1 decision).
+- A pass in flight at the turn end (D-F): no call, `auto.rerank_skipped`
+  with `reason: pass_in_flight` and the version the pass will land as,
+  and the ask is planned from the head at once, as slice 2 left it. No
+  committed turn since the last landed pass: skipped, `no_new_turns`.
+  One pending item: nothing to order, no call, no row.
+- Every re-ranker call is `model.call` (shape below). The four re-rank
+  settings are in the per-run thresholds record (`auto.enabled`).
+- The indicator's "preparing" state and the guarded tap's "planned"
+  both count a re-rank in flight; a doctor's tap, an urgency pause, auto
+  off and a handover cancel it (the tap's answer re-ranks afresh).
+
+**The race, and how it is handled** (the prompt asked for this here).
+By design nothing is planned when the verdict lands, because the plan
+waits for it. Three things can still plan a question while the call is
+out: the full pass requested at the same turn end landing first (a fast
+pass, a slow re-rank) — its merge supersedes the verdict (D-F's own
+logic) and `_ask_after_pass` plans from the merged head at once; a
+doctor's tap that consumed an item (which also cancels the re-rank);
+RESUME AUTO planning from the head. When the verdict then lands, the
+planned item is **protected**: removed from the drops and put first in
+the order, so the verdict shapes the rest of the queue and never
+displaces a question whose words may already be audio; the row carries
+`protected` and `protected_dropped_by_verdict`. A late verdict computed
+on the pre-merge pending set still applies to the post-merge queue: ids
+are stable, and items it never saw are "unmentioned" and keep their
+order after the ones it named. One seam found by the full suite: the
+first cut wrote the `model.call` row BEFORE applying the verdict, and
+under the suite's slower database the pass landed inside that await and
+planned the un-re-ranked head. The verdict is now applied and the plan
+made in the same step the call returns, and the audit rows are written
+after — the slice-2 pattern (merge before alarm, rows after). A test
+pins the race with the pass gated to land mid-re-rank and a verdict
+that would have dropped the planned item.
+
+**Where the prompt or spec did not fully decide, and what the code
+does — for the owner and Cowork to confirm or overrule:**
+
+- **The plan waits for the verdict.** "The re-ranker must not delay the
+  ask" could be read two ways: (A) re-rank, then plan — the ask is held
+  by at most the timeout; or (B) re-rank and plan in parallel — the
+  verdict only ever shapes the question after next. Built (A), because
+  spec §6 says the preparing state "covers re-rank plus synthesis",
+  slice 2 placed the re-rank "before the topic call", and under (B) the
+  immediate next question could be one the patient has just addressed —
+  the thing the re-ranker exists to prevent. The cost is on the number
+  to beat: `turn_end_to_issue_ms` now includes the re-rank (~1 s warm,
+  2 s at worst) before the topic call; the 486 baseline is 27.7 s. If
+  the owner prefers (B), the change is one line in `_request_revision`
+  (plan first, then start the re-rank) and the protection logic already
+  handles the verdict landing on a planned item.
+- **The skip is its own row** (`auto.rerank_skipped`), chosen over a
+  field on the next `auto.queue_reranked` row, which might never come.
+- **The pass requested at the same turn end is not held back** for the
+  re-ranker: it launches on the next tick, so on Ollama's single slot
+  the two calls queue re-ranker first. The re-ranker is therefore never
+  behind a pass, but the pass is behind the re-ranker by ~1 s. A
+  scheduler with teeth is slice 6.
+- **"Since the last full pass landed"** is the transcript parts after the
+  count recorded when that pass was LAUNCHED (what it actually saw); a
+  failed (runaway) pass does not move the mark.
+- **A re-ranker drop does not stick under cadence (a).** Every answer's
+  pass may re-propose a just-dropped question, which re-enters as a new
+  item (slice-1 decision, unchanged); the drop's practical effect is on
+  the ask planned at that turn end, which is the ask that matters. If
+  the owner wants drops to hold, the alternatives are the slice-1 one (a
+  re-ranker drop treated like answered — extending the never-re-enter
+  guarantee to a model's judgement) or a dropped-by-re-ranker memory for
+  N passes. To read in the first run's `auto.queue_reranked` and
+  `auto.queue_merged` rows before deciding.
+- **The reason is held to one word in code** (`cds.one_word`: the first
+  alphabetic word, lower case; "addressed" when there is none), whatever
+  the model writes.
+- **`apply_rerank`'s `before`** now records the order the verdict was
+  applied to, drops included; it was read after the drops had left the
+  order (the module test's case had no drops, so nothing was pinned
+  wrongly).
+- **`AUTO_RERANK_TIMEOUT_S` moved** from `app/main.py` to `app/cds.py`,
+  where the call is, like the topic timeout; `AUTO_RERANK_CONTEXT_TURNS`
+  and `AUTO_RERANK_MAX_CHARS` stay with the wiring that builds the
+  excerpt. `AUTO_RERANK_MAX_TOKENS` (200) and `AUTO_RERANK_MAX_CHARS`
+  (1500) are UNCALIBRATED GUESSES, marked so in `.env.example`.
+- **Tests repinned by decision** (each docstring names it): the D-E
+  "novel tap" test's never-held question now comes from an older
+  version the seed did not take (the current agenda IS held from the
+  toggle); the slice-2 "planned at the turn end" assertion accepts the
+  re-rank task as the plan's first step (the pass is still held and the
+  question still asked with it in flight); the slice-2 one-pass-per-
+  answer pin is extended, not changed (the urgency check still runs
+  exactly once per answer; the re-ranker once beside it). Nothing
+  weakened or deleted. Both scripted engines gain `rerank()` with
+  scripted verdicts and a gate.
+
+**The `model.call` shape** (`AGENDA_QUEUE_SPEC.md` §7a; the re-ranker
+first, every call in slice 6): `kind` (`rerank` now; `officer`, `topic`,
+`assessment`, `urgency`, `affect` to follow), `queued_ms` (from the
+decision to call to the request leaving — 0 until slice 6's scheduler
+holds calls back), `run_ms` (the server's own total for the call when it
+reports one — Ollama's `total_duration` — else the HTTP round trip),
+`elapsed_ms` (the round trip), `tokens` (`{prompt, output}` from
+`prompt_eval_count` / `eval_count`, or null), `outcome` (`ok | timeout |
+cap | malformed | error`) with `failed` (the reason) when not ok,
+`model`, `pass_in_flight` (whether a full pass held the slot when the
+call was issued — false for the re-ranker by construction), the session
+and `at_audio_s`. `CDSEngine._chat` now wraps `_chat_raw`, which returns
+the reply and this metadata, so the other calls can be moved onto the
+row without touching their prompts.
+
+**`help/`: NOT edited.** The sentence this slice makes untrue, and the
+sentences slice 2 flagged, all for the owner's wording after slice 4:
+
+- `help/04-the-architecture.md`: "MedGemma 27B does the differential,
+  the red-flag watch, the guideline summaries, the note and the letters
+  — and, when auto mode is enabled, the two small judgements that pace
+  the spoken interview: has the patient finished speaking, and what a
+  question is about." — now three: the third is which of the waiting
+  questions is still worth asking, and in what order, after each answer.
+- `help/01-a-consultations-journey.md` §2: "Each update *revises* the
+  previous one under rules: condition names stay put, reasoning must
+  absorb new evidence, answered questions drop off the list." — still
+  true of the assessment's own list; incomplete for auto mode (slice 2).
+- `help/01-a-consultations-journey.md` §3: "the app can conduct the
+  history-taking itself, inviting, encouraging and asking questions of
+  its own choosing" — incomplete: its choosing is the head of a standing
+  queue that every pass feeds, re-sorted after each answer (slice 2, and
+  now the re-ranker).
+- `help/02-using-it-step-by-step.md` step 5: "**Questions to ask.**
+  Suggestions that update as the conversation moves. Tap the small
+  speaker icon and the assistant asks that question aloud" — still true
+  of the panel; incomplete for the tap's effect on the queue (slice 2).
+- `help/02-using-it-step-by-step.md` step 3: "The transcript streams
+  in, questions come and go as they are answered" — true of the panel;
+  the assistant's own asking no longer waits for the assessment (slice 2).
+- `help/02-using-it-step-by-step.md` step 3: "it invites, listens,
+  encourages and asks aloud, one question at a time, while you
+  supervise" — still true.
+
+**The slices ahead (spec §9):**
+
+4. Panel and taps — the questions-to-ask panel shows `snapshot()`
+   (pending in order, asked struck through, dropped hidden and
+   expandable — a re-ranker drop with its reason now among them); a tap
+   on a queue item consumes it (the tap path already does); the
+   preparing state covers re-rank plus synthesis (the indicator already
+   counts the re-rank). `help/01` §2/§3, `help/02` step 5 and `help/04`
+   for the owner's wording.
+5. Cadence flag (D-C (b): full pass every second answer, re-rank every
+   answer) and the pin that the urgency check runs on its own call at
+   every answered turn whatever the cadence. Under (b) the re-ranker's
+   drops would hold for a whole answer, which is where its value should
+   show; the measurement is the next solo run's
+   `auto.question_latency` against 27.7 s.
+6. GPU discipline (§7a, D-G) — `model.call` for every call (the shape
+   above); the resident live set as an invariant with
+   `model.load_during_live`; the priority scheduler (urgency, then the
+   short conversational calls — officer, topic, re-ranker — then the
+   full pass, then speculation), which is where `queued_ms` becomes a
+   number and the pass stops queuing behind nothing; the second Ollama
+   slot as a measurement experiment only.
+7. Speculative pass during the patient's answer, behind a flag, once
+   the queue's own effect is measured.
+
+**Watch list, carried forward and added:** the re-ranker's judgement —
+read every `auto.queue_reranked` row of the first solo run against the
+transcript (does it drop what was addressed, and only that?), which is
+`evals/` material, not a unit test; the added second on the number to
+beat (`turn_end_to_issue_ms` now includes the re-rank — compare against
+slice 2's per-question rows); the two uncalibrated guesses (`AUTO_RERANK_
+MAX_TOKENS`, `AUTO_RERANK_MAX_CHARS`); the CDS reading its own
+parenthetical literally (harmless to the flow; the re-ranker's prompt
+now carries the lesson explicitly for the pending questions); D10 (the
+politeness abort) still unexercised; banner visibility; the felt length
+of the 90 s window.

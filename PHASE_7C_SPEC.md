@@ -342,7 +342,13 @@ asked-and-answered list and `auto.reask_suppressed` are retired.)
 **The cone's topic identity** (D3 above) uses the same normaliser with
 its own threshold, `AUTO_TOPIC_MATCH_THRESHOLD` (default 0.6): "this
 chest pain" and "the pain" are one topic, and the chest pain is opened
-once.
+once. **Possessives are stop words** (owner decision 2026-09-08, after
+slice 2 of the standing question queue found the matcher conflating
+"your X" topics): your, my, his, her, their, our and its carry nothing
+in the shared normaliser, so "your tablets" and "your sleep" share no
+token and are two topics — before, they scored 0.636 and the tablets
+were asked verbatim once sleep had been opened. The ratchet's pairs
+(§7) are unchanged by it.
 
 **HANDOVER.** When the agenda is empty after a revision, or the
 doctor taps Handover: speak the anything-else follow-up once, take
@@ -439,7 +445,9 @@ tapped question. A candidate action is now the same pending action if a
 normalised comparison matches an already-pending or already-acknowledged
 action: lower-cased, punctuation and whitespace stripped, a small
 stop-word list removed (urgency and hedging words, "do it" verbs,
-articles, "bedside"), and a token-set similarity at or above
+articles, "bedside" — and, from 2026-09-08, possessives; the same
+normaliser serves the cone and the queue, §6), and a token-set
+similarity at or above
 `AUTO_ACTION_MATCH_THRESHOLD` (default 0.6; `app/auto_mode.py`,
 `match_action`, stdlib only). A reworded action does not re-pause inside
 the one answer's chance; only a genuinely new action does, and it still
@@ -496,12 +504,16 @@ v1 remedy, as with #469.
 - Encourager < 1 s: fixed phrases are pre-synthesised into the disk
   cache at service start (cache hit = 0 ms synth; play command is a
   WS message and a cached fetch).
-- Question ≤ ~2 s from end-of-turn: the next question is planned from
-  the standing queue's head at the turn end (topic call ~1 s, then
-  synthesis, a cache hit when pre-synthesised); what remains is
-  playback start. The CDS pass is no longer in the gap (D2 as re-meant:
-  it runs in parallel and its merge shapes the ask after). 486's
-  baseline to beat is a 27.7 s mean from turn end to Alba speaking.
+- Question ≤ ~2 s from end-of-turn, plus the re-ranker: the next
+  question is planned from the standing queue's head at the turn end
+  (topic call ~1 s, then synthesis, a cache hit when pre-synthesised);
+  what remains is playback start. After an ANSWER the plan follows the
+  re-ranker's verdict (`AGENDA_QUEUE_SPEC.md` §3: bounded by
+  `AUTO_RERANK_TIMEOUT_S`, 2 s, ~1 s warm), so the head is chosen after
+  what the patient just said. The CDS pass is no longer in the gap (D2
+  as re-meant: it runs in parallel and its merge shapes the ask after).
+  486's baseline to beat is a 27.7 s mean from turn end to Alba
+  speaking.
 - The officer and topic calls reuse `CDS_NUM_CTX` so MedGemma is
   never reloaded (an `num_ctx` change costs ~4–10 s).
 - All thresholds in force are recorded per run, as the prereg
@@ -522,7 +534,15 @@ and `test_standing_rules.py` extends to the new controls.
   point. If the disclosure and invitation were already done
   manually, GOLDEN begins at the toggle, and the audit detail
   says so. (Owner decision 2026-08-16, replacing the earlier
-  disabled-until-disclosure rule.)
+  disabled-until-disclosure rule.) **The toggle seeds the standing
+  queue** (owner decision 2026-09-08): the current agenda's
+  `questions_to_ask` — passes landed while the machine was off are the
+  doctor's panel and never merged — are merged at once as a pass with
+  the current agenda version (`auto.queue_merged`, `seeded: true`), so
+  the first ask after the golden exit comes from the queue's head and
+  does not wait for the exit's own pass; an empty agenda is a no-op,
+  and a toggle off and on keeps asked items asked (the seed's copy is
+  discarded like any pass's).
 - **Phase indicator** on the status line while auto is on (Golden
   minutes / Open questions / Closed questions / Paused — urgent /
   Handing over), so the supervising doctor always knows what the
@@ -605,7 +625,14 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.queue_dropped` (the wiring gave an item up, with the reason) —
   `auto.reask_suppressed` (slice 3) is retired, the discard at the merge
   having taken its place (owner decision 2026-09-07, pilot 486 F4 and the
-  standing question queue),
+  standing question queue); `auto.queue_merged` carries `seeded: true`
+  for the merge at toggle-on (owner decision 2026-09-08); the re-ranker's
+  rows (`AGENDA_QUEUE_SPEC.md` §3, §7): `auto.queue_reranked` (before,
+  order, drops with reasons, ignored, ms, the protected item),
+  `auto.rerank_failed` (reason, outcome, elapsed_ms), `auto.rerank_skipped`
+  (`pass_in_flight` | `no_new_turns`) and `model.call` for every
+  re-ranker call (kind, queued_ms, run_ms, elapsed_ms, tokens, outcome,
+  pass_in_flight — the shape slice 6 of the queue extends to every call),
   the number to beat (`AGENDA_QUEUE_SPEC.md` §7): every auto question's
   `speech.requested` row and `system_utterance.ref_detail` carry
   `turn_end_to_issue_ms` from the turn end that permitted it, and
@@ -671,6 +698,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_OFFICER_MAX_TOKENS` / `AUTO_TOPIC_MAX_TOKENS` | `64` / `48` | The short calls' caps |
 | `CDS_ASSESSMENT_TIMEOUT_S` | `60` | The assessment call's own timeout (was 180) |
 | `AUTO_TOPIC_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot F4): the cone's token-set similarity for "the same topic" |
+| `AUTO_RERANK_TIMEOUT_S` / `AUTO_RERANK_MAX_TOKENS` / `AUTO_RERANK_CONTEXT_TURNS` / `AUTO_RERANK_MAX_CHARS` | `2.0` / `200` / `6` / `1500` | The standing queue's re-ranker (`AGENDA_QUEUE_SPEC.md` §3, D-B; slice 3, 2026-09-08): its timeout, output cap, and the excerpt's turns and characters; the cap and the characters are uncalibrated guesses. The queue's own numbers (`AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES`) are in that spec |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 
