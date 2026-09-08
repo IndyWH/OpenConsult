@@ -473,6 +473,7 @@ class AgendaQueue:
         their previous relative order after the ones it did.
         """
         now = self._clock()
+        before = list(self._order)          # the order the verdict was applied to, drops included
         pending = set(self._order)
         reasons: dict[str, str] = (dict(drop_ids) if isinstance(drop_ids, Mapping)
                                    else {str(i): "rerank" for i in drop_ids})
@@ -494,7 +495,6 @@ class AgendaQueue:
         for item_id in drops:
             self._drop(self._items[item_id], str(reasons[item_id] or "rerank"), now)
         rest = [i for i in self._order if i not in order and i not in drops]
-        before = list(self._order)
         self._order = order + rest
         self._renumber()
         return QueueEvent("queue_reranked", now, {

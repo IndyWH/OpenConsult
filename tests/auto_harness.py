@@ -26,7 +26,7 @@ from fastapi.testclient import TestClient
 from app import auth, auto_mode, consultations, speech, system_utterances
 from app import main as appmain
 from app.auto_mode import AutoPhase
-from app.cds import OfficerVerdict, TopicVerdict
+from app.cds import OfficerVerdict, RerankVerdict, TopicVerdict
 from app.transcription import SAMPLE_RATE
 
 
@@ -102,6 +102,14 @@ class ScriptedEngine:
         self.topic_calls: list[str] = []
         self.gate_event: asyncio.Event | None = None
         self.timeouts: list[float | None] = []   # the bound each ask came with (E4)
+        # The re-ranker (slice 3): scripted verdicts consumed in order, the
+        # last repeating; none scripted → a verdict that keeps the order.
+        # `rerank_gate`, when set, holds every re-rank call until released.
+        self.rerank_verdicts: list[RerankVerdict] = []
+        self.rerank_calls: list[tuple[list, str]] = []
+        self.rerank_during_pass: list[bool] = []   # was a full pass running when each call was issued?
+        self.rerank_gate: asyncio.Event | None = None
+        self.pass_in_flight = False
 
     async def end_of_turn(self, transcript, *, timeout_s=None):
         self.asked.append(transcript)
@@ -115,12 +123,26 @@ class ScriptedEngine:
             return TopicVerdict(None, failed="unusable: ''", elapsed_ms=7)
         return TopicVerdict(topic, elapsed_ms=9)
 
+    async def rerank(self, pending, excerpt):
+        self.rerank_calls.append((list(pending), excerpt))
+        self.rerank_during_pass.append(self.pass_in_flight)
+        if self.rerank_gate is not None:
+            await self.rerank_gate.wait()
+        if not self.rerank_verdicts:
+            return RerankVerdict(tuple(item_id for item_id, _ in pending), {}, elapsed_ms=5)
+        return (self.rerank_verdicts.pop(0) if len(self.rerank_verdicts) > 1
+                else self.rerank_verdicts[0])
+
     async def update(self, transcript, previous=None):
-        if self.gate_event is not None:
-            await self.gate_event.wait()
-        self.updates.append(transcript)
-        questions = self.agendas.pop(0) if len(self.agendas) > 1 else self.agendas[0]
-        return _assessment(questions, reasoning=f"pass {len(self.updates)}")
+        self.pass_in_flight = True
+        try:
+            if self.gate_event is not None:
+                await self.gate_event.wait()
+            self.updates.append(transcript)
+            questions = self.agendas.pop(0) if len(self.agendas) > 1 else self.agendas[0]
+            return _assessment(questions, reasoning=f"pass {len(self.updates)}")
+        finally:
+            self.pass_in_flight = False
 
 
 def _make_user(role: str = "doctor") -> dict:

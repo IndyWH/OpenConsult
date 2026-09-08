@@ -274,10 +274,12 @@ def test_with_a_pending_item_the_next_ask_is_planned_at_the_turn_end_before_the_
         topic_calls_before = len(engine.topic_calls)
         passes_before = len(engine.updates)
         s.turn_end("Tuesday night, quite suddenly.")   # the answer's turn end, in this probe
-        # Same event-loop turn as the turn end: the plan task already exists
-        # and the pass has been requested but has not landed.
+        # Same event-loop turn as the turn end: the ask is under way — since
+        # slice 3 its first step is the re-rank task, the plan following its
+        # verdict — and the pass has been requested but has not landed.
         assert s.auto["turn_ended"] is True
-        assert s.auto["plan_task"] is not None, "planned in _end_turn, not after on_fresh_agenda"
+        assert s.auto["plan_task"] is not None or s.auto["rerank_task"] is not None, \
+            "under way in _end_turn, not after on_fresh_agenda"
         assert s.auto["revision"] in ("requested", "running"), "the full pass is still requested (D-C a)"
         assert len(engine.updates) == passes_before, "the pass has not landed"
         nxt = s.wait_for_auto_speak()
@@ -305,7 +307,9 @@ def test_under_the_queue_exactly_one_full_pass_runs_per_answer(gate):
     requested on every answered turn end even though the ask never waits
     for it — so the urgency check (its own call inside the pass) runs
     exactly as often as before the queue. Three answers → three passes
-    after the golden exit's one."""
+    after the golden exit's one. Extended in slice 3: the re-ranker runs
+    once per answer beside it (two or more pending, no pass in flight)
+    and changes neither count — and never while a pass holds the slot."""
     assert appmain.AUTO_STRICT_REVISE is True
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
@@ -326,6 +330,11 @@ def test_under_the_queue_exactly_one_full_pass_runs_per_answer(gate):
     turn_ends = [t for t in _audit("auto.turn_ended", s.session_id) if t["answer"]]
     assert len(turn_ends) == 3
     assert len(engine.updates) == 4
+    assert len(engine.rerank_calls) == 3, "one re-rank per answer, none at the golden exit"
+    assert engine.rerank_during_pass == [False, False, False]
+    calls = _audit("model.call", s.session_id)
+    assert [c["kind"] for c in calls] == ["rerank"] * 3
+    assert all(c["pass_in_flight"] is False and c["outcome"] == "ok" for c in calls)
 
 
 def test_empty_rule_one_nothing_pending_and_a_pass_running_gives_one_bridge_and_waits(gate, monkeypatch):
@@ -725,3 +734,246 @@ def test_toggle_off_and_on_keeps_asked_items_asked_and_the_seed_discards_them(ga
     assert seeded[0]["version"] == 1 and seeded[0]["discarded"] == 1 and seeded[0]["refreshed"] == 1
     assert seeded[0]["discarded_items"] == [{"id": item.id, "text": Q_ONSET, "status": "asked"}]
     assert all("seeded" not in m for m in merges if m is not seeded[0])
+
+
+# ==========================================================================
+# Slice 3, item 4: the re-ranker wired — after each answered turn, fail-soft,
+# the no-invention guard, the race with a planned item (spec §3, D-B, D-F)
+
+from app.cds import RerankVerdict  # noqa: E402
+
+
+def _first_answer_setup(s, engine):
+    """GOLDEN → OPEN by a hand-back; the exit's ask (Q_ONSET, the head)
+    issued and played; the exit's pass landed. The next turn end is the
+    first ANSWER's — the first moment the re-ranker runs."""
+    s.to_golden()
+    s.to_open()
+    first = s.wait_for_auto_speak()
+    assert first["text"] == "Can you tell me more about the chest pain?"
+    wait_for_pass(s, 1)
+    s.play(first["utterance_id"])
+    return first
+
+
+def _probe_until(s, predicate, tries=60):
+    for _ in range(tries):
+        s.probe()
+        if predicate():
+            return
+        time.sleep(0.03)
+    raise AssertionError("condition not reached")
+
+
+def test_a_verdict_reorders_the_pending_items_and_drops_one_with_its_reason(gate):
+    """Spec §3, D-B: at the answer's turn end, with no pass in flight and
+    three items pending, the re-ranker is called with the pending (id,
+    text) pairs and the turns since the last landed pass — here exactly
+    the answer — and its verdict is applied: the named order first, the
+    drop marked with the re-ranker's one-word reason, and the next ask
+    planned from the NEW head. Audited auto.queue_reranked (order, drops
+    with reasons, ignored, ms) and model.call (kind=rerank)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    engine.rerank_verdicts = [RerankVerdict(("q4", "q2"), {"q3": "volunteered"}, elapsed_ms=41)]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        assert pending_texts(s) == [Q_SLEEP, Q_TABLETS, Q_RADIATE]
+        s.turn_end("Tuesday night, quite suddenly.")
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == Q_RADIATE, "the new head; its topic is already open, so verbatim"
+        tablets = queue.get("q3")
+        assert tablets.status is ItemStatus.DROPPED and tablets.drop_reason == "volunteered"
+        assert queue.pending[0].id == "q2", "the verdict's order, after the consumed head"
+        # The answer's own pass (the same list) may already have landed and
+        # re-proposed the tablets afresh — a NEW item, the slice-1 rule.
+        assert all(i.id != "q3" for i in queue.pending)
+        assert len(engine.rerank_calls) == 1
+        pairs, excerpt = engine.rerank_calls[0]
+        assert pairs == [("q2", Q_SLEEP), ("q3", Q_TABLETS), ("q4", Q_RADIATE)]
+        assert excerpt == "Tuesday night, quite suddenly.", "the turns since the last landed pass"
+        _stop(s)
+    rows = _audit("auto.queue_reranked", s.session_id)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["before"] == ["q2", "q3", "q4"] and row["order"] == ["q4", "q2"]
+    assert row["drops"] == [{"id": "q3", "text": Q_TABLETS, "reason": "volunteered"}]
+    assert row["ignored"] == [] and row["ms"] == 41 and row["protected"] is None
+    assert row["excerpt_turns"] == 1 and row["excerpt_chars"] == len("Tuesday night, quite suddenly.")
+    calls = _audit("model.call", s.session_id)
+    assert len(calls) == 1 and calls[0]["kind"] == "rerank" and calls[0]["outcome"] == "ok"
+    assert calls[0]["pass_in_flight"] is False and calls[0]["elapsed_ms"] == 41
+    assert set(calls[0]) >= {"queued_ms", "run_ms", "tokens", "outcome", "model"}
+    assert _audit("auto.rerank_failed", s.session_id) == []
+    assert _audit("auto.rerank_skipped", s.session_id) == []
+
+
+def test_an_unknown_id_in_the_verdict_is_ignored_and_appears_in_the_row(gate):
+    """The no-invention guard, through the wiring: ids the model made up
+    (q8 to drop, q9 to ask) touch nothing — no item is added, resurrected
+    or dropped for them — and the auto.queue_reranked row lists them as
+    ignored. The known ids it named are applied as usual."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    engine.rerank_verdicts = [RerankVerdict(("q9", "q3", "q2"), {"q8": "done"}, elapsed_ms=30)]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        items_before = [i.id for i in queue.items]
+        s.turn_end("Tuesday night.")
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your tablets?"
+        assert [i.id for i in queue.items] == items_before, "nothing invented"
+        assert queue.get("q8") is None and queue.get("q9") is None
+        assert pending_texts(s) == [Q_SLEEP, Q_RADIATE]
+        assert all(i.status is not ItemStatus.DROPPED for i in queue.items)
+        _stop(s)
+    row = _audit("auto.queue_reranked", s.session_id)[0]
+    assert sorted(row["ignored"]) == ["q8", "q9"]
+    assert row["order"] == ["q3", "q2", "q4"] and row["drops"] == []
+    assert row["unmentioned"] == ["q4"]
+
+
+def test_a_re_rank_is_skipped_while_a_pass_is_in_flight_and_never_issued_behind_one(gate):
+    """D-F: with a full pass in flight at the answer's turn end the
+    re-ranker is not called — its merge supersedes any verdict — audited
+    auto.rerank_skipped (reason pass_in_flight, the version the pass will
+    land as), and the ask is planned from the head at once, as slice 2
+    left it. Item 5's pin: a re-ranker call is never issued while a pass
+    holds Ollama's single slot — here none at all; across the run, none
+    while a pass was running."""
+    import asyncio
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    with live(gate) as s:
+        s.to_golden()
+        s.land_pass()                                  # v1 merges in the golden minutes
+        gate_event = s.ws.portal.call(asyncio.Event)
+        engine.gate_event = gate_event                 # the exit's pass (v2) is held from here
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        assert len(engine.updates) == 1, "the exit's pass is in flight"
+        s.turn_end("Tuesday night.")
+        assert engine.rerank_calls == []
+        assert s.auto["rerank_task"] is None and s.auto["plan_task"] is not None, "planned at once"
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?", "the head, unreordered"
+        assert engine.rerank_calls == []
+        s.ws.portal.call(gate_event.set)
+        wait_for_pass(s, 2)
+        s.play(nxt["utterance_id"])
+        s.turn_end("Badly.")                           # no pass in flight now: the re-ranker runs
+        s.wait_for_auto_speak()
+        assert len(engine.rerank_calls) == 1
+        assert engine.rerank_during_pass == [False]
+        _stop(s)
+    skipped = _audit("auto.rerank_skipped", s.session_id)
+    assert len(skipped) == 1
+    assert skipped[0]["reason"] == "pass_in_flight" and skipped[0]["pass_version"] == 2
+    assert skipped[0]["pending"] == 3
+    calls = _audit("model.call", s.session_id)
+    assert len(calls) == 1 and calls[0]["pass_in_flight"] is False
+    assert len(_audit("auto.queue_reranked", s.session_id)) == 1
+
+
+def test_a_failed_call_leaves_the_order_standing_and_is_audited_with_reason_and_elapsed(gate):
+    """Fail-soft (spec §3): a timed-out re-ranker changes nothing — the
+    next ask is the head in the baseline order — and auto.rerank_failed
+    carries the reason and elapsed_ms; model.call records the timeout."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    engine.rerank_verdicts = [RerankVerdict(failed="timeout", elapsed_ms=2003, outcome="timeout")]
+    with live(gate) as s:
+        _first_answer_setup(s, engine)
+        before = pending_texts(s)
+        s.turn_end("Tuesday night.")
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?", "the head, order untouched"
+        assert pending_texts(s) == before[1:]
+        assert all(i.status is not ItemStatus.DROPPED for i in s.auto["queue"].items)
+        _stop(s)
+    failed = _audit("auto.rerank_failed", s.session_id)
+    assert len(failed) == 1
+    assert failed[0]["reason"] == "timeout" and failed[0]["elapsed_ms"] == 2003
+    assert failed[0]["outcome"] == "timeout" and failed[0]["pending"] == 3
+    assert _audit("auto.queue_reranked", s.session_id) == []
+    calls = _audit("model.call", s.session_id)
+    assert len(calls) == 1 and calls[0]["outcome"] == "timeout" and calls[0]["failed"] == "timeout"
+
+
+def test_a_verdict_landing_after_the_next_ask_is_planned_leaves_the_planned_item_alone(gate):
+    """The race (spec §3 as built): the pass requested at the same turn end
+    lands while the re-ranker is still out — the merge supersedes it and
+    the ask is planned from the merged head at once. When the late verdict
+    arrives — reordering, and dropping the very item now planned — the
+    planned item is protected: not dropped, kept first; the verdict shapes
+    the rest of the queue; the row says what was protected and that the
+    verdict had dropped it. The planned question is the one asked."""
+    import asyncio
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    engine.rerank_verdicts = [RerankVerdict(("q4", "q3"), {"q2": "volunteered"}, elapsed_ms=900)]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        pass_gate = s.ws.portal.call(asyncio.Event)
+        rerank_gate = s.ws.portal.call(asyncio.Event)
+        engine.gate_event, engine.rerank_gate = pass_gate, rerank_gate
+        s.turn_end("Tuesday night.")
+        assert s.auto["rerank_task"] is not None
+        assert s.auto["plan_task"] is None or s.auto["plan_task"].done()
+        assert s.auto["queued"] is None, "the plan waits for the verdict"
+        s.ws.portal.call(pass_gate.set)                # the pass lands first, mid-re-rank
+        wait_for_pass(s, 2)
+        _probe_until(s, lambda: s.auto["queued"] is not None)
+        sleep = queue.find(Q_SLEEP)
+        assert s.auto["queued"]["item_id"] == sleep.id, "planned from the merged head"
+        assert s.auto["rerank_task"] is not None, "the verdict is still out"
+        s.ws.portal.call(rerank_gate.set)              # the late verdict lands now
+        _probe_until(s, lambda: s.auto["rerank_task"] is None)
+        assert s.auto["queued"]["item_id"] == sleep.id and sleep.status is ItemStatus.PENDING
+        assert pending_texts(s) == [Q_SLEEP, Q_RADIATE, Q_TABLETS], "protected first, the rest re-ordered"
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        _stop(s)
+    row = _audit("auto.queue_reranked", s.session_id)[0]
+    assert row["protected"] == sleep.id and row["protected_dropped_by_verdict"] is True
+    assert row["order"] == [sleep.id, "q4", "q3"] and row["drops"] == []
+    assert _audit("auto.rerank_skipped", s.session_id) == [], "it was not in flight when the re-rank started"
+
+
+def test_the_re_rank_is_not_run_with_one_pending_item_and_a_dropped_item_may_re_enter_on_a_later_pass(gate):
+    """With one pending item there is nothing to order: no call, no row.
+    And a re-ranker drop is not the never-re-enter guarantee (slice-1
+    decision): a later pass that raises the dropped question again adds
+    it afresh, with a new id."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_SLEEP], [Q_SLEEP, Q_TABLETS]]
+    engine.rerank_verdicts = [RerankVerdict(("q2",), {"q3": "answered"}, elapsed_ms=20)]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        s.turn_end("Tuesday night.")                   # re-rank: Q_TABLETS dropped; pass 2 [Q_SLEEP]
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        wait_for_pass(s, 2)
+        dropped = next(i for i in queue.items if i.text == Q_TABLETS)
+        assert dropped.status is ItemStatus.DROPPED and dropped.drop_reason == "answered"
+        s.play(nxt["utterance_id"])
+        s.turn_end("Badly.")                           # one pending at most: no re-rank; pass 3 re-proposes Q_TABLETS
+        wait_for_pass(s, 3)
+        again = queue.find(Q_TABLETS)
+        assert again is not None and again.id != dropped.id and again.status is ItemStatus.PENDING
+        assert dropped.status is ItemStatus.DROPPED
+        _stop(s)
+    assert len(engine.rerank_calls) == 1, "the second answer had nothing to order"
+    assert len(_audit("auto.queue_reranked", s.session_id)) == 1
+    assert _audit("auto.rerank_skipped", s.session_id) == []
