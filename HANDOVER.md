@@ -6342,3 +6342,248 @@ owner and Cowork to confirm or overrule:**
 
 **`help/`:** nothing is made untrue by this slice; nothing on the page
 changes until slice 4.
+
+## Standing question queue — slice 2 of 7, the wiring, built (2026-09-08)
+
+**What landed.** Slice 2 of the owner-approved standing question queue
+(`AGENDA_QUEUE_SPEC.md` §5, §6, §9 item 2; owner's prompt of 7 Sept, six
+items, one commit each): the pure module of slice 1 is now the thing Alba
+asks from. Every commit had the full suite green before it
+(`AUTO_MODE_ENABLED=false uv run pytest`). `AUTO_MODE_ENABLED` is
+untouched and `.env` reads `false`; `PHASE_7C_EVAL_PREREG.md`, `help/`,
+`vendor/` and `OPEN_CLOSED_RULE.md` untouched. **Needs a restart to be
+live** (the owner's act) — and it is live only behind the flag: with the
+flag down `entry["auto"]` is `None`, no queue exists, and nothing in
+this slice runs. The bare-minimum-of-slice-4 tap handling and the
+slice-5 cadence pin were pulled forward as the prompt asked.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `2a7910c` | one `AgendaQueue` per auto session; every pass that lands while the machine is on merges; `auto.queue_merged` with the counts | 1025 → 1028 |
+| 2 | `46b2bb0` | Alba asks from the queue head, consumes by id, marks answered at the turn end; the queue is the asked-memory (slice-3 list retired); `requeue`/`drop` in the module | 1028 → 1033 |
+| 3 | `346809d` | asking does not wait for the pass; the three empty rules; `AUTO_STRICT_REVISE` re-meant (`.env.example`, 7c D2 and §9, queue §4) | 1033 → 1038 |
+| 4 | `6913ed8` | the doctor's tap and the queue (D-E, the minimum): a pending match is consumed by tap, a novel tap is `add_asked`; the RESUME-from-head pin | 1038 → 1042 |
+| 5 | `4eca095` | the number to beat on every question: `turn_end_to_issue_ms` on the row, `auto.question_latency` at `speak_started` | 1042 → 1043 |
+| 6 | (this commit) | `AGENDA_QUEUE_SPEC.md` §2, §5, §6, §7, §9 truth-ups; this entry | 1043 |
+
+Final suite: **1043 passed** (from 1025 at `59a2244`). Every commit
+message carries the why; this entry carries the decisions and the seams.
+
+**What is now live behind the flag.**
+
+- One queue per session, in the auto dict (`auto["queue"]`), built from
+  `AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES` and
+  `AUTO_TOPIC_MATCH_THRESHOLD`; the two queue numbers now sit in the
+  per-run thresholds record (`auto.enabled`). In `maybe_run_cds` every
+  pass that lands and is versioned merges into it while the machine is
+  on (`_auto_on`: not OFF, HANDOVER, TAKEN_OVER — so PAUSED merges, and
+  the alarm-bearing pass has merged before RESUME asks). The merge is
+  synchronous and precedes the alarm handling; its audit rows are
+  written after the alarm so the pause is never delayed by the record.
+- The ask: `_plan_from_queue` takes the head, runs the topic call (cone
+  unchanged, the topic stored on the item) and pre-synthesis, and
+  remembers the item id in the plan; `_issue_queued` consumes THAT item
+  by id before the slot is taken (requeued if the issue fails); the
+  answer's turn end (`_end_turn`, answer, the F5 rule) marks it
+  answered. `asked_answered`, `asked_open` and `auto.reask_suppressed`
+  are gone; the guarantee is the merge's discard.
+- Asking does not wait for the pass: `_request_revision` at a turn end
+  requests the full pass (strict) AND plans from the head in the same
+  call; `_ask_after_pass` (landed and runaway paths) hands over when
+  nothing is pending after a post-answer merge, plans if the turn had
+  already ended, and otherwise leaves the plan to that turn's end. The
+  bridge encourager fires only with nothing to ask.
+- The tap: a pending match → `consume(by="tap")`; no match →
+  `add_asked` (new, audited `auto.queue_asked_externally`); a re-tap of
+  the asked (aborted) item is awaited. The guard and the tapped handover
+  are as slice 3 left them.
+- The numbers: `turn_ended_at` at every turn end that can permit an ask
+  (answer, golden exit, hand-back); `turn_end_to_issue_ms` in the
+  question's detail (row `ref_detail` and `speech.requested`);
+  `auto.question_latency` at the client's `speak_started` with
+  `turn_end_to_issue_ms`, `issue_to_speech_ms`, `turn_end_to_speech_ms`.
+  The speech pipeline DOES expose the far end — `speak_started` is the
+  client's report of actual playback start, the same message that opens
+  the exclusion window — so both numbers are on the record; nothing was
+  left to "where it would come from".
+
+**What is not (the slices ahead).**
+
+- No re-ranker (slice 3): the head after a merge is the baseline order.
+- The panel still shows the assessment's `questions_to_ask`, not the
+  queue (slice 4): the panel and the queue can differ — a question the
+  doctor sees may be asked or dropped in the queue; a tap on it is
+  handled as above. `snapshot()` is ready and unused.
+- No cadence (b) flag (slice 5); (a) is what `AUTO_STRICT_REVISE=true`
+  now means, pinned by the one-pass-per-answer test.
+- No GPU discipline (slice 6), no speculative pass (slice 7).
+
+**Where the prompt or spec did not fully decide, and what the code
+does — for the owner and Cowork to confirm or overrule:**
+
+- **"Created when auto mode is enabled" was read as the flag, not the
+  toggle.** The queue is built with the auto dict (which exists exactly
+  when `AUTO_MODE_ENABLED` is true) and lives for the session, across a
+  toggle off and on, because it is also the asked-memory: a question
+  asked in an earlier run of the same session must still be asked. A
+  pass landing while the machine is OFF (toggle) does not merge —
+  pinned. Consequence: questions the CDS proposed BEFORE the doctor
+  switched auto on are not in the queue; the first ask after the golden
+  exit then comes from the exit's own pass (the empty rule), as it did
+  before the queue. Seeding the queue from the current agenda at
+  toggle-on is a one-line alternative if the owner prefers it.
+- **The golden exit and a hand-back ask from the queue at once** when
+  it has items merged during the golden minutes (spec §5 names only
+  answered turn ends). Under the flag the pass is requested too.
+- **A pass landing mid-turn plans nothing**; that turn's end plans from
+  the head (`_ask_after_pass`). Chosen over planning at the merge so
+  that (i) nothing shows as "queued" on the indicator while the patient
+  is still answering, and (ii) slice 3's re-rank, which runs at the
+  answered turn end, sees the head before the topic call — a plan made
+  at the merge would bypass it. Cost: topic call + synthesis (~1–2 s)
+  after the turn end instead of ~0. The 486 baseline is 27.7 s.
+- **A turn end with nothing asked and nothing queued plans from the
+  head** (the non-answer branch of `_end_turn`, question phases only,
+  not during the handover sequence). Without it the exit's pass landing
+  mid-speech left nobody to plan when that speech ended — the bridge
+  test found it.
+- **The politeness abort requeues the item at its rank AND keeps the
+  prepared plan** (the audio is cached); re-issue consumes it again
+  (two `auto.queue_consumed` rows, one `queue_requeued`, one
+  `queue_answered`). The "not the same words twice in a row" rule is
+  kept in `_plan_from_queue`: when the head's text was the last asked
+  and another item is pending, that one is planned. Under the queue it
+  fires only when a plan is made anew after an unanswered ask (e.g.
+  after a pause cut the aborted-and-requeued question); the re-issue of
+  a kept plan is not a plan and is exempt, as the abort test pins.
+- **A question cut by an urgency pause stays ASKED** (never re-asked)
+  and no answer is awaited for it (`_cancel_officer` clears
+  `asked_item_id`); it is not requeued. The old code left `asked_open`
+  set across a pause and the next answer credited it; this is the
+  cleaner reading and is the place to repin if the owner wants a cut
+  question asked again.
+- **RESUME AUTO with nothing pending hands over** (the spent-agenda
+  rule), rather than requesting a pass — the owner's no-revision-at-
+  resume decision outranks the empty rule there.
+- **`add_asked` records a tapped question with the panel version it
+  was tapped from** (`first_version`), rank −1, never in the order.
+  An already-answered question the doctor taps again is theirs to ask
+  and is recorded nowhere twice.
+- **The queue item's words are resolved for the whitelist** through
+  `_agenda_ref`: the pass that last listed it (exact text, else that
+  pass's own normalised-equal wording — spoken as that version's
+  question verbatim), then the pass that first proposed it; both aged
+  out of the 20-version log cannot happen while D-A holds, and if it
+  did the item is `drop`ped (new module operation, audited
+  `auto.queue_dropped` with the reason) and the next head taken.
+- **`turn_end_to_issue_ms` is measured to the decision to speak**, with
+  one clock reading, so `issue_to_speech_ms` (synthesis + transport)
+  plus it equals `turn_end_to_speech_ms`. The F5 re-ask and the fixed
+  phrases carry no number.
+- **Tests repinned by decision** (each docstring names it): the 486
+  risk-factors test, the cone-collapse test and the spent-agenda test
+  read the merge's discards instead of `auto.reask_suppressed`; the
+  strict-off test and the two runaway tests land their "agenda in
+  hand" as a pass in the golden minutes (a `seed_agenda` is a panel the
+  machine never saw land and is NOT in the queue); the strict-revise
+  test's docstring says what it still pins; its row-equality pops the
+  new timing field. Nothing weakened or deleted. Harness: `land_pass`
+  (a pass on transcript growth) in `tests/auto_harness.py` and the
+  question file's own copy.
+
+**Findings not changed here (the owner's call):**
+
+- **The cone's topic matcher conflates "your X" topics.** With the E3
+  normaliser "your" is not a stop word, so `action_similarity("your
+  tablets", "your sleep")` = 0.636 ≥ `AUTO_TOPIC_MATCH_THRESHOLD`
+  (0.6): once sleep has been opened, the tablets question is asked
+  verbatim rather than open-form. A slice-3 property, seen while
+  building the empty-rule test (which sidesteps it with "the tablets").
+  Adding "your"/"my" to `ACTION_STOP_WORDS`, or a higher topic
+  threshold, are both one-line changes; which, and whether, is the
+  owner's.
+- **The pause tests' `_fire_pass` helper assumes the landing branch
+  completes within one tick** after the engine returns. Placing the
+  merge's audit writes before the alarm handling broke three of them
+  (the alarm then landed a tick late); moving the writes after the
+  alarm restored them. The helper is the fragile thing, not the
+  behaviour; noted for whoever next adds an await to that branch.
+
+**`help/`: NOT edited. Sentences the queue makes untrue or incomplete,
+quoted, for the owner's wording** (nothing on the page changes until
+slice 4, so these are about what the text now claims of the mechanism):
+
+- `help/01-a-consultations-journey.md` §2: "Each update *revises* the
+  previous one under rules: condition names stay put, reasoning must
+  absorb new evidence, answered questions drop off the list." — still
+  true of the assessment's own list; incomplete for auto mode, where
+  the list the machine asks from is now a standing queue that the
+  passes merge into, an asked question is removed by construction, and
+  a question the pass keeps after it was answered is discarded rather
+  than asked again.
+- `help/01-a-consultations-journey.md` §3: "the app can conduct the
+  history-taking itself, inviting, encouraging and asking questions of
+  its own choosing" — incomplete: its choosing is now the head of a
+  queue that every CDS pass feeds and that never re-offers an asked
+  question; and the diagram participant "Doctor taps — or auto mode
+  plans — a question" is still true.
+- `help/02-using-it-step-by-step.md` step 5: "**Questions to ask.**
+  Suggestions that update as the conversation moves. Tap the small
+  speaker icon and the assistant asks that question aloud" — still true
+  of the panel (it shows the assessment's list until slice 4); now
+  incomplete: with auto mode on, tapping a question also takes it off
+  the assistant's own queue, and the assistant will not later ask a
+  question the doctor has tapped.
+- `help/02-using-it-step-by-step.md` step 3: "The transcript streams
+  in, questions come and go as they are answered" — true of the panel;
+  for the assistant's own asking the truthful sentence would add that
+  it asks the next question as soon as the patient finishes, without
+  waiting for the assessment to revise (the revision still runs on
+  every answer).
+- `help/02-using-it-step-by-step.md` step 3: "it invites, listens,
+  encourages and asks aloud, one question at a time, while you
+  supervise" — still true.
+- `help/04-the-architecture.md`: "the two small judgements that pace
+  the spoken interview: has the patient finished speaking, and what a
+  question is about" — still true for this slice; becomes three with
+  slice 3's re-ranker.
+
+**The slices ahead (spec §9):**
+
+3. Re-ranker — the stateless call in the affect/topic shape after each
+   answered turn end (before the topic call: the slot is the answered
+   branch of `_end_turn`, ahead of `_plan_from_queue`), D-B's context
+   (`AUTO_RERANK_CONTEXT_TURNS`, capped by characters),
+   `AUTO_RERANK_TIMEOUT_S` fail-soft to the current order
+   (`auto.rerank_failed`), skipped while a full pass is in flight (D-F),
+   `apply_rerank` with its no-invention guard, audited
+   `auto.queue_reranked`. `help/04`'s "two small judgements" then wants
+   the owner's third.
+4. Panel and taps — the questions-to-ask panel shows `snapshot()`
+   (pending in order, asked struck through, dropped hidden and
+   expandable); a tap on a queue item consumes it (the tap path already
+   does; the panel's references change from version+index to item id
+   or stay as they are); the preparing state covers re-rank plus
+   synthesis. `help/01` §2/§3 and `help/02` step 5 for the owner's
+   wording.
+5. Cadence flag (D-C (b): full pass every second answer, re-rank every
+   answer) and the pin that the urgency check runs on its own call at
+   every answered turn whatever the cadence (today it is inside the
+   pass; under (b) it needs its own call on the off answers); HANDOVER,
+   `PHASE_7C_SPEC.md` §5, §6, §9 truth-ups, `help/` flags.
+6. GPU discipline (§7a, D-G) — `model.call` audit (kind, queued_ms,
+   run_ms, tokens, outcome); the resident live set as an invariant with
+   `model.load_during_live`; the priority scheduler (urgency, then the
+   short conversational calls, then the full pass, then speculation);
+   the second Ollama slot as a measurement experiment only.
+7. Speculative pass during the patient's answer, behind a flag, once
+   the queue's own effect is measured — `auto.question_latency` now
+   gives the per-question number; the next solo run's mean against
+   27.7 s is the measurement.
+
+**Watch list, carried forward:** the CDS reading its own parenthetical
+literally is now harmless to the flow (discarded at the merge) but
+still shapes what the model believes; D10 (the politeness abort) is
+still unexercised in the room — and now moves a queue item, so the
+next abort in a real run is worth reading in the trail; banner
+visibility; the felt length of the 90 s window.

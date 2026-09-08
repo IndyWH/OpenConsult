@@ -27,14 +27,27 @@ and timestamps.
 
 Operations:
 - merge(pass_version, questions): a new-pass question that matches a
-  PENDING item (match ≥ Q_MATCH, default 0.6) refreshes it; one that
-  matches an ASKED or ANSWERED item is discarded — an asked question
-  can never re-enter, whatever the pass says; one that matches nothing
-  is appended. Pending items the pass did not mention are NOT deleted on
-  that evidence alone (decision D-A).
-- consume(): the head item becomes asked; when the patient's turn ends
-  with speech (F5 rule) it becomes answered. A doctor tap on a queue
-  item consumes that item (D-E).
+  PENDING item refreshes it; one that matches an ASKED or ANSWERED
+  item is discarded — an asked question can never re-enter, whatever
+  the pass says; one that matches nothing is appended. Pending items
+  the pass did not mention are NOT deleted on that evidence alone
+  (decision D-A). **Matching is exact equality of normalised token sets
+  (the E3 normaliser; the slice-3 F4 rule) — not a 0.6 similarity, as
+  this spec first proposed.** Built that way, and kept, because two
+  questions on one topic are legitimately different questions: at 0.6
+  "Have you ever had chest pain like this before?" and a question about
+  the pain's character would be one item, and the never-re-enter
+  guarantee would silence a question the patient has not been asked. A
+  looser bound is the owner's to set; the actions and topics keep their
+  0.6 for their own reasons.
+- consume(item_id): the PLANNED item becomes asked — by id, not
+  whatever is head at issue time, because the prepared audio is for its
+  words; when the patient's turn ends with speech (F5 rule) it becomes
+  answered. A doctor tap on a queue item consumes that item (D-E); a
+  tapped question the queue never held is recorded asked
+  (add_asked) so it can never re-enter. A politeness-aborted ask goes
+  back to pending at its rank (requeue) — it was never put to the
+  patient — and the prepared plan is kept for the re-issue.
 - rerank(order, drops): applied only to pending items; drops are
   audited with the re-ranker's one-word reason.
 - cap: at most Q_MAX pending (D-D); lowest-ranked excess dropped, audited.
@@ -72,29 +85,54 @@ Guarantee under either: the urgency check runs on its own memory-less
 call at every answered turn, whatever the full-pass cadence — pinned by
 a test.
 
-## 5. Asking from the queue
+## 5. Asking from the queue (BUILT, slice 2)
 At an answered turn end: if the queue has a pending item → topic call
 for a new topic (D3 cone, unchanged) else verbatim → pre-synthesis →
 issue at the next quiet. A running pass never blocks the ask; when it
 completes, merge may change the head before the next ask, which is
 fine. If the queue is empty and a pass is running → one bridge "go on"
-and wait, as today. If the queue is empty and no pass is running → the
-existing rule: request a pass; an empty agenda on a fresh post-answer
-revision → the handover sequence (§6 as amended).
+and wait, as today (the bridge fires only with nothing to ask — never
+a second before a question in preparation). If the queue is empty and
+no pass is running → the existing rule: request a pass; an empty queue
+after the merge of a fresh post-answer revision → the handover
+sequence (§6 as amended).
+As built, two more turn ends go the same way: the golden exit and a
+hand-back (the first ask), and a turn end with nothing asked and
+nothing queued (the span after a pass landed mid-speech). A pass that
+lands while the patient is mid-turn plans nothing; that turn's end
+plans from the head — the slot where §3's re-rank will run. The manner
+rule from the pilot fixes stays: not the same words twice in a row when
+there is another to ask. A queue with nothing pending at RESUME AUTO
+hands over, as an empty agenda did.
 
 ## 6. The doctor's panel
 The questions-to-ask panel shows the queue: pending in order, asked
 struck through, dropped hidden (expandable). A tap consumes that item
 and Alba continues from the new head. The preparing state now covers
 re-rank plus synthesis — seconds, not tens of seconds.
+Slice 2 built the tap's half (D-E): a tapped question whose normalised
+text equals a pending item consumes it (by=tap) and the machine
+continues from the new head; one the queue never held is recorded
+asked. The panel itself still shows the assessment's list, not the
+queue (slice 4); until then the panel and the queue can differ — a
+question the doctor sees may already be asked or dropped in the queue.
+The tap guard and the tapped examination handover are unchanged.
 
 ## 7. Audit and the number to beat
 auto.queue_merged (added / refreshed / discarded, version),
 auto.queue_reranked (order, drops, ms), auto.queue_consumed (item, by
-auto or tap), auto.rerank_failed, auto.queue_capped. The metric: turn
-end → Alba speaking, per question. 486 baseline mean 27.7 s (report
-table). Prereg untouched; spec §5, §6, §9 truth-ups; help/ flagged for
-the owner's wording where the panel's behaviour changes.
+auto or tap), auto.rerank_failed, auto.queue_capped. Built (slice 2)
+with the rest the module reports: auto.queue_dropped_absent,
+auto.queue_answered, auto.queue_requeued, auto.queue_dropped,
+auto.queue_asked_externally — each with the module's flat details, the
+session and the audio time. The metric: turn end → Alba speaking, per
+question — now on the record for every auto question:
+`turn_end_to_issue_ms` on the question's row and its speech.requested
+audit, and `auto.question_latency` at the client's speak_started with
+`turn_end_to_speech_ms` and `issue_to_speech_ms`. 486 baseline mean
+27.7 s (report table). Prereg untouched; spec §5, §6, §9 truth-ups;
+help/ flagged for the owner's wording where the panel's behaviour
+changes.
 
 ## 7a. GPU discipline (owner's principle, 7 Sept)
 The RTX 4090 is the slow element in the chain. During a live
@@ -154,7 +192,10 @@ rather than impressions.
 1. Pure AgendaQueue module + tests (merge, consume, rerank apply, cap,
    normaliser reuse, the never-re-enter guarantee).
 2. Wiring: pass completion → merge; ask-from-queue; empty rules;
-   slice 3's asked-memory becomes the queue's asked status.
+   slice 3's asked-memory becomes the queue's asked status. BUILT
+   2026-09-08 (six commits; HANDOVER entry of that date), with the
+   tap's half of D-E, the per-question latency numbers and the D-C (a)
+   cadence pin pulled forward from slices 4 and 5.
 3. Re-ranker call, fail-soft, no-invention guard, audit.
 4. Panel and taps.
 5. Cadence flag, urgency-cadence pin, HANDOVER, spec truth-ups, help/
