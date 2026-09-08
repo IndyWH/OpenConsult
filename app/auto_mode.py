@@ -492,6 +492,13 @@ ACTION_STOP_WORDS = frozenset({
     "request", "refer", "send", "get", "carry", "out",
     # place words
     "bedside",
+    # possessives (owner decision 2026-09-08): the normaliser is shared by
+    # the ratchet, the queue's exact match and the cone's topic identity,
+    # and with "your" counted as a token "your tablets" and "your sleep"
+    # scored 0.636 — one topic at the 0.6 threshold, so the tablets were
+    # asked verbatim once sleep had been opened. Whose thing it is never
+    # says WHICH action or topic. The articles were already here.
+    "your", "my", "his", "her", "their", "our", "its",
 })
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")

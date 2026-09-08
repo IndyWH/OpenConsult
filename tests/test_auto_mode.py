@@ -590,3 +590,26 @@ def test_the_threshold_is_the_callers_and_bounds_the_match():
 def test_the_matcher_is_pure_and_symmetric():
     assert auto_mode.action_similarity(ADMIT, REFER) == auto_mode.action_similarity(REFER, ADMIT)
     assert auto_mode.action_similarity(ADMIT, REFER) == auto_mode.action_similarity(ADMIT, REFER)
+
+
+def test_possessives_are_stop_words_so_two_topics_stay_two_and_the_ratchet_did_not_loosen():
+    """Owner decision 2026-09-08. The normaliser is shared by the ratchet,
+    the queue's exact match and the cone's topic identity. Before, "your"
+    was a token and "your tablets" met "your sleep" at 0.636 — above the
+    0.6 topic threshold — so the tablets question was asked verbatim once
+    sleep had been opened. Now whose thing it is carries nothing: the two
+    topics share no token and score 0.0; and a hospital action re-worded
+    with a possessive still matches its acknowledged original above 0.6
+    (the ratchet is no looser and no tighter — the E3 pairs above are
+    pinned unchanged)."""
+    for word in ("your", "my", "his", "her", "their", "our", "its", "a", "an", "the"):
+        assert word in auto_mode.ACTION_STOP_WORDS
+    assert auto_mode.normalise_action("your tablets") == frozenset({"tablets"})
+    assert auto_mode.normalise_action("your sleep") == frozenset({"sleep"})
+    assert auto_mode.action_similarity("your tablets", "your sleep") == 0.0
+    assert auto_mode.match_action("your tablets", ["your sleep"], 0.6) is None
+    assert auto_mode.match_action("the tablets", ["your tablets"], 0.6) == ("your tablets", 1.0)
+    reworded = "Arrange her admission to hospital"
+    assert auto_mode.action_similarity(reworded, ADMIT) > 0.6
+    assert auto_mode.match_action(reworded, [ADMIT, "Bedside ECG"], 0.6)[0] == ADMIT
+    assert auto_mode.action_similarity("Refer him to the specialist today", SPECIALIST) > 0.6
