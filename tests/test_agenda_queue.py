@@ -258,6 +258,33 @@ def test_a_politeness_aborted_ask_is_requeued_at_its_rank_and_is_still_the_same_
     assert merged["discarded"] == 1 and ids(q.pending) == ["q4"]
 
 
+def test_a_question_asked_from_outside_the_queue_is_recorded_asked_and_never_re_enters():
+    """D-E, slice 2: add_asked(text, by='tap') records a doctor-tapped
+    question the queue never held as an ASKED item — no rank, not in the
+    pending order, not a consume — so a later pass proposing it is
+    DISCARDED at the merge; answered() then works on it like any asked
+    item. A text that already matches a live item is refused (the caller
+    consumes or finds it instead)."""
+    q = make()
+    q.merge(1, [RISK])
+    ev = q.add_asked(NAUSEA, by="tap")
+    assert ev.kind == "queue_asked_externally" and ev["by"] == "tap" and ev["version"] == 1
+    item = q.get(ev["id"])
+    assert item.status is ItemStatus.ASKED and item.asked_at is not None
+    assert ids(q.pending) == ["q1"], "not pending, not in the order"
+    merged = q.merge(2, [NAUSEA, DURATION])[0]
+    assert merged["discarded"] == 1 and merged["discarded_items"][0]["id"] == item.id
+    assert ids(q.pending) == ["q3", "q1"]
+    q.answered(item.id)
+    assert item.status is ItemStatus.ANSWERED
+    assert q.merge(3, [NAUSEA])[0]["discarded"] == 1
+    with pytest.raises(AgendaQueueError):
+        q.add_asked(RISK_REWORDED)                # matches pending q1: consume it instead
+    with pytest.raises(AgendaQueueError):
+        q.add_asked("   ")
+    assert q.snapshot()["asked"] == [] and [i["id"] for i in q.snapshot()["answered"]] == [item.id]
+
+
 def test_the_wiring_can_drop_a_pending_item_with_its_reason():
     """Slice 2: drop(id, reason) — for an item the wiring cannot speak
     (its text no longer resolves to a recorded agenda version). Audited

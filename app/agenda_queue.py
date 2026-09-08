@@ -42,8 +42,10 @@ EVENTS
 Every state change returns one or more `QueueEvent` records — small,
 flat, ready to be audited by the wiring: `queue_merged` (added /
 refreshed / discarded, version), `queue_dropped_absent`, `queue_capped`,
-`queue_consumed`, `queue_requeued` (a politeness-aborted ask back to
-pending at its rank), `queue_dropped` (the wiring gave up on an item),
+`queue_consumed`, `queue_asked_externally` (a doctor's tap on a question
+the queue never held, recorded so it can never re-enter), `queue_requeued`
+(a politeness-aborted ask back to pending at its rank), `queue_dropped`
+(the wiring gave up on an item),
 `queue_answered`, `queue_reranked` (with the ids the re-ranker named
 that were IGNORED — the no-invention guard, §3).
 
@@ -373,6 +375,35 @@ class AgendaQueue:
         return QueueEvent("queue_consumed", now, {
             "id": item.id, "text": item.text, "topic": item.topic, "by": by,
             "rank": rank, "version": item.last_seen_version,
+            "pending": len(self._order)})
+
+    def add_asked(self, text: str, *, by: str = "tap",
+                  version: int | None = None) -> QueueEvent:
+        """A question asked from OUTSIDE the queue — the doctor tapped a
+        panel question the queue never held (an older version's item, or
+        one the machine had not merged) — is recorded as an ASKED item so
+        it can never re-enter: a later pass proposing it is discarded at
+        the merge like any asked question (D-E, spec §2). It was never
+        pending, so it has no rank in the order and is not a consume.
+        Raises if the text already matches a live item — the caller should
+        have consumed or found it."""
+        text = str(text).strip()
+        if not text:
+            raise AgendaQueueError("add_asked() with an empty text")
+        if self.find(text) is not None:
+            raise AgendaQueueError(f"add_asked({text!r}): already a live item")
+        now = self._clock()
+        item_id = f"q{self._next_id}"
+        self._next_id += 1
+        v = self._last_version if version is None else int(version)
+        item = AgendaItem(id=item_id, text=text, key=question_key(text), topic=None,
+                          first_version=v if v is not None else 0,
+                          last_seen_version=v if v is not None else 0,
+                          rank=-1, status=ItemStatus.ASKED,
+                          created_at=now, updated_at=now, asked_at=now)
+        self._items[item_id] = item
+        return QueueEvent("queue_asked_externally", now, {
+            "id": item.id, "text": item.text, "by": by, "version": item.first_version,
             "pending": len(self._order)})
 
     def requeue(self, item_id: str) -> QueueEvent:

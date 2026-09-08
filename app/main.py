@@ -3540,18 +3540,29 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["awaiting_answer"] = True
             auto["turn_ended"] = False
             auto["last_asked_text"] = utterance.text
-            # The doctor's ask counts too (F4): a tapped question that is a
-            # pending queue item consumes it (D-E, by=tap) and its answer
-            # marks it answered; a re-tap of the item already asked (the
-            # aborted one) is awaited the same way.
+            # The doctor's ask counts too (F4, D-E): a tapped question that
+            # is a pending queue item consumes it (by=tap) and Alba
+            # continues from the new head; one the queue never held — an
+            # older panel version's item, or one not merged — is recorded
+            # as asked (auto.queue_asked_externally) so it can never
+            # re-enter; a re-tap of the item already asked (the aborted
+            # one) is awaited the same way. In every case its answer's
+            # turn end marks the item answered. An already-answered
+            # question the doctor asks again is theirs to ask; nothing is
+            # recorded twice.
             queue: agenda_queue.AgendaQueue = auto["queue"]
             item = queue.find(utterance.text)
             auto["asked_item_id"] = None
-            if item is not None and item.pending:
+            if item is None:
+                event = queue.add_asked(utterance.text, by="tap",
+                                        version=utterance.ref_detail.get("assessment_version"))
+                await _audit_queue_events((event,), {"utterance_id": utterance.utterance_id})
+                auto["asked_item_id"] = event["id"]
+            elif item.pending:
                 await _audit_queue_events((queue.consume(item.id, by="tap"),),
                                           {"utterance_id": utterance.utterance_id})
                 auto["asked_item_id"] = item.id
-            elif item is not None and item.status is agenda_queue.ItemStatus.ASKED:
+            elif item.status is agenda_queue.ItemStatus.ASKED:
                 auto["asked_item_id"] = item.id
 
     async def _end_run_by_tapped_handover(auto: dict, utterance: speech.Utterance) -> None:

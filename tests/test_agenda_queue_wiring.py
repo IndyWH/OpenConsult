@@ -425,3 +425,146 @@ def test_empty_rule_three_still_empty_after_the_post_answer_merge_hands_over_wit
     assert [(m["version"], m["discarded"], m["pending"]) for m in merges] == [
         (1, 0, 1), (2, 1, 0), (3, 1, 1), (4, 2, 0)]
     assert len(_audit("auto.handover", s.session_id)) == 1
+
+
+# ==========================================================================
+# Item 4: the doctor's tap and the queue (the minimum for D-E; the panel is slice 4)
+
+def test_a_tap_on_a_pending_item_consumes_it_by_tap_and_alba_continues_from_the_new_head(gate):
+    """D-E: the doctor taps a question the queue holds pending — the item
+    is consumed (auto.queue_consumed by=tap), its answer marks it
+    answered, and the machine's next ask is the new head. Here the tap
+    displaces the machine's own queued question (the guarded tap,
+    confirmed), which stays pending and is asked after."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        for _ in range(40):                          # let the machine queue its ask (Q_ONSET)
+            s.probe()
+            if s.auto["queued"] is not None:
+                break
+            time.sleep(0.03)
+        assert s.auto["queued"]["question"] == Q_ONSET
+        version = s.entry["agenda"].current_version
+        import json
+        s.ws.send_text(json.dumps({"type": "speak", "confirm_displace": True, "ref": {
+            "kind": "cds_question", "assessment_version": version, "index": 2}}))   # Q_TABLETS
+        from auto_harness import _until
+        ready = _until(s.ws, {"speak_ready"})
+        tablets = queue.find(Q_TABLETS)
+        assert tablets.status is ItemStatus.ASKED, "consumed by the tap"
+        assert pending_texts(s) == [Q_ONSET, Q_SLEEP], "the displaced question stays pending"
+        assert s.auto["asked_item_id"] == tablets.id
+        s.play(ready["utterance_id"])
+        s.turn_end("Most mornings I forget.")
+        nxt = s.wait_for_auto_speak()                # the answer's turn ends as the quiet grows
+        assert tablets.status is ItemStatus.ANSWERED
+        assert nxt["text"] == "Can you tell me more about the chest pain?", "the new head"
+        _stop(s)
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert [(c["text"], c["by"]) for c in consumed] == [(Q_TABLETS, "tap"), (Q_ONSET, "auto")]
+    assert consumed[0]["utterance_id"] == ready["utterance_id"]
+    assert [a["text"] for a in _audit("auto.queue_answered", s.session_id)] == [Q_TABLETS]
+    assert _audit("auto.queue_asked_externally", s.session_id) == []
+
+
+def test_a_tap_on_a_novel_question_is_recorded_asked_and_a_later_pass_proposing_it_is_discarded(gate):
+    """D-E, the other half: the doctor taps a question from a panel version
+    the queue never merged (landed before the machine was on). It is
+    recorded asked (auto.queue_asked_externally, by=tap), its answer
+    marks it answered, and when the next pass proposes the same words
+    they are discarded at the merge — never asked by Alba."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_NAUSEA], [Q_ONSET], [Q_NAUSEA, Q_SLEEP]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.disclose()
+        stale = s.land_pass()                          # v1 lands with the machine OFF: not merged
+        assert queue.items == ()
+        s.toggle(True)
+        from auto_harness import _collect_until, _until
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        invitation = next(m for m in seen if m.get("type") == "auto_speak")
+        s.play(invitation["utterance_id"])
+        s.probe()
+        assert s.phase.value == "golden"
+        s.to_open()                                    # v2 [Q_ONSET] merges
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        import json
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": stale, "index": 0}}))   # Q_NAUSEA, never merged
+        ready = _until(s.ws, {"speak_ready"})
+        recorded = queue.find(Q_NAUSEA)
+        assert recorded is not None and recorded.status is ItemStatus.ASKED
+        assert recorded.rank == -1 and not queue.has_pending
+        s.play(ready["utterance_id"])
+        s.turn_end("No, not sick at all.")
+        assert recorded.status is ItemStatus.ANSWERED
+        nxt = s.wait_for_auto_speak()                  # v3 proposes Q_NAUSEA again: discarded
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        _stop(s)
+    ext = _audit("auto.queue_asked_externally", s.session_id)
+    assert len(ext) == 1 and ext[0]["text"] == Q_NAUSEA and ext[0]["by"] == "tap"
+    assert ext[0]["version"] == stale and ext[0]["utterance_id"] == ready["utterance_id"]
+    merges = _audit("auto.queue_merged", s.session_id)
+    assert merges[-1]["version"] == 3 and merges[-1]["discarded"] == 1
+    assert merges[-1]["discarded_items"][0]["text"] == Q_NAUSEA
+    assert Q_NAUSEA not in [c["text"] for c in _audit("auto.queue_consumed", s.session_id)]
+
+
+def test_resume_after_an_urgency_pause_asks_from_the_queue_head_the_alarm_bearing_pass_merged(gate, monkeypatch):
+    """The one answer's chance, unchanged (owner decision 2026-08-17): at
+    RESUME AUTO no revision is requested; the ask is the queue's head,
+    which the alarm-bearing pass has already merged (it landed while the
+    machine was paused — paused is on)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET], [Q_NAUSEA, Q_SLEEP]]
+    engine.topics[Q_NAUSEA] = "nausea"
+    async def update(transcript, previous=None):
+        engine.updates.append(transcript)
+        questions = engine.agendas.pop(0) if len(engine.agendas) > 1 else engine.agendas[0]
+        from auto_harness import _assessment
+        assessment = _assessment(questions, reasoning=f"pass {len(engine.updates)}")
+        if len(engine.updates) == 2:
+            assessment["urgent_actions"] = [{"action": "Bedside ECG now", "reason": "exclude ACS"}]
+        return assessment
+    engine.update = update
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday night.")                  # pass 2: the alarm
+        for _ in range(40):
+            if s.phase.value == "paused_urgent":
+                break
+            s.probe()
+            time.sleep(0.02)
+        assert s.phase.value == "paused_urgent"
+        assert pending_texts(s) == [Q_NAUSEA, Q_SLEEP], "the alarm-bearing pass merged while paused"
+        assert queue.last_version == 2
+        passes = len(engine.updates)
+        import json
+        s.ws.send_text(json.dumps({"type": "auto_ack", "resolution": "resume"}))
+        from auto_harness import _collect_until
+        _collect_until(s.ws, {"auto_acknowledged"})
+        assert s.auto["revision"] is None, "no revision at resume"
+        assert s.auto["plan_task"] is not None, "planned from the head at once"
+        s.commit_transcript("okay")
+        s.quiet(3.2)
+        s.probe()
+        ask = s.wait_for_auto_speak()
+        assert ask["text"] == "Can you tell me more about nausea?"
+        assert len(engine.updates) == passes, "asked from the merged head, no new pass"
+        _stop(s)
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert [c["text"] for c in consumed] == [Q_ONSET, Q_NAUSEA]
+    assert consumed[1]["version"] == 2
