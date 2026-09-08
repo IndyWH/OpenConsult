@@ -1448,9 +1448,14 @@ AUTO_EOT_QUIET_S = float(os.getenv("AUTO_EOT_QUIET_S", "3.0"))
 AUTO_EOT_FALLBACK_S = float(os.getenv("AUTO_EOT_FALLBACK_S", "5.0"))
 # Pre-synthesise the top agenda question during the patient's turn (slice 4).
 AUTO_PRESYNTH = os.getenv("AUTO_PRESYNTH", "true").lower() != "false"
-# D2 posture (owner decision 2026-08-16): a CDS pass after every answer,
-# questions only from the fresh agenda. Flippable so the mock-patient round
-# can compare postures as a recorded per-run threshold (slice 4).
+# D2 posture (owner decision 2026-08-16), re-meant by the standing question
+# queue (AGENDA_QUEUE_SPEC.md §4, D-C option a, 2026-09-07): true = a full
+# CDS pass is REQUESTED on every answer, so the urgency check runs as often
+# as before; asking never waits for it — the next question comes from the
+# queue's head as soon as the turn ends. false = no pass on every answer;
+# a pass is still requested when the queue has nothing pending. Flippable
+# so the mock-patient round can compare postures as a recorded per-run
+# threshold.
 AUTO_STRICT_REVISE = os.getenv("AUTO_STRICT_REVISE", "true").lower() != "false"
 # The ratchet matches actions by meaning, not wording (owner decision
 # 2026-09-07, pilot 485 E3): a re-fired action is the same pending action
@@ -2376,10 +2381,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     auto = entry["auto"]
                     auto["revision"] = None
                     auto["bridge_used"] = False
-                    if (auto["controller"].phase in auto_mode.QUESTION_PHASES
-                            and not _plan_from_queue(
-                                auto, why="revision failed (runaway), asking from the queue in hand")):
-                        _plan_handover(auto, entry["agenda"].current_version)
+                    if auto["controller"].phase in auto_mode.QUESTION_PHASES:
+                        _ask_after_pass(auto, entry["agenda"].current_version,
+                                        "revision failed (runaway), asking from the queue in hand")
                 if cds_failures >= CDS_MAX_FAILURES:
                     await websocket.send_json(
                         {"type": "cds_unavailable",
@@ -3166,17 +3170,54 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     #                    handover sequence stands
 
     def _request_revision(auto: dict, why: str) -> None:
-        """D2: ask for a fresh CDS pass now (maybe_run_cds launches it,
-        bypassing CDS_MIN_NEW_CHARS) and ask only from what it returns.
-        Non-strict runs plan from the standing queue instead — unless it
-        has nothing pending, when the fresh pass is still needed before
-        handover can be concluded (empty counts only on a post-answer
-        revision)."""
+        """A turn has ended and the machine's next ask is due (an answer's
+        end, the golden exit, a hand-back). Spec §5 — asking does not wait
+        for the pass:
+
+        - Under AUTO_STRICT_REVISE (D-C option a, the recommended
+          cadence) a full CDS pass is requested on every answer, so the
+          urgency check runs exactly as often as before the queue;
+          maybe_run_cds launches it at once, bypassing CDS_MIN_NEW_CHARS.
+          The flag now says only whether that pass is requested — never
+          whether the ask waits for it.
+        - If the queue has a pending item, the next ask is planned NOW
+          from its head (topic call, pre-synthesis, issue at the next
+          permitting quiet); a running pass never blocks it, and its
+          merge may change the head before the ask after this one, which
+          is fine.
+        - Empty rules: nothing pending and a pass running → one bridge
+          "go on" and wait for the merge (handle_quiet); nothing pending
+          and no pass running → request one; still nothing after the
+          merge of a post-answer revision → the handover sequence
+          (_ask_after_pass)."""
         auto["bridge_used"] = False
-        if not AUTO_STRICT_REVISE and _plan_from_queue(auto, why=f"{why} (ask-from-current)"):
+        if AUTO_STRICT_REVISE:
+            auto["revision"] = "requested"
+            logger.info("Live session %s: auto revision requested (%s)", session_id, why)
+        if _plan_from_queue(auto, why=why):
             return
-        auto["revision"] = "requested"
-        logger.info("Live session %s: auto revision requested (%s)", session_id, why)
+        if auto["revision"] is None:
+            auto["revision"] = "requested"
+            logger.info("Live session %s: auto revision requested — nothing pending (%s)",
+                        session_id, why)
+
+    def _ask_after_pass(auto: dict, version: int, why: str) -> None:
+        """The pass auto mode asked for has landed (and merged) or failed.
+        A plan already under way, or a question already queued, is left
+        alone. Nothing pending after a post-answer revision → the handover
+        sequence (§6 as amended; it issues at the next turn end if the
+        patient is speaking). Something pending and the turn already
+        ended → the ask was waiting for this pass: plan it now. Something
+        pending and the patient mid-turn → nothing here; that turn's end
+        plans from the head (spec §5), after slice 3's re-rank."""
+        if auto["queued"] is not None:
+            return
+        if auto["plan_task"] is not None and not auto["plan_task"].done():
+            return
+        if not auto["queue"].has_pending:
+            _plan_handover(auto, version)
+        elif auto["turn_ended"]:
+            _plan_from_queue(auto, why=why)
 
     def _agenda_ref(item) -> tuple[int, int] | None:
         """Where the whitelist finds a queue item's words: the (assessment
@@ -3216,6 +3257,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         planned again straight after itself."""
         if auto["plan_task"] is not None and not auto["plan_task"].done():
             return True
+        if auto["queued"] is not None and auto["queued"]["kind"] == "question":
+            return True                      # already prepared, waiting for its quiet
         queue: agenda_queue.AgendaQueue = auto["queue"]
         while True:
             pending = queue.pending
@@ -3403,10 +3446,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["bridge_used"] = False
         if auto["controller"].phase not in auto_mode.QUESTION_PHASES:
             return
-        if auto["queued"] is not None:
-            return
-        if not _plan_from_queue(auto, why="post-answer revision"):
-            _plan_handover(auto, version)
+        _ask_after_pass(auto, version, "post-answer revision")
 
     async def on_auto_utterance_ended(utterance: speech.Utterance, reason: str) -> None:
         """The lifecycle end of an AUTO utterance, from handle_speak_ended.
@@ -3815,6 +3855,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                             if verdict is not None else {}),
                          "at_audio_s": round(session.audio_seconds, 1)})
         if not answer:
+            # A turn end with nothing asked and nothing awaited — the span
+            # after the golden exit's pass landed mid-speech, or after a
+            # doctor's word — is still a moment the machine may speak in:
+            # if nothing is queued and the queue has a head, plan it now
+            # (spec §5); an empty queue with a pass running keeps waiting
+            # for the merge, and the handover phrase, when queued, issues
+            # on this turn end as before.
+            if (ctl.phase in auto_mode.QUESTION_PHASES and auto["queued"] is None
+                    and auto["handover"] is None):
+                _plan_from_queue(auto, why=f"turn ended with nothing asked ({by})")
             return
         auto["awaiting_answer"] = False
         item_id, auto["asked_item_id"] = auto.get("asked_item_id"), None
@@ -3962,13 +4012,18 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         #    ONE per golden window, "go on" only, after
         #    AUTO_ENCOURAGER_MIN_QUIET_S of quiet, never once the window has
         #    run. In the question phases: the single bridge while the
-        #    revision runs, at AUTO_ENCOURAGER_QUIET_S, one per revision as
-        #    before — the same phrase. No cooldown: each rule is stricter
-        #    than the 8 s rotation cooldown it replaces.
+        #    revision runs AND there is nothing to ask (spec §5: the queue
+        #    empty, nothing planned or queued), at AUTO_ENCOURAGER_QUIET_S,
+        #    one per revision as before — the same phrase. With a question
+        #    in preparation the bridge would land a second before it. No
+        #    cooldown: each rule is stricter than the 8 s rotation cooldown
+        #    it replaces.
         golden_wants = (in_golden and not auto["golden_window_ran"]
                         and not auto["golden_encourager_used"]
                         and quiet_s >= AUTO_ENCOURAGER_MIN_QUIET_S)
-        bridge_wants = (not in_golden and auto["revision"] is not None
+        nothing_to_ask = (auto["queued"] is None and not auto["queue"].has_pending
+                          and (auto["plan_task"] is None or auto["plan_task"].done()))
+        bridge_wants = (not in_golden and auto["revision"] is not None and nothing_to_ask
                         and not auto["bridge_used"] and quiet_s >= AUTO_ENCOURAGER_QUIET_S)
         if (golden_wants or bridge_wants) and free:
             prepared = await auto_issue(auto_mode.PhraseUtterance(speech.ENCOURAGER_ID),

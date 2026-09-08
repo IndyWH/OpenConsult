@@ -59,9 +59,15 @@ When: after each answered turn, unless a full pass is in flight (D-F).
 ## 4. Cadence (D-C)
 (a) Full pass on every answer as now; the queue makes asking
     non-blocking. GPU load unchanged; latency solved; cleanest
-    measurement of the queue's own effect. RECOMMENDED first.
+    measurement of the queue's own effect. RECOMMENDED first. BUILT
+    (slice 2): this is `AUTO_STRICT_REVISE=true`, whose meaning is now
+    "a full pass is requested on every answer" — not "asking waits for
+    it", which nothing does any more. `false` requests no pass on every
+    answer (one is still requested when the queue has nothing pending)
+    and is the comparison posture for the mock-patient round; a test
+    counts exactly one pass per answer under (a).
 (b) Full pass every second answer, re-rank every answer — behind a
-    flag for later. Halves the heavy load.
+    flag for later (slice 5). Halves the heavy load.
 Guarantee under either: the urgency check runs on its own memory-less
 call at every answered turn, whatever the full-pass cadence — pinned by
 a test.

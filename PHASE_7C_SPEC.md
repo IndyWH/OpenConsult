@@ -286,20 +286,29 @@ when a verdict is applied, and whether or not the officer answered.
 The window's end is now visible in the record even when it does not
 coincide with an exit. Before the window, behaviour is as above.
 
-**D2 — DECIDED 2026-08-16: strict-revise.** The parent spec says:
-one question at a time, wait for the answer, let the CDS revise on
-each answer. A full CDS pass is ~17 s (three sequential calls), and
-segments commit ~2 s behind live — so waiting for a fresh agenda
-after every answer paces the interview at roughly one question per
-20–25 s. That is accepted for the first runs: after an answer ends,
-auto mode triggers a CDS pass (dropping the 150-char growth threshold
-to run per answer) and asks only from the fresh agenda, bridging the
-wait with at most one encourager. Immune to asking what was just
-answered; the prereg measures manners, not pace; the parent spec's
-tie-break is "err toward waiting". `AUTO_STRICT_REVISE` stays
-flippable so the mock-patient round can compare postures as a
-recorded per-run threshold, per the prereg's requirement that tuning
-changes between runs stay visible.
+**D2 — DECIDED 2026-08-16: strict-revise; re-meant 2026-09-07 by the
+standing question queue (`AGENDA_QUEUE_SPEC.md` §4, §5, D-C option
+a).** The parent spec says: one question at a time, wait for the
+answer, let the CDS revise on each answer. As first built, auto mode
+triggered a CDS pass after every answer (dropping the 150-char growth
+threshold to run per answer) and asked ONLY from the fresh agenda,
+bridging the ~17 s wait with at most one encourager — accepted for the
+first runs as immune to asking what was just answered. Consultation 486
+measured the cost: 27.7 s mean from turn end to the next question, 74 %
+of it the pass. Now the machine asks from the standing queue and the
+pass never blocks the ask: at an answered turn end the next question is
+planned at once from the queue's head; the pass is requested in
+parallel and its merge changes the head for the ask after. Immunity to
+re-asking what was answered is the queue's discard, not the wait.
+`AUTO_STRICT_REVISE` now says only whether that full pass is requested
+on every answer (true, the recommended cadence: the urgency check runs
+exactly as often as before) or not (false: a pass is still requested
+when the queue has nothing pending); it no longer says whether asking
+waits. It stays flippable so the mock-patient round can compare
+postures as a recorded per-run threshold, per the prereg's requirement
+that tuning changes between runs stay visible. The bridge encourager
+remains for the one case that still waits: nothing pending and a pass
+running.
 
 **D3 — DECIDED 2026-08-16: the topic-scoped mini-cone.** Each new
 agenda topic is asked open-form once (template + topic), and every
@@ -487,13 +496,12 @@ v1 remedy, as with #469.
 - Encourager < 1 s: fixed phrases are pre-synthesised into the disk
   cache at service start (cache hit = 0 ms synth; play command is a
   WS message and a cached fetch).
-- Question ≤ ~2 s from end-of-turn: the top agenda question (and its
-  open-form variant when D1's topic call has run) is pre-synthesised
-  during the patient's turn — synthesis cost moves off the critical
-  path; what remains at end-of-turn is the officer call (~1 s) and
-  playback start. Under D2(a) strict-revise, the budget applies from
-  fresh-agenda-ready to question, and the gap from answer to question
-  is the CDS pass — reported per run, not hidden.
+- Question ≤ ~2 s from end-of-turn: the next question is planned from
+  the standing queue's head at the turn end (topic call ~1 s, then
+  synthesis, a cache hit when pre-synthesised); what remains is
+  playback start. The CDS pass is no longer in the gap (D2 as re-meant:
+  it runs in parallel and its merge shapes the ask after). 486's
+  baseline to beat is a 27.7 s mean from turn end to Alba speaking.
 - The officer and topic calls reuse `CDS_NUM_CTX` so MedGemma is
   never reloaded (an `num_ctx` change costs ~4–10 s).
 - All thresholds in force are recorded per run, as the prereg

@@ -138,27 +138,33 @@ def test_the_486_case_end_to_end_an_answered_question_proposed_again_is_never_pl
         s.play(first["utterance_id"])
         s.turn_end("I smoke, and my blood pressure was high once.")
         assert risk.status is ItemStatus.ANSWERED
-        second = s.wait_for_auto_speak()          # pass 2 merged: Q_RISK discarded, Q_NAUSEA new head
-        assert second["text"] == "Can you tell me more about nausea?"
-        assert queue.find(Q_NAUSEA).status is ItemStatus.ASKED
-        assert pending_texts(s) == [Q_ONSET]
+        second = s.wait_for_auto_speak()          # the head in hand, asked without waiting for pass 2
+        assert second["text"] == "Can you tell me more about the chest pain?"
         s.play(second["utterance_id"])
-        s.turn_end("No, not sick.")
-        third = s.wait_for_auto_speak()           # pass 3 proposes Q_RISK a third time: discarded again
-        assert third["text"] == "Can you tell me more about the chest pain?"
+        wait_for_pass(s, 2)                       # pass 2 merges mid-answer: Q_RISK discarded, Q_NAUSEA added
+        assert pending_texts(s) == [Q_NAUSEA]
         assert risk.status is ItemStatus.ANSWERED
+        s.turn_end("Tuesday, quite suddenly.")
+        third = s.wait_for_auto_speak()
+        assert third["text"] == "Can you tell me more about nausea?"
         s.play(third["utterance_id"])
+        s.turn_end("No, not sick.")               # pass 3 proposes Q_RISK a third time: discarded again
+        fourth = s.wait_for_auto_speak()
+        assert fourth["ref_id"] == "anything_else", "nothing left that has not been asked: spent"
+        assert risk.status is ItemStatus.ANSWERED
         assert "asked_answered" not in s.auto and "asked_open" not in s.auto, "retired"
         _stop(s)
     consumed = _audit("auto.queue_consumed", s.session_id)
-    assert [c["text"] for c in consumed] == [Q_RISK, Q_NAUSEA, Q_ONSET]
+    assert [c["text"] for c in consumed] == [Q_RISK, Q_ONSET, Q_NAUSEA]
     assert all(c["by"] == "auto" for c in consumed)
-    assert [c["id"] for c in consumed] == [risk.id, "q3", "q2"], "consumed by id: the planned item, not whatever is head"
+    assert [c["id"] for c in consumed] == [risk.id, "q2", "q3"], "consumed by id: the planned item"
     answered = _audit("auto.queue_answered", s.session_id)
-    assert [a["text"] for a in answered] == [Q_RISK, Q_NAUSEA]
+    assert [a["text"] for a in answered] == [Q_RISK, Q_ONSET, Q_NAUSEA]
     merges = _audit("auto.queue_merged", s.session_id)
-    assert [(m["version"], m["discarded"]) for m in merges] == [(1, 0), (2, 1), (3, 1)]
-    assert all(d["text"] == Q_RISK for m in merges[1:] for d in m["discarded_items"])
+    # v4 is the nausea answer's own pass (the scripted engine repeats its
+    # last agenda): both proposals already answered, discarded again.
+    assert [(m["version"], m["discarded"]) for m in merges] == [(1, 0), (2, 2), (3, 2), (4, 2)]
+    assert all(Q_RISK in [d["text"] for d in m["discarded_items"]] for m in merges[1:])
     assert _audit("auto.reask_suppressed", s.session_id) == [], "retired with the asked-answered list"
 
 
@@ -231,3 +237,191 @@ def test_a_politeness_aborted_question_goes_back_to_pending_at_its_rank_and_is_a
     consumed = _audit("auto.queue_consumed", s.session_id)
     assert [c["id"] for c in consumed] == [item.id, item.id], "consumed twice: once per issue"
     assert [a["id"] for a in _audit("auto.queue_answered", s.session_id)] == [item.id]
+
+
+# ==========================================================================
+# Item 3: asking does not wait for the pass (spec §5); the empty rules; D-C (a)
+
+def test_with_a_pending_item_the_next_ask_is_planned_at_the_turn_end_before_the_pass_lands(gate):
+    """The point of the queue. The answer's turn end requests the pass
+    (strict) AND plans the next ask from the head in the same call — the
+    plan exists the moment the turn end has been judged, while the pass
+    is still held — and the question is issued with the pass still in
+    flight. 486: 27.7 s of that gap was the pass."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_NAUSEA]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about the chest pain?"
+        s.play(first["utterance_id"])
+        gate_event = s.ws.portal.call(lambda: __import__("asyncio").Event())
+        engine.gate_event = gate_event                  # hold every pass from here
+        topic_calls_before = len(engine.topic_calls)
+        passes_before = len(engine.updates)
+        s.turn_end("Tuesday night, quite suddenly.")   # the answer's turn end, in this probe
+        # Same event-loop turn as the turn end: the plan task already exists
+        # and the pass has been requested but has not landed.
+        assert s.auto["turn_ended"] is True
+        assert s.auto["plan_task"] is not None, "planned in _end_turn, not after on_fresh_agenda"
+        assert s.auto["revision"] in ("requested", "running"), "the full pass is still requested (D-C a)"
+        assert len(engine.updates) == passes_before, "the pass has not landed"
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?", "the head, asked with the pass in flight"
+        assert len(engine.updates) == passes_before, "still in flight"
+        assert len(engine.topic_calls) == topic_calls_before + 1
+        assert s.auto["revision"] == "running"
+        s.play(nxt["utterance_id"])
+        s.ws.portal.call(gate_event.set)               # the pass lands now, mid-answer
+        wait_for_pass(s, passes_before + 1)
+        assert pending_texts(s) == [Q_NAUSEA, Q_TABLETS], "merged: the new pass first, the survivor after"
+        assert s.auto["queued"] is None, "nothing planned mid-answer: the turn end plans from the head"
+        s.turn_end("Badly.")
+        third = s.wait_for_auto_speak()
+        assert third["text"] == "Can you tell me more about nausea?" or third["text"] == Q_NAUSEA
+        _stop(s)
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    merges = _audit("auto.queue_merged", s.session_id)
+    assert [c["text"] for c in consumed][:2] == [Q_ONSET, Q_SLEEP]
+    assert len(merges) == 3 and merges[1]["version"] == 2
+
+
+def test_under_the_queue_exactly_one_full_pass_runs_per_answer(gate):
+    """D-C option (a), pinned: with AUTO_STRICT_REVISE=true a full pass is
+    requested on every answered turn end even though the ask never waits
+    for it — so the urgency check (its own call inside the pass) runs
+    exactly as often as before the queue. Three answers → three passes
+    after the golden exit's one."""
+    assert appmain.AUTO_STRICT_REVISE is True
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE, Q_NAUSEA]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        ask = s.wait_for_auto_speak()
+        wait_for_pass(s, 1)
+        for answer in ("Tuesday.", "Badly.", "Sometimes."):
+            passes_before = len(engine.updates)
+            s.play(ask["utterance_id"])
+            s.turn_end(answer)
+            ask = s.wait_for_auto_speak()
+            wait_for_pass(s, passes_before + 1)
+            assert len(engine.updates) == passes_before + 1, "one full pass per answer, no more, no fewer"
+        _stop(s)
+    turn_ends = [t for t in _audit("auto.turn_ended", s.session_id) if t["answer"]]
+    assert len(turn_ends) == 3
+    assert len(engine.updates) == 4
+
+
+def test_empty_rule_one_nothing_pending_and_a_pass_running_gives_one_bridge_and_waits(gate, monkeypatch):
+    """Spec §5: the queue is empty after the answer (its one item was just
+    answered) and the post-answer pass is running → at most one "go on"
+    and no question until the merge lands; then the head is asked."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET], [Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        gate_event = s.ws.portal.call(lambda: __import__("asyncio").Event())
+        engine.gate_event = gate_event
+        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)
+        s.turn_end("Tuesday night.")
+        assert not s.auto["queue"].has_pending
+        assert s.auto["plan_task"] is None or s.auto["plan_task"].done(), "nothing being prepared"
+        assert s.auto["revision"] in ("requested", "running")
+        heard = []
+        q = 3.3
+        for _ in range(5):
+            q += 0.8
+            s.quiet(q)
+            heard += [m for m in s.probe() if m.get("type") == "auto_speak"]
+            for m in heard:
+                if m["ref_id"] == "go_on" and s.entry["pending_utterance"]:
+                    s.play(m["utterance_id"])
+        assert [m["ref_id"] for m in heard] == ["go_on"], "one bridge, no question, while the pass runs"
+        s.ws.portal.call(gate_event.set)
+        s.commit_transcript("still here")
+        s.quiet(3.4)
+        s.probe()
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        _stop(s)
+
+
+def test_empty_rule_two_nothing_pending_and_no_pass_running_requests_a_pass(gate, monkeypatch):
+    """Spec §5, discriminated with AUTO_STRICT_REVISE=false so no pass is
+    requested on the answer itself: the answer empties the queue and no
+    pass is running → one is requested; its merge supplies the next ask.
+    And, the flag's new meaning: with an item pending, the earlier answer
+    requested NO pass."""
+    monkeypatch.setattr(appmain, "AUTO_STRICT_REVISE", False)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP], [Q_TABLETS]]
+    # "your tablets" would match the opened "your sleep" at 0.636 under the
+    # cone's threshold (a slice-3 matcher property, flagged in HANDOVER);
+    # the topic here is chosen so this test is about the empty rule only.
+    engine.topics[Q_TABLETS] = "the tablets"
+    with live(gate) as s:
+        s.to_golden()
+        s.land_pass()                                  # pass 1 merged in the golden minutes
+        s.to_open()                                    # the exit: pending → no pass requested
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about the chest pain?"
+        assert len(engine.updates) == 1 and s.auto["revision"] is None
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday.")                         # pending (Q_SLEEP) → planned, still no pass
+        second = s.wait_for_auto_speak()
+        assert second["text"] == "Can you tell me more about your sleep?"
+        assert len(engine.updates) == 1, "strict off: no pass on an answer while something is pending"
+        s.play(second["utterance_id"])
+        s.turn_end("Badly.")                           # empties the queue, no pass running → request one
+        assert s.auto["revision"] in ("requested", "running")
+        third = s.wait_for_auto_speak()
+        assert third["text"] == "Can you tell me more about the tablets?"
+        assert len(engine.updates) == 2, "exactly the one pass the empty rule asked for"
+        _stop(s)
+    assert _audit("auto.enabled", s.session_id)[0]["thresholds"]["strict_revise"] is False
+
+
+def test_empty_rule_three_still_empty_after_the_post_answer_merge_hands_over_with_the_refill_return(gate):
+    """Spec §5, §6 as amended: the post-answer pass proposes only questions
+    already asked and answered → the merge discards them all → nothing
+    pending → the anything-else phrase; its answer's pass refills → back
+    to the questions; the next pass empties again → the examination
+    handover, and anything-else is not spoken twice."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET], [Q_ONSET], [Q_ONSET, Q_TABLETS], [Q_ONSET, Q_TABLETS]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday night.")                  # pass 2: only the answered one → spent
+        anything = s.wait_for_auto_speak()
+        assert anything["ref_id"] == "anything_else"
+        assert not queue.has_pending and queue.find(Q_ONSET).status is ItemStatus.ANSWERED
+        s.play(anything["utterance_id"])
+        s.turn_end("My tablets — I keep forgetting them.")   # pass 3 refills
+        back = s.wait_for_auto_speak()
+        assert back["text"] == "Can you tell me more about your tablets?"
+        s.play(back["utterance_id"])
+        s.turn_end("Most mornings.")                  # pass 4: both answered → spent again
+        final = s.wait_for_auto_speak()
+        assert final["ref_id"] == "examination_handover"
+        s.play(final["utterance_id"])
+        s.probe()
+        assert s.phase.value == "handover"
+        _stop(s)
+    merges = _audit("auto.queue_merged", s.session_id)
+    assert [(m["version"], m["discarded"], m["pending"]) for m in merges] == [
+        (1, 0, 1), (2, 1, 0), (3, 1, 1), (4, 2, 0)]
+    assert len(_audit("auto.handover", s.session_id)) == 1

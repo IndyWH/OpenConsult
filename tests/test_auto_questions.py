@@ -373,10 +373,17 @@ def _rows(cid):
 # D2: strict-revise
 
 def test_strict_revise_asks_only_from_the_fresh_agenda(gate):
-    """The agenda that stood before the answer is never asked from: after
-    the golden exit (itself a turn end) a CDS pass runs at once — no
-    150-char growth needed — and the first ask comes from what it
-    returned. Its row is a template ask (a new topic) with the §11 record."""
+    """After the golden exit (itself a turn end) a CDS pass runs at once —
+    no 150-char growth needed — and, with nothing in the standing queue,
+    the first ask comes from what it returned. Its row is a template ask
+    (a new topic) with the §11 record.
+
+    REPINNED 2026-09-07 (the standing question queue, spec §5): the
+    original property — "the agenda that stood before the answer is never
+    asked from" — is no longer the rule; the machine asks from the queue,
+    and what stood before IS asked from when it is pending. What this
+    test still pins: a panel version the machine never saw land (seeded
+    here) is not in the queue and is not asked; the exit's pass runs."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True)]
     engine.agendas = [[Q_ONSET]]                       # the FRESH agenda
