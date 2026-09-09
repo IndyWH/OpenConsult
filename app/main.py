@@ -1867,7 +1867,8 @@ def _new_auto_state() -> dict:
         "golden_unanswered": 0,
         "golden_encourager_span": None,
         "quiet_span_seq": 0,
-        "last_quiet_s": None,         # to notice a fresh quiet span
+        "last_quiet_s": None,         # the last report's quiet (the fallback fresh-span test)
+        "last_span": None,            # the client's span number on the last report (G3: the fresh-span test)
         "officer_task": None,         # the in-flight end-of-turn call, if any
         "officer_quiet_s": None,      # the quiet the running officer was asked about
         "officer_deferred": None,     # the CDS pass version the running officer waits behind (E4)
@@ -4638,7 +4639,24 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         if quiet_s < 0:
             return
-        fresh = auto["last_quiet_s"] is None or quiet_s < auto["last_quiet_s"]
+        # A fresh quiet span is never invisible (owner decision 2026-09-09,
+        # pilot 489 G3). The client numbers its spans — `span`, incremented
+        # at every activity() — and a fresh span is a new number. Before,
+        # the test was quiet_s < last_quiet_s, and the client rounds every
+        # threshold report to 0.1 s, so a new span whose first report
+        # equalled the previous span's last (1.8 after 1.8: the patient
+        # began 1.75–3 s after the last span began, the common case after a
+        # question's playback) was invisible: in 489 Q3's answer was never
+        # seen, the 5 s fallback could not end the turn, and the grace
+        # re-asked an answered question. A report without a span (an older
+        # page) keeps the old test.
+        span = payload.get("span")
+        if isinstance(span, (int, float)) and not isinstance(span, bool):
+            span = int(span)
+            fresh = auto["last_span"] is None or span != auto["last_span"]
+            auto["last_span"] = span
+        else:
+            fresh = auto["last_quiet_s"] is None or quiet_s < auto["last_quiet_s"]
         # G6 instrumentation (owner decision 2026-09-09): the report's RMS
         # trace is kept for the turn_ended row, and the report itself is
         # audited — the first of every span always, then at most one per
@@ -4668,16 +4686,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              "phase": ctl.phase.value,
                              "at_audio_s": round(session.audio_seconds, 1)})
         if fresh:
-            # A fresh quiet span: the patient spoke (or we did) in between.
-            # The officer is re-asked either way; a judged turn end is
-            # cleared only when the PATIENT spoke (owner decision
-            # 2026-09-07, pilot 485 E2): our own utterances — the bridge
-            # encourager above all — restart the client's span too, and in
-            # 485 the bridge 1 s after the golden exit erased the turn end
-            # the exit had set, so the first ask needed a second judgement
-            # in a silent room. The client says what began the span
-            # (`since`: "playback" or "speech"); a report without it is
-            # read as speech, the cautious side.
+            # A fresh quiet span (by the client's span number, G3): the
+            # patient spoke (or we did) in between. The officer is re-asked
+            # either way; a judged turn end is cleared only when the
+            # PATIENT spoke (owner decision 2026-09-07, pilot 485 E2): our
+            # own utterances restart the client's span too, and in 485 the
+            # bridge 1 s after the golden exit erased the turn end the exit
+            # had set, so the first ask needed a second judgement in a
+            # silent room. The client says what began the span (`since`:
+            # "playback" or "speech"); a report without it is read as
+            # speech, the cautious side.
             auto["officer_last_run_quiet_s"] = None
             auto["officer_verdict"] = None
             auto["quiet_span_seq"] += 1      # every fresh span, whatever began it

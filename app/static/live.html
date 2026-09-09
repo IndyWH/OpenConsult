@@ -908,7 +908,7 @@ async function initMic() {
       // (owner decision 2026-09-09, G6/G11): the reading it was taken at,
       // the floor it was judged against, and the RMS trace.
       ws.send(JSON.stringify({type: 'quiet', quiet_s: Math.round(quietS * 10) / 10,
-                              since: quietReporter.since,
+                              since: quietReporter.since, span: quietReporter.span,
                               rms: Math.round(rms * 1e5) / 1e5, floor: quietReporter.floor,
                               trace: quietReporter.trace.slice(),
                               trace_step_ms: quietReporter.traceStepMs}));
@@ -1450,6 +1450,8 @@ const quietReporter = {
   floor: 0.02,           // "this is speech": bargeIn.absFloor, copied at configure
   quietSince: null,      // ms of the last activity; null = not tracking
   since: 'speech',       // what began this span: 'speech' (room energy) or 'playback' (our own voice)
+  span: 0,               // the span's number, incremented at every activity() (G3, 2026-09-09):
+                         // the server keys "a fresh span" on it, not on quiet_s falling
   crossed: 0,            // thresholds already reported in this quiet span
   lastReportAt: null,    // ms of the last report in this span
   // The RMS trace (owner decision 2026-09-09, pilot 489/490 G6): a ring of
@@ -1483,6 +1485,7 @@ const quietReporter = {
   activity(now, cause) {
     this.quietSince = now; this.crossed = 0; this.lastReportAt = null;
     this.since = cause === 'playback' ? 'playback' : 'speech';
+    this.span += 1;
   },
   // Called at the meter's rate. Returns the quiet duration to report (s),
   // or null. `busy` is our own playback or a request in flight.

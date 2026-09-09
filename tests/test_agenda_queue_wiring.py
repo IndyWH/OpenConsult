@@ -13,6 +13,7 @@ Every test here runs with AUTO_MODE_ENABLED forced on for the session
 
 from __future__ import annotations
 
+import json
 import time
 
 import pytest  # noqa: F401
@@ -1342,4 +1343,76 @@ def test_quiet_reports_are_audited_and_rate_bounded(gate, monkeypatch):
         rows = _audit("auto.quiet_report", s.session_id)
         assert len(rows) == 4 and [r["quiet_s"] for r in rows[-2:]] == [3.0, 3.2]
         assert rows[-1]["fresh"] is False
+        _stop(s)
+
+
+# ==========================================================================
+# Pilot fix slice 4, item 8 (owner decision 2026-09-09, pilot 489 G3):
+# a fresh quiet span is never invisible
+
+def test_the_489_q3_shape_a_new_span_whose_first_report_equals_the_last_is_seen_and_the_answer_ends_the_turn(gate):
+    """489 Q3: the question's playback ended; the reporter's span (since
+    playback) reported 2.0; the patient began answering ~2 s later, so
+    the NEW span's first report was 2.0 too, and the server — keying a
+    fresh span on quiet_s falling — never saw it: awaiting_speech stayed
+    set, no turn end came, and at 12 s the grace re-asked an answered
+    question. Now the client numbers its spans and the server keys on
+    the number: the equal report on a new span is seen, awaiting_speech
+    clears, span_seq bumps, and the 3.5 s fallback ends the turn; the
+    grace re-ask does not fire. The attack reaches its target: the two
+    reports carry the same quiet_s and differ only by span."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])                  # the span restarts at our playback's end
+        assert s.since == "playback"
+        s.quiet(2.0)                                   # the playback span's report: 2.0
+        s.probe()
+        assert s.auto["awaiting_speech"] is True, "no patient speech yet (F5)"
+        seq_before = s.auto["span_seq"]
+        # The patient begins ~2 s after the playback span began: a NEW span
+        # whose first report is 2.0 again. The harness plays the client:
+        # activity → span + 1, since=speech; no transcript is committed yet
+        # (the words are still in flight) — exactly the 489 shape.
+        s.since = "speech"
+        s.span += 1
+        s.quiet(2.0)
+        s.probe()
+        assert s.auto["awaiting_speech"] is False, "the fresh span was seen: the patient has spoken"
+        assert s.auto["span_seq"] == seq_before + 1
+        assert s.auto["turn_ended"] is False
+        s.quiet(3.6)                                   # the 3.5 s fallback ends the answer's turn
+        s.probe()
+        assert s.auto["turn_ended"] is True
+        _stop(s)
+    ended = [t for t in _audit("auto.turn_ended", s.session_id) if t["answer"]]
+    assert len(ended) == 1 and ended[0]["by"] == "quiet_fallback" and ended[0]["quiet_s"] == 3.6
+    assert _audit("auto.reask_no_answer", s.session_id) == [], "no grace re-ask of an answered question"
+    reports = _audit("auto.quiet_report", s.session_id)
+    equal = [r for r in reports if r["quiet_s"] == 2.0]
+    assert len(equal) >= 2 and equal[-1]["span"] == equal[-2]["span"] + 1 and equal[-1]["fresh"] is True
+
+
+def test_a_report_without_a_span_number_keeps_the_old_fresh_span_test(gate):
+    """An older page sends no span: the server falls back to quiet_s
+    falling below the last report — the pre-G3 rule — so nothing breaks
+    and the two rules never mix within one session's reports of a kind."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.ws.send_text(json.dumps({"type": "quiet", "quiet_s": 2.0, "since": "playback"}))
+        s.probe()
+        assert s.auto["awaiting_speech"] is True
+        s.ws.send_text(json.dumps({"type": "quiet", "quiet_s": 1.0, "since": "speech"}))   # falls: fresh
+        s.probe()
+        assert s.auto["awaiting_speech"] is False
         _stop(s)

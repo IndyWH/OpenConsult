@@ -934,10 +934,16 @@ def test_resume_from_golden_keeps_the_golden_seconds_already_spent(gate, monkeyp
         _stop(s)
 
 
-def test_the_windows_one_encourager_is_one_across_a_pause_and_resume(gate, monkeypatch):
-    """"At most one per golden window" (owner decision 2026-09-01) counts
-    the window, not the stretch: an encourager spoken before a pause is
-    the window's one, and the resumed GOLDEN earns no second."""
+def test_the_encourager_count_is_the_windows_across_a_pause_and_resume(gate, monkeypatch):
+    """REPINNED 2026-09-09 (owner decision, golden window encouragers;
+    reversing the 1 Sept one-per-window rule this test pinned). What is
+    kept: the encourager bookkeeping counts the WINDOW, not the stretch —
+    a pause and resume neither reset it nor start it over. An encourager
+    spoken before the pause is the first (go_on, one unanswered); the
+    resumed GOLDEN's fresh span earns the second phrasing
+    (tell_me_more_short, two unanswered); the next qualifying silence
+    then ends the window early — the count carried across the pause —
+    and the exit follows on the fallback quiet."""
     monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 5.0)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(False, False)]
@@ -952,12 +958,21 @@ def test_the_windows_one_encourager_is_one_across_a_pause_and_resume(gate, monke
         _fire_pass(s, LONG)                                   # paused
         _ack(s, "resume")
         assert s.phase.value == "golden"
-        for q in (5.5, 8.0, 12.0):
-            s.quiet(q)
-            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"a second at {q}s"
+        assert s.auto["golden_encourager_count"] == 1 and s.auto["golden_unanswered"] == 1
+        s.quiet(5.5)                                          # a fresh span after the resume
+        second = _until(s.ws, {"auto_speak"})
+        assert second["ref_id"] == "tell_me_more_short", "the window's second, not a fresh first"
+        s.play(second["utterance_id"])
+        s.quiet(5.5)                                          # the third qualifying silence
+        s.probe()
+        assert s.auto["golden_window_ran"] is True
+        assert s.phase.value == "open", "the window ended early and the exit followed"
         cid = _stop(s)
-    assert [r["text"] for r in _rows(cid) if r["ref_detail"].get("via") == "auto"
-            and r["text"] == "Go on."] == ["Go on."]
+    spoken = [r["ref_detail"]["id"] for r in _rows(cid) if r["ref_detail"].get("via") == "auto"
+              and r["ref_detail"]["id"] in speech.GOLDEN_ENCOURAGER_IDS]
+    assert spoken == ["go_on", "tell_me_more_short"]
+    ran = _audit("auto.golden_window_ran", s.session_id)
+    assert len(ran) == 1 and ran[0]["reason"] == "unanswered_encouragers" and ran[0]["encouragers"] == 2
 
 
 def test_the_window_runs_correctly_across_two_pauses_the_482_arithmetic(gate, monkeypatch):

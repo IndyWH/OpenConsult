@@ -329,6 +329,21 @@ until the mock-patient round:
   judgement in a silent room — which, under the officer's "not finished"
   tie-break, might never have come.
 
+  **A fresh quiet span is never invisible (owner decision 2026-09-09,
+  after consultation 489, finding G3).** The client numbers its spans —
+  `span` on every report, incremented at every `activity()`, the
+  patient's or our own playback — and the server keys the fresh-span
+  test on the number, not on `quiet_s` falling below the last report's.
+  The client rounds every threshold report to 0.1 s, so the first report
+  of every span read 1.8 (now 2.0), and a new span whose first report
+  equalled the previous span's last — the patient beginning 1.75–3 s
+  after the last span began, the common case after a question's
+  playback — was invisible: in 489 Q3's answer was never seen by the
+  server, `awaiting_speech` was not cleared, the fallback could not end
+  the turn, and the grace re-asked an answered question ("I think I
+  answered that question"). A report without a span number (an older
+  page) keeps the old test; `since` travels as before.
+
 **Politeness abort (interruption count ~0 by construction).** The
 server never orders playback into live speech: an `auto_speak` is only
 issued while the quiet window is still open, and the client re-checks

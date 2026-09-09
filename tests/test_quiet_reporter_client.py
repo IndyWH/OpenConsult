@@ -73,8 +73,13 @@ out.crossedAll = r.crossed;
 out.busy = r.poll(9100, true);
 out.afterBusy = r.poll(9100, false);          // same instant, not busy → the report busy withheld
 
-// Activity starts a fresh span: back below the first threshold.
+// Activity starts a fresh span: back below the first threshold — and a
+// new span NUMBER (G3, 2026-09-09), which is what the server keys on.
+out.spanBefore = r.span;
 r.activity(10000);
+out.spanAfter = r.span;
+r.activity(10000, 'playback');
+out.spanAfterPlayback = r.span;
 out.afterActivityCrossed = r.crossed;
 out.t10500 = r.poll(10500, false);            // 0.5 s: nothing
 out.t11800 = r.poll(11800, false);            // 1.8 s: first threshold again
@@ -119,6 +124,11 @@ def test_the_shipped_reporter_executed_under_node():
     assert out["afterBusy"] == pytest.approx(8.1)
 
     assert out["afterActivityCrossed"] == 0
+    # G3 (owner decision 2026-09-09, pilot 489): every activity — the
+    # patient's or our own playback — numbers a new span, so a fresh span
+    # whose first report equals the previous span's last is still seen.
+    assert out["spanAfter"] == out["spanBefore"] + 1
+    assert out["spanAfterPlayback"] == out["spanBefore"] + 2
     assert out["t10500"] is None
     assert out["t11800"] == pytest.approx(1.8), "a fresh span crosses the first threshold again"
 
@@ -150,7 +160,7 @@ def test_the_reporter_is_fed_by_the_existing_rms_loop_at_the_speech_floor():
     # G6/G11 (owner decision 2026-09-09): every reading feeds the RMS trace,
     # and the report carries the reading, the floor and the trace.
     assert "quietReporter.sample(rms);" in loop
-    for field in ("rms: Math.round(rms * 1e5) / 1e5", "floor: quietReporter.floor",
+    for field in ("span: quietReporter.span", "rms: Math.round(rms * 1e5) / 1e5", "floor: quietReporter.floor",
                   "trace: quietReporter.trace.slice()", "trace_step_ms: quietReporter.traceStepMs"):
         assert field in loop, field
 

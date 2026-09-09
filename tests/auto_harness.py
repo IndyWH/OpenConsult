@@ -236,6 +236,7 @@ class Session:
         self.seq = 0
         self.quiet_s = 0.0
         self.since = "speech"        # what began the current quiet span (E2)
+        self.span = 1                # the client's span number, bumped at every activity (G3)
         self.thinking_heard: list[dict] = []   # every "Let me think" wait_for_auto_speak stepped over
 
     @property
@@ -289,6 +290,7 @@ class Session:
         if not keeps_quiet_clock:
             self.quiet_s = 0.0                # our playback ended: a fresh span
             self.since = "playback"
+            self.span += 1
         return seen
 
     def abort(self, utterance_id):
@@ -296,6 +298,7 @@ class Session:
                                       "seq": self.seq + 1, "reason": "politeness_abort",
                                       "rms": 0.07}))
         self.quiet_s = 0.0
+        self.span += 1                        # the voice that aborted it began a span
 
     def toggle(self, on: bool):
         self.ws.send_text(json.dumps({"type": "auto", "on": on}))
@@ -305,7 +308,7 @@ class Session:
         quiet_s and since — rms, floor, span, trace (G6/G3, 2026-09-09)."""
         self.quiet_s = quiet_s
         self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s, "since": self.since,
-                                      **extra}))
+                                      "span": self.span, **extra}))
 
     def commit_transcript(self, *lines: str):
         def _inject():
@@ -314,6 +317,7 @@ class Session:
         self.ws.portal.call(_inject)
         self.quiet_s = 0.0
         self.since = "speech"                 # the patient spoke: a fresh span of theirs
+        self.span += 1
 
     def seed_agenda(self, *questions):
         """A pre-existing agenda version, as an earlier CDS pass would have
