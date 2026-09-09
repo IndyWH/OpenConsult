@@ -147,6 +147,51 @@ def test_the_reporter_is_fed_by_the_existing_rms_loop_at_the_speech_floor():
     assert "quietReporter.poll(now, speaking !== null || pendingSpeakText !== '')" in loop
     assert "ws.send(JSON.stringify({type: 'quiet', quiet_s:" in loop
     assert "recording && ws && ws.readyState === WebSocket.OPEN" in loop
+    # G6/G11 (owner decision 2026-09-09): every reading feeds the RMS trace,
+    # and the report carries the reading, the floor and the trace.
+    assert "quietReporter.sample(rms);" in loop
+    for field in ("rms: Math.round(rms * 1e5) / 1e5", "floor: quietReporter.floor",
+                  "trace: quietReporter.trace.slice()", "trace_step_ms: quietReporter.traceStepMs"):
+        assert field in loop, field
+
+
+_TRACE_HARNESS = """
+%(reporter)s
+const out = {};
+const r = quietReporter;
+r.configure({encourager_min_quiet_s: 4.0, eot_quiet_s: 2.0, eot_fallback_s: 3.5,
+             trace_s: 8.0, trace_step_ms: 100});
+out.traceLen = r.traceLen; out.step = r.traceStepMs;
+for (let i = 0; i < 100; i++) r.sample(0.001 * i);
+out.len = r.trace.length;
+out.first = r.trace[0]; out.last = r.trace[r.trace.length - 1];
+r.configure({encourager_min_quiet_s: 4.0, eot_quiet_s: 2.0, eot_fallback_s: 3.5, trace_s: 0.5});
+out.shortLen = r.traceLen; out.cleared = r.trace.length;
+r.sample(0.123456789);
+out.rounded = r.trace[0];
+r.configure({eot_quiet_s: 2.0, eot_fallback_s: 3.5});
+out.defaultLen = r.traceLen;
+console.log(JSON.stringify(out));
+"""
+
+
+@pytest.mark.skipif(NODE is None, reason="node not available")
+def test_the_rms_trace_is_a_bounded_ring_sized_by_the_server(monkeypatch):
+    """G6 (owner decision 2026-09-09): the reporter keeps the last trace_s
+    seconds of readings at the meter's step — 80 samples for 8 s at
+    100 ms — oldest dropped first, newest last, rounded to the page's RMS
+    precision; a reconfigure resizes and clears it; without a length the
+    default is 8 s."""
+    script = _TRACE_HARNESS % {"reporter": _reporter()}
+    result = subprocess.run([NODE, "-e", script], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+    out = json.loads(result.stdout)
+    assert out["traceLen"] == 80 and out["step"] == 100
+    assert out["len"] == 80
+    assert out["first"] == pytest.approx(0.020) and out["last"] == pytest.approx(0.099)
+    assert out["shortLen"] == 5 and out["cleared"] == 0
+    assert out["rounded"] == 0.12346
+    assert out["defaultLen"] == 80
 
 
 def test_every_activity_source_resets_the_reporter():

@@ -21,7 +21,7 @@ from app import main as appmain
 from app.agenda_queue import ItemStatus
 from app.cds import OfficerVerdict
 from auto_harness import (  # noqa: F401 - the fixture is used by name
-    Q_ONSET, Q_RADIATE, Q_SLEEP, Q_TABLETS, _audit, _stop, gate, live, needs_db)
+    Q_ONSET, Q_RADIATE, Q_SLEEP, Q_TABLETS, _audit, _collect_until, _stop, gate, live, needs_db)
 
 pytestmark = needs_db
 
@@ -1237,3 +1237,109 @@ def test_every_call_is_a_model_call_row_and_a_re_rank_behind_a_held_pass_says_pa
         assert call["outcome"] == "ok" and call["queued_ms"] >= 0 and call["elapsed_ms"] >= 0
         assert call["run_ms"] is None and call["tokens"] is None, "the pass's own numbers are slice 6's"
     assert [c["version"] for c in passes] == [1, 2, 3, 4]
+
+
+# ==========================================================================
+# Pilot fix slice 4, item 7 (owner decision 2026-09-09, pilot 489/490 G6):
+# the turn-end quiet rule to 3.5 s, with the evidence recorded
+
+def test_the_fallback_fires_at_3_5_s_and_the_officer_is_asked_at_2_s(gate):
+    """AUTO_EOT_FALLBACK_S 5.0 → 3.5 and AUTO_EOT_QUIET_S 3.0 → 2.0: after
+    an answered question, a report at 2.1 s asks the officer (here "not
+    finished"), 3.4 s ends nothing, and 3.6 s ends the turn by the quiet
+    fallback with fallback_s 3.5 on the row."""
+    assert (appmain.AUTO_EOT_FALLBACK_S, appmain.AUTO_EOT_QUIET_S) == (3.5, 2.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        asked = len(engine.asked)
+        s.commit_transcript("Tuesday night, quite suddenly.")
+        s.quiet(1.9)
+        s.probe()
+        assert len(engine.asked) == asked, "under the officer's 2 s"
+        s.quiet(2.1)
+        s.probe()
+        assert len(engine.asked) == asked + 1, "the officer is asked at 2 s"
+        s.quiet(3.4)
+        s.probe()
+        assert s.auto["turn_ended"] is False, "under the 3.5 s rule"
+        s.quiet(3.6)
+        s.probe()
+        assert s.auto["turn_ended"] is True
+        _stop(s)
+    ended = [t for t in _audit("auto.turn_ended", s.session_id) if t["answer"]]
+    assert len(ended) == 1
+    assert ended[0]["by"] == "quiet_fallback" and ended[0]["quiet_s"] == 3.6
+    assert ended[0]["fallback_s"] == 3.5 and ended[0]["finished_thought"] is False
+
+
+def test_the_turn_ended_row_carries_the_clients_rms_trace(gate):
+    """G6: every quiet report carries the client's RMS trace (the last
+    AUTO_TRACE_S seconds at ~100 ms), and the auto.turn_ended row carries
+    the latest one — newest sample last — with its step, the report it
+    came with and its age, so the next run can say what the ≈ 3 s of
+    trailing energy after an answer is. A report without a trace leaves
+    the last one standing; a session that never sent one records null."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    trace = [0.0412, 0.0388, 0.021, 0.0093, 0.0041, 0.0032, 0.0031, 0.003]
+    with live(gate) as s:
+        config = next(m for m in _collect_until(s.ws, {"auto_toggled"}) if m["type"] == "speech_config")
+        assert config["auto"]["trace_s"] == appmain.AUTO_TRACE_S and config["auto"]["trace_step_ms"] == 100
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.commit_transcript("Tuesday night.")
+        s.quiet(2.0, rms=0.0041, floor=0.02, trace=trace, trace_step_ms=100)
+        s.probe()
+        s.quiet(3.6, rms=0.003, floor=0.02)               # no trace on this one: the last stands
+        s.probe()
+        assert s.auto["turn_ended"] is True
+        _stop(s)
+    ended = [t for t in _audit("auto.turn_ended", s.session_id) if t["answer"]][0]
+    assert ended["trace"] == trace and ended["trace_step_ms"] == 100
+    assert ended["trace_s"] == appmain.AUTO_TRACE_S and ended["trace_quiet_s"] == 2.0
+    assert ended["trace_age_ms"] >= 0 and ended["floor"] == 0.02
+    exit_end = [t for t in _audit("auto.turn_ended", s.session_id) if not t["answer"]]
+    assert all(t["trace"] is None for t in exit_end), "no trace was ever sent before the exit"
+
+
+def test_quiet_reports_are_audited_and_rate_bounded(gate, monkeypatch):
+    """G11: the client's quiet reports are on the record — quiet_s, span,
+    since, rms, floor, whether the report began a span — the first of
+    every span always, then at most one per AUTO_QUIET_REPORT_AUDIT_S.
+    Eight reports across two spans inside a fraction of a second → two
+    rows (the two span starts); with the bound at zero every report is a
+    row."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(False, False)]
+    engine.agendas = [[Q_ONSET]]
+    with live(gate) as s:
+        s.to_golden()
+        s.commit_transcript("It started last week.")
+        for q in (1.0, 1.5, 2.0, 2.5):                 # one span, four reports
+            s.quiet(q, rms=0.004, floor=0.02, span=7)
+            s.probe()
+        s.commit_transcript("And then it stopped.")     # the patient speaks: a fresh span
+        for q in (1.0, 1.5, 2.0, 2.5):
+            s.quiet(q, rms=0.005, floor=0.02, span=8)
+            s.probe()
+        rows = _audit("auto.quiet_report", s.session_id)
+        assert [r["fresh"] for r in rows] == [True, True], "the two span starts, nothing else inside the bound"
+        assert [r["span"] for r in rows] == [7, 8] and [r["since"] for r in rows] == ["speech", "speech"]
+        assert rows[0]["rms"] == 0.004 and rows[0]["floor"] == 0.02 and rows[0]["phase"] == "golden"
+        monkeypatch.setattr(appmain, "AUTO_QUIET_REPORT_AUDIT_S", 0.0)
+        for q in (3.0, 3.2):
+            s.quiet(q, rms=0.005, floor=0.02, span=8)
+            s.probe()
+        rows = _audit("auto.quiet_report", s.session_id)
+        assert len(rows) == 4 and [r["quiet_s"] for r in rows[-2:]] == [3.0, 3.2]
+        assert rows[-1]["fresh"] is False
+        _stop(s)

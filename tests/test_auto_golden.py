@@ -591,6 +591,8 @@ def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
                                   "encourager_min_quiet_s": appmain.AUTO_ENCOURAGER_MIN_QUIET_S,
                                   "eot_quiet_s": appmain.AUTO_EOT_QUIET_S,
                                   "eot_fallback_s": appmain.AUTO_EOT_FALLBACK_S,
+                                  # the RMS trace the client keeps (G6, 2026-09-09)
+                                  "trace_s": appmain.AUTO_TRACE_S, "trace_step_ms": 100,
                                   # the floor from the room (G2, 2026-09-09):
                                   # no sound check for this fresh account
                                   "floor": 0.02, "floor_source": "no_sound_check"}
@@ -994,26 +996,28 @@ def test_the_483_shape_a_healthy_not_finished_officer_no_longer_holds_golden_pas
     "not finished" to every ask could hold the golden minutes open
     indefinitely — and did, for 19 s in 483. Here the officer is asked
     once, says not finished, is never re-asked, and the exit comes from
-    the report at 5.1 s."""
+    the report past the fallback. REPINNED 2026-09-09 (owner decision,
+    pilot 489/490 G6): the fallback is 3.5 s and the officer's trigger
+    2.0 s, so the reports are 2.1 (asked), 3.4 (hold) and 3.6 (exit)."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
     gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
     with live(gate) as s:
         s.enable_to_golden()
         s.commit_transcript("…this is not like a usual fever. I'm worried.")
-        s.quiet(3.0)
+        s.quiet(2.1)
         s.probe()
         assert s.phase is AutoPhase.GOLDEN and len(gate.cds_engine.asked) == 1
-        s.quiet(4.9)
+        s.quiet(3.4)
         s.probe()
         assert s.phase is AutoPhase.GOLDEN, "under the fallback span: hold"
-        s.quiet(5.1)
+        s.quiet(3.6)
         s.probe()
         assert s.phase is AutoPhase.OPEN
         assert len(gate.cds_engine.asked) == 1, "the exit came from the report, not a re-ask"
         _stop(s)
     last = _audit("auto.phase", s.session_id)[-1]
     assert (last["from"], last["to"], last["trigger"]) == ("golden", "open", "golden_timer_elapsed")
-    assert last["detail"]["by"] == "quiet_fallback" and last["detail"]["quiet_s"] == 5.1
+    assert last["detail"]["by"] == "quiet_fallback" and last["detail"]["quiet_s"] == 3.6
     assert last["detail"]["fallback_s"] == appmain.AUTO_EOT_FALLBACK_S
     assert last["detail"]["handed_back"] is False, "the span's verdict travels in the record"
 
@@ -1038,21 +1042,23 @@ def test_no_encourager_once_the_window_has_run_and_the_run_is_audited_exactly_on
     encourager is issued in GOLDEN — each one restarted the client's quiet
     span and was the livelock's engine — and auto.golden_window_ran is
     written once per run, on the first observation (a quiet report or a
-    verdict), never again however many reports follow."""
+    verdict), never again however many reports follow. REPINNED 2026-09-09
+    (owner decision, G6): the fallback is 3.5 s, so the reports before it
+    stop at 3.4 and the exit comes at 3.6."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
     # The minimum quiet set BELOW the fallback, so "none after the window"
-    # is pinned on its own and not by the two thresholds coinciding at 5 s.
+    # is pinned on its own and not by the two thresholds coinciding.
     monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 2.0)
     gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
     with live(gate) as s:
         s.enable_to_golden()
         s.commit_transcript("It started on Tuesday and")
-        for q in (1.8, 2.5, 3.2, 4.0, 4.6):              # reports before the fallback
+        for q in (1.8, 2.5, 3.0, 3.2, 3.4):              # reports before the fallback
             s.quiet(q)
             assert all(m.get("type") != "auto_speak" for m in s.probe()), f"encourager at {q}s"
         assert s.entry["auto"]["golden_window_ran"] is True
         assert s.phase is AutoPhase.GOLDEN
-        s.quiet(5.2)
+        s.quiet(3.6)
         s.probe()
         assert s.phase is AutoPhase.OPEN
         _stop(s)
@@ -1091,24 +1097,27 @@ def test_a_finished_turn_before_the_window_has_run_does_not_exit_golden(gate):
 
 
 def test_a_failed_officer_is_audited_and_the_silence_rule_decides(gate, monkeypatch):
+    """REPINNED 2026-09-09 (owner decision, G6): the officer is asked at
+    2 s and the silence rule is 3.5 s; the property — a failed officer is
+    audited and the silence rule alone decides the exit — is unchanged."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
     gate.cds_engine.verdicts = [OfficerVerdict(False, False, failed="timeout", elapsed_ms=2001)]
     with live(gate) as s:
         s.enable_to_golden()
         s.commit_transcript("It started on Tuesday.")
-        s.quiet(3.2)
+        s.quiet(2.2)
         s.probe()
-        assert s.phase is AutoPhase.GOLDEN, "3.2 s is under the fallback span"
-        s.quiet(4.9)
+        assert s.phase is AutoPhase.GOLDEN, "2.2 s is under the fallback span"
+        s.quiet(3.4)
         s.probe()
         assert s.phase is AutoPhase.GOLDEN
-        s.quiet(5.1)                                     # ≥ AUTO_EOT_FALLBACK_S
+        s.quiet(3.6)                                     # ≥ AUTO_EOT_FALLBACK_S
         s.probe()
         assert s.phase is AutoPhase.OPEN
         _stop(s)
     failed = _audit("auto.officer_failed", s.session_id)
     assert len(failed) == 1
-    assert failed[0]["reason"] == "timeout" and failed[0]["quiet_s"] == 3.2
+    assert failed[0]["reason"] == "timeout" and failed[0]["quiet_s"] == 2.2
     assert failed[0]["fallback_s"] == appmain.AUTO_EOT_FALLBACK_S
     last = _audit("auto.phase", s.session_id)[-1]
     assert last["trigger"] == "golden_timer_elapsed"
@@ -1117,15 +1126,16 @@ def test_a_failed_officer_is_audited_and_the_silence_rule_decides(gate, monkeypa
 
 def test_the_officer_is_not_asked_without_committed_transcript(gate, monkeypatch):
     """Nothing to judge, no model call; the silence rule alone can move a
-    patient who never spoke once the window has run."""
+    patient who never spoke once the window has run. REPINNED 2026-09-09
+    (owner decision, G6): the silence rule is 3.5 s — 3.4 holds, 3.6 moves."""
     monkeypatch.setattr(appmain, "AUTO_GOLDEN_MINUTES_S", 0.0)
     with live(gate) as s:
         s.enable_to_golden()
-        s.quiet(3.5)
+        s.quiet(3.4)
         s.probe()
         assert gate.cds_engine.asked == []
         assert s.phase is AutoPhase.GOLDEN
-        s.quiet(5.5)
+        s.quiet(3.6)
         s.probe()
         assert s.phase is AutoPhase.OPEN
         _stop(s)

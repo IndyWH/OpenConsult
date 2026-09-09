@@ -300,9 +300,12 @@ class Session:
     def toggle(self, on: bool):
         self.ws.send_text(json.dumps({"type": "auto", "on": on}))
 
-    def quiet(self, quiet_s: float):
+    def quiet(self, quiet_s: float, **extra):
+        """A quiet report. `extra` adds what the client sends besides
+        quiet_s and since — rms, floor, span, trace (G6/G3, 2026-09-09)."""
         self.quiet_s = quiet_s
-        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s, "since": self.since}))
+        self.ws.send_text(json.dumps({"type": "quiet", "quiet_s": quiet_s, "since": self.since,
+                                      **extra}))
 
     def commit_transcript(self, *lines: str):
         def _inject():

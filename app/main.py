@@ -1460,12 +1460,31 @@ AUTO_ENCOURAGER_MAX_UNANSWERED = int(os.getenv("AUTO_ENCOURAGER_MAX_UNANSWERED",
 # auto.thinking with the reason. In 489/490 the bridge "Go on." was spoken
 # into finished answers three times while the queue had run dry (G13).
 AUTO_THINK_THRESHOLD_S = float(os.getenv("AUTO_THINK_THRESHOLD_S", "3.0"))
-# Quiet this long triggers the end-of-turn officer (app/cds.py).
-AUTO_EOT_QUIET_S = float(os.getenv("AUTO_EOT_QUIET_S", "3.0"))
-# Officer fail-soft: with the officer unavailable, quiet this long counts as
-# a finished thought. Longer than AUTO_EOT_QUIET_S on purpose — err toward
-# waiting.
-AUTO_EOT_FALLBACK_S = float(os.getenv("AUTO_EOT_FALLBACK_S", "5.0"))
+# Quiet this long triggers the end-of-turn officer (app/cds.py). 3.0 → 2.0
+# (owner decision 2026-09-09, pilot 489/490 G6; the officer's half of the
+# turn-end rule, moved with the fallback below).
+AUTO_EOT_QUIET_S = float(os.getenv("AUTO_EOT_QUIET_S", "2.0"))
+# The turn-end quiet rule: quiet this long ends the patient's turn on the
+# report itself, whatever the officer said (E1), and is the officer's
+# fail-soft. Longer than AUTO_EOT_QUIET_S on purpose — err toward waiting.
+# 5.0 → 3.5 (owner decision 2026-09-09, pilot 489/490 G6): over nine clean
+# answers the patient waited a mean 11.6 s from the last word to Alba's
+# voice, of which the 5 s rule was 5; the diagnostic's simulation of these
+# turns put 3.5 s at one answer of nine cut on the pessimistic (transcript)
+# reading and none on the optimistic (RMS) reading, 2.5 s at two. The
+# ≈ 3 s of untranscribed trailing energy above the floor after every answer
+# is unrecorded, so the quiet reports and an RMS trace at each turn end are
+# now audited (AUTO_TRACE_S, AUTO_QUIET_REPORT_AUDIT_S) for the next run to
+# say what it is.
+AUTO_EOT_FALLBACK_S = float(os.getenv("AUTO_EOT_FALLBACK_S", "3.5"))
+# The client keeps a ring of its ~10 fps RMS readings this many seconds long
+# and sends it with every quiet report; every auto.turn_ended row carries the
+# latest one, so the trailing energy before each turn end is on the record.
+AUTO_TRACE_S = float(os.getenv("AUTO_TRACE_S", "8.0"))
+# The client's quiet reports are audited (auto.quiet_report: quiet_s, span,
+# since, rms, floor) at a bounded rate — the first report of every span
+# always, then at most one per this many seconds.
+AUTO_QUIET_REPORT_AUDIT_S = float(os.getenv("AUTO_QUIET_REPORT_AUDIT_S", "1.0"))
 # Pre-synthesise the top agenda question during the patient's turn (slice 4).
 AUTO_PRESYNTH = os.getenv("AUTO_PRESYNTH", "true").lower() != "false"
 # D2 posture (owner decision 2026-08-16), re-meant by the standing question
@@ -1862,6 +1881,11 @@ def _new_auto_state() -> dict:
         "awaiting_answer": False,
         "revision": None,             # None | "requested" | "running"
         "think_used": False,          # "Let me think" spoken in this wait (once per wait)
+        # G6 instrumentation (owner decision 2026-09-09): the latest RMS
+        # trace the client sent with a quiet report (for the turn_ended
+        # row) and when a quiet report was last audited (the rate bound).
+        "last_trace": None,
+        "quiet_audit_at": None,
         "queued": None,               # the prepared next utterance (a plan dict)
         "plan_task": None,            # topic call + pre-synthesis in flight
         "planning_item_id": None,     # the queue item plan_task is preparing (the re-rank race guard)
@@ -1959,6 +1983,8 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
         "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
         "encourager_max_unanswered": AUTO_ENCOURAGER_MAX_UNANSWERED,
         "think_threshold_s": AUTO_THINK_THRESHOLD_S,
+        "trace_s": AUTO_TRACE_S,
+        "quiet_report_audit_s": AUTO_QUIET_REPORT_AUDIT_S,
         "eot_quiet_s": AUTO_EOT_QUIET_S,
         "eot_fallback_s": AUTO_EOT_FALLBACK_S,
         "officer_timeout_s": cds_module.AUTO_OFFICER_TIMEOUT_S,
@@ -2359,6 +2385,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
             "eot_quiet_s": AUTO_EOT_QUIET_S,
             "eot_fallback_s": AUTO_EOT_FALLBACK_S,
+            # The RMS trace the client keeps and sends with each report
+            # (owner decision 2026-09-09, G6): its length; the step is the
+            # meter loop's own 100 ms.
+            "trace_s": AUTO_TRACE_S,
+            "trace_step_ms": 100,
             # The floor comes from the room (owner decision 2026-09-09, G2):
             # the session's own floor for the politeness abort and the
             # quiet reporter, replacing the absolute BARGE_IN_RMS_THRESHOLD
@@ -4518,6 +4549,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if verdict is not None and verdict.handed_back:
             logger.info("Live session %s: hand-back detected in %s (quiet %.1fs)",
                         session_id, ctl.phase.value, quiet_s)
+        trace = auto.get("last_trace")
         await audit.log(user["id"], "auto.turn_ended", None, None,
                         {"session_id": session_id, "phase": ctl.phase.value, "by": by,
                          "quiet_s": round(quiet_s, 1), "answer": answer,
@@ -4527,6 +4559,16 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              "officer_ms": verdict.elapsed_ms,
                              **({"officer_failed": verdict.failed} if verdict.failed else {})}
                             if verdict is not None else {}),
+                         # G6 (owner decision 2026-09-09): the client's RMS
+                         # trace of the last AUTO_TRACE_S seconds, as sent
+                         # with the latest quiet report — newest sample
+                         # last — so the next run can say what the trailing
+                         # energy after an answer is.
+                         **({"trace": trace["samples"], "trace_step_ms": trace["step_ms"],
+                             "trace_s": AUTO_TRACE_S, "trace_quiet_s": trace["quiet_s"],
+                             "trace_age_ms": int(round((time.monotonic() - trace["at"]) * 1000)),
+                             "floor": trace["floor"]}
+                            if trace is not None else {"trace": None}),
                          "at_audio_s": round(session.audio_seconds, 1)})
         if not answer:
             # A turn end with nothing asked and nothing awaited — the span
@@ -4596,7 +4638,36 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         if quiet_s < 0:
             return
-        if auto["last_quiet_s"] is None or quiet_s < auto["last_quiet_s"]:
+        fresh = auto["last_quiet_s"] is None or quiet_s < auto["last_quiet_s"]
+        # G6 instrumentation (owner decision 2026-09-09): the report's RMS
+        # trace is kept for the turn_ended row, and the report itself is
+        # audited — the first of every span always, then at most one per
+        # AUTO_QUIET_REPORT_AUDIT_S. 489/490 could not say where a span
+        # began or what the energy around it was.
+        raw_trace = payload.get("trace")
+        if isinstance(raw_trace, list) and raw_trace:
+            samples = []
+            for v in raw_trace[-int(AUTO_TRACE_S * 10) - 1:]:
+                try:
+                    samples.append(round(float(v), 5))
+                except (TypeError, ValueError):
+                    samples.append(None)
+            auto["last_trace"] = {"samples": samples, "at": time.monotonic(),
+                                  "quiet_s": round(quiet_s, 1),
+                                  "step_ms": int(payload.get("trace_step_ms") or 100),
+                                  "floor": payload.get("floor")}
+        now = time.monotonic()
+        if fresh or auto["quiet_audit_at"] is None or now - auto["quiet_audit_at"] >= AUTO_QUIET_REPORT_AUDIT_S:
+            auto["quiet_audit_at"] = now
+            rms = payload.get("rms")
+            await audit.log(user["id"], "auto.quiet_report", None, None,
+                            {"session_id": session_id, "quiet_s": round(quiet_s, 1),
+                             "span": payload.get("span"), "since": payload.get("since"),
+                             "rms": (round(float(rms), 5) if isinstance(rms, (int, float)) else None),
+                             "floor": payload.get("floor"), "fresh": fresh,
+                             "phase": ctl.phase.value,
+                             "at_audio_s": round(session.audio_seconds, 1)})
+        if fresh:
             # A fresh quiet span: the patient spoke (or we did) in between.
             # The officer is re-asked either way; a judged turn end is
             # cleared only when the PATIENT spoke (owner decision

@@ -574,8 +574,12 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
     REPINNED once more 2026-09-07 (owner decision, pilot 486 F5): a turn
     must start before it can end — silence after the asked question no
     longer ends its turn until the patient has spoken since it. So the
-    tail now plays the question, has the patient answer, and lets 5 s of
-    quiet after THAT end the turn."""
+    tail now plays the question, has the patient answer, and lets the
+    fallback quiet after THAT end the turn.
+
+    REPINNED 2026-09-09 (owner decision, pilot 489/490 G6): the fallback
+    is 3.5 s and the officer's trigger 2.0 s — the answer's fresh span
+    starts under the trigger and the turn ends by silence at 3.6 s."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [["When did the chest pain first start?"], ["Any nausea?"]]
@@ -603,9 +607,9 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
         s.probe()
         assert len(engine.updates) == passes, "no speech since the question: no turn end (F5)"
         s.commit_transcript("Nobody has done an ECG.")
-        s.quiet(2.0)
+        s.quiet(1.9)
         s.probe()
-        s.quiet(5.1)
+        s.quiet(3.6)
         for _ in range(30):
             s.probe()
             if len(engine.updates) == passes + 1:
@@ -616,7 +620,7 @@ def test_no_ack_resume_loop_is_possible_without_an_intervening_answer(gate, monk
         assert s.phase.value in ("open", "closed"), "an acknowledged action does not re-pause"
         _stop(s)
     ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
-    assert ended and ended[-1]["by"] == "quiet_fallback" and ended[-1]["quiet_s"] == 5.1
+    assert ended and ended[-1]["by"] == "quiet_fallback" and ended[-1]["quiet_s"] == 3.6
     assert len(_audit("auto.paused", s.session_id)) == 1
     assert len(_audit("auto.repause_skipped_acknowledged", s.session_id)) == 1
 

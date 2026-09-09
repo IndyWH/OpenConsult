@@ -901,10 +901,17 @@ async function initMic() {
     // energy, is activity here (see the reporter's comment); a report goes
     // to the server only while it has confirmed auto mode on.
     if (rms >= quietReporter.floor) quietReporter.activity(now);
+    quietReporter.sample(rms);
     const quietS = quietReporter.poll(now, speaking !== null || pendingSpeakText !== '');
     if (quietS !== null && recording && ws && ws.readyState === WebSocket.OPEN) {
+      // The report carries what the server needs to read the room later
+      // (owner decision 2026-09-09, G6/G11): the reading it was taken at,
+      // the floor it was judged against, and the RMS trace.
       ws.send(JSON.stringify({type: 'quiet', quiet_s: Math.round(quietS * 10) / 10,
-                              since: quietReporter.since}));
+                              since: quietReporter.since,
+                              rms: Math.round(rms * 1e5) / 1e5, floor: quietReporter.floor,
+                              trace: quietReporter.trace.slice(),
+                              trace_step_ms: quietReporter.traceStepMs}));
     }
     const level = Math.min(1, rms * 8);
     barEls.forEach((bar, k) => {
@@ -1445,10 +1452,29 @@ const quietReporter = {
   since: 'speech',       // what began this span: 'speech' (room energy) or 'playback' (our own voice)
   crossed: 0,            // thresholds already reported in this quiet span
   lastReportAt: null,    // ms of the last report in this span
+  // The RMS trace (owner decision 2026-09-09, pilot 489/490 G6): a ring of
+  // the meter loop's own readings, the last trace_s seconds at the loop's
+  // 100 ms step, sent with every report so the server can put the energy
+  // before each turn end on the record (auto.turn_ended). 489/490 showed
+  // ≈ 3 s of untranscribed energy above the floor after every answer and
+  // nothing recorded to say what it was.
+  trace: [],
+  traceLen: 80,          // trace_s / 0.1 s; from speech_config.auto
+  traceStepMs: 100,
   configure(cfg) {
     // (encourager_quiet_s, the bridge's threshold, was retired 2026-09-09.)
     const raw = [cfg.encourager_min_quiet_s, cfg.eot_quiet_s, cfg.eot_fallback_s];
     this.thresholds = [...new Set(raw.map(Number).filter(v => v > 0))].sort((a, b) => a - b);
+    const step = Number(cfg.trace_step_ms) > 0 ? Number(cfg.trace_step_ms) : 100;
+    const secs = Number(cfg.trace_s);
+    this.traceStepMs = step;
+    this.traceLen = secs > 0 ? Math.max(1, Math.round(secs * 1000 / step)) : 80;
+    this.trace = [];
+  },
+  // Called at the meter's rate with every reading, quiet or not.
+  sample(rms) {
+    this.trace.push(Math.round(rms * 1e5) / 1e5);
+    if (this.trace.length > this.traceLen) this.trace.splice(0, this.trace.length - this.traceLen);
   },
   // `cause` travels with every report of the span it began (owner decision
   // 2026-09-07, pilot 485 E2): the server must know whether a fresh span

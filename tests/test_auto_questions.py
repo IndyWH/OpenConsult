@@ -606,7 +606,8 @@ def test_the_485_shape_a_not_finished_officer_no_longer_holds_an_answered_questi
     AUTO_EOT_FALLBACK_S ends the turn on the report itself, whatever the
     officer said. The turn end is audited (auto.turn_ended, by
     quiet_fallback), the revision runs, and the next question is planned
-    and issued."""
+    and issued. REPINNED 2026-09-09 (owner decision, pilot 489/490 G6):
+    the fallback is 3.5 s — 3.4 holds, 3.6 ends the turn."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]   # hand-back, then never finished
     engine.agendas = [[Q_ONSET], [Q_RADIATE]]
@@ -621,11 +622,11 @@ def test_the_485_shape_a_not_finished_officer_no_longer_holds_an_answered_questi
         s.quiet(3.0)
         s.probe()                                     # officer asked: not finished
         assert len(engine.asked) == 2 and s.auto["turn_ended"] is False
-        s.quiet(4.9)
+        s.quiet(3.4)
         s.probe()
         assert s.auto["turn_ended"] is False and s.auto["awaiting_answer"] is True
         assert len(engine.updates) == 1, "under the fallback span: the answer is still open"
-        s.quiet(5.1)
+        s.quiet(3.6)
         s.probe()
         assert s.auto["turn_ended"] is True and s.auto["awaiting_answer"] is False
         # The answer's revision was asked for (the scripted pass may already
@@ -639,7 +640,7 @@ def test_the_485_shape_a_not_finished_officer_no_longer_holds_an_answered_questi
         _stop(s)
     ended = [d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]]
     assert len(ended) == 1
-    assert ended[0]["by"] == "quiet_fallback" and ended[0]["quiet_s"] == 5.1
+    assert ended[0]["by"] == "quiet_fallback" and ended[0]["quiet_s"] == 3.6
     assert ended[0]["phase"] == "open" and ended[0]["fallback_s"] == appmain.AUTO_EOT_FALLBACK_S
     assert ended[0]["finished_thought"] is False, "the span's verdict travels in the record"
 
@@ -990,7 +991,7 @@ def test_the_thinking_phrase_does_not_erase_the_golden_exits_turn_end(gate):
                 break
             time.sleep(0.03)
         assert s.auto["queued"] is not None
-        s.quiet(5.3)                                   # the same span; the officer not due again
+        s.quiet(5.0)                                   # the same span; the officer not due again (2 s since its ask)
         ask = next(m for m in s.probe() if m.get("type") == "auto_speak")
         assert ask["text"] == "Can you tell me more about the chest pain?"
         assert len(engine.asked) == asked, "no second judgement was needed"
@@ -1058,7 +1059,7 @@ def test_an_officer_asked_during_a_cds_pass_is_deferred_not_failed_and_its_verdi
             return OfficerVerdict(True, False, elapsed_ms=12000)
         engine.end_of_turn = queued_officer
         s.commit_transcript("Nobody has done an ECG yet.")   # the patient speaks during the pass
-        s.quiet(2.0)                                   # a fresh span of theirs
+        s.quiet(1.9)                                   # a fresh span of theirs (under the 2 s trigger, G6)
         s.probe()
         s.quiet(3.1)
         s.probe()                                      # officer asked while the pass is in flight

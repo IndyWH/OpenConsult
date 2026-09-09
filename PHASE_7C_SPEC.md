@@ -207,14 +207,36 @@ until the mock-patient round:
   speech between encouragers resets the count. None once the window has
   run, by either end. The 1 Sept brakes stay: the minimum quiet, none
   after the window; the unanswered count is the loop's end.
-- `AUTO_EOT_QUIET_S` (default 3.0): outside GOLDEN, a pause this long
-  triggers the **end-of-turn officer** — a tiny stateless model call
-  (affect-call shape) over the recent committed transcript answering
-  one schema: `{"finished_thought": bool, "handed_back": bool}`.
-  Fail-soft: on error or timeout, treat a longer silence
-  (`AUTO_EOT_FALLBACK_S`, default 5.0) as finished. "Handed back"
-  (explicit hand-backs like "that's all" / "what do you think?") is
-  logged when detected, as the prereg requires for metric 3 scoring.
+- `AUTO_EOT_QUIET_S` (default 3.0; **2.0 from 2026-09-09**): outside
+  GOLDEN, a pause this long triggers the **end-of-turn officer** — a
+  tiny stateless model call (affect-call shape) over the recent
+  committed transcript answering one schema: `{"finished_thought":
+  bool, "handed_back": bool}`. Fail-soft: on error or timeout, treat a
+  longer silence (`AUTO_EOT_FALLBACK_S`, default 5.0; **3.5 from
+  2026-09-09**) as finished. "Handed back" (explicit hand-backs like
+  "that's all" / "what do you think?") is logged when detected, as the
+  prereg requires for metric 3 scoring.
+
+  **The turn-end quiet rule to 3.5 s, with the evidence recorded (owner
+  decision 2026-09-09, after consultations 489/490, finding G6).** Over
+  nine clean answers the patient waited a mean 11.6 s from the last word
+  to Alba's voice: the 5 s rule, ≈ 3 s of untranscribed trailing energy
+  above the floor after every answer (cause unrecorded — AGC recovery is
+  the candidate), and ≈ 3 s of preparation. The diagnostic's simulation
+  on those turns put 3.5 s at one answer of nine cut on the pessimistic
+  (transcript) reading and none on the optimistic (RMS) reading, 2.5 s
+  at two; the owner chose 3.5 (`AUTO_EOT_FALLBACK_S`) with
+  `AUTO_EOT_QUIET_S` 2.0. Instrumentation, so the next run can say what
+  the trailing energy is: the client keeps a ring of its ~10 fps RMS
+  readings for the last `AUTO_TRACE_S` (8.0) seconds and sends it with
+  every quiet report — with the reading the report was taken at and the
+  floor — and every `auto.turn_ended` row carries the latest trace
+  (`trace`, newest sample last, `trace_step_ms`, `trace_quiet_s`,
+  `trace_age_ms`); the reports themselves are audited
+  (`auto.quiet_report`: quiet_s, span, since, rms, floor, fresh) at a
+  bounded rate — the first report of every span always, then at most
+  one per `AUTO_QUIET_REPORT_AUDIT_S` (1.0). The golden exit's own turn
+  end travels in its `auto.phase` detail as before and carries no trace.
 
   The officer also runs during GOLDEN, where its verdict is used
   only for the exit decision — hand-back, or turn-end at the
@@ -731,6 +753,10 @@ and `test_standing_rules.py` extends to the new controls.
   (with from/to/trigger), `auto.paused`, `auto.acknowledged`,
   `auto.resumed`, `auto.takeover`, `auto.handover`,
   `auto.officer_failed` (fail-soft visibility),
+  `auto.quiet_report` for the client's quiet reports at a bounded rate
+  (quiet_s, span, since, rms, floor, fresh, the phase; owner decision
+  2026-09-09, G6/G11), and `auto.turn_ended` gains the client's RMS
+  `trace` of the last `AUTO_TRACE_S` seconds with its step and age (G6),
   `auto.thinking` for every "Let me think for a moment." (the reason —
   `empty_queue` | `slow_preparation` — the quiet, the seconds since the
   turn end, what was pending and whether a pass was in flight; owner
@@ -821,8 +847,9 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_THINK_THRESHOLD_S` | `3.0` | Owner decision 2026-09-09: "Let me think for a moment." once per wait when a planned question's preparation has run this long past the turn end with nothing ready (and at once when the queue is empty and a pass is running) |
 | `AUTO_ENCOURAGER_MIN_QUIET_S` | `4.0` | Owner decision 2026-09-09 (was 5.0, the 1 Sept one-per-window rule): a golden encourager every time the patient has been this quiet, one per span, two phrasings alternating |
 | `AUTO_ENCOURAGER_MAX_UNANSWERED` | `2` | Owner decision 2026-09-09: after this many unanswered encouragers, the next qualifying silence ends the golden window early |
-| `AUTO_EOT_QUIET_S` | `3.0` | Uncalibrated guess |
-| `AUTO_EOT_FALLBACK_S` | `5.0` | Officer fail-soft silence |
+| `AUTO_EOT_QUIET_S` | `2.0` | Owner decision 2026-09-09 (pilot 489/490 G6; was 3.0): the officer's trigger |
+| `AUTO_EOT_FALLBACK_S` | `3.5` | Owner decision 2026-09-09 (pilot 489/490 G6; was 5.0): the turn-end quiet rule and the officer's fail-soft |
+| `AUTO_TRACE_S` / `AUTO_QUIET_REPORT_AUDIT_S` | `8.0` / `1.0` | Owner decision 2026-09-09 (G6): the client's RMS trace length on every `auto.turn_ended`, and the quiet reports' audit rate bound |
 | `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back — with no CDS pass in flight |
 | `AUTO_OFFICER_MAX_WAIT_S` | `30` | Owner decision 2026-09-07 (pilot E4): the officer's bound while a CDS pass is in flight |
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
