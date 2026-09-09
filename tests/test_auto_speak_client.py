@@ -63,6 +63,9 @@ let reading = null;
 function currentRms() { return reading; }
 const bargeIn = {absFloor: 0.02};
 async function onSpeakReady(msg) { played.push(msg); }
+// The floor from the room (owner decision 2026-09-09, G2): the session's
+// floor once speech_config.auto carried one; null = the absolute stand-in.
+politeness.floor = null;
 
 const out = {};
 (async () => {
@@ -91,6 +94,15 @@ const out = {};
   reading = 0.5;
   await onAutoSpeak(msg);
   out.noFloorPlayed = played.length;
+
+  politeness.floor = 0.0255;             // the cafe's session floor (G2)
+  reading = 0.024;                       // above the old 0.02, under the room's floor
+  await onAutoSpeak(msg);
+  out.roomFloorPlayed = played.length;   // plays
+  reading = 0.0314;                      // 488's reading: above the cafe floor too
+  await onAutoSpeak(msg);
+  out.roomFloorAborted = sent.length;
+  out.currentFloor = politeness.currentFloor();
 
   out.shouldAbort = [
     politeness.shouldAbort(0.001, 0.02), politeness.shouldAbort(0.02, 0.02),
@@ -125,6 +137,11 @@ def test_the_shipped_auto_speak_handler_executed_under_node():
     assert out["nullPlayed"] == 2
     # No floor configured means no comparison, not a permanent abort.
     assert out["noFloorPlayed"] == 3
+    # The floor from the room (owner decision 2026-09-09, G2): with the
+    # session floor 0.0255 a 0.024 reading plays (it would have aborted at
+    # the old absolute 0.02) and 488's 0.0314 still aborts.
+    assert out["roomFloorPlayed"] == 4
+    assert out["roomFloorAborted"] == 3 and out["currentFloor"] == 0.0255   # the third abort sent
 
     assert out["shouldAbort"] == [False, True, True, False, False, False]
 
@@ -158,7 +175,10 @@ def test_the_threshold_is_the_barge_in_absolute_floor_not_the_silence_floor():
     room. The page compares against the barge-in absolute floor it is
     already sent in speech_config, whether or not the detector is on."""
     handler = _on_auto_speak()
-    assert "politeness.shouldAbort(rms, bargeIn.absFloor)" in handler
+    # REPINNED 2026-09-09 (owner decision, pilot 488 G2): the number is the
+    # session's floor from the room, with the absolute floor as the stand-in.
+    assert "politeness.shouldAbort(rms, politeness.currentFloor())" in handler
+    assert "return this.floor !== null ? this.floor : bargeIn.absFloor;" in _politeness()
     # No comparison against the silence floor anywhere in the check.
     for code in (handler, _politeness()):
         assert "> 1e-4" not in code and ">= 1e-4" not in code

@@ -254,6 +254,29 @@ resumed, it declines to play and reports `speak_ended` with a new
 reason `politeness_abort`. The utterance is requeued, not lost. This
 makes prereg metric 6's target structural rather than aspirational.
 
+**The floor comes from the room (owner decision 2026-09-09, after
+consultation 488, finding G2).** The number both the politeness abort
+and the client's quiet reporter compare against — "this is speech, not
+room noise" — was the one absolute `BARGE_IN_RMS_THRESHOLD` (0.02), and
+a cafe sits above it: the sound check's quiet-room peak was 0.0085, the
+owner's own speech averaged 0.0216, the enable's disclosure aborted at
+0.0314, and 94 s of GOLDEN never saw 3 s of quiet. Now each auto
+session's floor is derived at session start from the doctor's newest
+sound check (the calibration surface that already exists): its
+`noise_floor_rms` × `AUTO_FLOOR_MARGIN` (3.0), clamped to
+[`AUTO_FLOOR_MIN` (0.02), `AUTO_FLOOR_MAX` (0.08)] —
+`speech.auto_floor`, pure. The quiet flat (0.0031) yields exactly 0.02,
+so nothing changes there; the cafe yields 0.0255; a very loud room clamps
+at the max; no sound check falls back to `AUTO_FLOOR_MIN` and the record
+says so (`floor_source: no_sound_check`). The floor is sent to the client
+in `speech_config.auto.floor` (one number for the reporter and the abort;
+the absolute floor stands in only when none arrived), recorded on
+`auto.enabled` (`floor`, `noise_floor_rms`, `margin`, `floor_source`,
+`floor_clamped`, the sound check's age) and on every
+`speech.politeness_abort` row (`floor`, beside the reading). No recency
+bound is applied to the sound check used; its age is on the row for the
+owner to judge. The three numbers are uncalibrated guesses.
+
 **Err toward waiting** is the tie-break everywhere, verbatim from the
 parent spec: a slow system is polite; an interrupting one fails the
 eval.
@@ -721,6 +744,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_TOPIC_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot F4): the cone's token-set similarity for "the same topic" |
 | `AUTO_RERANK_TIMEOUT_S` / `AUTO_RERANK_MAX_TOKENS` / `AUTO_RERANK_CONTEXT_TURNS` / `AUTO_RERANK_MAX_CHARS` | `2.0` / `200` / `6` / `1500` | The standing queue's re-ranker (`AGENDA_QUEUE_SPEC.md` §3, D-B; slice 3, 2026-09-08): its timeout, output cap, and the excerpt's turns and characters; the cap and the characters are uncalibrated guesses. The queue's own numbers (`AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES`) are in that spec |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
+| `AUTO_FLOOR_MARGIN` / `AUTO_FLOOR_MIN` / `AUTO_FLOOR_MAX` | `3.0` / `0.02` / `0.08` | Owner decision 2026-09-09 (pilot 488 G2): the session's politeness-abort and quiet-reporter floor is the sound check's `noise_floor_rms` × margin, clamped; uncalibrated guesses (`app/speech.py`) |
 | `AUTO_ENABLE_RETRIES` / `AUTO_ENABLE_RETRY_WINDOW_S` | `3` / `30` | Owner decision 2026-09-09 (pilot 488 G1): a politeness-aborted enable disclosure or chained invitation is re-issued on the next quiet report — at most this many attempts in all, inside this window of the first issue; then `too_loud_to_start` |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 

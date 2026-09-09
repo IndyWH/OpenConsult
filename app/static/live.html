@@ -1740,6 +1740,14 @@ const politeness = {
   // analyser — the microphone itself is down) cannot show speech and does
   // not abort: the server issued this into a quiet window by its own
   // measure, and a page that cannot listen has nothing to be polite to.
+  //
+  // The floor comes from the room (owner decision 2026-09-09, pilot 488
+  // G2): the server derives each session's floor from the doctor's newest
+  // sound check (noise floor x margin, bounded) and sends it in
+  // speech_config.auto.floor; until one arrives the barge-in absolute
+  // floor stands in, as before.
+  floor: null,
+  currentFloor() { return this.floor !== null ? this.floor : bargeIn.absFloor; },
   shouldAbort(rms, floor) {
     return rms !== null && Number(floor) > 0 && rms >= Number(floor);
   },
@@ -1765,7 +1773,7 @@ function onAutoStop(msg) {
 
 async function onAutoSpeak(msg) {
   const rms = currentRms();
-  if (politeness.shouldAbort(rms, bargeIn.absFloor)) {
+  if (politeness.shouldAbort(rms, politeness.currentFloor())) {
     // Declined, not cancelled: no audio was created, no window opens.
     // The measured RMS rides along as calibration data for the floor.
     ws.send(JSON.stringify({type: 'speak_ended', utterance_id: msg.utterance_id,
@@ -2669,7 +2677,13 @@ function onWsMessage(event) {
     if (msg.auto) {                       // Phase 7c, only when enabled server-side
       quietReporter.configure(msg.auto);
       goldenCountdown.configure(msg.auto);        // the window length, for the indicator
-      quietReporter.floor = bargeIn.absFloor;   // the same "this is speech" number
+      // The floor from the room (owner decision 2026-09-09, G2): one number
+      // for the reporter and the politeness abort — the session's own,
+      // derived server-side from the sound check; the absolute barge-in
+      // floor only when the server sent none.
+      const roomFloor = Number(msg.auto.floor);
+      politeness.floor = roomFloor > 0 ? roomFloor : null;
+      quietReporter.floor = politeness.currentFloor();   // the same "this is speech" number
       autoAvailable = true;                     // slice 6: the Auto pill exists
       refreshSpeechControls();
     }

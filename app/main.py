@@ -1876,6 +1876,11 @@ def _new_auto_state() -> dict:
         # RMS the client read. None once the invitation has played through
         # (or the machine is off).
         "enable_chain": None,
+        # The floor comes from the room (owner decision 2026-09-09, pilot 488
+        # G2): the session's politeness-abort and quiet-reporter floor,
+        # derived from the doctor's newest sound check at session start
+        # (ws_transcribe) — this default is the no-sound-check fallback.
+        "floor": speech.auto_floor(None),
     }
 
 
@@ -1895,10 +1900,11 @@ def _auto_on(ctl: auto_mode.AutoModeController) -> bool:
                              auto_mode.AutoPhase.TAKEN_OVER)
 
 
-def _thresholds_in_force() -> dict:
+def _thresholds_in_force(floor: float | None = None) -> dict:
     """Every auto-mode setting in force, recorded per run on auto.enabled
     (spec §9 / the prereg: thresholds recorded per run, both D2 postures
-    visible as a recorded value)."""
+    visible as a recorded value). `floor` is the session's own politeness
+    floor (G2); without one the module default is recorded."""
     from app import cds as cds_module
     return {
         "golden_s": AUTO_GOLDEN_MINUTES_S,
@@ -1920,7 +1926,10 @@ def _thresholds_in_force() -> dict:
         "rerank_max_tokens": cds_module.AUTO_RERANK_MAX_TOKENS,
         "rerank_context_turns": AUTO_RERANK_CONTEXT_TURNS,
         "rerank_max_chars": AUTO_RERANK_MAX_CHARS,
-        "politeness_floor_rms": speech.BARGE_IN_RMS_THRESHOLD,
+        "politeness_floor_rms": speech.AUTO_FLOOR_MIN if floor is None else floor,
+        "floor_margin": speech.AUTO_FLOOR_MARGIN,
+        "floor_min": speech.AUTO_FLOOR_MIN,
+        "floor_max": speech.AUTO_FLOOR_MAX,
         "enable_retries": AUTO_ENABLE_RETRIES,
         "enable_retry_window_s": AUTO_ENABLE_RETRY_WINDOW_S,
     }
@@ -2203,6 +2212,32 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # rest of the table was warmed at service start.
             entry["auto"]["warm_task"] = asyncio.create_task(asyncio.to_thread(
                 state.speech.presynthesise_phrases, speech.doctor_name_for(user)))
+            # The floor comes from the room (owner decision 2026-09-09, pilot
+            # 488 G2): this doctor's newest sound check — the calibration
+            # surface that already exists — gives the quiet room's
+            # noise_floor_rms; the session's floor for the politeness abort
+            # and the quiet reporter is derived from it (speech.auto_floor)
+            # and lives with the session, across a reconnect. No sound
+            # check: AUTO_FLOOR_MIN, and the record says so. The check's age
+            # travels with it — nothing here bounds it (the owner's call).
+            sound_check = None
+            try:
+                sound_check = await audit.latest_row("speech.sound_check", user["id"])
+            except Exception as exc:  # noqa: BLE001 - config, not the consultation
+                logger.warning("Could not read sound-check rows for the auto floor: %s", exc)
+            check_detail = (sound_check or {}).get("detail") or {}
+            floor = speech.auto_floor(check_detail.get("noise_floor_rms"))
+            if sound_check is not None:
+                age = (datetime.now(timezone.utc) - sound_check["at"]).total_seconds()
+                floor["sound_check_age_s"] = round(max(age, 0.0), 1)
+                floor["sound_check_output_label"] = check_detail.get("device_label")
+                floor["sound_check_input_label"] = check_detail.get("input_label")
+            entry["auto"]["floor"] = floor
+            logger.info("Live session %s: auto floor %.5f (%s%s)", session_id, floor["floor"],
+                        floor["source"],
+                        f", noise {floor['noise_floor_rms']} x {floor['margin']}"
+                        + (f", clamped at {floor['clamped']}" if floor["clamped"] else "")
+                        if floor["source"] == "sound_check" else "")
 
     # Session 3: the client runs the silence-nudge quiet-window detector
     # (it holds the mic analyser and sees the transcript stream), so it is
@@ -2273,6 +2308,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
             "eot_quiet_s": AUTO_EOT_QUIET_S,
             "eot_fallback_s": AUTO_EOT_FALLBACK_S,
+            # The floor comes from the room (owner decision 2026-09-09, G2):
+            # the session's own floor for the politeness abort and the
+            # quiet reporter, replacing the absolute BARGE_IN_RMS_THRESHOLD
+            # for both; the client holds no number of its own.
+            "floor": entry["auto"]["floor"]["floor"],
+            "floor_source": entry["auto"]["floor"]["source"],
         }
     await websocket.send_json(speech_config)
     if entry["auto"] is not None:
@@ -2724,6 +2765,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                             {"utterance_id": utterance.utterance_id,
                              "via": utterance.ref_detail.get("via", "tap"),
                              "phase": utterance.ref_detail.get("phase"),
+                             # The floor the client compared against — the
+                             # session's own, from the room (G2) — beside
+                             # the reading, so the row can be read alone.
+                             **({"floor": entry["auto"]["floor"]["floor"]}
+                                if entry["auto"] is not None else {}),
                              # The client's reading at the moment it declined
                              # — calibration data for the floor it compared
                              # against, like quiet_s for the nudge.
@@ -2991,12 +3037,24 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if session.speaking or entry["pending_utterance"] is not None:
                 await refuse_auto("an utterance is in flight — try again when it has finished")
                 return
+            floor = auto["floor"]
             await audit.log(user["id"], "auto.enabled", None, None,
                             {"session_id": session_id, "via": via,
                              "disclosed": entry["disclosed"],
                              "at_audio_s": round(session.audio_seconds, 1),
+                             # The floor from the room (G2): the value, the
+                             # measurement it came from and the margin — or
+                             # that there was no sound check and the minimum
+                             # was used.
+                             "floor": floor["floor"],
+                             "noise_floor_rms": floor["noise_floor_rms"],
+                             "margin": floor["margin"],
+                             "floor_source": floor["source"],
+                             "floor_clamped": floor["clamped"],
+                             **({"sound_check_age_s": floor["sound_check_age_s"]}
+                                if "sound_check_age_s" in floor else {}),
                              # The thresholds in force, recorded per run.
-                             "thresholds": _thresholds_in_force()})
+                             "thresholds": _thresholds_in_force(floor["floor"])})
             await auto_transition(ctl.enable())
             # Owner decision 2026-09-08: the questions the CDS has already
             # proposed are in the queue from the toggle, so the first ask
@@ -3085,8 +3143,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                 "aborted": False, "abort_rms": None}
 
     def _politeness_floor() -> float:
-        """The floor the client's politeness abort compares against."""
-        return speech.BARGE_IN_RMS_THRESHOLD
+        """The floor the client's politeness abort compares against: the
+        session's own, from the room (owner decision 2026-09-09, G2)."""
+        return float(entry["auto"]["floor"]["floor"])
 
     async def _too_loud_to_start(auto: dict) -> None:
         """The tries are spent (owner decision 2026-09-09, G1): the machine

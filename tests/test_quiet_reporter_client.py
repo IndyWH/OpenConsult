@@ -135,10 +135,14 @@ def test_the_reporter_is_fed_by_the_existing_rms_loop_at_the_speech_floor():
     loop = LIVE[LIVE.index("// Level meter: RMS of the analyser"):LIVE.index("refreshDeviceMenu();")]
     assert "if (rms > 1e-4) nudge.activity(now);" in loop         # the nudge, unchanged
     assert "if (rms >= quietReporter.floor) quietReporter.activity(now);" in loop
-    # ...and that floor IS the barge-in absolute floor, copied when the
-    # server configures the reporter (the meter loop itself must never
-    # mention the detector — tests/test_barge_in_constraints.py).
-    assert "quietReporter.floor = bargeIn.absFloor;" in LIVE
+    # ...and that floor is the SESSION's floor from the room (owner decision
+    # 2026-09-09, pilot 488 G2: speech_config.auto.floor, derived from the
+    # sound check; the barge-in absolute floor only stands in when the
+    # server sent none), copied when the server configures the reporter —
+    # the same number the politeness abort compares against (the meter
+    # loop itself must never mention the detector —
+    # tests/test_barge_in_constraints.py).
+    assert "quietReporter.floor = politeness.currentFloor();" in LIVE
     assert "barge" not in loop.lower()
     assert "quietReporter.poll(now, speaking !== null || pendingSpeakText !== '')" in loop
     assert "ws.send(JSON.stringify({type: 'quiet', quiet_s:" in loop

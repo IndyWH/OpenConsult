@@ -582,7 +582,10 @@ def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
                                   "encourager_quiet_s": appmain.AUTO_ENCOURAGER_QUIET_S,
                                   "encourager_min_quiet_s": appmain.AUTO_ENCOURAGER_MIN_QUIET_S,
                                   "eot_quiet_s": appmain.AUTO_EOT_QUIET_S,
-                                  "eot_fallback_s": appmain.AUTO_EOT_FALLBACK_S}
+                                  "eot_fallback_s": appmain.AUTO_EOT_FALLBACK_S,
+                                  # the floor from the room (G2, 2026-09-09):
+                                  # no sound check for this fresh account
+                                  "floor": 0.02, "floor_source": "no_sound_check"}
         assert first[-1] == {"type": "auto_toggled", "on": False, "phase": "off"}
         _stop(s)
 

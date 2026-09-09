@@ -118,6 +118,52 @@ BARGE_IN_MARGIN = float(os.getenv("BARGE_IN_MARGIN", "2.0"))
 _BARGE_IN_FLOOR_RAW = os.getenv("BARGE_IN_RMS_THRESHOLD", "").strip()
 BARGE_IN_RMS_THRESHOLD = float(_BARGE_IN_FLOOR_RAW) if _BARGE_IN_FLOOR_RAW else 0.02
 
+# --- the auto-mode floor comes from the room (owner decision 2026-09-09) ----
+#
+# Pilot 488, finding G2: one absolute floor — BARGE_IN_RMS_THRESHOLD, 0.02
+# — served both the politeness abort and the client's quiet reporter, and a
+# cafe sits above it (the sound check's quiet-room peak 0.0085, speech mean
+# 0.0216; the enable's disclosure aborted at 0.0314; 94 s of GOLDEN in
+# which quiet never reached 3 s). Now each auto session's floor is derived
+# from the room: the doctor's newest sound check's noise_floor_rms (the
+# quiet room's peak over 400 ms) times AUTO_FLOOR_MARGIN, clamped to
+# [AUTO_FLOOR_MIN, AUTO_FLOOR_MAX]. The quiet flat (0.0031) yields exactly
+# AUTO_FLOOR_MIN, so today's behaviour there is unchanged; the cafe
+# (0.0085) yields 0.0255; a very loud room clamps at the max; no sound
+# check falls back to AUTO_FLOOR_MIN and says so. All three are
+# UNCALIBRATED GUESSES — the next runs' auto.enabled and
+# speech.politeness_abort rows carry the floor chosen and inform them.
+AUTO_FLOOR_MARGIN = float(os.getenv("AUTO_FLOOR_MARGIN", "3.0"))
+AUTO_FLOOR_MIN = float(os.getenv("AUTO_FLOOR_MIN", "0.02"))
+AUTO_FLOOR_MAX = float(os.getenv("AUTO_FLOOR_MAX", "0.08"))
+
+
+def auto_floor(noise_floor_rms: float | None, *, margin: float | None = None,
+               floor_min: float | None = None, floor_max: float | None = None) -> dict:
+    """The per-session floor for the politeness abort and the quiet
+    reporter (owner decision 2026-09-09, pilot 488 G2). Pure.
+
+    Returns the floor and how it was arrived at: `source` is
+    "sound_check" when a measured noise floor was used, "no_sound_check"
+    when there was none (the floor is then AUTO_FLOOR_MIN); `clamped` is
+    None, "min" or "max"; `noise_floor_rms` and `margin` travel for the
+    record. Rounded to 5 places, the client's own precision for RMS.
+    """
+    m = AUTO_FLOOR_MARGIN if margin is None else float(margin)
+    lo = AUTO_FLOOR_MIN if floor_min is None else float(floor_min)
+    hi = AUTO_FLOOR_MAX if floor_max is None else float(floor_max)
+    if noise_floor_rms is None:
+        return {"floor": round(lo, 5), "noise_floor_rms": None, "margin": m,
+                "min": lo, "max": hi, "source": "no_sound_check", "clamped": None}
+    raw = float(noise_floor_rms) * m
+    clamped = None
+    if raw < lo:
+        raw, clamped = lo, "min"
+    elif raw > hi:
+        raw, clamped = hi, "max"
+    return {"floor": round(raw, 5), "noise_floor_rms": round(float(noise_floor_rms), 8),
+            "margin": m, "min": lo, "max": hi, "source": "sound_check", "clamped": clamped}
+
 # Pre-synthesis guard on the hard cap. Fast speech tops out around 25
 # characters per second, so this refuses a pathological string before
 # spending CPU on it. The real bound is the post-synthesis duration check

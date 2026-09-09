@@ -74,6 +74,22 @@ async def latest_detail(action: str, user_id: int) -> dict | None:
     return row[0] if row else None
 
 
+async def latest_row(action: str, user_id: int) -> dict | None:
+    """Newest row this user recorded for one action — `detail` and `at` —
+    or None. Added for the auto-mode floor (owner decision 2026-09-09,
+    pilot 488 G2): the session derives its floor from the newest
+    speech.sound_check row and records how old that measurement was."""
+    async with await psycopg.AsyncConnection.connect(DATABASE_URL) as conn:
+        row = await (
+            await conn.execute(
+                "SELECT detail, at FROM audit_event"
+                " WHERE action = %s AND user_id = %s"
+                " ORDER BY id DESC LIMIT 1", (action, user_id),
+            )
+        ).fetchone()
+    return {"detail": row[0], "at": row[1]} if row else None
+
+
 async def for_subject(subject_type: str, subject_id: int, action: str) -> list[dict]:
     """Every row of one action about one subject, oldest first, with who
     wrote it. Added for the review page's live-acknowledgement display
