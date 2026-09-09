@@ -542,7 +542,23 @@ and `test_standing_rules.py` extends to the new controls.
   the first ask after the golden exit comes from the queue's head and
   does not wait for the exit's own pass; an empty agenda is a no-op,
   and a toggle off and on keeps asked items asked (the seed's copy is
-  discarded like any pass's).
+  discarded like any pass's). **A cut-off enable disclosure is retried,
+  then the machine switches itself off** (owner decision 2026-09-09,
+  after consultation 488, finding G1): the enable's disclosure — or the
+  chained invitation — politeness-aborted is re-issued on the next quiet
+  report, at most `AUTO_ENABLE_RETRIES` attempts in all (the enable's own
+  issue is the first) inside `AUTO_ENABLE_RETRY_WINDOW_S` of the first
+  issue, each re-issue audited `auto.enable_retry` with the attempt number
+  and the abort's RMS; with the tries spent the machine switches itself
+  off — `auto.disabled` with reason `too_loud_to_start`, the measured RMS
+  and the floor — and the pill is told in plain words ("Too loud to start:
+  0.031 against 0.020"). The enable never reports success while the
+  disclosure has not played through: the `auto_toggled` echo at issue
+  carries `starting: true` (the pill reads "Auto: starting…", the
+  client's reporter is armed so its reports can carry the retry) and the
+  on-echo follows the disclosure's completion. In 488 the disclosure was
+  aborted 105 ms after issue at 0.031 RMS against the 0.02 floor, nothing
+  re-issued it, and the machine sat in DISCLOSURE, on and silent, for 41 s.
 - **Phase indicator** on the status line while auto is on (Golden
   minutes / Open questions / Closed questions / Paused — urgent /
   Handing over), so the supervising doctor always knows what the
@@ -601,7 +617,12 @@ and `test_standing_rules.py` extends to the new controls.
   "phase":..., "trigger":{"quiet_s":...,"handed_back":...}}` and
   `cds_rationale` populated from the agenda version as today. New
   `end_reason` values: `politeness_abort`, `urgency_pause`.
-- Audit events: `auto.enabled`, `auto.disabled`, `auto.phase`
+- Audit events: `auto.enabled`, `auto.disabled` (with `reason` and the
+  measured RMS, floor and attempts when the machine switched itself off
+  — `too_loud_to_start`, owner decision 2026-09-09, G1),
+  `auto.enable_retry` for every re-issue of the enable's disclosure or
+  chained invitation after a politeness abort (the phrase, the attempt
+  number, the abort's RMS, the floor, the quiet; G1), `auto.phase`
   (with from/to/trigger), `auto.paused`, `auto.acknowledged`,
   `auto.resumed`, `auto.takeover`, `auto.handover`,
   `auto.officer_failed` (fail-soft visibility),
@@ -700,6 +721,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_TOPIC_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot F4): the cone's token-set similarity for "the same topic" |
 | `AUTO_RERANK_TIMEOUT_S` / `AUTO_RERANK_MAX_TOKENS` / `AUTO_RERANK_CONTEXT_TURNS` / `AUTO_RERANK_MAX_CHARS` | `2.0` / `200` / `6` / `1500` | The standing queue's re-ranker (`AGENDA_QUEUE_SPEC.md` §3, D-B; slice 3, 2026-09-08): its timeout, output cap, and the excerpt's turns and characters; the cap and the characters are uncalibrated guesses. The queue's own numbers (`AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES`) are in that spec |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
+| `AUTO_ENABLE_RETRIES` / `AUTO_ENABLE_RETRY_WINDOW_S` | `3` / `30` | Owner decision 2026-09-09 (pilot 488 G1): a politeness-aborted enable disclosure or chained invitation is re-issued on the next quiet report — at most this many attempts in all, inside this window of the first issue; then `too_loud_to_start` |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 
 Every setting mirrored in `.env.example` with a one-line comment;

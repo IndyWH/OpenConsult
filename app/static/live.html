@@ -2512,9 +2512,15 @@ function applyAutoToggle(msg) {
   applyAutoPhase(autoPhase);
   // The pill shows the current state — a control that can act must not
   // look as if it cannot (and the reverse; the 448 companion rule).
-  autoPillLabel.textContent = autoOn ? 'Auto: on' : 'Auto: off';
+  // `starting` (owner decision 2026-09-09, pilot 488 G1): the machine is
+  // on but the disclosure has not played through — the enable has not
+  // succeeded yet, so the pill does not say "on".
+  autoPillLabel.textContent = autoOn ? (msg.starting ? 'Auto: starting…' : 'Auto: on') : 'Auto: off';
   autoPill.setAttribute('aria-pressed', String(autoOn));
   autoPill.classList.toggle('done', autoOn);
+  // The machine switched itself off and says why, in plain words
+  // ("Too loud to start: 0.031 against 0.020") — shown, never swallowed.
+  if (!autoOn && msg.reason) showSpeakError(msg.reason);
   refreshSpeechControls();
 }
 

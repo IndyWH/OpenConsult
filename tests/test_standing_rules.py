@@ -266,7 +266,13 @@ def test_the_auto_pill_keeps_all_three_standing_rules():
     assert "Start the consultation first — auto mode runs inside a live session" in refresh
     apply = live[live.index("function applyAutoToggle(msg) {"):]
     apply = apply[:apply.index("\n}")]
-    assert "autoPillLabel.textContent = autoOn ? 'Auto: on' : 'Auto: off';" in apply
+    # The label shows the server-confirmed state — and, from 2026-09-09
+    # (owner decision, pilot 488 G1), a machine that is on but whose
+    # disclosure has not played through reads "starting", not "on": the
+    # enable never reports success before the disclosure has been heard.
+    assert ("autoPillLabel.textContent = autoOn ? (msg.starting ? 'Auto: starting…' : 'Auto: on')"
+            " : 'Auto: off';") in apply
+    assert "if (!autoOn && msg.reason) showSpeakError(msg.reason);" in apply   # rule 1: the machine's own reason is shown
     assert "autoPill.setAttribute('aria-pressed', String(autoOn));" in apply
     click = live[live.index("autoPill.addEventListener('click'"):]
     click = click[:click.index("\n});")]

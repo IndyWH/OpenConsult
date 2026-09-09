@@ -1493,6 +1493,21 @@ AUTO_QUEUE_ABSENT_PASSES = int(os.getenv("AUTO_QUEUE_ABSENT_PASSES", "3"))
 # (AUTO_RERANK_TIMEOUT_S, AUTO_RERANK_MAX_TOKENS).
 AUTO_RERANK_CONTEXT_TURNS = int(os.getenv("AUTO_RERANK_CONTEXT_TURNS", "6"))
 AUTO_RERANK_MAX_CHARS = int(os.getenv("AUTO_RERANK_MAX_CHARS", "1500"))
+# A cut-off enable disclosure is retried, then the machine switches itself
+# off (owner decision 2026-09-09, pilot 488 G1). In 488 the enable's
+# disclosure was politeness-aborted 105 ms after issue (0.031 RMS against
+# the 0.02 floor, a cafe) and nothing ever re-issued it: the machine sat in
+# DISCLOSURE, on and silent, for 41 s. Now the enable's disclosure (or the
+# chained invitation) is re-issued on the next quiet report, at most
+# AUTO_ENABLE_RETRIES attempts in all (the enable's own issue counts as the
+# first) inside AUTO_ENABLE_RETRY_WINDOW_S of the first issue; each re-issue
+# is audited auto.enable_retry with the attempt number and the abort's RMS.
+# With the tries spent the machine switches itself off — auto.disabled with
+# reason too_loud_to_start, the measured RMS and the floor — and the Auto
+# pill is told in plain words. The enable never reports success while the
+# disclosure has not played through: the pill shows "starting" until then.
+AUTO_ENABLE_RETRIES = int(os.getenv("AUTO_ENABLE_RETRIES", "3"))
+AUTO_ENABLE_RETRY_WINDOW_S = float(os.getenv("AUTO_ENABLE_RETRY_WINDOW_S", "30"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1854,6 +1869,13 @@ def _new_auto_state() -> dict:
         # re-pause on an already-acknowledged action — the one answer's
         # chance made real. Cleared by that turn end; see maybe_run_cds.
         "repause_block": False,
+        # A cut-off enable disclosure is retried (owner decision 2026-09-09,
+        # pilot 488 G1): the utterance the enable is waiting on — the
+        # disclosure, then the chained invitation — with its attempt count,
+        # the time of its first issue and, after a politeness abort, the
+        # RMS the client read. None once the invitation has played through
+        # (or the machine is off).
+        "enable_chain": None,
     }
 
 
@@ -1899,7 +1921,24 @@ def _thresholds_in_force() -> dict:
         "rerank_context_turns": AUTO_RERANK_CONTEXT_TURNS,
         "rerank_max_chars": AUTO_RERANK_MAX_CHARS,
         "politeness_floor_rms": speech.BARGE_IN_RMS_THRESHOLD,
+        "enable_retries": AUTO_ENABLE_RETRIES,
+        "enable_retry_window_s": AUTO_ENABLE_RETRY_WINDOW_S,
     }
+
+
+def _auto_toggled(ctl: auto_mode.AutoModeController, **extra) -> dict:
+    """The auto_toggled echo — the server's word on whether the machine is
+    on, which the pill and the client's quiet reporter follow. While the
+    machine is in DISCLOSURE the enable has not succeeded yet (owner
+    decision 2026-09-09, pilot 488 G1: the enable must never report
+    success while the disclosure has not played through), so the echo
+    says `starting`: the reporter is armed — its reports are what a
+    retried disclosure rides on — and the pill says "starting", not on."""
+    message = {"type": "auto_toggled", "on": _auto_on(ctl), "phase": ctl.phase.value}
+    if ctl.phase is auto_mode.AutoPhase.DISCLOSURE:
+        message["starting"] = True
+    message.update(extra)
+    return message
 
 
 def _cancel_playback(entry: dict, reason: str, *,
@@ -2241,10 +2280,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # reconnect — the client's reporter and (slice 6) the pill follow
         # it. Never sent when the gate is down.
         _ctl = entry["auto"]["controller"]
-        await websocket.send_json({"type": "auto_toggled", "on": _auto_on(_ctl),
-                                   "phase": _ctl.phase.value,
-                                   **({"pending": sorted(_ctl.pending_actions)}
-                                      if _ctl.phase is auto_mode.AutoPhase.PAUSED_URGENT else {})})
+        await websocket.send_json(_auto_toggled(
+            _ctl, **({"pending": sorted(_ctl.pending_actions)}
+                     if _ctl.phase is auto_mode.AutoPhase.PAUSED_URGENT else {})))
 
     session: LiveSession = entry["session"]
     engine: CDSEngine = state.cds_engine
@@ -2677,9 +2715,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # (slice 3/4); here it is simply not lost from the record.
             record_utterance(utterance, None, "politeness_abort")
             entry["pending_utterance"] = None
-            if utterance.ref_detail.get("via") == "auto":
-                await on_auto_utterance_ended(utterance, "politeness_abort")
             rms = payload.get("rms")
+            if utterance.ref_detail.get("via") == "auto":
+                await on_auto_utterance_ended(
+                    utterance, "politeness_abort",
+                    rms=round(float(rms), 5) if rms is not None else None)
             await audit.log(user["id"], "speech.politeness_abort", None, None,
                             {"utterance_id": utterance.utterance_id,
                              "via": utterance.ref_detail.get("via", "tap"),
@@ -2731,6 +2771,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if (auto is not None and auto["controller"].is_legal(
                     auto_mode.AutoEvent.INVITATION_COMPLETED)):
                 _reset_golden(auto)
+                auto["enable_chain"] = None      # the enable's chain is complete (G1)
                 await auto_transition(auto["controller"].invitation_completed())
         if utterance.ref_detail.get("via") == "auto":
             await on_auto_utterance_ended(utterance, reason)
@@ -2755,9 +2796,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 # through the AUTO path, its own row and audit, via=auto.
                 await auto_transition(auto["controller"].disclosure_completed(),
                                       detail={"disclosure": "spoken"})
-                await auto_issue(auto_mode.PhraseUtterance("invitation"),
-                                 phase=auto["controller"].phase,
-                                 trigger={"via": "auto_chain"})
+                chained = await auto_issue(auto_mode.PhraseUtterance("invitation"),
+                                           phase=auto["controller"].phase,
+                                           trigger={"via": "auto_chain"})
+                if chained is not None:
+                    # The chained invitation is the enable chain's next
+                    # step: a politeness abort of it is retried the same
+                    # way (owner decision 2026-09-09, G1).
+                    _begin_enable_chain(auto, "invitation", chained)
+                else:
+                    auto["enable_chain"] = None
+                # The disclosure has played through: NOW the enable has
+                # succeeded, and the pill is told on (it said "starting").
+                await websocket.send_json(_auto_toggled(auto["controller"]))
             elif AUTO_INVITATION_AFTER_DISCLOSURE:
                 await handle_speak({"ref": {"kind": "phrase", "id": "invitation"}},
                                    via="auto_invitation")
@@ -2935,8 +2986,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await auto_transition(ctl.auto_off(), detail={"reason": "restart"})
                 _cancel_officer(auto)
             if ctl.phase is not auto_mode.AutoPhase.OFF:
-                await websocket.send_json({"type": "auto_toggled", "on": _auto_on(ctl),
-                                           "phase": ctl.phase.value})
+                await websocket.send_json(_auto_toggled(ctl))
                 return   # already on — idempotent, nothing to re-audit
             if session.speaking or entry["pending_utterance"] is not None:
                 await refuse_auto("an utterance is in flight — try again when it has finished")
@@ -2964,8 +3014,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     await refuse_auto("auto mode could not speak the disclosure — "
                                       "see the speech error, then try again")
                     return
-                await websocket.send_json({"type": "auto_toggled", "on": True,
-                                           "phase": ctl.phase.value})
+                _begin_enable_chain(auto, "disclosure", prepared)
+                # Not success yet (G1): the disclosure has not played
+                # through. The echo says `starting`; the on-echo follows the
+                # disclosure's completion (handle_speak_ended).
+                await websocket.send_json(_auto_toggled(ctl))
                 return
             await auto_transition(ctl.disclosure_completed(),
                                   detail={"disclosure": "already_given"})
@@ -2989,24 +3042,116 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     await refuse_auto("auto mode could not speak the invitation — "
                                       "see the speech error, then try again")
                     return
-            await websocket.send_json({"type": "auto_toggled", "on": True,
-                                       "phase": ctl.phase.value})
+                _begin_enable_chain(auto, "invitation", prepared)
+            await websocket.send_json(_auto_toggled(ctl))
         else:
             if ctl.phase is auto_mode.AutoPhase.OFF:
                 await websocket.send_json({"type": "auto_toggled", "on": False,
                                            "phase": ctl.phase.value})
                 return   # already off
-            await audit.log(user["id"], "auto.disabled", None, None,
-                            {"session_id": session_id, "via": via,
-                             "at_audio_s": round(session.audio_seconds, 1)})
-            await auto_transition(ctl.auto_off())
-            _cancel_officer(auto)
-            auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
-                        handover=None, last_issued=None, handover_by_doctor=False,
-                        repause_block=False)
-            _reset_golden(auto)
-            await websocket.send_json({"type": "auto_toggled", "on": False,
-                                       "phase": ctl.phase.value})
+            await _switch_auto_off(auto, via=via)
+
+    async def _switch_auto_off(auto: dict, *, via: str, reason: str | None = None,
+                               detail: dict | None = None, tell: str | None = None) -> None:
+        """Auto off, from any state: audited auto.disabled (with `via`, and
+        the machine's own `reason` and detail when it switched itself off),
+        the machine to OFF, the officer, any plan and the enable chain
+        stood down, the golden bookkeeping reset, and the client told
+        (auto_toggled off — with `reason` in plain words when the machine
+        decided, so the pill can say why)."""
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        await audit.log(user["id"], "auto.disabled", None, None,
+                        {"session_id": session_id, "via": via,
+                         **({"reason": reason} if reason else {}),
+                         **(detail or {}),
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        await auto_transition(ctl.auto_off(), detail={"reason": reason} if reason else None)
+        _cancel_officer(auto)
+        auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
+                    handover=None, last_issued=None, handover_by_doctor=False,
+                    repause_block=False, enable_chain=None)
+        _reset_golden(auto)
+        await websocket.send_json({"type": "auto_toggled", "on": False,
+                                   "phase": ctl.phase.value,
+                                   **({"reason": tell} if tell else {})})
+
+    def _begin_enable_chain(auto: dict, phrase_id: str, prepared: speech.Utterance) -> None:
+        """The enable is now waiting on this utterance (the disclosure, or
+        the invitation) to play through — attempt 1 of AUTO_ENABLE_RETRIES,
+        the retry window open from now (owner decision 2026-09-09, G1)."""
+        auto["enable_chain"] = {"phrase": phrase_id, "attempt": 1,
+                                "first_issued_at": time.monotonic(),
+                                "utterance_id": prepared.utterance_id,
+                                "aborted": False, "abort_rms": None}
+
+    def _politeness_floor() -> float:
+        """The floor the client's politeness abort compares against."""
+        return speech.BARGE_IN_RMS_THRESHOLD
+
+    async def _too_loud_to_start(auto: dict) -> None:
+        """The tries are spent (owner decision 2026-09-09, G1): the machine
+        switches itself off with the reason on the record — the last
+        abort's RMS against the floor, the attempts made — and on the pill
+        in plain words ("Too loud to start: 0.031 against 0.020")."""
+        chain = auto["enable_chain"] or {}
+        rms, floor = chain.get("abort_rms"), _politeness_floor()
+        words = (f"Too loud to start: {rms:.3f} against {floor:.3f}" if rms is not None
+                 else f"Too loud to start (floor {floor:.3f})")
+        logger.info("Live session %s: auto off — %s after %d attempt(s) at the %s",
+                    session_id, words, chain.get("attempt", 0), chain.get("phrase"))
+        await _switch_auto_off(auto, via="too_loud_to_start", reason="too_loud_to_start",
+                               detail={"rms": rms, "floor": floor,
+                                       "attempts": chain.get("attempt"),
+                                       "phrase": chain.get("phrase"),
+                                       "retries": AUTO_ENABLE_RETRIES,
+                                       "window_s": AUTO_ENABLE_RETRY_WINDOW_S},
+                               tell=words)
+
+    async def _on_enable_chain_aborted(auto: dict, utterance: speech.Utterance,
+                                       rms: float | None) -> None:
+        """The enable's disclosure (or the chained invitation) was
+        politeness-aborted: remember the reading; with the tries already
+        spent, switch off now — otherwise the next quiet report retries
+        (_retry_enable_chain)."""
+        chain = auto["enable_chain"]
+        chain["aborted"] = True
+        chain["abort_rms"] = rms
+        logger.info("Live session %s: the enable's %s was politeness-aborted (rms %s) on attempt "
+                    "%d of %d", session_id, chain["phrase"], rms, chain["attempt"],
+                    AUTO_ENABLE_RETRIES)
+        if chain["attempt"] >= AUTO_ENABLE_RETRIES:
+            await _too_loud_to_start(auto)
+
+    async def _retry_enable_chain(auto: dict, quiet_s: float) -> None:
+        """A quiet report while the enable's utterance stands aborted: re-issue
+        it (attempt n+1, audited auto.enable_retry with the abort's RMS)
+        while attempts and the window allow; otherwise the machine switches
+        itself off (too_loud_to_start). A slot not free waits for the next
+        report."""
+        chain = auto["enable_chain"]
+        ctl: auto_mode.AutoModeController = auto["controller"]
+        if session.speaking or entry["pending_utterance"] is not None:
+            return
+        if (chain["attempt"] >= AUTO_ENABLE_RETRIES
+                or time.monotonic() - chain["first_issued_at"] > AUTO_ENABLE_RETRY_WINDOW_S):
+            await _too_loud_to_start(auto)
+            return
+        attempt = chain["attempt"] + 1
+        prepared = await auto_issue(auto_mode.PhraseUtterance(chain["phrase"]), phase=ctl.phase,
+                                    trigger={"via": "auto_enable_retry", "attempt": attempt,
+                                             "quiet_s": round(quiet_s, 1)})
+        if prepared is None:
+            return                          # a guard refusal: the next report tries again
+        chain.update(attempt=attempt, aborted=False, utterance_id=prepared.utterance_id)
+        await audit.log(user["id"], "auto.enable_retry", None, None,
+                        {"session_id": session_id, "phrase": chain["phrase"], "attempt": attempt,
+                         "abort_rms": chain["abort_rms"], "floor": _politeness_floor(),
+                         "quiet_s": round(quiet_s, 1), "retries": AUTO_ENABLE_RETRIES,
+                         "window_s": AUTO_ENABLE_RETRY_WINDOW_S,
+                         "utterance_id": prepared.utterance_id,
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        logger.info("Live session %s: the enable's %s re-issued (attempt %d of %d) on quiet %.1f s",
+                    session_id, chain["phrase"], attempt, AUTO_ENABLE_RETRIES, quiet_s)
 
     async def handle_auto_ack(payload: dict) -> None:
         """RESUME AUTO / TAKE OVER on the pause banner (spec §7, §10).
@@ -3689,14 +3834,24 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         _ask_after_pass(auto, version, "post-answer revision")
 
-    async def on_auto_utterance_ended(utterance: speech.Utterance, reason: str) -> None:
+    async def on_auto_utterance_ended(utterance: speech.Utterance, reason: str,
+                                      *, rms: float | None = None) -> None:
         """The lifecycle end of an AUTO utterance, from handle_speak_ended.
         A politeness-aborted QUESTION (or handover phrase) is requeued and
         re-issued at the next permitting quiet — unlike an encourager,
         which is dropped; the examination handover, played through, ends
-        the auto run (machine HANDOVER, audit auto.handover)."""
+        the auto run (machine HANDOVER, audit auto.handover). A
+        politeness-aborted enable disclosure or chained invitation is
+        retried on the next quiet report, then the machine switches itself
+        off (owner decision 2026-09-09, pilot 488 G1); `rms` is the
+        client's reading at the abort."""
         auto = entry["auto"]
         if auto is None:
+            return
+        chain = auto.get("enable_chain")
+        if (chain is not None and chain.get("utterance_id") == utterance.utterance_id
+                and reason == "politeness_abort"):
+            await _on_enable_chain_aborted(auto, utterance, rms)
             return
         last = auto.get("last_issued")
         if last is None or last.get("utterance_id") != utterance.utterance_id:
@@ -4225,6 +4380,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # for exactly that.
         in_handover_seq = (ctl.phase is auto_mode.AutoPhase.HANDOVER
                            and auto["handover"] is not None)
+        chain = auto.get("enable_chain")
+        if (chain is not None and chain.get("aborted")
+                and ctl.phase in (auto_mode.AutoPhase.DISCLOSURE, auto_mode.AutoPhase.INVITATION)):
+            # The enable's disclosure (or chained invitation) stands
+            # politeness-aborted: this report is the retry's moment (owner
+            # decision 2026-09-09, pilot 488 G1). In 488 DISCLOSURE ignored
+            # every report and the machine sat silent for 41 s.
+            await _retry_enable_chain(auto, quiet_s)
+            return
         if not (in_golden or in_questions or in_handover_seq):
             return
         if in_golden:

@@ -331,16 +331,23 @@ def test_one_tap_with_no_disclosure_speaks_it_chains_the_invitation_and_golden_s
         disclosure = next(m for m in seen if m.get("type") == "auto_speak")
         assert disclosure["ref_id"] == "disclosure"
         assert disclosure["text"].startswith("Hello. I'm a computer, not a person.")
-        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "disclosure"}
+        # REPINNED 2026-09-09 (owner decision, pilot 488 G1): the enable
+        # never reports success while the disclosure has not played
+        # through — the echo at issue says `starting`, and the on-echo
+        # follows the disclosure's completion below.
+        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "disclosure",
+                            "starting": True}
         assert s.phase is AutoPhase.DISCLOSURE
         # The disclosure plays through: given (spoken), and the invitation
         # is chained — through the AUTO path, not the tap chain.
         s.play(disclosure["utterance_id"])
-        seen = _collect_until(s.ws, {"auto_speak"})
+        seen = _collect_until(s.ws, {"auto_toggled"})
         assert any(m.get("type") == "disclosure" and m["how"] == "spoken" for m in seen)
         assert not any(m.get("type") == "speak_ready" for m in seen), "the auto chain, not the tap chain"
-        invitation = seen[-1]
+        invitation = next(m for m in seen if m.get("type") == "auto_speak")
         assert invitation["ref_id"] == "invitation"
+        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "invitation"}, \
+            "success is reported once the disclosure has played through"
         assert s.entry["disclosed"] is True
         assert s.phase is AutoPhase.INVITATION
         s.play(invitation["utterance_id"])
@@ -420,6 +427,150 @@ def test_enable_fails_as_a_unit_when_the_disclosure_cannot_be_spoken(gate, tmp_p
         assert s.phase is AutoPhase.OFF
         _stop(s)
     assert [d["via"] for d in _audit("auto.disabled", s.session_id)] == ["enable_failed"]
+
+
+def _abort(s: Session, utterance_id: str, rms: float = 0.0314) -> None:
+    """The client's politeness abort, with the reading it took (488: 0.0314)."""
+    s.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
+                               "seq": s.seq + 1, "reason": "politeness_abort", "rms": rms}))
+
+
+def test_the_488_shape_an_aborted_enable_disclosure_is_retried_on_the_next_quiet_report(gate):
+    """Owner decision 2026-09-09 (pilot 488 G1). The enable's disclosure is
+    politeness-aborted 105 ms after issue (0.0314 RMS at the cafe); in 488
+    nothing re-issued it and the machine sat in DISCLOSURE, on and silent,
+    for 41 s. Now: the echo at issue says `starting` (not on — the
+    disclosure has not played through), the next quiet report re-issues
+    the disclosure (attempt 2, audited auto.enable_retry with the abort's
+    RMS), and a disclosure that plays through on the second try chains the
+    invitation as normal, with the on-echo reported then."""
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        first = next(m for m in seen if m.get("type") == "auto_speak")
+        assert first["ref_id"] == "disclosure"
+        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "disclosure",
+                            "starting": True}, "not success: the disclosure has not played"
+        _abort(s, first["utterance_id"])                 # 105 ms later: the room was loud
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
+        assert s.phase is AutoPhase.DISCLOSURE and s.entry["disclosed"] is False
+        s.quiet(1.8)                                     # the next quiet report: the retry
+        seen = _collect_until(s.ws, {"auto_speak"})
+        second = seen[-1]
+        assert second["ref_id"] == "disclosure" and second["utterance_id"] != first["utterance_id"]
+        assert not any(m.get("type") == "auto_toggled" for m in seen), "still not reported on"
+        s.play(second["utterance_id"])                   # plays through on the second try
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        invitation = next(m for m in seen if m.get("type") == "auto_speak")
+        assert invitation["ref_id"] == "invitation", "the invitation chains as normal"
+        assert seen[-1] == {"type": "auto_toggled", "on": True, "phase": "invitation"}
+        assert s.entry["disclosed"] is True
+        s.play(invitation["utterance_id"])
+        s.probe()
+        assert s.phase is AutoPhase.GOLDEN
+        assert s.entry["auto"]["enable_chain"] is None
+        cid = _stop(s)
+    retries = _audit("auto.enable_retry", s.session_id)
+    assert len(retries) == 1
+    assert retries[0]["phrase"] == "disclosure" and retries[0]["attempt"] == 2
+    assert retries[0]["abort_rms"] == 0.0314 and retries[0]["floor"] == 0.02
+    assert retries[0]["retries"] == appmain.AUTO_ENABLE_RETRIES
+    assert _audit("auto.disabled", s.session_id) == []
+    rows = asyncio.run(system_utterances.for_consultation(cid))
+    disclosures = [r for r in rows if r["ref_detail"]["id"] == "disclosure"]
+    assert sorted(r["end_reason"] for r in disclosures) == ["complete", "politeness_abort"]
+    retried = next(r for r in disclosures if r["end_reason"] == "complete")
+    assert retried["ref_detail"]["trigger"] == {"via": "auto_enable_retry", "attempt": 2,
+                                                "quiet_s": 1.8}
+
+
+def test_three_aborts_switch_the_machine_off_with_too_loud_to_start_on_the_record_and_the_pill(gate):
+    """Owner decision 2026-09-09 (G1): with the tries spent —
+    AUTO_ENABLE_RETRIES attempts in all, the enable's own issue the first —
+    the machine switches itself off: auto.disabled with reason
+    too_loud_to_start, the measured RMS and the floor; the pill told in
+    plain words ("Too loud to start: 0.031 against 0.020"); the machine
+    OFF, not sitting in DISCLOSURE. The attack reaches its target: three
+    disclosures were issued and every one was aborted."""
+    assert appmain.AUTO_ENABLE_RETRIES == 3
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        issued = [next(m for m in seen if m.get("type") == "auto_speak")]
+        _abort(s, issued[0]["utterance_id"], rms=0.0290)
+        s.quiet(1.8)
+        issued.append(_until(s.ws, {"auto_speak"}))                # attempt 2
+        _abort(s, issued[1]["utterance_id"], rms=0.0350)
+        s.quiet(1.8)
+        issued.append(_until(s.ws, {"auto_speak"}))                # attempt 3, the last
+        assert len({m["utterance_id"] for m in issued}) == 3
+        assert all(m["ref_id"] == "disclosure" for m in issued)
+        assert s.phase is AutoPhase.DISCLOSURE
+        _abort(s, issued[2]["utterance_id"], rms=0.0314)          # the third abort: off
+        off = _until(s.ws, {"auto_toggled"})
+        assert off == {"type": "auto_toggled", "on": False, "phase": "off",
+                       "reason": "Too loud to start: 0.031 against 0.020"}
+        assert s.phase is AutoPhase.OFF
+        assert s.entry["auto"]["enable_chain"] is None
+        s.quiet(3.0)
+        assert all(m.get("type") != "auto_speak" for m in s.probe()), "off means nothing more"
+        _stop(s)
+    retries = _audit("auto.enable_retry", s.session_id)
+    assert [(r["attempt"], r["abort_rms"]) for r in retries] == [(2, 0.029), (3, 0.035)]
+    disabled = _audit("auto.disabled", s.session_id)
+    assert len(disabled) == 1
+    assert disabled[0]["via"] == "too_loud_to_start" and disabled[0]["reason"] == "too_loud_to_start"
+    assert disabled[0]["rms"] == 0.0314 and disabled[0]["floor"] == 0.02
+    assert disabled[0]["attempts"] == 3 and disabled[0]["phrase"] == "disclosure"
+    phases = [(d["from"], d["to"]) for d in _audit("auto.phase", s.session_id)]
+    assert phases == [("off", "disclosure"), ("disclosure", "off")]
+
+
+def test_the_retry_window_spent_switches_the_machine_off_at_the_next_report(gate, monkeypatch):
+    """The window half of the rule: a retry is only ever issued inside
+    AUTO_ENABLE_RETRY_WINDOW_S of the first issue. With the window already
+    past when the report arrives — attempts still in hand — the machine
+    switches itself off with the same reason."""
+    monkeypatch.setattr(appmain, "AUTO_ENABLE_RETRY_WINDOW_S", 0.0)
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        first = next(m for m in _collect_until(s.ws, {"auto_toggled"}) if m.get("type") == "auto_speak")
+        _abort(s, first["utterance_id"])
+        s.quiet(1.8)
+        off = _until(s.ws, {"auto_toggled"})
+        assert off["on"] is False and off["reason"] == "Too loud to start: 0.031 against 0.020"
+        assert s.phase is AutoPhase.OFF
+        _stop(s)
+    assert _audit("auto.enable_retry", s.session_id) == []
+    assert [d["reason"] for d in _audit("auto.disabled", s.session_id)] == ["too_loud_to_start"]
+
+
+def test_an_aborted_chained_invitation_is_retried_the_same_way(gate):
+    """The chained invitation is the enable chain's second step (the
+    decision names it): aborted, it is re-issued on the next quiet report
+    and GOLDEN starts at its end as normal."""
+    with live(gate) as s:
+        _collect_until(s.ws, {"auto_toggled"})
+        s.auto(True)
+        disclosure = next(m for m in _collect_until(s.ws, {"auto_toggled"}) if m.get("type") == "auto_speak")
+        s.play(disclosure["utterance_id"])
+        seen = _collect_until(s.ws, {"auto_toggled"})
+        invitation = next(m for m in seen if m.get("type") == "auto_speak")
+        assert invitation["ref_id"] == "invitation" and s.phase is AutoPhase.INVITATION
+        _abort(s, invitation["utterance_id"], rms=0.041)
+        assert s.phase is AutoPhase.INVITATION
+        s.quiet(2.0)
+        again = _until(s.ws, {"auto_speak"})
+        assert again["ref_id"] == "invitation" and again["utterance_id"] != invitation["utterance_id"]
+        s.play(again["utterance_id"])
+        s.probe()
+        assert s.phase is AutoPhase.GOLDEN
+        _stop(s)
+    retries = _audit("auto.enable_retry", s.session_id)
+    assert [(r["phrase"], r["attempt"], r["abort_rms"]) for r in retries] == [("invitation", 2, 0.041)]
 
 
 def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):

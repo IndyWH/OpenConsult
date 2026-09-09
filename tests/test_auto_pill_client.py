@@ -44,15 +44,19 @@ function refreshSpeechControls() { refreshed += 1; }
 // The indicator (slice 6) is applyAutoPhase's business; here it only keeps
 // the phase, as the shipped function does when given one.
 function applyAutoPhase(phase) { autoPhase = phase || autoPhase; }
+const shown = [];
+function showSpeakError(detail) { shown.push(detail); }
 const out = [];
 for (const msg of [{on: true, phase: 'disclosure'}, {on: true, phase: 'golden'},
                    {on: true, phase: 'paused_urgent'}, {on: false, phase: 'off'},
-                   {on: false, phase: 'taken_over'}, {on: true}]) {
+                   {on: false, phase: 'taken_over'}, {on: true},
+                   {on: true, phase: 'disclosure', starting: true},
+                   {on: false, phase: 'off', reason: 'Too loud to start: 0.031 against 0.020'}]) {
   applyAutoToggle(msg);
   out.push({label: autoPillLabel.textContent, pressed: attrs['aria-pressed'],
             done: classes.has('done'), on: autoOn, phase: autoPhase});
 }
-console.log(JSON.stringify({out, refreshed}));
+console.log(JSON.stringify({out, refreshed, shown}));
 """
 
 
@@ -72,7 +76,16 @@ def test_the_pill_follows_the_servers_echo_not_the_tap():
                              "on": False, "phase": "off"}
     assert got["out"][4]["label"] == "Auto: off" and got["out"][4]["phase"] == "taken_over"
     assert got["out"][5]["on"] is True and got["out"][5]["phase"] == "taken_over"  # phase kept if absent
-    assert got["refreshed"] == 6, "every echo re-evaluates the controls"
+    # Owner decision 2026-09-09 (pilot 488 G1): the enable never reports
+    # success while the disclosure has not played through — the `starting`
+    # echo is on (the reporter is armed) but the pill does not say "on";
+    # and a machine that switched itself off says why, in plain words,
+    # through the same error surface a refusal uses — shown, not swallowed.
+    assert got["out"][6] == {"label": "Auto: starting…", "pressed": "true", "done": True,
+                             "on": True, "phase": "disclosure"}
+    assert got["out"][7]["label"] == "Auto: off" and got["out"][7]["on"] is False
+    assert got["shown"] == ["Too loud to start: 0.031 against 0.020"]
+    assert got["refreshed"] == 8, "every echo re-evaluates the controls"
 
 
 def test_the_pill_is_hidden_unless_the_server_says_auto_mode_exists():
