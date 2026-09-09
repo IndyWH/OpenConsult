@@ -6827,3 +6827,32 @@ parenthetical literally (harmless to the flow; the re-ranker's prompt
 now carries the lesson explicitly for the pending questions); D10 (the
 politeness abort) still unexercised; banner visibility; the felt length
 of the 90 s window.
+
+## Pilot diagnostic — consultations 487–490, 9 Sept 2026: the first real-actor runs and the queue's first outing (REPORT ONLY, 2026-09-09)
+
+**A report exists**, outside the repository:
+`~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_487-490_2026-09-09.md`
+— 487 (cafe, two real voices, auto never enabled), 488 (cafe, the enable
+and the countdown), 489 and 490 (the flat, script 01 solo, slice-3 code
+live at `6e24542`). What it shows: the owner's role hypothesis does not
+hold — 488's auto disclosure was issued and **politeness-aborted at
+0.031 RMS against the absolute 0.02 floor**, and an aborted enable
+disclosure is never re-issued (G1); the cafe never gave 5 s of quiet, so
+the countdown reached 0 once and the one "reset" was the owner's own
+toggle (G2, G12); the number to beat is **3.0 s mean turn end → Alba
+speaking** against 27.7 s (target met), but the patient waits ≈ 11.6 s
+from the last word — the 5 s rule, ≈ 3 s of unrecorded trailing energy
+above the floor, and ≈ 3 s of preparation of which 2 s is the topic
+call's timeout, lost to the pass on 9 of 10 questions (G4, G6); a fresh
+quiet span whose first report equals the previous span's last is
+invisible to the server, which re-asked an answered question (G3); the
+re-ranker was skipped while a pass was in flight and a question the
+patient had answered was asked (G5), and its one verdict dropped the
+wrong item, which re-entered on the next pass and was asked; the halving
+simulation (2.5 s cuts two answers of nine on the transcript reading,
+3.5 s one, neither on the RMS reading) with a recommendation to record
+the reporter's span first; and the record does not know the machine or
+microphone beyond the sound check's output-device label (G10). Candidate
+defects G1–G14 with file:line at `6e24542`; nothing in code, tests,
+config, flags or the database changed. Docs-only commit; the suite was
+not run for it.
