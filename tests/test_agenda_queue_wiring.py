@@ -22,7 +22,7 @@ from app import main as appmain
 from app.agenda_queue import ItemStatus
 from app.cds import OfficerVerdict
 from auto_harness import (  # noqa: F401 - the fixture is used by name
-    Q_ONSET, Q_RADIATE, Q_SLEEP, Q_TABLETS, _audit, _collect_until, _stop, gate, live, needs_db)
+    Q_ONSET, Q_RADIATE, Q_SLEEP, Q_TABLETS, _audit, _collect_until, _stop, _until, gate, live, needs_db)
 
 pytestmark = needs_db
 
@@ -1416,3 +1416,111 @@ def test_a_report_without_a_span_number_keeps_the_old_fresh_span_test(gate):
         s.probe()
         assert s.auto["awaiting_speech"] is False
         _stop(s)
+
+
+# ==========================================================================
+# Pilot fix slice 4, item 9 (owner decision 2026-09-09, pilot 489/490 G7 and G8):
+# no plan is issued before its pre-synthesis has finished; the re-ask's own row
+
+def _slow_speech(tmp_path, seconds: float):
+    """A SpeechService whose synthesiser takes `seconds` to answer."""
+    import secrets as _secrets
+    import sys as _sys
+    script = tmp_path / f"slow_tts_{_secrets.token_hex(4)}.py"
+    script.write_text(
+        "import sys, time, wave\n"
+        "sys.stdin.buffer.read()\n"
+        f"time.sleep({seconds})\n"
+        "with wave.open(sys.argv[sys.argv.index('--output-file') + 1], 'wb') as w:\n"
+        "    w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)\n"
+        "    w.writeframes(b'\\x00\\x00' * 11025)\n")
+    (tmp_path / "voice.onnx").write_bytes(b"never read")
+    from app import speech as _speech
+    return _speech.SpeechService(voice="test", model_path=str(tmp_path / "voice.onnx"),
+                                 cache_dir=tmp_path / "slow_cache",
+                                 command=f"{_sys.executable} {script} --model {{model}} --output-file {{output}}")
+
+
+def test_the_issue_waits_for_the_plans_presynthesis_so_the_ask_is_a_cache_hit(gate, tmp_path):
+    """G7: in 489/490 the plan was issued the moment the turn had ended
+    while its pre-synthesis was still running, so the same text was
+    synthesised twice and issue_to_speech_ms read 0.9–1.4 s against 24 ms
+    on a cache hit. Now the issue waits for the synthesis task (bounded):
+    with a 0.6 s synthesiser the question still goes out synth_ms 0 — a
+    cache hit — and no fallback is audited."""
+    gate.speech = _slow_speech(tmp_path, 0.6)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday night.")                   # the plan's synthesis starts now (0.6 s)
+        nxt = s.wait_for_auto_speak()                  # the first report finds it still running
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        assert s.entry["pending_utterance"].synth_ms == 0, "waited for the pre-synthesis: a cache hit"
+        s.play(nxt["utterance_id"])
+        _stop(s)
+    assert _audit("auto.presynth_fallback", s.session_id) == []
+    latency = [r for r in _audit("auto.question_latency", s.session_id) if r["text"].endswith("sleep?")]
+    assert latency and latency[0]["turn_end_to_issue_ms"] >= 500, "the issue instant is after the wait"
+
+
+def test_past_the_bound_the_issue_falls_back_to_synthesis_at_issue_and_says_so(gate, tmp_path, monkeypatch):
+    """The bound (AUTO_PRESYNTH_WAIT_S): a synthesiser slower than it does
+    not hold the ask — the issue proceeds, synthesises at issue, and
+    auto.presynth_fallback records the wait."""
+    monkeypatch.setattr(appmain, "AUTO_PRESYNTH_WAIT_S", 0.15)
+    gate.speech = _slow_speech(tmp_path, 0.8)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday night.")
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        s.play(nxt["utterance_id"])
+        _stop(s)
+    fallback = _audit("auto.presynth_fallback", s.session_id)
+    assert len(fallback) >= 1
+    row = fallback[-1]
+    assert row["text"] == "Can you tell me more about your sleep?" and row["kind"] == "question"
+    assert 150 <= row["waited_ms"] < 800 and row["bound_s"] == 0.15
+
+
+def test_the_f5_re_asks_latency_row_is_marked_reask_and_carries_no_turn_end_numbers(gate, monkeypatch):
+    """G8: 489's re-ask wrote auto.question_latency against the ORIGINAL
+    turn end — 43,627 ms, an artefact. Now the re-ask's row is marked
+    reask=true, carries only issue_to_speech_ms (measured from the
+    re-ask's own issue), and its turn-end numbers are null, so it is
+    excluded from the mean by its mark; the original's row is unchanged."""
+    monkeypatch.setattr(appmain, "AUTO_NO_ANSWER_GRACE_S", 6.0)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET]]
+    with live(gate) as s:
+        s.to_golden()
+        s.to_open()
+        first = s.wait_for_auto_speak()
+        s.play(first["utterance_id"])
+        s.quiet(4.0)                                   # no speech since the question
+        s.probe()
+        s.quiet(6.2)                                   # the grace: re-asked once
+        again = _until(s.ws, {"auto_speak"})
+        assert again["text"] == first["text"] and again["utterance_id"] != first["utterance_id"]
+        s.play(again["utterance_id"])                  # speak_started writes the row
+        _stop(s)
+    rows = _audit("auto.question_latency", s.session_id)
+    original = next(r for r in rows if r["utterance_id"] == first["utterance_id"])
+    reask = next(r for r in rows if r["utterance_id"] == again["utterance_id"])
+    assert original["reask"] is False and original["turn_end_to_speech_ms"] is not None
+    assert reask["reask"] is True
+    assert reask["turn_end_to_issue_ms"] is None and reask["turn_end_to_speech_ms"] is None
+    assert 0 <= reask["issue_to_speech_ms"] < 5000, "measured from the re-ask's own issue"
+    assert len(_audit("auto.reask_no_answer", s.session_id)) == 1

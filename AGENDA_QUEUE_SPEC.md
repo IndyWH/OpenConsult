@@ -199,7 +199,14 @@ question — now on the record for every auto question:
 `turn_end_to_issue_ms` on the question's row and its speech.requested
 audit, and `auto.question_latency` at the client's speak_started with
 `turn_end_to_speech_ms` and `issue_to_speech_ms`. 486 baseline mean
-27.7 s (report table). Prereg untouched; spec §5, §6, §9 truth-ups;
+27.7 s (report table). The F5 re-ask's row is marked `reask: true` and
+carries only `issue_to_speech_ms` — it has no turn end of its own and is
+excluded from the mean (owner decision 2026-09-09, G8; 489's re-ask had
+read 43.6 s against the original's turn end). And no plan is issued
+before its pre-synthesis has finished (G7): the issue waits for the
+synthesis task, bounded by `AUTO_PRESYNTH_WAIT_S`, then falls back to
+synthesis at issue and audits `auto.presynth_fallback` — in 489/490 the
+same question was synthesised twice on four asks. Prereg untouched; spec §5, §6, §9 truth-ups;
 help/ flagged for the owner's wording where the panel's behaviour
 changes.
 

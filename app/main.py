@@ -1487,6 +1487,15 @@ AUTO_TRACE_S = float(os.getenv("AUTO_TRACE_S", "8.0"))
 AUTO_QUIET_REPORT_AUDIT_S = float(os.getenv("AUTO_QUIET_REPORT_AUDIT_S", "1.0"))
 # Pre-synthesise the top agenda question during the patient's turn (slice 4).
 AUTO_PRESYNTH = os.getenv("AUTO_PRESYNTH", "true").lower() != "false"
+# No plan is issued before its pre-synthesis has finished (owner decision
+# 2026-09-09, pilot 489/490 G7): when the quiet report that permits the ask
+# arrives while the plan's synthesis is still running, the issue waits for
+# it — at most this long — rather than synthesising the same text a second
+# time at issue (489/490: the same question synthesised twice, 0.9–1.4 s
+# on issue_to_speech_ms against 24 ms on a cache hit). Past the bound the
+# issue proceeds and synthesises at issue, audited auto.presynth_fallback.
+# An UNCALIBRATED GUESS; synthesis of a question takes ≈ 1 s on this machine.
+AUTO_PRESYNTH_WAIT_S = float(os.getenv("AUTO_PRESYNTH_WAIT_S", "2.0"))
 # D2 posture (owner decision 2026-08-16), re-meant by the standing question
 # queue (AGENDA_QUEUE_SPEC.md §4, D-C option a, 2026-09-07): true = a full
 # CDS pass is REQUESTED on every answer, so the urgency check runs as often
@@ -1992,6 +2001,7 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
         "officer_max_wait_s": cds_module.AUTO_OFFICER_MAX_WAIT_S,
         "topic_timeout_s": cds_module.AUTO_TOPIC_TIMEOUT_S,
         "presynth": AUTO_PRESYNTH,
+        "presynth_wait_s": AUTO_PRESYNTH_WAIT_S,
         "strict_revise": AUTO_STRICT_REVISE,
         "action_match_threshold": AUTO_ACTION_MATCH_THRESHOLD,
         "no_answer_grace_s": AUTO_NO_ANSWER_GRACE_S,
@@ -3995,15 +4005,6 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     _plan_handover(auto, entry["agenda"].current_version)
                 return
             detail = {"topic": plan["topic"], "open_form": plan["open_form"]}
-            issued_at = time.monotonic()      # the issue instant: one reading for all three numbers
-            if auto["turn_ended_at"] is not None:
-                # The number to beat, per question (spec §7): from the turn
-                # end that permitted this ask (auto.turn_ended, or the
-                # golden exit's) to the issue — the decision to speak;
-                # synthesis and transport are in issue_to_speech_ms.
-                # 486 baseline: 27.7 s mean.
-                detail["turn_end_to_issue_ms"] = int(
-                    round((issued_at - auto["turn_ended_at"]) * 1000))
             if (not plan["open_form"] and ctl.phase is auto_mode.AutoPhase.OPEN
                     and ctl.is_legal(auto_mode.AutoEvent.NARRATIVE_EXHAUSTED)):
                 await auto_transition(ctl.narrative_exhausted(),
@@ -4014,6 +4015,42 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 logger.error("Live session %s: question refused by the machine: %s", session_id, exc)
                 auto["queued"] = None
                 return
+        # No plan is issued before its pre-synthesis has finished (owner
+        # decision 2026-09-09, G7): the plan task — the topic call is back
+        # by now; what remains is the synthesis — is awaited, bounded by
+        # AUTO_PRESYNTH_WAIT_S, so the issue is a cache hit. Past the bound
+        # the issue synthesises at issue, as before, and says so.
+        task = auto["plan_task"]
+        if task is not None and not task.done():
+            waited_from = time.monotonic()
+            try:
+                await asyncio.wait_for(asyncio.shield(task), timeout=AUTO_PRESYNTH_WAIT_S)
+            except asyncio.TimeoutError:
+                waited_ms = int(round((time.monotonic() - waited_from) * 1000))
+                await audit.log(user["id"], "auto.presynth_fallback", None, None,
+                                {"session_id": session_id, "text": plan["text"],
+                                 "kind": plan["kind"], "waited_ms": waited_ms,
+                                 "bound_s": AUTO_PRESYNTH_WAIT_S,
+                                 "at_audio_s": round(session.audio_seconds, 1)})
+                logger.info("Live session %s: pre-synthesis still running after %d ms — "
+                            "synthesising at issue", session_id, waited_ms)
+            except Exception:  # noqa: BLE001 - the plan task's own fault surfaces at issue
+                pass
+            if auto["queued"] is not plan:
+                return                     # the plan changed under the wait (a tap, a pause)
+            free_now = not session.speaking and entry["pending_utterance"] is None
+            if not free_now:
+                return
+        issued_at = time.monotonic()          # the issue instant: one reading for all three numbers
+        if plan["kind"] == "question":
+            if auto["turn_ended_at"] is not None:
+                # The number to beat, per question (spec §7): from the turn
+                # end that permitted this ask (auto.turn_ended, or the
+                # golden exit's) to the issue — the decision to speak, after
+                # any wait for the pre-synthesis (G7); synthesis and
+                # transport are in issue_to_speech_ms. 486 baseline: 27.7 s.
+                detail["turn_end_to_issue_ms"] = int(
+                    round((issued_at - auto["turn_ended_at"]) * 1000))
             # Consume THIS item by id (spec §2, §5) — not whatever is head by
             # now — before the slot is taken; if the issue fails the item
             # goes straight back to its rank.
@@ -4027,7 +4064,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["queued"] = None
         auto["think_used"] = False           # the wait is over; the next one starts fresh
         auto["last_issued"] = {**plan, "utterance_id": prepared.utterance_id,
-                               "issued_at": issued_at if plan["kind"] == "question" else time.monotonic(),
+                               "issued_at": issued_at,
                                "turn_ended_at": auto["turn_ended_at"],
                                "turn_end_to_issue_ms": (detail or {}).get("turn_end_to_issue_ms")}
         auto["turn_ended"] = False       # the next turn end is the answer's
@@ -4068,12 +4105,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 or last.get("kind") != "question" or last.get("turn_ended_at") is None):
             return
         now = time.monotonic()
+        reask = bool(last.get("reask"))
         await audit.log(user["id"], "auto.question_latency", None, None,
                         {"session_id": session_id, "utterance_id": utterance.utterance_id,
                          "text": last.get("text"), "queue_item": last.get("item_id"),
-                         "turn_end_to_issue_ms": last.get("turn_end_to_issue_ms"),
+                         # The F5 re-ask has no turn end of its own (owner
+                         # decision 2026-09-09, G8): its row is marked and
+                         # carries only issue → speech; it is excluded from
+                         # the turn-end mean by that mark.
+                         "reask": reask,
+                         "turn_end_to_issue_ms": None if reask else last.get("turn_end_to_issue_ms"),
                          "issue_to_speech_ms": int(round((now - last["issued_at"]) * 1000)),
-                         "turn_end_to_speech_ms": int(round((now - last["turn_ended_at"]) * 1000)),
+                         "turn_end_to_speech_ms": (None if reask else
+                                                   int(round((now - last["turn_ended_at"]) * 1000))),
                          "phase": auto["controller"].phase.value,
                          "at_audio_s": round(session.audio_seconds, 1)})
 
@@ -4771,7 +4815,13 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                                     if last.get("kind") == "question" else None))
                 if prepared is not None:
                     auto["reasked"] = True
-                    auto["last_issued"] = {**last, "utterance_id": prepared.utterance_id}
+                    # G8 (owner decision 2026-09-09): the re-ask's latency
+                    # row is marked reask and measured from its own issue —
+                    # never from the original's turn end (489: a 43.6 s
+                    # artefact).
+                    auto["last_issued"] = {**last, "utterance_id": prepared.utterance_id,
+                                           "reask": True, "issued_at": time.monotonic(),
+                                           "turn_end_to_issue_ms": None}
                     await audit.log(user["id"], "auto.reask_no_answer", None, None,
                                     {"session_id": session_id, "phase": ctl.phase.value,
                                      "quiet_s": round(quiet_s, 1), "text": last.get("text"),

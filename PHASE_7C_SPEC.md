@@ -811,7 +811,12 @@ and `test_standing_rules.py` extends to the new controls.
   `turn_end_to_issue_ms` from the turn end that permitted it, and
   `auto.question_latency` is written at the client's `speak_started` for
   that question with `turn_end_to_issue_ms`, `issue_to_speech_ms` and
-  `turn_end_to_speech_ms` (486 baseline: 27.7 s mean turn end → speaking),
+  `turn_end_to_speech_ms` (486 baseline: 27.7 s mean turn end → speaking;
+  the F5 re-ask's row is marked `reask: true` with only
+  `issue_to_speech_ms` — owner decision 2026-09-09, G8),
+  `auto.presynth_fallback` when an ask's pre-synthesis was still running
+  past `AUTO_PRESYNTH_WAIT_S` at issue and the text was synthesised at
+  issue instead (owner decision 2026-09-09, G7),
   `cds.runaway` when a model call hits its output cap or its timeout —
   the call, the reason (`cap` | `timeout`), tokens, elapsed_ms, the cap
   or timeout, the failure count and the assessment version kept (owner
@@ -868,6 +873,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back — with no CDS pass in flight |
 | `AUTO_OFFICER_MAX_WAIT_S` | `30` | Owner decision 2026-09-07 (pilot E4): the officer's bound while a CDS pass is in flight |
 | `AUTO_PRESYNTH` | `true` | Pre-synthesise top question |
+| `AUTO_PRESYNTH_WAIT_S` | `2.0` | Owner decision 2026-09-09 (pilot 489/490 G7): the issue waits this long for a plan's pre-synthesis, then synthesises at issue and audits the fallback |
 | `AUTO_STRICT_REVISE` | `true` | D2 posture, flippable for comparison runs |
 | `AUTO_ACTION_MATCH_THRESHOLD` | `0.6` | Owner decision 2026-09-07 (pilot E3): the ratchet's token-set similarity for "the same action" |
 | `CDS_ASSESSMENT_MAX_TOKENS` / `CDS_URGENCY_MAX_TOKENS` / `CDS_AFFECT_MAX_TOKENS` | `1500` / `1000` / `800` | Owner decision 2026-09-07 (pilot F3): output caps on the pass's three calls |
