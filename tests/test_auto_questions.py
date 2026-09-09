@@ -187,7 +187,6 @@ def gate(monkeypatch, tmp_path):
     # they would only take the one utterance slot at the wrong moment, so
     # both thresholds — the golden window's minimum quiet and the bridge's
     # — are parked out of reach except where a test wants them.
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
     monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 100.0)
     state = appmain.app.state
     missing = object()
@@ -237,6 +236,7 @@ class Session:
         self.seq = 0
         self.quiet_s = 0.0
         self.since = "speech"        # what began the current quiet span (E2)
+        self.thinking_heard: list[dict] = []   # every "Let me think" probe() played through
 
     @property
     def entry(self):
@@ -259,18 +259,33 @@ class Session:
         self.ws.send_bytes(_frame(self.seq, amplitude))
 
     def probe(self):
+        """Send one frame and return every message that arrived before its
+        ack. A "Let me think for a moment." among them (owner decision
+        2026-09-09) is played through here — keeping the quiet clock, as
+        the client does — and recorded in `thinking_heard`, so a test that
+        merely ticks past a turn end does not leave the one-utterance slot
+        blocked by an unplayed phrase; the message is still returned."""
         self.frame()
-        return _collect_until(self.ws, {"ack"})[:-1]
+        seen = _collect_until(self.ws, {"ack"})[:-1]
+        for m in list(seen):
+            if m.get("type") == "auto_speak" and m.get("ref_id") == "let_me_think":
+                pending = self.entry.get("pending_utterance")
+                if pending is not None and pending.utterance_id == m["utterance_id"]:
+                    self.thinking_heard.append(m)
+                    seen.extend(self.play(m["utterance_id"], keeps_quiet_clock=True))
+        return seen
 
-    def play(self, utterance_id, reason="complete"):
+    def play(self, utterance_id, reason="complete", *, keeps_quiet_clock=False):
         self.ws.send_text(json.dumps({"type": "speak_started",
                                       "utterance_id": utterance_id, "seq": self.seq + 1}))
         self.frame(TTS_AMPLITUDE)
-        _until(self.ws, {"ack"})
+        seen = _collect_until(self.ws, {"ack"})[:-1]   # anything the server said meanwhile
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
                                       "seq": self.seq + 1, "reason": reason}))
-        self.quiet_s = 0.0                    # our playback ended: a fresh span
-        self.since = "playback"
+        if not keeps_quiet_clock:             # "Let me think" keeps the span (2026-09-09)
+            self.quiet_s = 0.0                # our playback ended: a fresh span
+            self.since = "playback"
+        return seen
 
     def abort(self, utterance_id):
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
@@ -339,7 +354,7 @@ class Session:
         self.quiet(quiet)
         self.probe()
 
-    def wait_for_auto_speak(self, *, start_quiet=None, tries=40):
+    def wait_for_auto_speak(self, *, start_quiet=None, tries=40, skip_thinking=True):
         """Keep the quiet span going with reports and loop ticks until the
         server issues an utterance (background work — the CDS pass, the
         topic call, pre-synthesis — needs ticks to land)."""
@@ -349,6 +364,8 @@ class Session:
             self.quiet(q)
             seen = self.probe()
             spoken = [m for m in seen if m.get("type") == "auto_speak"]
+            if skip_thinking:                 # probe() has already played it through
+                spoken = [m for m in spoken if m.get("ref_id") != "let_me_think"]
             if spoken:
                 return spoken[0]
             time.sleep(0.03)
@@ -441,35 +458,46 @@ def test_strict_revise_asks_only_from_the_fresh_agenda(gate):
     assert not any(Q_SLEEP in r["text"] or "your sleep" in r["text"] for r in rows)
 
 
-def test_the_bridge_encourager_is_at_most_one_while_the_pass_runs(gate, monkeypatch):
+def test_let_me_think_is_spoken_once_while_the_pass_runs_and_the_queue_is_empty(gate):
+    """REPINNED 2026-09-09 (owner decision, "Let me think" and the
+    empty-queue rule). Slice 4 pinned one bridge "go on" while the pass
+    ran; that property is deliberately replaced, not weakened: in the
+    question phases the bridge is gone, and with the patient's turn ended,
+    the queue empty and the pass in flight the machine says "Let me think
+    for a moment." — once per wait, however long the quiet goes on — and
+    no question before the pass lands. It is not an encourager and not a
+    question: nothing is consumed or awaited, the judged turn end stands,
+    and the span it was spoken into continues (the client keeps its
+    clock), so the question that follows issues on that span's next report."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True)]
     engine.agendas = [[Q_ONSET]]
     engine.gate_event = asyncio.Event()                # hold the pass
     with live(gate) as s:
         s.to_golden()
-        s.to_open()
-        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)   # now they may come
+        s.to_open()                                    # the exit's turn end; nothing pending; pass requested
+        assert s.auto["turn_ended"] is True and not s.auto["queue"].has_pending
         heard = []
         q = 3.3
         for _ in range(5):                            # a long quiet while the pass runs
             q += 0.8
             s.quiet(q)
-            heard += [m for m in s.probe() if m.get("type") == "auto_speak"]
-            for m in heard:
-                if m["ref_id"] in speech.ENCOURAGER_IDS and s.entry["pending_utterance"]:
-                    s.play(m["utterance_id"])
-        encouragers = [m for m in heard if m["ref_id"] in speech.ENCOURAGER_IDS]
-        assert len(encouragers) == 1, "one bridge, not a machine-gun"
-        assert encouragers[0]["ref_id"] == "go_on", "the bridge's phrase (owner decision 2026-09-01)"
+            heard += [m for m in s.probe() if m.get("type") == "auto_speak"]   # probe plays it through
+        thinking = [m for m in heard if m["ref_id"] == "let_me_think"]
+        assert len(thinking) == 1, "once per wait, not a machine-gun"
+        assert thinking[0]["text"] == "Let me think for a moment."
+        assert not any(m["ref_id"] in speech.ENCOURAGER_IDS for m in heard), "no bridge 'go on' any more"
         assert not any(m["ref_id"] is None for m in heard), "no question before the pass lands"
+        assert s.auto["turn_ended"] is True, "never resets the quiet clock: the turn end stands"
+        assert s.auto["awaiting_answer"] is False and s.auto["asked_item_id"] is None, "not a question"
         s.ws.portal.call(lambda: engine.gate_event.set())   # release the pass
-        s.commit_transcript("still here")             # nothing more said, but a fresh span
-        s.quiet(3.4)
-        s.probe()
-        ask = s.wait_for_auto_speak()
-        assert ask["text"] == "Can you tell me more about the chest pain?"
+        ask = s.wait_for_auto_speak(skip_thinking=False)
+        assert ask["text"] == "Can you tell me more about the chest pain?", "the merge's head, on the same span"
         _stop(s)
+    rows = _audit("auto.thinking", s.session_id)
+    assert len(rows) == 1 and rows[0]["reason"] == "empty_queue"
+    assert rows[0]["pending"] == 0 and rows[0]["revision"] in ("requested", "running")
+    assert _audit("auto.queue_consumed", s.session_id)[0]["text"] == Q_ONSET, "the phrase consumed nothing"
 
 
 def test_ask_from_current_when_strict_revise_is_off_and_the_posture_is_recorded(gate, monkeypatch):
@@ -926,14 +954,17 @@ def test_a_genuinely_new_question_passes_and_a_spent_agenda_hands_over(gate):
 # ==========================================================================
 # Our own utterances never erase a judged turn end (owner decision 2026-09-07, E2)
 
-def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):
+def test_the_thinking_phrase_does_not_erase_the_golden_exits_turn_end(gate):
     """Owner decision 2026-09-07 (pilot 485, defect E2). The golden exit is
     a turn end; in 485 the bridge "Go on." 1 s later restarted the client's
     quiet span and the fresh-span rule cleared turn_ended, so the first ask
-    needed a second judgement in a room where nobody spoke. Now a span
-    that began with OUR playback keeps the judged turn end: golden exit →
-    bridge → the revision lands → the queued question issues on the next
-    report, with the officer never asked again and never saying finished."""
+    needed a second judgement in a room where nobody spoke. A span that
+    began with OUR playback keeps the judged turn end. REPINNED 2026-09-09
+    (owner decision): the bridge is now "Let me think for a moment.", and
+    it never resets the quiet clock at all — the client keeps its span —
+    so the report after it is the same span, longer; either way the exit's
+    turn end stands, the revision lands, the queued question issues on the
+    next report, and the officer is never asked again."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(False, False)]
     engine.agendas = [[Q_ONSET]]
@@ -943,14 +974,15 @@ def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):
         s.to_open()                                    # the exit: turn_ended True
         assert s.auto["turn_ended"] is True
         asked = len(engine.asked)
-        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)
         s.quiet(3.5)
         bridge = next(m for m in s.probe() if m.get("type") == "auto_speak")
-        assert bridge["ref_id"] == "go_on"
-        s.play(bridge["utterance_id"])                 # our voice: the client's span restarts
-        s.quiet(2.0)                                   # a fresh span, since=playback
+        assert bridge["ref_id"] == "let_me_think"      # probe() played it through, keeping the span
+        assert s.thinking_heard[-1]["utterance_id"] == bridge["utterance_id"]
+        s.quiet(4.5)                                   # the same span, longer
         s.probe()
         assert s.auto["turn_ended"] is True, "our own utterance erased nothing"
+        # (the reports below stay on that span — a lower quiet would be a
+        # fresh span the patient began, which rightly reopens the turn)
         s.ws.portal.call(lambda: engine.gate_event.set())
         for _ in range(30):                            # the pass lands, the plan is prepared
             s.probe()
@@ -958,7 +990,7 @@ def test_the_bridge_does_not_erase_the_golden_exits_turn_end(gate, monkeypatch):
                 break
             time.sleep(0.03)
         assert s.auto["queued"] is not None
-        s.quiet(2.6)                                   # under the officer's 3 s
+        s.quiet(5.3)                                   # the same span; the officer not due again
         ask = next(m for m in s.probe() if m.get("type") == "auto_speak")
         assert ask["text"] == "Can you tell me more about the chest pain?"
         assert len(engine.asked) == asked, "no second judgement was needed"

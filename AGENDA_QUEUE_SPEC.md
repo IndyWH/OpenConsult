@@ -146,12 +146,20 @@ verbatim → pre-synthesis → issue at the next quiet. The full pass
 requested at the same turn end launches only once the re-ranker and the
 topic call have returned, bounded (owner decision 2026-09-09, G4; §3,
 §7a). A running pass never blocks the ask; when it completes, merge may
-change the head before the next ask, which is fine. If the queue is empty and a pass is running → one bridge "go on"
-and wait, as today (the bridge fires only with nothing to ask — never
-a second before a question in preparation). If the queue is empty and
-no pass is running → the existing rule: request a pass; an empty queue
-after the merge of a fresh post-answer revision → the handover
-sequence (§6 as amended).
+change the head before the next ask, which is fine. If the queue is
+empty and a pass is running → "Let me think for a moment." once
+(`let_me_think`; owner decision 2026-09-09, replacing the bridge "go on"
+here entirely) and wait for the merge; the same phrase, once, when the
+planned question's preparation has run `AUTO_THINK_THRESHOLD_S` past
+the turn end with nothing ready. It is not a question and touches
+neither the queue nor the quiet clock. If the queue is empty and no pass
+is running → the existing rule: request a pass; an empty queue after the
+merge of a fresh post-answer revision → the handover sequence (§6 as
+amended). Restated by the owner 2026-09-09: queue empty → say
+`let_me_think` once and wait for the pass in flight (or request one); if
+its merge adds new pending items → ask from the head; if it adds nothing
+→ the anything-else phrase once, then the examination handover. Later
+CDS questions stay on the panel for the doctor to ask or tap.
 As built, two more turn ends go the same way: the golden exit and a
 hand-back (the first ask), and a turn end with nothing asked and
 nothing queued (the span after a pass landed mid-speech). A pass that

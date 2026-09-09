@@ -349,10 +349,15 @@ def test_under_the_queue_exactly_one_full_pass_runs_per_answer(gate):
     # the held case is pinned by test_the_topic_call_returns_before_the_pass_is_launched.)
 
 
-def test_empty_rule_one_nothing_pending_and_a_pass_running_gives_one_bridge_and_waits(gate, monkeypatch):
-    """Spec §5: the queue is empty after the answer (its one item was just
-    answered) and the post-answer pass is running → at most one "go on"
-    and no question until the merge lands; then the head is asked."""
+def test_empty_rule_one_nothing_pending_and_a_pass_running_says_let_me_think_once_and_a_non_empty_merge_asks(gate):
+    """Spec §5, as the owner restated it 2026-09-09: the queue is empty
+    after the answer (its one item was just answered) and the post-answer
+    pass is running → "Let me think for a moment." once and no question
+    until the merge lands; the merge adds a pending item → ask from the
+    head. REPINNED 2026-09-09 (owner decision): the bridge "go on" this
+    test pinned is replaced by the thinking phrase, which never resets the
+    quiet clock — the question issues on the same span's next report,
+    with no fresh span needed."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET], [Q_SLEEP]]
@@ -363,7 +368,6 @@ def test_empty_rule_one_nothing_pending_and_a_pass_running_gives_one_bridge_and_
         s.play(first["utterance_id"])
         gate_event = s.ws.portal.call(lambda: __import__("asyncio").Event())
         engine.gate_event = gate_event
-        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 1.75)
         s.turn_end("Tuesday night.")
         assert not s.auto["queue"].has_pending
         assert s.auto["plan_task"] is None or s.auto["plan_task"].done(), "nothing being prepared"
@@ -373,18 +377,89 @@ def test_empty_rule_one_nothing_pending_and_a_pass_running_gives_one_bridge_and_
         for _ in range(5):
             q += 0.8
             s.quiet(q)
-            heard += [m for m in s.probe() if m.get("type") == "auto_speak"]
-            for m in heard:
-                if m["ref_id"] == "go_on" and s.entry["pending_utterance"]:
-                    s.play(m["utterance_id"])
-        assert [m["ref_id"] for m in heard] == ["go_on"], "one bridge, no question, while the pass runs"
-        s.ws.portal.call(gate_event.set)
-        s.commit_transcript("still here")
-        s.quiet(3.4)
-        s.probe()
-        nxt = s.wait_for_auto_speak()
-        assert nxt["text"] == "Can you tell me more about your sleep?"
+            heard += [m for m in s.probe() if m.get("type") == "auto_speak"]   # probe plays it through
+        assert [m["ref_id"] for m in heard] == ["let_me_think"], "once, no question, while the pass runs"
+        s.ws.portal.call(gate_event.set)               # the merge adds Q_SLEEP
+        nxt = s.wait_for_auto_speak(skip_thinking=False)
+        assert nxt["text"] == "Can you tell me more about your sleep?", "asked from the head, same span"
         _stop(s)
+    thinking = _audit("auto.thinking", s.session_id)
+    # Two empty waits: the golden exit's (the first pass had not landed yet)
+    # and the answer's — one phrase each, no more.
+    assert [t["reason"] for t in thinking] == ["empty_queue", "empty_queue"]
+    assert [t["pending"] for t in thinking] == [0, 0]
+
+
+def test_let_me_think_is_not_spoken_when_a_question_is_ready(gate):
+    """Owner decision 2026-09-09: the thinking phrase covers a wait with no
+    question ready, never a question in preparation that is quick. With an
+    item pending and the plan back inside the threshold, the next ask
+    issues with no "Let me think" before it — the thing the bridge used
+    to get wrong ("Go on." a second before a question)."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS]]
+    with live(gate) as s:
+        s.to_golden()
+        s.land_pass()                                  # the queue holds items at the exit
+        s.to_open()
+        first = s.wait_for_auto_speak(skip_thinking=False)
+        assert first["ref_id"] is None and first["text"] == "Can you tell me more about the chest pain?"
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday night.")
+        second = s.wait_for_auto_speak(skip_thinking=False)
+        assert second["ref_id"] is None and second["text"] == "Can you tell me more about your sleep?"
+        _stop(s)
+    assert _audit("auto.thinking", s.session_id) == []
+    assert s.thinking_heard == []
+
+
+def test_a_slow_preparation_speaks_let_me_think_once_and_it_neither_counts_as_asked_nor_resets_the_clock(gate, monkeypatch):
+    """Owner decision 2026-09-09: when the planned question's preparation
+    runs past AUTO_THINK_THRESHOLD_S after the turn end with nothing ready
+    (here the topic call is held), "Let me think for a moment." is spoken
+    once (reason slow_preparation), and only once however long the wait
+    goes on. It is not a question: the queue is untouched (no consume, the
+    planned item still pending), nothing is awaited, last_asked_text is
+    the last real question, and the judged turn end stands — the question
+    issues on the same span's next report once the preparation is back."""
+    import asyncio
+    monkeypatch.setattr(appmain, "AUTO_THINK_THRESHOLD_S", 0.2)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        topic_gate = s.ws.portal.call(asyncio.Event)
+        engine.topic_gate = topic_gate                 # the preparation stalls here
+        s.turn_end("Tuesday night.")
+        time.sleep(0.25)                               # past the threshold with nothing ready
+        heard = []
+        q = 3.3
+        for _ in range(4):
+            q += 0.8
+            s.quiet(q)
+            heard += [m for m in s.probe() if m.get("type") == "auto_speak"]   # probe plays it through
+            time.sleep(0.03)
+        assert [m["ref_id"] for m in heard] == ["let_me_think"], "once per wait"
+        assert s.auto["turn_ended"] is True, "the turn end stands: the phrase never resets the clock"
+        assert s.auto["awaiting_answer"] is False and s.auto["asked_item_id"] is None
+        assert s.auto["last_asked_text"] == Q_ONSET, "not a question: the last real question stands"
+        assert [i.text for i in queue.pending] == [Q_SLEEP, Q_TABLETS], "the queue is untouched"
+        consumed_before = len(_audit("auto.queue_consumed", s.session_id))
+        s.ws.portal.call(topic_gate.set)               # the preparation returns
+        nxt = s.wait_for_auto_speak(skip_thinking=False)
+        assert nxt["text"] == "Can you tell me more about your sleep?", "issued on the same span"
+        _stop(s)
+    thinking = _audit("auto.thinking", s.session_id)
+    slow = [t for t in thinking if t["reason"] == "slow_preparation"]
+    assert len(slow) == 1, "once — the other row is the golden exit's empty wait"
+    assert slow[0]["since_turn_end_ms"] >= 200 and slow[0]["pending"] == 2
+    assert [t["reason"] for t in thinking if t["reason"] != "slow_preparation"] == ["empty_queue"]
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert len(consumed) == consumed_before + 1 and consumed[-1]["text"] == Q_SLEEP
+    assert all(c["text"] != "Let me think for a moment." for c in consumed)
 
 
 def test_empty_rule_two_nothing_pending_and_no_pass_running_requests_a_pass(gate, monkeypatch):
@@ -428,7 +503,10 @@ def test_empty_rule_three_still_empty_after_the_post_answer_merge_hands_over_wit
     already asked and answered → the merge discards them all → nothing
     pending → the anything-else phrase; its answer's pass refills → back
     to the questions; the next pass empties again → the examination
-    handover, and anything-else is not spoken twice."""
+    handover, and anything-else is not spoken twice. Extended 2026-09-09
+    (owner decision, the empty-queue rule restated): "Let me think for a
+    moment." is said once while the pass is awaited, before the anything-
+    else phrase — the harness steps over it and records it."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET], [Q_ONSET], [Q_ONSET, Q_TABLETS], [Q_ONSET, Q_TABLETS]]
@@ -453,11 +531,15 @@ def test_empty_rule_three_still_empty_after_the_post_answer_merge_hands_over_wit
         s.play(final["utterance_id"])
         s.probe()
         assert s.phase.value == "handover"
+        assert [t["ref_id"] for t in s.thinking_heard] == ["let_me_think"] * len(s.thinking_heard)
+        assert len(s.thinking_heard) >= 1, "the machine said it was thinking before the empty merge handed over"
         _stop(s)
     merges = _audit("auto.queue_merged", s.session_id)
     assert [(m["version"], m["discarded"], m["pending"]) for m in merges] == [
         (1, 0, 1), (2, 1, 0), (3, 1, 1), (4, 2, 0)]
     assert len(_audit("auto.handover", s.session_id)) == 1
+    thinking = _audit("auto.thinking", s.session_id)
+    assert len(thinking) == len(s.thinking_heard) and all(t["reason"] == "empty_queue" for t in thinking)
 
 
 # ==========================================================================

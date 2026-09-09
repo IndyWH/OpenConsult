@@ -1429,10 +1429,9 @@ AUTO_MODE_ENABLED = os.getenv("AUTO_MODE_ENABLED", "false").lower() == "true"
 AUTO_GOLDEN_MINUTES_S = float(os.getenv("AUTO_GOLDEN_MINUTES_S", "90"))
 # The remaining values are UNCALIBRATED GUESSES, stated as such; the
 # mock-patient round is the run that informs them (spec §5, §12).
-# Quiet this long earns the single bridging encourager in the question
-# phases while the D2 revision runs (spec's ~1.5–2 s). It no longer governs
-# GOLDEN — see AUTO_ENCOURAGER_MIN_QUIET_S.
-AUTO_ENCOURAGER_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_QUIET_S", "1.75"))
+# (AUTO_ENCOURAGER_QUIET_S — the bridge "go on" in the question phases —
+# was retired 2026-09-09: the thinking phrase below replaces the bridge
+# entirely, gated by the turn end rather than a quiet length.)
 # Golden window encouragers (owner decision 2026-09-09, after consultations
 # 487–490; reversing the 1 Sept one-per-window rule). In GOLDEN, before the
 # window has run, an encourager may be spoken every time the patient has
@@ -1450,6 +1449,17 @@ AUTO_ENCOURAGER_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_QUIET_S", "1.75"))
 # adds the unanswered count as the loop's end.
 AUTO_ENCOURAGER_MIN_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_MIN_QUIET_S", "4.0"))
 AUTO_ENCOURAGER_MAX_UNANSWERED = int(os.getenv("AUTO_ENCOURAGER_MAX_UNANSWERED", "2"))
+# "Let me think for a moment." (owner decision 2026-09-09; replaces the
+# bridge "go on" in the question phases entirely). Spoken at most once per
+# wait, only when the patient's turn has ended and no question is ready:
+# the queue is empty and a pass is in flight (or has just been requested),
+# or the planned question's preparation has already run this long since
+# the turn end with nothing ready. Not a question: it does not count as
+# asked, does not touch the queue and never resets the quiet clock (the
+# client keeps its span across it; the judged turn end stands). Audited
+# auto.thinking with the reason. In 489/490 the bridge "Go on." was spoken
+# into finished answers three times while the queue had run dry (G13).
+AUTO_THINK_THRESHOLD_S = float(os.getenv("AUTO_THINK_THRESHOLD_S", "3.0"))
 # Quiet this long triggers the end-of-turn officer (app/cds.py).
 AUTO_EOT_QUIET_S = float(os.getenv("AUTO_EOT_QUIET_S", "3.0"))
 # Officer fail-soft: with the officer unavailable, quiet this long counts as
@@ -1851,7 +1861,7 @@ def _new_auto_state() -> dict:
         "turn_ended": False,
         "awaiting_answer": False,
         "revision": None,             # None | "requested" | "running"
-        "bridge_used": False,
+        "think_used": False,          # "Let me think" spoken in this wait (once per wait)
         "queued": None,               # the prepared next utterance (a plan dict)
         "plan_task": None,            # topic call + pre-synthesis in flight
         "planning_item_id": None,     # the queue item plan_task is preparing (the re-rank race guard)
@@ -1946,9 +1956,9 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
     from app import cds as cds_module
     return {
         "golden_s": AUTO_GOLDEN_MINUTES_S,
-        "encourager_quiet_s": AUTO_ENCOURAGER_QUIET_S,
         "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
         "encourager_max_unanswered": AUTO_ENCOURAGER_MAX_UNANSWERED,
+        "think_threshold_s": AUTO_THINK_THRESHOLD_S,
         "eot_quiet_s": AUTO_EOT_QUIET_S,
         "eot_fallback_s": AUTO_EOT_FALLBACK_S,
         "officer_timeout_s": cds_module.AUTO_OFFICER_TIMEOUT_S,
@@ -2346,7 +2356,6 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         speech_config["auto"] = {
             "enabled": True,
             "golden_s": AUTO_GOLDEN_MINUTES_S,
-            "encourager_quiet_s": AUTO_ENCOURAGER_QUIET_S,
             "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
             "eot_quiet_s": AUTO_EOT_QUIET_S,
             "eot_fallback_s": AUTO_EOT_FALLBACK_S,
@@ -2565,7 +2574,6 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 if entry["auto"] is not None and entry["auto"]["revision"] == "running":
                     auto = entry["auto"]
                     auto["revision"] = None
-                    auto["bridge_used"] = False
                     if auto["controller"].phase in auto_mode.QUESTION_PHASES:
                         _ask_after_pass(auto, entry["agenda"].current_version,
                                         "revision failed (runaway), asking from the queue in hand")
@@ -3241,7 +3249,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          "at_audio_s": round(session.audio_seconds, 1)})
         await auto_transition(ctl.auto_off(), detail={"reason": reason} if reason else None)
         _cancel_officer(auto)
-        auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
+        auto.update(turn_ended=False, awaiting_answer=False, think_used=False,
                     handover=None, last_issued=None, handover_by_doctor=False,
                     repause_block=False, enable_chain=None)
         _reset_golden(auto)
@@ -3384,7 +3392,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await audit.log(user["id"], "auto.resumed", None, None,
                             {"session_id": session_id, "phase": ctl.phase.value,
                              "actions": covered, "at_audio_s": round(session.audio_seconds, 1)})
-            auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False)
+            auto.update(turn_ended=False, awaiting_answer=False, think_used=False)
             # Owner decision 2026-09-01 (pilot D4, the 482 stutter): the
             # ratchet may only re-pause on a pass started after at least
             # one answer following this resume. A pass already in flight
@@ -3470,7 +3478,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if auto["plan_task"] is not None and not auto["plan_task"].done():
             auto["plan_task"].cancel()
         auto["plan_task"] = None
-        auto.update(awaiting_answer=False, revision=None, bridge_used=False, topic_pending=False)
+        auto.update(awaiting_answer=False, revision=None, think_used=False, topic_pending=False)
         if ctl.phase is auto_mode.AutoPhase.GOLDEN:
             await auto_transition(ctl.handover_requested(), detail={"by": "doctor"})
         _plan_handover(auto, entry["agenda"].current_version)
@@ -3529,10 +3537,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
           permitting quiet); a running pass never blocks it, and its
           merge may change the head before the ask after this one, which
           is fine.
-        - Empty rules: nothing pending and a pass running → one bridge
-          "go on" and wait for the merge (handle_quiet); nothing pending
-          and no pass running → request one; still nothing after the
-          merge of a post-answer revision → the handover sequence
+        - Empty rules (as the owner restated them 2026-09-09): nothing
+          pending → "Let me think for a moment." once (handle_quiet) and
+          wait for the pass in flight, or request one; its merge adds
+          pending items → ask from the head; adds nothing → the
+          anything-else phrase once, then the examination handover
           (_ask_after_pass).
         - With `rerank` (an ANSWER's turn end, spec §3): if anything is
           pending, the re-ranker runs first — whether or not a full pass
@@ -3545,7 +3554,6 @@ async def ws_transcribe(websocket: WebSocket) -> None:
           until the re-ranker and the topic call have returned (bounded by
           AUTO_SHORT_CALLS_HOLD_S; maybe_run_cds), so on Ollama's single
           slot the short calls come first (owner decision 2026-09-09, G4)."""
-        auto["bridge_used"] = False
         if AUTO_STRICT_REVISE:
             auto["revision"] = "requested"
             logger.info("Live session %s: auto revision requested (%s)", session_id, why)
@@ -3985,6 +3993,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await _audit_queue_events((queue.requeue(plan["item_id"]),), {"issue": "failed"})
             return                     # in flight or a fault: try again on the next report
         auto["queued"] = None
+        auto["think_used"] = False           # the wait is over; the next one starts fresh
         auto["last_issued"] = {**plan, "utterance_id": prepared.utterance_id,
                                "issued_at": issued_at if plan["kind"] == "question" else time.monotonic(),
                                "turn_ended_at": auto["turn_ended_at"],
@@ -4047,7 +4056,6 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if auto is None or auto["revision"] != "running":
             return
         auto["revision"] = None
-        auto["bridge_used"] = False
         if auto["controller"].phase not in auto_mode.QUESTION_PHASES:
             return
         _ask_after_pass(auto, version, "post-answer revision")
@@ -4196,7 +4204,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                          "utterance_id": utterance.utterance_id,
                          "at_audio_s": round(session.audio_seconds, 1)})
         _cancel_officer(auto)          # drops the queue, any plan and the revision
-        auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
+        auto.update(turn_ended=False, awaiting_answer=False, think_used=False,
                     handover=None, handover_by_doctor=True, last_issued=None)
         await auto_transition(ctl.handover_requested(), detail={"by": "doctor", "via": "tap"})
         await audit.log(user["id"], "auto.handover", None, None,
@@ -4412,7 +4420,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             auto["pause_versions"] = []
             await cancel_auto_playback(entry, websocket, "urgency_pause")
             _cancel_officer(auto)          # also drops the queue and any plan
-            auto.update(turn_ended=False, awaiting_answer=False, bridge_used=False,
+            auto.update(turn_ended=False, awaiting_answer=False, think_used=False,
                         revision=None, last_issued=None, awaiting_speech=False, reasked=False)
         auto["pause_versions"].append(assessment_version)
         await auto_transition(transition, detail={"actions": texts, "pending": pending,
@@ -4480,6 +4488,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         await auto_transition(transition, detail=detail)
         auto["turn_ended"] = True
         auto["turn_ended_at"] = time.monotonic()
+        auto["think_used"] = False           # a new wait begins
         auto["repause_block"] = False        # a turn has ended (pilot D4)
         _request_revision(auto, why)
         return transition
@@ -4503,6 +4512,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             return
         auto["turn_ended"] = True
         auto["turn_ended_at"] = time.monotonic()   # the zero of the number to beat (spec §7)
+        auto["think_used"] = False           # a new wait: "Let me think" may be said once in it
         auto["repause_block"] = False        # a patient turn has ended (pilot D4)
         answer = bool(auto["awaiting_answer"])
         if verdict is not None and verdict.handed_back:
@@ -4696,45 +4706,73 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s,
                             verdict=auto["officer_verdict"])
         free = not session.speaking and entry["pending_utterance"] is None
-        # 1. The encourager. In GOLDEN (owner decision 2026-09-09, reversing
-        #    the 1 Sept one-per-window rule): one per quiet span, whenever
-        #    the patient has been quiet for AUTO_ENCOURAGER_MIN_QUIET_S —
-        #    the client's span restarts at the patient's speech AND at the
-        #    end of Alba's own phrase, so the quiet is counted from the
-        #    later of the two — never once the window has run; go_on and
+        # 1. The golden encourager (owner decision 2026-09-09, reversing the
+        #    1 Sept one-per-window rule): one per quiet span, whenever the
+        #    patient has been quiet for AUTO_ENCOURAGER_MIN_QUIET_S — the
+        #    client's span restarts at the patient's speech AND at the end
+        #    of Alba's own phrase, so the quiet is counted from the later of
+        #    the two — never once the window has run; go_on and
         #    tell_me_more_short alternate; spent at issue (a politeness
         #    abort drops it, and the patient's voice that caused it starts
-        #    the next span). In the question phases: the single bridge
-        #    while the revision runs AND there is nothing to ask (spec §5:
-        #    the queue empty, nothing planned or queued), at
-        #    AUTO_ENCOURAGER_QUIET_S, one per revision as before. With a
-        #    question in preparation the bridge would land a second before
-        #    it.
+        #    the next span).
         golden_wants = (in_golden and not auto["golden_window_ran"]
                         and quiet_s >= AUTO_ENCOURAGER_MIN_QUIET_S
                         and auto["golden_encourager_span"] != auto["quiet_span_seq"])
-        nothing_to_ask = (auto["queued"] is None and not auto["queue"].has_pending
-                          and (auto["plan_task"] is None or auto["plan_task"].done()))
-        bridge_wants = (not in_golden and auto["revision"] is not None and nothing_to_ask
-                        and not auto["bridge_used"] and quiet_s >= AUTO_ENCOURAGER_QUIET_S)
-        if (golden_wants or bridge_wants) and free:
-            phrase_id = (speech.GOLDEN_ENCOURAGER_IDS[auto["golden_encourager_count"]
-                                                     % len(speech.GOLDEN_ENCOURAGER_IDS)]
-                         if in_golden else speech.ENCOURAGER_ID)
+        if golden_wants and free:
+            phrase_id = speech.GOLDEN_ENCOURAGER_IDS[auto["golden_encourager_count"]
+                                                    % len(speech.GOLDEN_ENCOURAGER_IDS)]
             prepared = await auto_issue(auto_mode.PhraseUtterance(phrase_id),
                                         phase=ctl.phase,
                                         trigger={"quiet_s": round(quiet_s, 1),
-                                                 **({"encourager": auto["golden_encourager_count"] + 1,
-                                                     "unanswered": auto["golden_unanswered"] + 1}
-                                                    if in_golden else {})})
+                                                 "encourager": auto["golden_encourager_count"] + 1,
+                                                 "unanswered": auto["golden_unanswered"] + 1})
             if prepared is not None:
-                if in_golden:
-                    auto["golden_encourager_count"] += 1     # spent at issue, like the nudge
-                    auto["golden_unanswered"] += 1
-                    auto["golden_encourager_span"] = auto["quiet_span_seq"]
-                else:
-                    auto["bridge_used"] = True
+                auto["golden_encourager_count"] += 1     # spent at issue, like the nudge
+                auto["golden_unanswered"] += 1
+                auto["golden_encourager_span"] = auto["quiet_span_seq"]
                 free = False
+        # 1b. "Let me think for a moment." in the question phases (owner
+        #    decision 2026-09-09; replaces the bridge "go on" entirely). At
+        #    most once per wait, only when the patient's turn has ended and
+        #    no question is ready: the queue is empty and a pass is in
+        #    flight or just requested (empty_queue), or the plan under way
+        #    has already run AUTO_THINK_THRESHOLD_S past the turn end with
+        #    nothing queued (slow_preparation). Not a question: nothing is
+        #    consumed, awaited or reset — the judged turn end stands, and
+        #    the client keeps its span across the phrase. In 489/490 the
+        #    bridge was said into finished answers three times (G13).
+        plan_running = any(auto[k] is not None and not auto[k].done()
+                           for k in ("plan_task", "rerank_task"))
+        think_reason = None
+        if (in_questions and auto["turn_ended"] and auto["queued"] is None
+                and auto["handover"] is None and not auto["think_used"]):
+            if not auto["queue"].has_pending and auto["revision"] is not None:
+                think_reason = "empty_queue"
+            elif (plan_running and auto["turn_ended_at"] is not None
+                  and time.monotonic() - auto["turn_ended_at"] >= AUTO_THINK_THRESHOLD_S):
+                think_reason = "slow_preparation"
+        if think_reason is not None and free:
+            since_turn_end = time.monotonic() - auto["turn_ended_at"] if auto["turn_ended_at"] else None
+            prepared = await auto_issue(auto_mode.PhraseUtterance(speech.THINKING_ID),
+                                        phase=ctl.phase,
+                                        trigger={"quiet_s": round(quiet_s, 1),
+                                                 "thinking": think_reason})
+            if prepared is not None:
+                auto["think_used"] = True
+                free = False
+                await audit.log(user["id"], "auto.thinking", None, None,
+                                {"session_id": session_id, "reason": think_reason,
+                                 "phase": ctl.phase.value, "quiet_s": round(quiet_s, 1),
+                                 "since_turn_end_ms": (int(round(since_turn_end * 1000))
+                                                       if since_turn_end is not None else None),
+                                 "pending": len(auto["queue"].pending),
+                                 "revision": auto["revision"],
+                                 "pass_in_flight": _pass_in_flight(),
+                                 "threshold_s": AUTO_THINK_THRESHOLD_S,
+                                 "utterance_id": prepared.utterance_id,
+                                 "at_audio_s": round(session.audio_seconds, 1)})
+                logger.info("Live session %s: \"Let me think\" (%s) at quiet %.1f s",
+                            session_id, think_reason, quiet_s)
         # 2. The queued ask, once the turn has ended in this span. (A
         #    doctor-requested handover sequence is issued as soon as the
         #    room is quiet enough for the officer to have judged — the same
@@ -4825,6 +4863,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await auto_transition(transition, detail=detail)
                 auto["turn_ended"] = True
                 auto["turn_ended_at"] = time.monotonic()
+                auto["think_used"] = False
                 _request_revision(auto, "golden exit: hand-back")
                 return transition
             elapsed = _golden_elapsed(auto)

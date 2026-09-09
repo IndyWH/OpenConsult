@@ -1446,8 +1446,8 @@ const quietReporter = {
   crossed: 0,            // thresholds already reported in this quiet span
   lastReportAt: null,    // ms of the last report in this span
   configure(cfg) {
-    const raw = [cfg.encourager_quiet_s, cfg.encourager_min_quiet_s,
-                 cfg.eot_quiet_s, cfg.eot_fallback_s];
+    // (encourager_quiet_s, the bridge's threshold, was retired 2026-09-09.)
+    const raw = [cfg.encourager_min_quiet_s, cfg.eot_quiet_s, cfg.eot_fallback_s];
     this.thresholds = [...new Set(raw.map(Number).filter(v => v > 0))].sort((a, b) => a - b);
   },
   // `cause` travels with every report of the span it began (owner decision
@@ -1651,7 +1651,13 @@ function stopSpeaking(reason, cutLatencyMs) {
   } else {
     nudge.activity(performance.now());
   }
-  quietReporter.activity(performance.now(), 'playback');   // our voice is not the patient's
+  // "Let me think for a moment." never resets the quiet clock (owner
+  // decision 2026-09-09): it is the machine covering its own thinking,
+  // not a prompt to the patient, so the span it was spoken into continues
+  // and the queued question issues on the next report of that span.
+  if (refId !== 'let_me_think') {
+    quietReporter.activity(performance.now(), 'playback');   // our voice is not the patient's
+  }
 }
 
 async function onSpeakReady(msg) {

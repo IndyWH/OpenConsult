@@ -268,6 +268,12 @@ PHRASES: dict[str, str] = {
     # consultations 487–490): the second golden encourager, alternated
     # with "go_on". Owner wording, verbatim.
     "tell_me_more_short": "Please, tell me more.",
+    # Owner decision 2026-09-09 ("Let me think" and the empty-queue rule):
+    # spoken at most once per wait in the question phases when the
+    # patient's turn has ended and no question is ready — the machine
+    # covering its own thinking, not a prompt to the patient. Replaces the
+    # bridge "go on" there entirely. Owner wording, verbatim.
+    "let_me_think": "Let me think for a moment.",
     # Examination handover: the system never pretends to examine.
     "examination_handover": "Thank you — Dr {doctor} will examine you now.",
     # Sound check (spec Part 10 / D6). Deliberately not clinical and not
@@ -300,6 +306,10 @@ ENCOURAGER_ID = "go_on"
 # every time the patient has been quiet for AUTO_ENCOURAGER_MIN_QUIET_S,
 # go_on then tell_me_more_short then go_on…
 GOLDEN_ENCOURAGER_IDS = ("go_on", "tell_me_more_short")
+# The thinking phrase (owner decision 2026-09-09): not an encourager, not a
+# question — it does not count as asked, does not touch the queue, and the
+# client does not restart its quiet span at its end.
+THINKING_ID = "let_me_think"
 
 # Phrases the patient must have heard the disclosure before (hard rule 4).
 # The encouragers are exempt: "mm-hm" is not a clinical interaction, and

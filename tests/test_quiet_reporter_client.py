@@ -49,7 +49,7 @@ const r = quietReporter;
 
 // Not configured, not enabled: never reports.
 out.beforeConfig = r.poll(5000, false);
-r.configure({encourager_quiet_s: 1.75, eot_quiet_s: 3.0, eot_fallback_s: 5.0});
+r.configure({encourager_min_quiet_s: 1.75, eot_quiet_s: 3.0, eot_fallback_s: 5.0});
 out.thresholds = r.thresholds.slice();
 out.disabled = r.poll(99999, false);          // still disabled
 
@@ -84,9 +84,9 @@ r.enabled = false;
 out.disabledMidSpan = r.poll(20000, false);
 
 // Configure de-duplicates and sorts, and drops nonsense.
-r.configure({encourager_quiet_s: 3, eot_quiet_s: 1, eot_fallback_s: 3});
+r.configure({encourager_min_quiet_s: 3, eot_quiet_s: 1, eot_fallback_s: 3});
 out.dedup = r.thresholds.slice();
-r.configure({encourager_quiet_s: 0, eot_quiet_s: -1, eot_fallback_s: 'x'});
+r.configure({encourager_min_quiet_s: 0, eot_quiet_s: -1, eot_fallback_s: 'x'});
 out.nonsense = r.thresholds.slice();
 console.log(JSON.stringify(out));
 """
@@ -183,7 +183,8 @@ def test_the_reporter_is_configured_and_enabled_by_the_server_only():
     main = Path("app/main.py").read_text()
     block = main[main.index('speech_config["auto"] = {'):]
     block = block[:block.index("}")]
-    for key in ("encourager_quiet_s", "eot_quiet_s", "eot_fallback_s"):
+    # (encourager_quiet_s, the bridge's threshold, was retired 2026-09-09.)
+    for key in ("encourager_min_quiet_s", "eot_quiet_s", "eot_fallback_s"):
         assert key in block
     assert "if AUTO_MODE_ENABLED:" in main[main.index("speech_config = {"):main.index('speech_config["auto"]')]
 

@@ -225,7 +225,7 @@ class Session:
         self.frame()
         return _collect_until(self.ws, {"ack"})[:-1]
 
-    def play(self, utterance_id, reason="complete", frames=1):
+    def play(self, utterance_id, reason="complete", frames=1, *, keeps_quiet_clock=False):
         self.ws.send_text(json.dumps({"type": "speak_started",
                                       "utterance_id": utterance_id, "seq": self.seq + 1}))
         for _ in range(frames):
@@ -233,7 +233,8 @@ class Session:
         _until(self.ws, {"ack"})
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
                                       "seq": self.seq + 1, "reason": reason}))
-        self.since = "playback"
+        if not keeps_quiet_clock:             # "Let me think" keeps the span (2026-09-09)
+            self.since = "playback"
 
     def auto(self, on: bool):
         self.ws.send_text(json.dumps({"type": "auto", "on": on}))
@@ -587,7 +588,6 @@ def test_the_connect_echo_says_off_and_the_config_carries_the_thresholds(gate):
         config = next(m for m in first if m["type"] == "speech_config")
         assert config["auto"] == {"enabled": True,
                                   "golden_s": appmain.AUTO_GOLDEN_MINUTES_S,
-                                  "encourager_quiet_s": appmain.AUTO_ENCOURAGER_QUIET_S,
                                   "encourager_min_quiet_s": appmain.AUTO_ENCOURAGER_MIN_QUIET_S,
                                   "eot_quiet_s": appmain.AUTO_EOT_QUIET_S,
                                   "eot_fallback_s": appmain.AUTO_EOT_FALLBACK_S,
@@ -883,23 +883,24 @@ def test_the_other_two_encouragers_stay_registered_and_tappable(gate):
         _stop(s)
 
 
-def test_outside_golden_the_only_encourager_is_the_single_bridge(gate):
+def test_outside_golden_no_encourager_is_spoken_only_the_thinking_phrase_once_per_wait(gate):
     """REPINNED 2026-09-01. Slice 3 pinned "nothing is spoken in OPEN", and
     that held after slice 4 only by accident: the 3.2 s quiet report that
     triggered the hand-back also issued a golden encourager (then at
     1.75 s) which the test never played, so the one-utterance slot stayed
-    blocked for the rest of the run. With the golden encourager now needing
-    5 s of quiet the slot is free, and what OPEN actually says shows: at
-    most the single bridge ("go on") while the D2 revision runs, then the
-    flow's own asks (here the agenda is empty, so the anything-else
-    phrase) — never a rotation of encouragers.
+    blocked for the rest of the run. With the golden encourager needing
+    more quiet the slot is free, and what OPEN actually says shows.
 
-    REPINNED 2026-09-07 (owner decision, pilot 485 E1): with quiet of
-    AUTO_EOT_FALLBACK_S now ending a turn in the question phases too, the
-    anything-else phrase's unanswered turn ends at the 9 s report and its
-    revision earns a second bridge. The property kept is one bridge PER
-    REVISION — never a rotation — so the bound is the number of revisions
-    (the golden exit's plus one per answered turn), not one."""
+    REPINNED 2026-09-07 (owner decision, pilot 485 E1): one bridge PER
+    REVISION — never a rotation — so the bound was the number of revisions.
+
+    REPINNED 2026-09-09 (owner decision, "Let me think" and the empty-queue
+    rule): the bridge "go on" is gone from the question phases entirely.
+    Outside GOLDEN no encourager is spoken at all; with the queue empty and
+    a pass awaited the machine says "Let me think for a moment." — at most
+    once per wait, so at most once per turn end — then the flow's own
+    phrases (here the agenda is empty, so the anything-else phrase and the
+    handover). Never a rotation of encouragers."""
     gate.cds_engine.verdicts = [OfficerVerdict(True, True)]      # a hand-back
     with live(gate) as s:
         s.enable_to_golden()
@@ -913,12 +914,18 @@ def test_outside_golden_the_only_encourager_is_the_single_bridge(gate):
             for m in s.probe():
                 if m.get("type") == "auto_speak":
                     heard.append(m["ref_id"])
-                    s.play(m["utterance_id"])
-        encouragers = [r for r in heard if r in speech.ENCOURAGER_IDS]
-        revisions = 1 + len([d for d in _audit("auto.turn_ended", s.session_id) if d["answer"]])
-        assert len(encouragers) <= revisions and set(encouragers) <= {"go_on"}
-        assert set(heard) - set(speech.ENCOURAGER_IDS) <= {"anything_else", "examination_handover"}
+                    s.play(m["utterance_id"], keeps_quiet_clock=(m["ref_id"] == "let_me_think"))
+        assert not [r for r in heard if r in speech.ENCOURAGER_IDS], "no encourager outside GOLDEN"
+        waits = 1 + len([d for d in _audit("auto.turn_ended", s.session_id)])
+        # (this file's fake engine lands its empty pass instantly, so the
+        # exit's wait is usually over before the first report — then there
+        # is nothing to think about and the phrase is rightly absent)
+        assert heard.count("let_me_think") <= waits
+        assert set(heard) <= {"let_me_think", "anything_else", "examination_handover"}
         _stop(s)
+    thinking = _audit("auto.thinking", s.session_id)
+    assert len(thinking) == heard.count("let_me_think")
+    assert all(t["reason"] == "empty_queue" for t in thinking)
 
 
 # ==========================================================================

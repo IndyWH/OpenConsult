@@ -157,6 +157,22 @@ until the mock-patient round:
   phases while the D2 revision runs (one per revision). Zero
   questions in GOLDEN is enforced in the controller — a question
   request in GOLDEN is a coding error and raises, it is not filtered.
+  **RETIRED 2026-09-09** (owner decision, "Let me think" and the
+  empty-queue rule): the bridge in the question phases is replaced
+  entirely by the thinking phrase `let_me_think` ("Let me think for a
+  moment."), spoken at most once per wait, only when the patient's turn
+  has ended and no question is ready — either the queue is empty and a
+  pass is in flight (or has just been requested), or the planned
+  question's preparation has already run `AUTO_THINK_THRESHOLD_S` (3.0)
+  since the turn end with nothing ready (the "predicted to exceed" of
+  the decision, built as "has already exceeded": the preparation's
+  worst-case bounds always exceed 3 s, so a true prediction would speak
+  it at every turn end). It is not a question — it does not count as
+  asked, does not touch the queue, and never resets the quiet clock:
+  the client does not restart its span at its end, and the server's
+  judged turn end stands — audited `auto.thinking` with the reason
+  (`empty_queue` | `slow_preparation`). The golden encourager rule
+  below is untouched by it.
 
   **The encourager policy (owner decision 2026-09-01, after the solo
   pilot: "we need to get rid of the mm-hm").** In GOLDEN, at most ONE
@@ -384,8 +400,15 @@ when the queue has nothing pending); it no longer says whether asking
 waits. It stays flippable so the mock-patient round can compare
 postures as a recorded per-run threshold, per the prereg's requirement
 that tuning changes between runs stay visible. The bridge encourager
-remains for the one case that still waits: nothing pending and a pass
-running.
+remained for the one case that still waits — nothing pending and a pass
+running — until 2026-09-09, when the thinking phrase replaced it (§5).
+
+**The empty-queue rule, as the owner restated it (2026-09-09).** Queue
+empty at an answered turn end → say `let_me_think` once and wait for
+the pass in flight (or request one); if its merge adds new pending items
+→ ask from the head; if it adds nothing → the anything-else phrase once
+(as today), then the examination handover. Later CDS questions stay on
+the panel for the doctor to ask or tap.
 
 **D3 — DECIDED 2026-08-16: the topic-scoped mini-cone.** Each new
 agenda topic is asked open-form once (template + topic), and every
@@ -708,6 +731,10 @@ and `test_standing_rules.py` extends to the new controls.
   (with from/to/trigger), `auto.paused`, `auto.acknowledged`,
   `auto.resumed`, `auto.takeover`, `auto.handover`,
   `auto.officer_failed` (fail-soft visibility),
+  `auto.thinking` for every "Let me think for a moment." (the reason —
+  `empty_queue` | `slow_preparation` — the quiet, the seconds since the
+  turn end, what was pending and whether a pass was in flight; owner
+  decision 2026-09-09),
   `auto.golden_window_ran` (once per run: the window's end, with
   `golden_s`, whichever report or verdict first observed it — owner
   decision 2026-09-01; with `reason: elapsed | unanswered_encouragers`
@@ -790,7 +817,8 @@ and `test_standing_rules.py` extends to the new controls.
 |---|---|---|
 | `AUTO_MODE_ENABLED` | `false` | The gate. Owner's flip, after barge-in calibration + mock-patient review |
 | `AUTO_GOLDEN_MINUTES_S` | `90` | Owner range 1–2 min (decided 2026-08-16; prereg amendment A1) |
-| `AUTO_ENCOURAGER_QUIET_S` | `1.75` | Uncalibrated guess; the bridge's quiet (question phases only, from 2026-09-01) |
+| `AUTO_ENCOURAGER_QUIET_S` | — | RETIRED 2026-09-09: the bridge it governed is replaced by the thinking phrase |
+| `AUTO_THINK_THRESHOLD_S` | `3.0` | Owner decision 2026-09-09: "Let me think for a moment." once per wait when a planned question's preparation has run this long past the turn end with nothing ready (and at once when the queue is empty and a pass is running) |
 | `AUTO_ENCOURAGER_MIN_QUIET_S` | `4.0` | Owner decision 2026-09-09 (was 5.0, the 1 Sept one-per-window rule): a golden encourager every time the patient has been this quiet, one per span, two phrasings alternating |
 | `AUTO_ENCOURAGER_MAX_UNANSWERED` | `2` | Owner decision 2026-09-09: after this many unanswered encouragers, the next qualifying silence ends the golden window early |
 | `AUTO_EOT_QUIET_S` | `3.0` | Uncalibrated guess |

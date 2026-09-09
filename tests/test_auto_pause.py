@@ -252,7 +252,6 @@ def test_an_alarm_in_each_active_phase_pauses_cuts_and_audits(gate, monkeypatch,
             _until(s.ws, {"ack"})
             _fire_pass(s, LONG)                              # pass 1: the alarm
         else:
-            monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
             s.commit_transcript("It started on Tuesday.", "That's all really.")
             s.quiet(3.1)
             s.probe()                                        # hand-back → OPEN, pass 1 (quiet)
@@ -427,7 +426,6 @@ def _pause_from_open(s, engine, monkeypatch, alarm_pass=2, actions=(ECG,)):
     """GOLDEN → OPEN by a hand-back, first ask played, then the D2 revision
     (pass `alarm_pass`) carries the alarm → PAUSED_URGENT from OPEN."""
     s.to_golden()
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
     s.commit_transcript("It started on Tuesday.", "That's all really.")
     s.quiet(3.1)
     s.probe()
@@ -1145,7 +1143,6 @@ def test_the_doctors_handover_from_open_runs_the_sequence_and_ends_by_the_doctor
     _engine_with_alarms(engine, {})
     with live(gate) as s:
         s.to_golden()
-        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
         s.to_open()
         first = s.wait_for_auto_speak()                    # the first question, playing
         s.play(first["utterance_id"])
@@ -1181,7 +1178,6 @@ def test_the_doctors_handover_refill_path_returns_to_the_questions(gate, monkeyp
     _engine_with_alarms(engine, {})
     with live(gate) as s:
         s.to_golden()
-        monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
         s.to_open()
         first = s.wait_for_auto_speak()
         s.play(first["utterance_id"])
@@ -1261,7 +1257,6 @@ def test_a_tapped_examination_handover_ends_the_run_like_the_control(gate, monke
     with live(gate) as s:
         s.to_golden()
         if phase == "open":
-            monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
             s.to_open()
         assert s.phase.value == phase
         s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase",

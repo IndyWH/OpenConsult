@@ -184,9 +184,9 @@ def gate(monkeypatch, tmp_path):
     monkeypatch.setattr(appmain, "AUTO_MODE_ENABLED", True)
     # Encouragers are slice 3's subject (tests/test_auto_golden.py); here
     # they would only take the one utterance slot at the wrong moment, so
-    # both thresholds — the golden window's minimum quiet and the bridge's
-    # — are parked out of reach except where a test wants them.
-    monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_QUIET_S", 100.0)
+    # the golden window's minimum quiet is parked out of reach except where
+    # a test wants it. (The bridge's threshold was retired 2026-09-09; the
+    # thinking phrase that replaced it is stepped over by wait_for_auto_speak.)
     monkeypatch.setattr(appmain, "AUTO_ENCOURAGER_MIN_QUIET_S", 100.0)
     state = appmain.app.state
     missing = object()
@@ -236,6 +236,7 @@ class Session:
         self.seq = 0
         self.quiet_s = 0.0
         self.since = "speech"        # what began the current quiet span (E2)
+        self.thinking_heard: list[dict] = []   # every "Let me think" wait_for_auto_speak stepped over
 
     @property
     def entry(self):
@@ -258,18 +259,37 @@ class Session:
         self.ws.send_bytes(_frame(self.seq, amplitude))
 
     def probe(self):
+        """Send one frame and return every message that arrived before its
+        ack. A "Let me think for a moment." among them (owner decision
+        2026-09-09) is played through here — keeping the quiet clock, as
+        the client does — and recorded in `thinking_heard`, so a test that
+        merely ticks past a turn end does not leave the one-utterance slot
+        blocked by an unplayed phrase; the message is still returned."""
         self.frame()
-        return _collect_until(self.ws, {"ack"})[:-1]
+        seen = _collect_until(self.ws, {"ack"})[:-1]
+        for m in list(seen):
+            if m.get("type") == "auto_speak" and m.get("ref_id") == "let_me_think":
+                pending = self.entry.get("pending_utterance")
+                if pending is not None and pending.utterance_id == m["utterance_id"]:
+                    self.thinking_heard.append(m)
+                    seen.extend(self.play(m["utterance_id"], keeps_quiet_clock=True))
+        return seen
 
-    def play(self, utterance_id, reason="complete"):
+    def play(self, utterance_id, reason="complete", *, keeps_quiet_clock=False):
+        """Play an utterance through. `keeps_quiet_clock` mirrors the client
+        for "Let me think for a moment." (owner decision 2026-09-09): the
+        reporter does not restart its span at that phrase's end, so the
+        next report continues the same span."""
         self.ws.send_text(json.dumps({"type": "speak_started",
                                       "utterance_id": utterance_id, "seq": self.seq + 1}))
         self.frame(TTS_AMPLITUDE)
-        _until(self.ws, {"ack"})
+        seen = _collect_until(self.ws, {"ack"})[:-1]   # anything the server said meanwhile
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
                                       "seq": self.seq + 1, "reason": reason}))
-        self.quiet_s = 0.0                    # our playback ended: a fresh span
-        self.since = "playback"
+        if not keeps_quiet_clock:
+            self.quiet_s = 0.0                # our playback ended: a fresh span
+            self.since = "playback"
+        return seen
 
     def abort(self, utterance_id):
         self.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": utterance_id,
@@ -340,16 +360,22 @@ class Session:
         self.quiet(quiet)
         self.probe()
 
-    def wait_for_auto_speak(self, *, start_quiet=None, tries=40):
+    def wait_for_auto_speak(self, *, start_quiet=None, tries=40, skip_thinking=True):
         """Keep the quiet span going with reports and loop ticks until the
         server issues an utterance (background work — the CDS pass, the
-        topic call, pre-synthesis — needs ticks to land)."""
+        topic call, pre-synthesis — needs ticks to land). By default a
+        "Let me think for a moment." (owner decision 2026-09-09) is played
+        through — keeping the quiet clock, as the client does — recorded
+        in `thinking_heard`, and stepped over, so a test about the question
+        that follows sees the question; pass skip_thinking=False to see it."""
         q = start_quiet if start_quiet is not None else max(self.quiet_s, 3.3)
         for _ in range(tries):
             q += 0.7
             self.quiet(q)
             seen = self.probe()
             spoken = [m for m in seen if m.get("type") == "auto_speak"]
+            if skip_thinking:                 # probe() has already played it through
+                spoken = [m for m in spoken if m.get("ref_id") != "let_me_think"]
             if spoken:
                 return spoken[0]
             time.sleep(0.03)
