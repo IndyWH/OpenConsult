@@ -1508,6 +1508,17 @@ AUTO_RERANK_MAX_CHARS = int(os.getenv("AUTO_RERANK_MAX_CHARS", "1500"))
 # disclosure has not played through: the pill shows "starting" until then.
 AUTO_ENABLE_RETRIES = int(os.getenv("AUTO_ENABLE_RETRIES", "3"))
 AUTO_ENABLE_RETRY_WINDOW_S = float(os.getenv("AUTO_ENABLE_RETRY_WINDOW_S", "30"))
+# Short calls before the pass (owner decision 2026-09-09, pilot 489/490 G4
+# and G5; AGENDA_QUEUE_SPEC.md §3, §7a). Ollama serves one request at a
+# time, and the topic call issued at a turn end in the same tick as the
+# full pass lost the slot to it on 9 of 10 questions (timeout, always
+# verbatim, 2 s on every question's latency). Now, at a turn end, the
+# re-ranker and then the topic call run FIRST and the requested full pass
+# is launched only when they have returned — the hold bounded by this many
+# seconds from the turn end, after which the pass launches anyway. The hold
+# is on the record: auto.pass_held with its length, and queued_ms on the
+# pass's model.call row.
+AUTO_SHORT_CALLS_HOLD_S = float(os.getenv("AUTO_SHORT_CALLS_HOLD_S", "4.0"))
 
 
 async def _complete_session(app_state, entry: dict, *, connection_lost: bool) -> int:
@@ -1881,6 +1892,13 @@ def _new_auto_state() -> dict:
         # derived from the doctor's newest sound check at session start
         # (ws_transcribe) — this default is the no-sound-check fallback.
         "floor": speech.auto_floor(None),
+        # Short calls before the pass (owner decision 2026-09-09, G4/G5):
+        # whether a topic call is out (set when a plan is made, cleared
+        # when the call returns), when the short calls at this turn end
+        # began (the hold's zero), and when a due pass was first held.
+        "topic_pending": False,
+        "short_calls_since": None,
+        "pass_hold_since": None,
     }
 
 
@@ -1932,6 +1950,7 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
         "floor_max": speech.AUTO_FLOOR_MAX,
         "enable_retries": AUTO_ENABLE_RETRIES,
         "enable_retry_window_s": AUTO_ENABLE_RETRY_WINDOW_S,
+        "short_calls_hold_s": AUTO_SHORT_CALLS_HOLD_S,
     }
 
 
@@ -2007,6 +2026,7 @@ async def cancel_auto_playback(entry: dict, websocket, reason: str) -> dict | No
         if auto.get("plan_task") is not None and not auto["plan_task"].done():
             auto["plan_task"].cancel()
         auto["plan_task"] = None
+        auto["topic_pending"] = False
     utterance = entry.get("pending_utterance")
     if utterance is None:
         return None
@@ -2333,6 +2353,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     # accumulated state lives in the entry and survives reconnects.
     cds_task: asyncio.Task | None = None
     cds_task_parts = 0        # len(transcript_parts) when the pass in flight was launched
+    cds_task_launched_at = 0.0   # monotonic, for the pass's model.call row (elapsed_ms)
+    cds_task_queued_ms = 0       # how long the short calls held it back (owner decision 2026-09-09, G4)
     cds_failures = 0
     # Phase 7c (owner decision 2026-09-01, pilot D4): whether the CDS pass
     # in flight was launched before the first post-resume turn end — or was
@@ -2344,9 +2366,53 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     face_task: asyncio.Task | None = None  # Phase 7b tick loop, per-connection
     last_acked = -1
 
+    async def _audit_pass_call(outcome: str, *, failed: str | None = None,
+                               version: int | None = None) -> None:
+        """The full pass on the model.call record (AGENDA_QUEUE_SPEC.md §7a):
+        one row for the pass's three calls (assessment, urgency, affect —
+        their own tokens and run_ms wait for slice 6 of the queue), with
+        queued_ms = how long the short calls held it back at the turn end
+        (owner decision 2026-09-09, G4) and elapsed_ms launch → landing."""
+        await audit.log(user["id"], "model.call", None, None,
+                        {"session_id": session_id, "kind": "pass",
+                         "model": getattr(engine, "model", None),
+                         "queued_ms": int(cds_task_queued_ms),
+                         "run_ms": None,
+                         "elapsed_ms": int(round((time.monotonic() - cds_task_launched_at) * 1000)),
+                         "tokens": None, "outcome": outcome,
+                         **({"failed": failed} if failed else {}),
+                         "pass_in_flight": False,
+                         **({"version": version} if version is not None else {}),
+                         "at_audio_s": round(session.audio_seconds, 1)})
+
+    def _short_calls_out(auto: dict) -> bool:
+        """A re-ranker call or a topic call is out right now."""
+        return ((auto["rerank_task"] is not None and not auto["rerank_task"].done())
+                or bool(auto["topic_pending"]))
+
+    def _pass_held() -> bool:
+        """Short calls before the pass (owner decision 2026-09-09, pilot
+        489/490 G4; AGENDA_QUEUE_SPEC.md §3, §7a). While the re-ranker or
+        the topic call is out, a due full pass is not launched — on Ollama's
+        single slot it would win the slot from them and the topic call
+        would time out, as it did on 9 of 10 questions — for at most
+        AUTO_SHORT_CALLS_HOLD_S from the moment the short calls began; past
+        the bound the pass launches anyway. Clears the hold's zero once the
+        short calls are back."""
+        auto = entry["auto"]
+        if auto is None:
+            return False
+        if not _short_calls_out(auto):
+            auto["short_calls_since"] = None
+            return False
+        if auto["short_calls_since"] is None:
+            auto["short_calls_since"] = time.monotonic()
+        return time.monotonic() - auto["short_calls_since"] < AUTO_SHORT_CALLS_HOLD_S
+
     async def maybe_run_cds() -> None:
         """Launch/collect the CDS side task without ever blocking transcription."""
-        nonlocal cds_task, cds_task_parts, cds_failures, cds_pre_answer
+        nonlocal cds_task, cds_task_parts, cds_task_launched_at, cds_task_queued_ms
+        nonlocal cds_failures, cds_pre_answer
         if cds_task is not None and cds_task.done():
             try:
                 entry["assessment"] = cds_task.result()
@@ -2435,6 +2501,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 if entry["face"] is not None:
                     entry["face"].on_affect(
                         entry["assessment"].get("patient_affect"))
+                if entry["auto"] is not None:
+                    await _audit_pass_call("ok", version=assessment_version)
             except cds.CDSRunaway as exc:
                 # Cap runaway generation (owner decision 2026-09-07, pilot
                 # 486 F3): the pass failed at its cap or its timeout. On the
@@ -2479,6 +2547,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     if auto["controller"].phase in auto_mode.QUESTION_PHASES:
                         _ask_after_pass(auto, entry["agenda"].current_version,
                                         "revision failed (runaway), asking from the queue in hand")
+                if entry["auto"] is not None:
+                    await _audit_pass_call(exc.reason, failed=str(exc),
+                                           version=entry["agenda"].current_version)
                 if cds_failures >= CDS_MAX_FAILURES:
                     await websocket.send_json(
                         {"type": "cds_unavailable",
@@ -2487,6 +2558,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             except Exception as exc:  # noqa: BLE001 - degrade, don't crash the stream
                 cds_failures += 1
                 logger.warning("CDS pass failed (%d): %s: %s", cds_failures, type(exc).__name__, exc)
+                if entry["auto"] is not None:
+                    await _audit_pass_call("error", failed=f"{type(exc).__name__}: {exc}")
                 if cds_failures >= CDS_MAX_FAILURES:
                     await websocket.send_json(
                         {"type": "cds_unavailable",
@@ -2509,17 +2582,38 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # moment it is asked for, bypassing CDS_MIN_NEW_CHARS — the whole
         # point is a fresh agenda after every answer.
         auto_due = entry["auto"] is not None and entry["auto"]["revision"] == "requested"
-        if (
-            cds_task is None
-            and cds_failures < CDS_MAX_FAILURES
-            and (first_call_due or auto_due
-                 or len(transcript) - entry["cds_sent_len"] >= CDS_MIN_NEW_CHARS)
-        ):
+        due = (cds_task is None and cds_failures < CDS_MAX_FAILURES
+               and (first_call_due or auto_due
+                    or len(transcript) - entry["cds_sent_len"] >= CDS_MIN_NEW_CHARS))
+        if due and _pass_held():
+            # Short calls before the pass (owner decision 2026-09-09, G4):
+            # the re-ranker and the topic call are out; the pass waits for
+            # them (bounded) rather than taking the slot from them.
+            auto = entry["auto"]
+            if auto["pass_hold_since"] is None:
+                auto["pass_hold_since"] = time.monotonic()
+            return
+        if due:
+            held_since = entry["auto"]["pass_hold_since"] if entry["auto"] is not None else None
+            cds_task_queued_ms = 0
+            if held_since is not None:
+                auto = entry["auto"]
+                auto["pass_hold_since"] = None
+                cds_task_queued_ms = int(round((time.monotonic() - held_since) * 1000))
+                released = "bound" if _short_calls_out(auto) else "short_calls_done"
+                logger.info("Live session %s: pass held %d ms for the short calls (%s)",
+                            session_id, cds_task_queued_ms, released)
+                await audit.log(user["id"], "auto.pass_held", None, None,
+                                {"session_id": session_id, "hold_ms": cds_task_queued_ms,
+                                 "released": released, "bound_s": AUTO_SHORT_CALLS_HOLD_S,
+                                 "pass_version": entry["agenda"].current_version + 1,
+                                 "at_audio_s": round(session.audio_seconds, 1)})
             entry["cds_sent_len"] = len(transcript)
             if auto_due:
                 entry["auto"]["revision"] = "running"
             cds_pre_answer = bool(entry["auto"] is not None and entry["auto"]["repause_block"])
             cds_task_parts = len(entry["transcript_parts"])
+            cds_task_launched_at = time.monotonic()
             cds_task = asyncio.create_task(
                 engine.update(transcript, entry["assessment"])
             )
@@ -3354,7 +3448,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if auto["plan_task"] is not None and not auto["plan_task"].done():
             auto["plan_task"].cancel()
         auto["plan_task"] = None
-        auto.update(awaiting_answer=False, revision=None, bridge_used=False)
+        auto.update(awaiting_answer=False, revision=None, bridge_used=False, topic_pending=False)
         if ctl.phase is auto_mode.AutoPhase.GOLDEN:
             await auto_transition(ctl.handover_requested(), detail={"by": "doctor"})
         _plan_handover(auto, entry["agenda"].current_version)
@@ -3370,6 +3464,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["officer_deferred"] = None
         auto["queued"] = None
         auto["revision"] = None
+        auto["topic_pending"] = False
         auto["awaiting_speech"] = False
         # A question cut by a pause, auto off or a handover keeps its ASKED
         # status in the queue — never asked again — but no answer is
@@ -3417,13 +3512,17 @@ async def ws_transcribe(websocket: WebSocket) -> None:
           and no pass running → request one; still nothing after the
           merge of a post-answer revision → the handover sequence
           (_ask_after_pass).
-        - With `rerank` (an ANSWER's turn end, spec §3): if no full pass
-          is in flight and at least two items are pending, the re-ranker
-          runs first and the plan follows its verdict (or its failure,
-          bounded by AUTO_RERANK_TIMEOUT_S) — the head Alba asks next is
-          chosen after what the patient just said. The pass requested
-          here launches on the next tick, behind the re-ranker on
-          Ollama's single slot, never ahead of it."""
+        - With `rerank` (an ANSWER's turn end, spec §3): if anything is
+          pending, the re-ranker runs first — whether or not a full pass
+          is in flight, and with a single pending item too (owner
+          decision 2026-09-09, G5: D-F switched it off exactly when it
+          was needed, and a lone stale head was never checked) — and the
+          plan follows its verdict (or its failure, bounded by
+          AUTO_RERANK_TIMEOUT_S): the head Alba asks next is chosen after
+          what the patient just said. The pass requested here is held
+          until the re-ranker and the topic call have returned (bounded by
+          AUTO_SHORT_CALLS_HOLD_S; maybe_run_cds), so on Ollama's single
+          slot the short calls come first (owner decision 2026-09-09, G4)."""
         auto["bridge_used"] = False
         if AUTO_STRICT_REVISE:
             auto["revision"] = "requested"
@@ -3452,14 +3551,21 @@ async def ws_transcribe(websocket: WebSocket) -> None:
 
     def _start_rerank(auto: dict, why: str) -> bool:
         """The re-ranker at an answered turn end (AGENDA_QUEUE_SPEC.md §3,
-        D-B, D-F). Returns True when a re-rank is under way and the plan
-        will follow it; False when the caller should plan now.
+        D-B). Returns True when a re-rank is under way and the plan will
+        follow it; False when the caller should plan now.
 
-        - Fewer than two pending items: nothing to order, no call, no row.
-        - A full pass in flight (D-F): skipped — its merge supersedes any
-          verdict — audited auto.rerank_skipped with reason pass_in_flight
-          and the version the pass will land as. By construction, then, a
-          re-ranker call is never issued while a pass holds Ollama's slot.
+        - Nothing pending: nothing to judge, no call, no row.
+        - A full pass in flight is NOT a skip (owner decision 2026-09-09,
+          pilot 490 G5, reversing D-F): under cadence (a) a pass is in
+          flight at most answered turn ends, so the skip switched the
+          re-ranker off exactly when it was needed — 490 asked "Do you
+          smoke?" to a patient who had just said so, the pass that knew
+          in flight. The slice-3 race logic protects a planned item and
+          applies a late verdict to the post-merge queue; the pass
+          requested at this turn end is held behind the short calls
+          (maybe_run_cds), so the re-ranker is not queued behind it.
+        - One pending item IS consulted (same decision): a lone stale
+          head can be dropped by a verdict, and the empty rules follow.
         - No committed turn since the last pass landed: nothing for the
           re-ranker to judge, skipped (reason no_new_turns).
         - Otherwise the call runs on the pending (id, text) pairs and the
@@ -3468,29 +3574,25 @@ async def ws_transcribe(websocket: WebSocket) -> None:
           front — and _rerank_then_plan applies what comes back."""
         queue: agenda_queue.AgendaQueue = auto["queue"]
         pending = queue.pending
-        if len(pending) < 2:
+        if not pending:
             return False
         if auto["rerank_task"] is not None and not auto["rerank_task"].done():
             return True
-        skip_reason = None
-        if _pass_in_flight():
-            skip_reason = "pass_in_flight"
         turns = entry["transcript_parts"][entry["cds_landed_parts"]:]
         excerpt = cds.rerank_excerpt(turns, max_turns=AUTO_RERANK_CONTEXT_TURNS,
                                      max_chars=AUTO_RERANK_MAX_CHARS)
-        if skip_reason is None and not excerpt:
-            skip_reason = "no_new_turns"
-        if skip_reason is not None:
-            logger.info("Live session %s: re-rank skipped (%s), %d pending", session_id,
-                        skip_reason, len(pending))
+        if not excerpt:
+            logger.info("Live session %s: re-rank skipped (no_new_turns), %d pending", session_id,
+                        len(pending))
             asyncio.create_task(audit.log(user["id"], "auto.rerank_skipped", None, None,
-                                          {"session_id": session_id, "reason": skip_reason,
+                                          {"session_id": session_id, "reason": "no_new_turns",
                                            "pending": len(pending),
-                                           **({"pass_version": entry["agenda"].current_version + 1}
-                                              if skip_reason == "pass_in_flight" else {}),
+                                           "pass_in_flight": _pass_in_flight(),
                                            "at_audio_s": round(session.audio_seconds, 1)}))
             return False
         pairs = [(i.id, i.text) for i in pending]
+        if auto["short_calls_since"] is None:
+            auto["short_calls_since"] = time.monotonic()   # the pass hold's zero (G4)
         auto["rerank_task"] = asyncio.create_task(
             _rerank_then_plan(auto, pairs, excerpt, len(turns), why))
         return True
@@ -3683,6 +3785,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["handover"] = None
         auto["handover_by_doctor"] = False   # a refill returned the flow to the questions
         auto["planning_item_id"] = item.id   # a re-rank verdict landing now leaves this item alone
+        auto["topic_pending"] = True         # a short call is out: the pass waits for it (G4)
+        if auto["short_calls_since"] is None:
+            auto["short_calls_since"] = time.monotonic()
         auto["plan_task"] = asyncio.create_task(_prepare_question(auto, item, ref, why))
         return True
 
@@ -3724,7 +3829,10 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         version, index = ref
         text = item.text
         queue: agenda_queue.AgendaQueue = auto["queue"]
-        verdict = await engine.topic_for(text)
+        try:
+            verdict = await engine.topic_for(text)
+        finally:
+            auto["topic_pending"] = False    # the short call is back: the pass may launch (G4)
         current = queue.get(item.id)
         if current is None or not current.pending:
             # Consumed by a doctor's tap, or dropped by a merge, while the
@@ -3978,6 +4086,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if auto[key] is not None and not auto[key].done():
                 auto[key].cancel()       # the tap's answer will re-rank and plan afresh
             auto[key] = None
+        auto["topic_pending"] = False
         await audit.log(user["id"], "auto.doctor_tap", None, None,
                         {"session_id": session_id, "phase": auto["controller"].phase.value,
                          "ref_kind": utterance.ref_kind, "ref_detail": utterance.ref_detail,

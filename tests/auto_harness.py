@@ -110,6 +110,13 @@ class ScriptedEngine:
         self.rerank_during_pass: list[bool] = []   # was a full pass running when each call was issued?
         self.rerank_gate: asyncio.Event | None = None
         self.pass_in_flight = False
+        # Short calls before the pass (slice 4 of the pilot fixes, G4):
+        # `topic_gate`, when set, holds every topic call until released;
+        # `order` is the engine's own view of arrivals — "rerank", "topic",
+        # "topic_done", "pass" — so a test can pin what reached the slot
+        # before what.
+        self.topic_gate: asyncio.Event | None = None
+        self.order: list[str] = []
 
     async def end_of_turn(self, transcript, *, timeout_s=None):
         self.asked.append(transcript)
@@ -118,6 +125,10 @@ class ScriptedEngine:
 
     async def topic_for(self, question):
         self.topic_calls.append(question)
+        self.order.append("topic")
+        if self.topic_gate is not None:
+            await self.topic_gate.wait()
+        self.order.append("topic_done")
         topic = self.topics.get(question)
         if topic is None:
             return TopicVerdict(None, failed="unusable: ''", elapsed_ms=7)
@@ -126,6 +137,7 @@ class ScriptedEngine:
     async def rerank(self, pending, excerpt):
         self.rerank_calls.append((list(pending), excerpt))
         self.rerank_during_pass.append(self.pass_in_flight)
+        self.order.append("rerank")
         if self.rerank_gate is not None:
             await self.rerank_gate.wait()
         if not self.rerank_verdicts:
@@ -135,6 +147,7 @@ class ScriptedEngine:
 
     async def update(self, transcript, previous=None):
         self.pass_in_flight = True
+        self.order.append("pass")
         try:
             if self.gate_event is not None:
                 await self.gate_event.wait()

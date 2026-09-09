@@ -534,7 +534,12 @@ v1 remedy, as with #469.
   re-ranker's verdict (`AGENDA_QUEUE_SPEC.md` §3: bounded by
   `AUTO_RERANK_TIMEOUT_S`, 2 s, ~1 s warm), so the head is chosen after
   what the patient just said. The CDS pass is no longer in the gap (D2
-  as re-meant: it runs in parallel and its merge shapes the ask after).
+  as re-meant: it runs in parallel and its merge shapes the ask after)
+  — and since 2026-09-09 (owner decision, pilot 489/490 G4) it launches
+  only AFTER the re-ranker and the topic call have returned, bounded by
+  `AUTO_SHORT_CALLS_HOLD_S`, so the short calls no longer lose Ollama's
+  single slot to it (9 of 10 topic calls timed out behind the pass in
+  489/490; 3.0 s mean turn end → speaking, 2 s of it that timeout).
   486's baseline to beat is a 27.7 s mean from turn end to Alba
   speaking.
 - The officer and topic calls reuse `CDS_NUM_CTX` so MedGemma is
@@ -745,6 +750,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_RERANK_TIMEOUT_S` / `AUTO_RERANK_MAX_TOKENS` / `AUTO_RERANK_CONTEXT_TURNS` / `AUTO_RERANK_MAX_CHARS` | `2.0` / `200` / `6` / `1500` | The standing queue's re-ranker (`AGENDA_QUEUE_SPEC.md` §3, D-B; slice 3, 2026-09-08): its timeout, output cap, and the excerpt's turns and characters; the cap and the characters are uncalibrated guesses. The queue's own numbers (`AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES`) are in that spec |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
 | `AUTO_FLOOR_MARGIN` / `AUTO_FLOOR_MIN` / `AUTO_FLOOR_MAX` | `3.0` / `0.02` / `0.08` | Owner decision 2026-09-09 (pilot 488 G2): the session's politeness-abort and quiet-reporter floor is the sound check's `noise_floor_rms` × margin, clamped; uncalibrated guesses (`app/speech.py`) |
+| `AUTO_SHORT_CALLS_HOLD_S` | `4.0` | Owner decision 2026-09-09 (pilot 489/490 G4): the full pass requested at a turn end waits for the re-ranker and the topic call, at most this long from when they began (`AGENDA_QUEUE_SPEC.md` §3, §7a) |
 | `AUTO_ENABLE_RETRIES` / `AUTO_ENABLE_RETRY_WINDOW_S` | `3` / `30` | Owner decision 2026-09-09 (pilot 488 G1): a politeness-aborted enable disclosure or chained invitation is re-issued on the next quiet report — at most this many attempts in all, inside this window of the first issue; then `too_loud_to_start` |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |
 

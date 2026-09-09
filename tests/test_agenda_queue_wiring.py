@@ -308,8 +308,11 @@ def test_under_the_queue_exactly_one_full_pass_runs_per_answer(gate):
     for it — so the urgency check (its own call inside the pass) runs
     exactly as often as before the queue. Three answers → three passes
     after the golden exit's one. Extended in slice 3: the re-ranker runs
-    once per answer beside it (two or more pending, no pass in flight)
-    and changes neither count — and never while a pass holds the slot."""
+    once per answer beside it and changes neither count. Extended
+    2026-09-09 (owner decision, pilot 489/490 G4: short calls before the
+    pass): at every answer the re-ranker and then the topic call reach the
+    engine BEFORE the pass is launched, and the urgency check still runs
+    exactly once per answer — the hold delays the pass, it never drops it."""
     assert appmain.AUTO_STRICT_REVISE is True
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
@@ -332,9 +335,18 @@ def test_under_the_queue_exactly_one_full_pass_runs_per_answer(gate):
     assert len(engine.updates) == 4
     assert len(engine.rerank_calls) == 3, "one re-rank per answer, none at the golden exit"
     assert engine.rerank_during_pass == [False, False, False]
+    # The order at the slot (G4): the exit's pass first (nothing pending
+    # at the exit, so no short call held it) and its merge's topic call,
+    # then every answer is re-rank → topic → topic back → pass, three times.
+    assert engine.order == (["pass", "topic", "topic_done"]
+                            + ["rerank", "topic", "topic_done", "pass"] * 3), engine.order
     calls = _audit("model.call", s.session_id)
-    assert [c["kind"] for c in calls] == ["rerank"] * 3
+    assert [c["kind"] for c in calls if c["kind"] == "rerank"] == ["rerank"] * 3
+    assert [c["kind"] for c in calls if c["kind"] == "pass"] == ["pass"] * 4, "every pass is a row too"
     assert all(c["pass_in_flight"] is False and c["outcome"] == "ok" for c in calls)
+    # (The scripted short calls return inside one yield, so no pass was
+    # actually held here — auto.pass_held is written only for a real hold;
+    # the held case is pinned by test_the_topic_call_returns_before_the_pass_is_launched.)
 
 
 def test_empty_rule_one_nothing_pending_and_a_pass_running_gives_one_bridge_and_waits(gate, monkeypatch):
@@ -802,7 +814,7 @@ def test_a_verdict_reorders_the_pending_items_and_drops_one_with_its_reason(gate
     assert row["drops"] == [{"id": "q3", "text": Q_TABLETS, "reason": "volunteered"}]
     assert row["ignored"] == [] and row["ms"] == 41 and row["protected"] is None
     assert row["excerpt_turns"] == 1 and row["excerpt_chars"] == len("Tuesday night, quite suddenly.")
-    calls = _audit("model.call", s.session_id)
+    calls = [c for c in _audit("model.call", s.session_id) if c["kind"] == "rerank"]
     assert len(calls) == 1 and calls[0]["kind"] == "rerank" and calls[0]["outcome"] == "ok"
     assert calls[0]["pass_in_flight"] is False and calls[0]["elapsed_ms"] == 41
     assert set(calls[0]) >= {"queued_ms", "run_ms", "tokens", "outcome", "model"}
@@ -837,18 +849,23 @@ def test_an_unknown_id_in_the_verdict_is_ignored_and_appears_in_the_row(gate):
     assert row["unmentioned"] == ["q4"]
 
 
-def test_a_re_rank_is_skipped_while_a_pass_is_in_flight_and_never_issued_behind_one(gate):
-    """D-F: with a full pass in flight at the answer's turn end the
-    re-ranker is not called — its merge supersedes any verdict — audited
-    auto.rerank_skipped (reason pass_in_flight, the version the pass will
-    land as), and the ask is planned from the head at once, as slice 2
-    left it. Item 5's pin: a re-ranker call is never issued while a pass
-    holds Ollama's single slot — here none at all; across the run, none
-    while a pass was running."""
+def test_the_re_ranker_runs_with_a_pass_in_flight_and_its_row_says_so(gate):
+    """REPINNED 2026-09-09 (owner decision, pilot 490 G5). Slice 3 pinned
+    D-F: with a full pass in flight at the answer's turn end the re-ranker
+    was skipped and the ask planned from the head at once. That property
+    is deliberately replaced, not weakened: under cadence (a) a pass is in
+    flight at most answered turn ends, so the skip switched the re-ranker
+    off exactly when it was needed — 490 asked "Do you smoke?" to a
+    patient who had just said so, with the pass that knew still in flight.
+    Now the re-ranker runs with the pass in flight, the plan follows its
+    verdict, model.call says pass_in_flight=true, and no skip row is
+    written. The attack reaches its target: the pass IS running when the
+    answer ends."""
     import asyncio
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    engine.rerank_verdicts = [RerankVerdict(("q4", "q3"), {"q2": "volunteered"}, elapsed_ms=30)]
     with live(gate) as s:
         s.to_golden()
         s.land_pass()                                  # v1 merges in the golden minutes
@@ -857,28 +874,95 @@ def test_a_re_rank_is_skipped_while_a_pass_is_in_flight_and_never_issued_behind_
         s.to_open()
         first = s.wait_for_auto_speak()
         s.play(first["utterance_id"])
-        assert len(engine.updates) == 1, "the exit's pass is in flight"
+        _probe_until(s, lambda: engine.pass_in_flight)
+        assert len(engine.updates) == 1 and engine.pass_in_flight, "the exit's pass is in flight"
         s.turn_end("Tuesday night.")
-        assert engine.rerank_calls == []
-        assert s.auto["rerank_task"] is None and s.auto["plan_task"] is not None, "planned at once"
+        assert len(engine.rerank_calls) == 1, "the re-ranker runs, pass or no pass"
         nxt = s.wait_for_auto_speak()
-        assert nxt["text"] == "Can you tell me more about your sleep?", "the head, unreordered"
-        assert engine.rerank_calls == []
+        assert nxt["text"] == Q_RADIATE or nxt["text"].endswith("the chest pain?"), \
+            "planned after the verdict: q4 first, q2 dropped — not the unreordered head"
+        assert len(engine.rerank_calls) == 1 and engine.rerank_during_pass == [True]
+        sleep = next(i for i in s.auto["queue"].items if i.text == Q_SLEEP)
+        assert sleep.status is ItemStatus.DROPPED, "the verdict was applied with the pass in flight"
         s.ws.portal.call(gate_event.set)
         wait_for_pass(s, 2)
-        s.play(nxt["utterance_id"])
-        s.turn_end("Badly.")                           # no pass in flight now: the re-ranker runs
-        s.wait_for_auto_speak()
-        assert len(engine.rerank_calls) == 1
-        assert engine.rerank_during_pass == [False]
         _stop(s)
-    skipped = _audit("auto.rerank_skipped", s.session_id)
-    assert len(skipped) == 1
-    assert skipped[0]["reason"] == "pass_in_flight" and skipped[0]["pass_version"] == 2
-    assert skipped[0]["pending"] == 3
-    calls = _audit("model.call", s.session_id)
-    assert len(calls) == 1 and calls[0]["pass_in_flight"] is False
+    assert _audit("auto.rerank_skipped", s.session_id) == [], "a pass in flight is no longer a skip"
+    calls = [c for c in _audit("model.call", s.session_id) if c["kind"] == "rerank"]
+    assert len(calls) == 1 and calls[0]["pass_in_flight"] is True and calls[0]["outcome"] == "ok"
     assert len(_audit("auto.queue_reranked", s.session_id)) == 1
+
+
+def test_the_topic_call_returns_before_the_pass_is_launched(gate):
+    """Owner decision 2026-09-09 (pilot 489/490 G4: short calls before the
+    pass). On Ollama's single slot the topic call issued in the same tick
+    as the pass lost to it on 9 of 10 questions. Now the pass requested at
+    the answer's turn end is not launched until the re-ranker and the
+    topic call have returned: with the topic call HELD the engine sees no
+    pass however many ticks go by; released, the pass launches at once,
+    auto.pass_held records the hold and its release, and the pass's
+    model.call row carries the hold as queued_ms."""
+    import asyncio
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    with live(gate) as s:
+        _first_answer_setup(s, engine)                 # the exit's pass (v1) has landed
+        topic_gate = s.ws.portal.call(asyncio.Event)
+        engine.topic_gate = topic_gate                 # hold every topic call from here
+        engine.order.clear()
+        passes_before = len(engine.updates)
+        s.turn_end("Tuesday night.")
+        assert s.auto["revision"] == "requested", "the pass is asked for at the turn end"
+        for _ in range(8):                             # ticks go by: the pass waits
+            s.probe()
+            time.sleep(0.03)
+        assert engine.order == ["rerank", "topic"], engine.order
+        assert len(engine.updates) == passes_before and not engine.pass_in_flight
+        assert s.auto["revision"] == "requested" and s.auto["topic_pending"] is True
+        s.ws.portal.call(topic_gate.set)               # the topic call returns
+        wait_for_pass(s, passes_before + 1)
+        assert engine.order[:4] == ["rerank", "topic", "topic_done", "pass"], engine.order
+        s.wait_for_auto_speak()
+        _stop(s)
+    held = _audit("auto.pass_held", s.session_id)
+    assert len(held) >= 1
+    row = held[-1]
+    assert row["released"] == "short_calls_done" and row["hold_ms"] >= 200
+    assert row["bound_s"] == appmain.AUTO_SHORT_CALLS_HOLD_S and row["pass_version"] == 2
+    pass_rows = [c for c in _audit("model.call", s.session_id) if c["kind"] == "pass"]
+    assert pass_rows[-1]["queued_ms"] == row["hold_ms"] and pass_rows[-1]["outcome"] == "ok"
+    assert pass_rows[-1]["version"] == 2
+
+
+def test_the_hold_is_bounded_a_topic_call_that_never_returns_does_not_hold_the_pass_forever(gate, monkeypatch):
+    """The bound (AUTO_SHORT_CALLS_HOLD_S): the pass — and the urgency
+    check inside it — is never held hostage by a short call. With the
+    topic call held past the bound the pass launches anyway, and the row
+    says the hold was released by the bound."""
+    import asyncio
+    monkeypatch.setattr(appmain, "AUTO_SHORT_CALLS_HOLD_S", 0.3)
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS]]
+    with live(gate) as s:
+        _first_answer_setup(s, engine)
+        topic_gate = s.ws.portal.call(asyncio.Event)
+        engine.topic_gate = topic_gate
+        engine.order.clear()
+        passes_before = len(engine.updates)
+        s.turn_end("Tuesday night.")
+        wait_for_pass(s, passes_before + 1)            # launches despite the held topic call
+        assert engine.order[:3] == ["rerank", "topic", "pass"], engine.order
+        assert s.auto["topic_pending"] is True, "the topic call is still out when the pass launches"
+        s.ws.portal.call(topic_gate.set)
+        s.wait_for_auto_speak()
+        _stop(s)
+    row = _audit("auto.pass_held", s.session_id)[-1]
+    # hold_ms counts from the moment the due pass was first held, which is
+    # a tick after the short calls began (the bound's zero), so it is a
+    # little under the bound, never over it by more than a tick.
+    assert row["released"] == "bound" and 0 < row["hold_ms"] <= 300 + 250 and row["bound_s"] == 0.3
 
 
 def test_a_failed_call_leaves_the_order_standing_and_is_audited_with_reason_and_elapsed(gate):
@@ -903,19 +987,25 @@ def test_a_failed_call_leaves_the_order_standing_and_is_audited_with_reason_and_
     assert failed[0]["reason"] == "timeout" and failed[0]["elapsed_ms"] == 2003
     assert failed[0]["outcome"] == "timeout" and failed[0]["pending"] == 3
     assert _audit("auto.queue_reranked", s.session_id) == []
-    calls = _audit("model.call", s.session_id)
+    calls = [c for c in _audit("model.call", s.session_id) if c["kind"] == "rerank"]
     assert len(calls) == 1 and calls[0]["outcome"] == "timeout" and calls[0]["failed"] == "timeout"
 
 
-def test_a_verdict_landing_after_the_next_ask_is_planned_leaves_the_planned_item_alone(gate):
+def test_a_verdict_landing_after_the_next_ask_is_planned_leaves_the_planned_item_alone(gate, monkeypatch):
     """The race (spec §3 as built): the pass requested at the same turn end
     lands while the re-ranker is still out — the merge supersedes it and
     the ask is planned from the merged head at once. When the late verdict
     arrives — reordering, and dropping the very item now planned — the
     planned item is protected: not dropped, kept first; the verdict shapes
     the rest of the queue; the row says what was protected and that the
-    verdict had dropped it. The planned question is the one asked."""
+    verdict had dropped it. The planned question is the one asked.
+
+    REPINNED 2026-09-09 (owner decision, G4: short calls before the pass):
+    the pass is now held behind the re-ranker, so it can only land
+    mid-re-rank once the hold's bound has expired — the bound is shortened
+    here so the race still occurs; the protection it exercises is unchanged."""
     import asyncio
+    monkeypatch.setattr(appmain, "AUTO_SHORT_CALLS_HOLD_S", 0.2)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
@@ -949,34 +1039,56 @@ def test_a_verdict_landing_after_the_next_ask_is_planned_leaves_the_planned_item
     assert _audit("auto.rerank_skipped", s.session_id) == [], "it was not in flight when the re-rank started"
 
 
-def test_the_re_rank_is_not_run_with_one_pending_item_and_a_dropped_item_may_re_enter_on_a_later_pass(gate):
-    """With one pending item there is nothing to order: no call, no row.
-    And a re-ranker drop is not the never-re-enter guarantee (slice-1
-    decision): a later pass that raises the dropped question again adds
-    it afresh, with a new id."""
+def test_a_single_stale_pending_item_is_dropped_by_a_verdict_and_a_dropped_item_may_re_enter_on_a_later_pass(gate):
+    """REPINNED 2026-09-09 (owner decision, pilot 490 G5). Slice 3 pinned
+    "one pending item: nothing to order, no call, no row". Replaced: the
+    re-ranker is consulted with one pending item too, so a lone stale
+    head can be dropped by a verdict — in 489/490 a single item was never
+    checked six times. Here the second answer leaves one item pending;
+    the verdict drops it; nothing is asked from it; the empty rule waits
+    for the pass, whose merge supplies the next ask. And a re-ranker drop
+    is still not the never-re-enter guarantee (slice-1 decision): a later
+    pass that raises the dropped question again adds it afresh, with a
+    new id."""
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
-    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_SLEEP], [Q_SLEEP, Q_TABLETS]]
-    engine.rerank_verdicts = [RerankVerdict(("q2",), {"q3": "answered"}, elapsed_ms=20)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_SLEEP, Q_TABLETS], [Q_RADIATE],
+                      [Q_RADIATE, Q_TABLETS]]
+    engine.rerank_verdicts = [RerankVerdict(("q2", "q3"), {}, elapsed_ms=20),
+                              RerankVerdict((), {"q3": "volunteered"}, elapsed_ms=20),
+                              RerankVerdict((), {}, elapsed_ms=20)]
     with live(gate) as s:
         queue = s.auto["queue"]
         _first_answer_setup(s, engine)
-        s.turn_end("Tuesday night.")                   # re-rank: Q_TABLETS dropped; pass 2 [Q_SLEEP]
+        s.turn_end("Tuesday night.")                   # re-rank 1: the order kept; pass 2 refreshes both
         nxt = s.wait_for_auto_speak()
         assert nxt["text"] == "Can you tell me more about your sleep?"
         wait_for_pass(s, 2)
-        dropped = next(i for i in queue.items if i.text == Q_TABLETS)
-        assert dropped.status is ItemStatus.DROPPED and dropped.drop_reason == "answered"
         s.play(nxt["utterance_id"])
-        s.turn_end("Badly.")                           # one pending at most: no re-rank; pass 3 re-proposes Q_TABLETS
+        assert [i.text for i in queue.pending] == [Q_TABLETS], "one item left pending"
+        s.turn_end("Badly — and my tablets, I keep forgetting them.")   # one pending: re-rank 2 drops it
+        assert len(engine.rerank_calls) == 2, "consulted with a single pending item"
+        assert engine.rerank_calls[1][0] == [("q3", Q_TABLETS)]
+        _probe_until(s, lambda: s.auto["rerank_task"] is None)
+        dropped = next(i for i in queue.items if i.text == Q_TABLETS)
+        assert dropped.status is ItemStatus.DROPPED and dropped.drop_reason == "volunteered"
+        assert Q_TABLETS not in [i.text for i in queue.pending], \
+            "the lone stale head was dropped; nothing is asked from it (pass 3 may already have merged)"
+        third = s.wait_for_auto_speak()                # the empty rule: pass 3's merge supplies it
+        assert third["text"] in (Q_RADIATE, "Can you tell me more about the chest pain?")
         wait_for_pass(s, 3)
+        s.play(third["utterance_id"])
+        s.turn_end("No.")                              # pass 4 re-proposes Q_TABLETS
+        wait_for_pass(s, 4)
         again = queue.find(Q_TABLETS)
         assert again is not None and again.id != dropped.id and again.status is ItemStatus.PENDING
         assert dropped.status is ItemStatus.DROPPED
         _stop(s)
-    assert len(engine.rerank_calls) == 1, "the second answer had nothing to order"
-    assert len(_audit("auto.queue_reranked", s.session_id)) == 1
-    assert _audit("auto.rerank_skipped", s.session_id) == []
+    reranked = _audit("auto.queue_reranked", s.session_id)
+    assert len(reranked) >= 2
+    assert reranked[1]["before"] == ["q3"] and reranked[1]["drops"][0]["reason"] == "volunteered"
+    consumed = [c["text"] for c in _audit("auto.queue_consumed", s.session_id)]
+    assert Q_TABLETS not in consumed, "the stale head was never put to the patient"
 
 
 # ==========================================================================
@@ -988,17 +1100,17 @@ MODEL_CALL_KEYS = {"session_id", "kind", "model", "queued_ms", "run_ms", "elapse
                    "tokens", "outcome", "pass_in_flight", "at_audio_s"}
 
 
-def test_a_re_ranker_call_is_never_issued_while_a_pass_is_running_and_every_call_is_a_model_call_row(gate):
-    """§7a, by construction (item 4: the re-rank runs only when no pass is
-    in flight), pinned from the engine's side: across three answers — the
-    second ending while the pass for the first is HELD mid-flight — the
-    engine sees no re-rank call while one of its passes is running, the
-    held answer is a recorded skip, and each of the two calls that were
-    issued has exactly one model.call row (kind=rerank, queued_ms,
-    run_ms, elapsed_ms, tokens, outcome, pass_in_flight=false — the
-    shape slice 6 extends to the officer, topic, assessment, urgency and
-    affect calls). The attack reaches its target: the pass was in flight
-    when the second answer ended."""
+def test_every_call_is_a_model_call_row_and_a_re_rank_behind_a_held_pass_says_pass_in_flight(gate):
+    """REPINNED 2026-09-09 (owner decision, pilot 490 G5). Slice 3's item 5
+    pinned "a re-ranker call is never issued while a pass holds the slot"
+    (by construction, through D-F's skip). Replaced: the re-ranker IS
+    issued with a pass in flight — that is the moment it is needed — and
+    its model.call row says so (pass_in_flight=true). What stands from
+    item 5: every call is a model.call row in the §7a shape — each
+    re-ranker call one row (kind=rerank), and now each full pass one row
+    too (kind=pass, queued_ms = the hold behind the short calls, G4). The
+    attack reaches its target: the pass was in flight when the second
+    answer ended."""
     import asyncio
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
@@ -1007,32 +1119,39 @@ def test_a_re_ranker_call_is_never_issued_while_a_pass_is_running_and_every_call
         _first_answer_setup(s, engine)                 # the exit's pass (v1) has landed
         hold = s.ws.portal.call(asyncio.Event)         # unset: every pass from here is held
         engine.gate_event = hold
-        s.turn_end("Tuesday.")                         # no pass in flight: re-rank 1; v2 requested, then held
+        s.turn_end("Tuesday.")                         # no pass in flight: re-rank 1; v2 requested
         first = s.wait_for_auto_speak()
         assert len(engine.rerank_calls) == 1
         s.play(first["utterance_id"])
         _probe_until(s, lambda: engine.pass_in_flight)
         assert engine.pass_in_flight is True, "v2 is running when the second answer ends"
-        s.turn_end("Badly.")                           # a pass in flight: skipped, planned at once
+        s.turn_end("Badly.")                           # a pass in flight: re-rank 2 runs anyway
         second = s.wait_for_auto_speak()
-        assert len(engine.rerank_calls) == 1, "no call issued behind the running pass"
+        assert len(engine.rerank_calls) == 2, "issued with the pass running (G5)"
         assert engine.pass_in_flight is True
         s.play(second["utterance_id"])
         s.ws.portal.call(hold.set)                     # the held passes land
         wait_for_pass(s, 3)
         _probe_until(s, lambda: not engine.pass_in_flight and s.auto["revision"] is None)
-        s.turn_end("Sometimes.")                       # free again: re-rank 2
+        s.turn_end("Sometimes.")                       # free again: re-rank 3
         s.wait_for_auto_speak()
-        assert len(engine.rerank_calls) == 2
+        assert len(engine.rerank_calls) == 3
         _stop(s)
-    assert engine.rerank_during_pass == [False, False]
-    skipped = _audit("auto.rerank_skipped", s.session_id)
-    assert [r["reason"] for r in skipped] == ["pass_in_flight"] and skipped[0]["pass_version"] == 2
+    assert engine.rerank_during_pass == [False, True, False]
+    assert _audit("auto.rerank_skipped", s.session_id) == []
     calls = _audit("model.call", s.session_id)
-    assert len(calls) == 2 == len(engine.rerank_calls)
-    for call in calls:
+    reranks = [c for c in calls if c["kind"] == "rerank"]
+    assert len(reranks) == 3 == len(engine.rerank_calls)
+    for call in reranks:
         assert set(call) == MODEL_CALL_KEYS, sorted(call)
-        assert call["kind"] == "rerank" and call["outcome"] == "ok"
-        assert call["pass_in_flight"] is False
+        assert call["outcome"] == "ok"
         assert call["queued_ms"] >= 0 and call["run_ms"] == call["elapsed_ms"] == 5
         assert call["tokens"] is None, "the scripted engine reports none; Ollama's counts travel here"
+    assert [c["pass_in_flight"] for c in reranks] == [False, True, False]
+    passes = [c for c in calls if c["kind"] == "pass"]
+    assert len(passes) == len(engine.updates) == 4
+    for call in passes:
+        assert set(call) == MODEL_CALL_KEYS | {"version"}, sorted(call)
+        assert call["outcome"] == "ok" and call["queued_ms"] >= 0 and call["elapsed_ms"] >= 0
+        assert call["run_ms"] is None and call["tokens"] is None, "the pass's own numbers are slice 6's"
+    assert [c["version"] for c in passes] == [1, 2, 3, 4]

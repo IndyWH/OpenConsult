@@ -78,27 +78,50 @@ row — the re-ranker cannot invent, resurrect or touch an asked question.
 A drop marks the item dropped with the re-ranker's reason; a dropped item
 is a fresh proposal if a later pass raises it again (slice-1 decision).
 
-When: after each answered turn end, if at least two items are pending
-(one is nothing to order: no call, no row) and no full pass is in flight
-(D-F: skipped, audited auto.rerank_skipped with reason pass_in_flight
-and the version the pass will land as; the ask is planned from the head
-at once). No committed turn since the last landed pass is also a skip
-(reason no_new_turns). Otherwise the next ask is planned AFTER the
-verdict — the head Alba asks next is chosen after what the patient just
-said — so the re-ranker holds the ask by at most its timeout; the full
-pass requested at the same turn end launches behind it on Ollama's
-single slot, never ahead of it. The verdict is applied and the plan made
-in the same step the call returns, before any audit write. If a question
-was planned while the call was out (the pass landing first — its merge
-supersedes the verdict and the merged head is planned at once; a doctor's
-tap; RESUME), the planned item is protected — not dropped, kept first —
-and the verdict shapes the rest of the queue (`protected` and
-`protected_dropped_by_verdict` on the audit row). A doctor's tap, a
-pause, auto off and a handover cancel a re-rank in flight.
+When: after each answered turn end, whenever anything is pending —
+**with one pending item too, and whether or not a full pass is in
+flight** (owner decision 2026-09-09, after consultations 489/490, finding
+G5; this reverses D-F as built in slice 3). Under cadence (a) a pass is
+in flight at most answered turn ends, so the D-F skip switched the
+re-ranker off exactly when it was needed: in 490 "Do you smoke?" was
+asked to a patient who had just said so, the pass that knew still in
+flight and the re-rank skipped; and a lone pending item was never
+checked, six times in two runs. A single stale head can now be dropped
+by a verdict, and the empty rules follow. No committed turn since the
+last landed pass is still a skip (reason no_new_turns; the row now also
+says whether a pass was in flight). Otherwise the next ask is planned
+AFTER the verdict — the head Alba asks next is chosen after what the
+patient just said — so the re-ranker holds the ask by at most its
+timeout. **The full pass requested at the same turn end is held until
+the re-ranker and then the topic call have returned** (owner decision
+2026-09-09, finding G4; §7a): on Ollama's single slot the topic call
+issued in the same tick as the pass lost the slot to it on 9 of 10
+questions in 489/490 (timeout, always verbatim, 2 s on every question's
+latency, the cone dead). The hold is bounded by `AUTO_SHORT_CALLS_HOLD_S`
+(4.0 s) from the moment the short calls began, after which the pass
+launches anyway — the urgency check inside it is never held hostage —
+and it is on the record: `auto.pass_held` (hold_ms, released:
+short_calls_done | bound, the version) and `queued_ms` on the pass's
+`model.call` row. The verdict is applied and the plan made in the same
+step the call returns, before any audit write. If a question was planned
+while the call was out (the pass landing first once the hold's bound has
+passed — its merge supersedes the verdict and the merged head is planned
+at once; a doctor's tap; RESUME), the planned item is protected — not
+dropped, kept first — and the verdict shapes the rest of the queue
+(`protected` and `protected_dropped_by_verdict` on the audit row). A
+late verdict computed on the pre-merge pending set applies to the
+post-merge queue (ids are stable; unmentioned items keep their order
+after the named ones). A doctor's tap, a pause, auto off and a handover
+cancel a re-rank in flight.
 
 Every re-ranker call is audited model.call (§7a) with kind=rerank,
 queued_ms, run_ms, elapsed_ms, tokens {prompt, output}, outcome,
-pass_in_flight — the shape slice 6 extends to the other calls.
+pass_in_flight (true when a pass held the slot at issue — possible since
+2026-09-09) — the shape slice 6 extends to the other calls. Since
+2026-09-09 every full pass is a model.call row too (kind=pass, one row
+for its three calls, queued_ms = the hold behind the short calls,
+elapsed_ms launch → landing, outcome ok | cap | timeout | error, the
+version; run_ms and tokens null until slice 6).
 
 ## 4. Cadence (D-C)
 (a) Full pass on every answer as now; the queue makes asking
@@ -117,11 +140,13 @@ call at every answered turn, whatever the full-pass cadence — pinned by
 a test.
 
 ## 5. Asking from the queue (BUILT, slice 2)
-At an answered turn end: if the queue has a pending item → topic call
-for a new topic (D3 cone, unchanged) else verbatim → pre-synthesis →
-issue at the next quiet. A running pass never blocks the ask; when it
-completes, merge may change the head before the next ask, which is
-fine. If the queue is empty and a pass is running → one bridge "go on"
+At an answered turn end: the re-ranker (§3), then, if the queue has a
+pending item → topic call for a new topic (D3 cone, unchanged) else
+verbatim → pre-synthesis → issue at the next quiet. The full pass
+requested at the same turn end launches only once the re-ranker and the
+topic call have returned, bounded (owner decision 2026-09-09, G4; §3,
+§7a). A running pass never blocks the ask; when it completes, merge may
+change the head before the next ask, which is fine. If the queue is empty and a pass is running → one bridge "go on"
 and wait, as today (the bridge fires only with nothing to ask — never
 a second before a question in preparation). If the queue is empty and
 no pass is running → the existing rule: request a pass; an empty queue
@@ -155,8 +180,9 @@ for the merge at toggle-on), auto.queue_reranked (before, order, drops
 with reasons, ignored, unmentioned, ms, excerpt_turns, excerpt_chars,
 protected), auto.queue_consumed (item, by auto or tap),
 auto.rerank_failed (reason, outcome, elapsed_ms), auto.rerank_skipped
-(pass_in_flight | no_new_turns), auto.queue_capped, and model.call for
-every re-ranker call (§3, §7a). Built (slice 2)
+(no_new_turns only, since 2026-09-09), auto.pass_held (hold_ms,
+released, bound_s, pass_version; 2026-09-09), auto.queue_capped, and
+model.call for every re-ranker call and every full pass (§3, §7a). Built (slice 2)
 with the rest the module reports: auto.queue_dropped_absent,
 auto.queue_answered, auto.queue_requeued, auto.queue_dropped,
 auto.queue_asked_externally — each with the module's flat details, the
@@ -191,6 +217,13 @@ minutes while five officer verdicts died behind it. Three mechanisms:
    work. The app's call scheduler enforces it: a long pass is not
    launched when a short critical call is due within its expected run
    time, and a runaway (slice 3's cap) is cut rather than waited for.
+   **Built in part, 2026-09-09 (owner decision, pilot 489/490 G4):** at a
+   turn end the re-ranker and the topic call go first and the requested
+   full pass is held until they have returned, bounded by
+   `AUTO_SHORT_CALLS_HOLD_S` (4.0 s), audited `auto.pass_held`; the
+   pass's `model.call` row carries the hold as `queued_ms`. The officer
+   is not yet scheduled (E4's deferral stands), and there is no urgency
+   pre-emption yet.
    Alternative for measurement: a second Ollama slot
    (OLLAMA_NUM_PARALLEL=2) so a short call can overlap a long one — at a
    VRAM cost per slot's context cache that must be measured on the 24
@@ -216,7 +249,9 @@ rather than impressions.
 - D-E  A doctor tap consumes the tapped item and the flow continues:
        (rec) yes.
 - D-F  Re-rank skipped while a full pass is in flight: (rec) yes — the
-       merge supersedes it.
+       merge supersedes it. **Reversed by the owner 2026-09-09 (G5):**
+       the re-ranker runs whether or not a pass is in flight, and with
+       one pending item; the race logic of §3 handles a late verdict.
 - D-G  GPU discipline (§7a): (rec) adopt all three mechanisms; build
        the resident-set invariant and the priority scheduler in this
        round, speculation as the last slice once the queue is measured;
