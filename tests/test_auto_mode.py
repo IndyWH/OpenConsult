@@ -290,16 +290,22 @@ def public_types() -> set[type]:
             if isinstance(getattr(auto_mode, name), type)}
 
 
-def test_the_public_surface_exposes_exactly_three_utterance_types_and_no_free_text_one():
+def test_the_public_surface_exposes_exactly_four_utterance_types_and_no_free_text_one():
     """Hard rule 1 by construction (§4). Asserted on the public surface:
-    the `Utterance` union is exactly the three whitelist types, they are
-    the only public types whose name says utterance, and no field of any
-    of them is a free-text field — the only str slots are an id, an id
-    plus a topic noun phrase for an owner-approved template. There is no
-    type a caller could use to hand auto mode a sentence."""
-    whitelist = {PhraseUtterance, TemplateUtterance, AgendaUtterance}
+    the `Utterance` union is exactly the whitelist types, they are the
+    only public types whose name says utterance, and no field of any of
+    them is a free-text field — the only str slots are an id, an id plus
+    a topic noun phrase for an owner-approved template, and (REPINNED
+    2026-09-09, owner decision: lay wording through the topic call, the
+    D1 extension) the `lay` slot of LayUtterance, which is bound to an
+    agenda reference and admitted only through the speech layer's subject
+    guard — a wording that does not share the agenda question's subject is
+    refused at resolution (tests/test_lay_wording.py). There is still no
+    type a caller could use to hand auto mode an unbound sentence."""
+    from app.auto_mode import LayUtterance
+    whitelist = {PhraseUtterance, TemplateUtterance, AgendaUtterance, LayUtterance}
     assert set(typing.get_args(Utterance)) == whitelist
-    assert set(typing.get_args(QuestionUtterance)) == {TemplateUtterance, AgendaUtterance}
+    assert set(typing.get_args(QuestionUtterance)) == {TemplateUtterance, AgendaUtterance, LayUtterance}
     published_utterances = {t for t in public_types() if t.__name__.endswith("Utterance")}
     assert published_utterances == whitelist
     # No whitelist type accepts free text under any name.
@@ -312,6 +318,10 @@ def test_the_public_surface_exposes_exactly_three_utterance_types_and_no_free_te
     assert [f.name for f in dataclasses.fields(PhraseUtterance)] == ["phrase_id"]
     assert [f.name for f in dataclasses.fields(TemplateUtterance)] == ["template_id", "topic"]
     assert [f.name for f in dataclasses.fields(AgendaUtterance)] == ["assessment_version", "index"]
+    assert [f.name for f in dataclasses.fields(LayUtterance)] == ["assessment_version", "index", "lay"]
+    # The one sentence slot cannot stand alone: it needs the agenda reference.
+    with pytest.raises(TypeError):
+        LayUtterance(lay="You will be fine.")  # type: ignore[call-arg]
 
 
 def test_the_module_is_pure_stdlib():

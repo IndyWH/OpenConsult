@@ -117,6 +117,10 @@ class ScriptedEngine:
         # before what.
         self.topic_gate: asyncio.Event | None = None
         self.order: list[str] = []
+        # Lay wording (slice 4 of the pilot fixes, the D1 extension): the
+        # plain-English wording the topic call returns for a question;
+        # missing → none, so the question is spoken verbatim as before.
+        self.lays: dict[str, str] = {}
 
     async def end_of_turn(self, transcript, *, timeout_s=None):
         self.asked.append(transcript)
@@ -130,9 +134,11 @@ class ScriptedEngine:
             await self.topic_gate.wait()
         self.order.append("topic_done")
         topic = self.topics.get(question)
+        lay = self.lays.get(question)
         if topic is None:
-            return TopicVerdict(None, failed="unusable: ''", elapsed_ms=7)
-        return TopicVerdict(topic, elapsed_ms=9)
+            return TopicVerdict(None, failed="unusable: ''", elapsed_ms=7, lay=lay,
+                                lay_failed=None if lay else "unusable: None")
+        return TopicVerdict(topic, elapsed_ms=9, lay=lay, lay_failed=None if lay else "unusable: None")
 
     async def rerank(self, pending, excerpt):
         self.rerank_calls.append((list(pending), excerpt))

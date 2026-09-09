@@ -485,21 +485,40 @@ def turn_finished(verdict: OfficerVerdict, quiet_s: float, fallback_s: float) ->
 
 TOPIC_SCHEMA = {
     "type": "object",
-    "properties": {"topic": {"type": "string"}},
-    "required": ["topic"],
+    "properties": {"topic": {"type": "string"}, "lay": {"type": "string"}},
+    "required": ["topic", "lay"],
 }
 
+# Two fields since 2026-09-09 (owner decision, the D1 extension after
+# consultation 486's "risk factors like hypertension" lesson): `topic`, as
+# before, for the open-form template; and `lay`, the SAME question in plain
+# spoken English for the verbatim ask — one sentence, no medical terms, no
+# examples in brackets, nothing the question did not ask. Alba speaks the
+# lay wording; the queue item, the panel and the never-twice guarantee keep
+# the original text as the question's identity. The lay wording must pass
+# the code-enforced subject guard (app/speech.py, lay_accepted) or the
+# original is spoken verbatim.
 TOPIC_PROMPT = """\
-You are helping a doctor ask a question in an open way. You are given ONE \
-question from the doctor's list. Name what it is ABOUT — the thing the \
-patient would talk about — as a short noun phrase, the way a doctor \
-would say it to the patient: "the chest pain", "your sleep", "the tablets \
-you started last week", "the falls".
-Rules: two to six words; lower case; no verb; not a question; no \
-diagnosis; no advice; nothing the patient has not already mentioned. The \
-phrase must fit the sentence "Can you tell me more about ___?" exactly.
-Answer with the phrase only.\
+You are helping a doctor ask a question in an open, plain way. You are \
+given ONE question from the doctor's list. Answer with two fields.
+"topic": what the question is ABOUT — the thing the patient would talk \
+about — as a short noun phrase, the way a doctor would say it to the \
+patient: "the chest pain", "your sleep", "the tablets you started last \
+week", "the falls". Rules: two to six words; lower case; no verb; not a \
+question; no diagnosis; no advice; nothing the patient has not already \
+mentioned. The phrase must fit the sentence "Can you tell me more about \
+___?" exactly.
+"lay": the SAME question in plain spoken English that a patient with no \
+medical knowledge understands. Rules: one sentence, ending in a question \
+mark; no medical terms; no examples in brackets; nothing the question did \
+not ask — do not add, narrow or widen what is asked, and do not name \
+examples the question did not name.
+Answer with JSON only.\
 """
+
+# Bounds on a usable lay wording, stated as such: one spoken sentence.
+LAY_MAX_CHARS = 200
+LAY_MIN_WORDS = 3
 
 # Bounds on a usable slot filler, stated as such: a phrase longer than
 # this is a sentence, not a topic, and would read oddly in the template.
@@ -531,6 +550,36 @@ def clean_topic_phrase(raw) -> str | None:
     return phrase
 
 
+def clean_lay_wording(raw) -> str | None:
+    """A usable lay wording, or None (owner decision 2026-09-09, D1
+    extension).
+
+    Whitespace collapsed; surrounding quotes stripped; a missing question
+    mark appended. Unusable — the caller then speaks the original verbatim
+    — is anything that is not a string, is empty or under LAY_MIN_WORDS
+    words, exceeds LAY_MAX_CHARS, carries a line break, a bracket (the 486
+    lesson: no examples in brackets), or more than one sentence, or ends
+    as a statement rather than a question.
+    """
+    if not isinstance(raw, str):
+        return None
+    text = " ".join(raw.split()).strip().strip('"\'“”‘’').strip()
+    if not text or "\n" in raw.strip("\n"):
+        return None
+    if any(ch in text for ch in "()[]{}"):
+        return None
+    if text.endswith((".", "!")):
+        return None
+    if not text.endswith("?"):
+        text += "?"
+    body = text[:-1]
+    if any(ch in body for ch in ".?!;"):
+        return None                              # more than one sentence
+    if len(text) > LAY_MAX_CHARS or len(body.split()) < LAY_MIN_WORDS:
+        return None
+    return text
+
+
 @dataclass(frozen=True)
 class TopicVerdict:
     """What the topic call named — or that it did not.
@@ -538,11 +587,18 @@ class TopicVerdict:
     `topic` is a usable slot filler when `failed` is None; otherwise
     `failed` names the failure (error, "timeout", or "unusable: …") and
     `topic` is None. The caller asks the agenda question verbatim.
+
+    `lay` (owner decision 2026-09-09, D1 extension) is the same call's
+    plain-English wording of the question, cleaned, or None when the
+    call failed or the wording was unusable (`lay_failed` says why). The
+    caller still applies the subject guard before speaking it.
     """
 
     topic: str | None
     failed: str | None = None
     elapsed_ms: int = 0
+    lay: str | None = None
+    lay_failed: str | None = None
 
 
 # ----------------------------------------- the re-ranker (standing queue)
@@ -757,11 +813,15 @@ class CDSEngine:
             return TopicVerdict(None, failed=f"{type(exc).__name__}: {exc}",
                                 elapsed_ms=elapsed)
         elapsed = round(1000 * (time.perf_counter() - started))
+        raw_lay = reply.get("lay") if isinstance(reply, dict) else None
+        lay = clean_lay_wording(raw_lay)
+        lay_failed = None if lay is not None else f"unusable: {raw_lay!r}"
         topic = clean_topic_phrase(raw)
         if topic is None:
             logger.info("Topic call returned an unusable phrase %r; asking verbatim", raw)
-            return TopicVerdict(None, failed=f"unusable: {raw!r}", elapsed_ms=elapsed)
-        return TopicVerdict(topic, elapsed_ms=elapsed)
+            return TopicVerdict(None, failed=f"unusable: {raw!r}", elapsed_ms=elapsed,
+                                lay=lay, lay_failed=lay_failed)
+        return TopicVerdict(topic, elapsed_ms=elapsed, lay=lay, lay_failed=lay_failed)
 
     def __init__(self, model: str | None = None, base_url: str | None = None) -> None:
         self.model = model or CDS_MODEL

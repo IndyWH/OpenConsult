@@ -1761,7 +1761,7 @@ async def issue_auto_speak(state, entry: dict, websocket, utterance: auto_mode.U
         raise exc(reason)
 
     if not isinstance(utterance, (auto_mode.PhraseUtterance, auto_mode.TemplateUtterance,
-                                  auto_mode.AgendaUtterance)):
+                                  auto_mode.AgendaUtterance, auto_mode.LayUtterance)):
         # The type system is the first line; this is the second. A bare
         # string here is the auto path's equivalent of a `speak` carrying
         # text, and it is refused and audited the same way.
@@ -1951,6 +1951,7 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
         "enable_retries": AUTO_ENABLE_RETRIES,
         "enable_retry_window_s": AUTO_ENABLE_RETRY_WINDOW_S,
         "short_calls_hold_s": AUTO_SHORT_CALLS_HOLD_S,
+        "lay_min_similarity": speech.AUTO_LAY_MIN_SIMILARITY,
     }
 
 
@@ -3866,19 +3867,43 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # 2026-09-07, pilot 486 F4): "this chest pain" and "the pain"
             # are one topic.
             open_form = True
+        lay_used = False
         if open_form:
             utterance = auto_mode.TemplateUtterance("tell_me_more", topic)
             spoken = speech.render_template("tell_me_more", topic)
         else:
+            # Lay wording (owner decision 2026-09-09, the D1 extension):
+            # the verbatim ask is spoken in the topic call's plain-English
+            # wording of the SAME question when that wording passes the
+            # subject guard; otherwise — drift, an unusable wording, a
+            # timeout or a failed call — the original, verbatim, as
+            # before. The item's identity stays the original text.
             utterance = auto_mode.AgendaUtterance(version, index)
             spoken = text
+            if verdict.lay is not None:
+                ok, score = speech.lay_accepted(verdict.lay, text)
+                if ok:
+                    utterance = auto_mode.LayUtterance(version, index, verdict.lay)
+                    spoken = verdict.lay
+                    lay_used = True
+                else:
+                    await audit.log(user["id"], "auto.lay_rejected", None, None,
+                                    {"session_id": session_id, "question": text,
+                                     "lay": verdict.lay, "score": score,
+                                     "threshold": speech.AUTO_LAY_MIN_SIMILARITY,
+                                     "queue_item": item.id, "agenda_version": version,
+                                     "at_audio_s": round(session.audio_seconds, 1)})
+                    logger.info("Live session %s: lay wording rejected (%.3f < %.2f): %r for %r",
+                                session_id, score, speech.AUTO_LAY_MIN_SIMILARITY,
+                                verdict.lay, text)
         auto["queued"] = {"utterance": utterance, "kind": "question", "text": spoken,
                           "agenda_version": version, "index": index, "question": text,
-                          "item_id": item.id, "topic": topic, "open_form": open_form}
+                          "item_id": item.id, "topic": topic, "open_form": open_form,
+                          "lay": lay_used}
         auto["handover"] = None
         logger.info("Live session %s: auto question planned from queue %s (v%d[%d]; %s, %s): %r",
                     session_id, item.id, version, index, why,
-                    "open" if open_form else "verbatim", spoken)
+                    "open" if open_form else ("lay" if lay_used else "verbatim"), spoken)
         if AUTO_PRESYNTH:
             await _presynth(spoken)
 
@@ -3947,9 +3972,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["awaiting_speech"] = plan["kind"] != "handover"   # F5: a turn must start before it can end
         auto["reasked"] = False
         if plan["kind"] == "question":
-            auto["last_asked_text"] = plan["question"]
+            auto["last_asked_text"] = plan["question"]   # the original: the identity (lay or not)
             auto["asked_item_id"] = plan["item_id"]    # answered at the answer's turn end (F4)
-            await _audit_queue_events((consumed,), {"utterance_id": prepared.utterance_id})
+            # The spoken text beside the original (owner decision 2026-09-09):
+            # the row's `text` is the item's identity; `spoken` is what the
+            # patient heard — the lay wording, the template, or the same.
+            await _audit_queue_events((consumed,), {"utterance_id": prepared.utterance_id,
+                                                    "spoken": plan["text"],
+                                                    "lay": bool(plan.get("lay"))})
             if plan["open_form"]:
                 auto["opened_topics"].add(plan["topic"].casefold())
             auto["awaiting_answer"] = True

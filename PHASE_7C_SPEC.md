@@ -100,6 +100,11 @@ Four sources, nothing else reaches TTS:
 4. **The invitation-class follow-up** `Is there anything else you
    wanted to talk about today?` before handover (also a fixed phrase,
    owner wording to approve).
+5. **An agenda question in lay wording** (owner decision 2026-09-09,
+   the D1 extension below): the same agenda reference as source 2, spoken
+   in the topic call's plain-English wording of THAT question, admitted
+   only through a code-enforced subject guard — never free text, never a
+   question the agenda did not hold.
 
 **D1 — DECIDED 2026-08-16: the tiny topic call.** The template needs
 a short noun phrase ("the chest pain") distilled from an agenda
@@ -111,6 +116,27 @@ verbatim instead — still correct, just less open. The CDS
 `ASSESSMENT_PROMPT` and its revision rules are untouched. (The
 alternative — a `topic` field in the assessment schema — was
 declined because it touches the stable CDS prompt.)
+
+**D1 extended — lay wording (owner decision 2026-09-09, after
+consultation 486's "risk factors like hypertension" lesson).** The topic
+call returns two fields for the planned question: `topic` (as above) and
+`lay` — the SAME question in plain spoken English a patient with no
+medical knowledge understands: one sentence, no medical terms, no
+examples in brackets, nothing the question did not ask. For a verbatim
+ask Alba speaks the lay wording; the queue item, the doctor's panel and
+the never-twice guarantee keep the original text as the question's
+identity, and the record carries both (`spoken` beside the original on
+`auto.queue_consumed`; `lay: true`, `question` and `lay_similarity` in
+the utterance's `ref_detail`). Code-enforced guard, in the speech
+layer's resolver as the last line and in the wiring before it: the lay
+wording must share its subject with the original under the shared
+normaliser — token-set similarity at or above `AUTO_LAY_MIN_SIMILARITY`
+(0.3, an uncalibrated guess) — or the original is spoken verbatim and
+`auto.lay_rejected` is audited with both texts and the score. An
+unusable wording (`clean_lay_wording`: brackets, more than one sentence,
+a statement, over-long), a timeout or a failed call → verbatim, as
+today. The open-form template ask is unchanged (its topic is already
+plain); the lay wording replaces only the verbatim ask.
 
 ## 5. Turn-taking — quiet detection, end of turn, politeness
 
@@ -750,6 +776,7 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_RERANK_TIMEOUT_S` / `AUTO_RERANK_MAX_TOKENS` / `AUTO_RERANK_CONTEXT_TURNS` / `AUTO_RERANK_MAX_CHARS` | `2.0` / `200` / `6` / `1500` | The standing queue's re-ranker (`AGENDA_QUEUE_SPEC.md` §3, D-B; slice 3, 2026-09-08): its timeout, output cap, and the excerpt's turns and characters; the cap and the characters are uncalibrated guesses. The queue's own numbers (`AUTO_QUEUE_MAX`, `AUTO_QUEUE_ABSENT_PASSES`) are in that spec |
 | `AUTO_NO_ANSWER_GRACE_S` | `12` | Owner decision 2026-09-07 (pilot F5): silence after an auto question with no patient speech — one re-ask at this, the ordinary path past a second |
 | `AUTO_FLOOR_MARGIN` / `AUTO_FLOOR_MIN` / `AUTO_FLOOR_MAX` | `3.0` / `0.02` / `0.08` | Owner decision 2026-09-09 (pilot 488 G2): the session's politeness-abort and quiet-reporter floor is the sound check's `noise_floor_rms` × margin, clamped; uncalibrated guesses (`app/speech.py`) |
+| `AUTO_LAY_MIN_SIMILARITY` | `0.3` | Owner decision 2026-09-09 (D1 extension): the lay wording's token-set similarity to the original question, below which the original is spoken verbatim; uncalibrated guess (`app/speech.py`) |
 | `AUTO_SHORT_CALLS_HOLD_S` | `4.0` | Owner decision 2026-09-09 (pilot 489/490 G4): the full pass requested at a turn end waits for the re-ranker and the topic call, at most this long from when they began (`AGENDA_QUEUE_SPEC.md` §3, §7a) |
 | `AUTO_ENABLE_RETRIES` / `AUTO_ENABLE_RETRY_WINDOW_S` | `3` / `30` | Owner decision 2026-09-09 (pilot 488 G1): a politeness-aborted enable disclosure or chained invitation is re-issued on the next quiet report — at most this many attempts in all, inside this window of the first issue; then `too_loud_to_start` |
 | `AUTO_SPEAKER_DECLARATION_WAIT_S` | `180` | Owner decision 2026-09-01 (pilot D6): the speaker-count wait at Stop for a consultation in which auto mode was enabled, instead of `SPEAKER_DECLARATION_WAIT_S` (25 s, unchanged otherwise); on expiry the ignored-declaration path applies unchanged |

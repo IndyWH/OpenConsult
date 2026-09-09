@@ -137,6 +137,32 @@ AUTO_FLOOR_MARGIN = float(os.getenv("AUTO_FLOOR_MARGIN", "3.0"))
 AUTO_FLOOR_MIN = float(os.getenv("AUTO_FLOOR_MIN", "0.02"))
 AUTO_FLOOR_MAX = float(os.getenv("AUTO_FLOOR_MAX", "0.08"))
 
+# --- lay wording through the topic call (owner decision 2026-09-09) --------
+#
+# The D1 extension: the topic call returns, beside the topic, a plain-English
+# wording of the SAME agenda question, and Alba speaks that instead of the
+# clinical original ("Do you have any risk factors for heart disease? (e.g.,
+# smoking, diabetes, hypertension...)" — 486's lesson). The wording is
+# model text spoken to a patient, so it is admitted only through a
+# code-enforced guard: it must share its subject with the original under
+# the shared normaliser — token-set similarity at or above this — or the
+# original is spoken verbatim and auto.lay_rejected is audited with both
+# texts and the score. An UNCALIBRATED GUESS; the next runs' rows (the
+# spoken wording beside the original on every auto.queue_consumed) inform
+# it.
+AUTO_LAY_MIN_SIMILARITY = float(os.getenv("AUTO_LAY_MIN_SIMILARITY", "0.3"))
+
+
+def lay_accepted(lay: str, original: str, threshold: float | None = None) -> tuple[bool, float]:
+    """The subject guard for a lay wording (owner decision 2026-09-09): the
+    token-set similarity of the lay wording to the original question under
+    the shared normaliser (app/auto_mode.py, action_similarity — the same
+    tokens the queue's identity and the cone use), and whether it reaches
+    AUTO_LAY_MIN_SIMILARITY. Pure."""
+    t = AUTO_LAY_MIN_SIMILARITY if threshold is None else float(threshold)
+    score = auto_mode.action_similarity(str(lay), str(original))
+    return score >= t, score
+
 
 def auto_floor(noise_floor_rms: float | None, *, margin: float | None = None,
                floor_min: float | None = None, floor_max: float | None = None) -> dict:
@@ -575,6 +601,13 @@ def resolve_utterance(utterance: auto_mode.Utterance,
     - `AgendaUtterance` → the versioned AgendaLog, by assessment version and
       index, exactly as a doctor's tap resolves — same stale rule, same
       rationale, same refusal to guess at another version's wording.
+    - `LayUtterance` (owner decision 2026-09-09) → the same agenda
+      resolution for the question's identity, rationale and stale rule;
+      the spoken text is the lay wording, admitted only through the
+      subject guard (lay_accepted) — a wording that drifts from the
+      original's subject is REFUSED here, whatever the caller checked —
+      and recorded as ref_kind "cds_question" with `lay: true` and the
+      original `question` beside the reference.
 
     Anything else raises SpeechRefused. Not TypeError: a wrong type here is
     the same class of event as a `speak` carrying text, and it is audited
@@ -591,9 +624,25 @@ def resolve_utterance(utterance: auto_mode.Utterance,
         return Resolution(text=text, ref_kind="template",
                           ref_detail={"template_id": utterance.template_id,
                                       "topic": clean_topic(utterance.topic)})
+    if isinstance(utterance, auto_mode.LayUtterance):
+        base = resolve({"kind": "cds_question",
+                        "assessment_version": utterance.assessment_version,
+                        "index": utterance.index}, agenda, doctor)
+        lay = " ".join(str(utterance.lay).split()).strip()
+        if not lay:
+            raise SpeechRefused("a lay wording must not be empty")
+        ok, score = lay_accepted(lay, base.text)
+        if not ok:
+            raise SpeechRefused(
+                f"the lay wording does not share its subject with the question "
+                f"(similarity {score} < {AUTO_LAY_MIN_SIMILARITY}): {lay!r} for {base.text!r}")
+        return Resolution(text=lay, ref_kind="cds_question",
+                          ref_detail={**base.ref_detail, "lay": True, "question": base.text,
+                                      "lay_similarity": score},
+                          cds_rationale=base.cds_rationale, stale=base.stale)
     raise SpeechRefused(
-        "the auto path speaks only a PhraseUtterance, TemplateUtterance or "
-        f"AgendaUtterance, not {type(utterance).__name__}")
+        "the auto path speaks only a PhraseUtterance, TemplateUtterance, "
+        f"AgendaUtterance or LayUtterance, not {type(utterance).__name__}")
 
 
 # --- synthesis -------------------------------------------------------------

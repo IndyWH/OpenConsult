@@ -80,6 +80,7 @@ __all__ = [
     "PhraseUtterance",
     "TemplateUtterance",
     "AgendaUtterance",
+    "LayUtterance",
     "Utterance",
     "QuestionUtterance",
     "Transition",
@@ -165,12 +166,32 @@ class AgendaUtterance:
     index: int
 
 
-# The whole whitelist. Nothing else is an utterance; there is no free-text
-# member and none may be added.
-Utterance = PhraseUtterance | TemplateUtterance | AgendaUtterance
+@dataclass(frozen=True, slots=True)
+class LayUtterance:
+    """A CDS agenda question asked in LAY wording (owner decision
+    2026-09-09, the D1 extension after consultation 486): the agenda
+    reference — assessment version and index, exactly as AgendaUtterance —
+    is the question's identity, resolved server-side from the versioned
+    AgendaLog; `lay` is the topic call's plain-English wording of THAT
+    question, admitted only through the code-enforced subject guard in the
+    speech layer (a wording that does not share its subject with the
+    original is refused there, and the wiring speaks the original verbatim
+    instead). The queue item, the panel and the never-twice guarantee keep
+    the original text; only what is spoken differs, and the record carries
+    both."""
 
-# The two utterance shapes that are questions, and hence forbidden in GOLDEN.
-QuestionUtterance = TemplateUtterance | AgendaUtterance
+    assessment_version: int
+    index: int
+    lay: str
+
+
+# The whole whitelist. Nothing else is an utterance; there is no free-text
+# member and none may be added. LayUtterance is not free text: it is bound
+# to an agenda question and its wording is guarded against that question.
+Utterance = PhraseUtterance | TemplateUtterance | AgendaUtterance | LayUtterance
+
+# The utterance shapes that are questions, and hence forbidden in GOLDEN.
+QuestionUtterance = TemplateUtterance | AgendaUtterance | LayUtterance
 
 
 # --- audit records ---------------------------------------------------------
@@ -334,12 +355,12 @@ class AutoModeController:
         every other phase that is not OPEN or CLOSED, since a question
         during disclosure, invitation, a pause or after handover is
         equally a wiring fault. Also refuses anything that is not a
-        `TemplateUtterance` or `AgendaUtterance`: a fixed phrase is not a
-        question, and free text is not an utterance at all.
+        `TemplateUtterance`, `AgendaUtterance` or `LayUtterance`: a fixed
+        phrase is not a question, and free text is not an utterance at all.
         """
-        if not isinstance(utterance, (TemplateUtterance, AgendaUtterance)):
+        if not isinstance(utterance, (TemplateUtterance, AgendaUtterance, LayUtterance)):
             raise AutoModeError(
-                f"a question must be a TemplateUtterance or AgendaUtterance, "
+                f"a question must be a TemplateUtterance, AgendaUtterance or LayUtterance, "
                 f"not {type(utterance).__name__}")
         if self._phase is AutoPhase.GOLDEN:
             raise AutoModeError(

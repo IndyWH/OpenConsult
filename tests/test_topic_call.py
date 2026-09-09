@@ -56,17 +56,24 @@ QUESTION = "Does the pain radiate to your jaw or arm?"
 
 # --- the call's shape ------------------------------------------------------
 
-def test_the_topic_call_asks_its_own_question_with_the_one_string_schema(monkeypatch):
-    seen = _capture(monkeypatch, {"topic": "the chest pain"})
+def test_the_topic_call_asks_its_own_question_with_the_two_string_schema(monkeypatch):
+    """REPINNED 2026-09-09 (owner decision, the D1 extension): the schema
+    is two strings, `topic` as before and `lay` — the same question in
+    plain spoken English — both required. The call is otherwise the same
+    call: own prompt, the one question as the user message."""
+    seen = _capture(monkeypatch, {"topic": "the chest pain",
+                                  "lay": "Does the pain spread to your jaw or your arm?"})
     verdict = asyncio.run(CDSEngine().topic_for(QUESTION))
     assert verdict.topic == "the chest pain" and verdict.failed is None
+    assert verdict.lay == "Does the pain spread to your jaw or your arm?" and verdict.lay_failed is None
     sent = seen["json"]
     assert sent["messages"][0] == {"role": "system", "content": cds.TOPIC_PROMPT}
     assert sent["messages"][1] == {"role": "user", "content": cds.topic_message(QUESTION)}
     assert cds.topic_message(QUESTION) == "THE QUESTION:\nDoes the pain radiate to your jaw or arm?"
     assert sent["format"] == cds.TOPIC_SCHEMA
-    assert cds.TOPIC_SCHEMA == {"type": "object", "properties": {"topic": {"type": "string"}},
-                                "required": ["topic"]}
+    assert cds.TOPIC_SCHEMA == {"type": "object",
+                                "properties": {"topic": {"type": "string"}, "lay": {"type": "string"}},
+                                "required": ["topic", "lay"]}
     assert seen["url"].endswith("/api/chat")
 
 
@@ -90,7 +97,8 @@ def test_the_prompt_asks_for_a_slot_filler_and_nothing_clinical():
     prompt = cds.TOPIC_PROMPT
     assert 'must fit the sentence "Can you tell me more about ___?"' in prompt
     assert "no diagnosis" in prompt and "no advice" in prompt
-    assert "Answer with the phrase only" in prompt
+    # Two fields since 2026-09-09 (the D1 extension): the answer is JSON.
+    assert "Answer with JSON only" in prompt
     # The slot sentence in the prompt IS the registered template.
     from app import speech
     assert speech.TEMPLATES["tell_me_more"] == "Can you tell me more about {topic}?"
