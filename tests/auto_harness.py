@@ -371,6 +371,13 @@ def live(state, user=None):
     session_id = secrets.token_hex(8)
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": session_id})
+        # The server creates the entry when it has processed the handshake;
+        # a test whose first line reads the entry must not race it (the
+        # suite's slower database showed the race twice on 2026-09-09).
+        for _ in range(300):
+            if session_id in state.live_sessions:
+                break
+            time.sleep(0.01)
         yield Session(state, ws, session_id)
 
 

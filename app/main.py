@@ -1433,13 +1433,23 @@ AUTO_GOLDEN_MINUTES_S = float(os.getenv("AUTO_GOLDEN_MINUTES_S", "90"))
 # phases while the D2 revision runs (spec's ~1.5–2 s). It no longer governs
 # GOLDEN — see AUTO_ENCOURAGER_MIN_QUIET_S.
 AUTO_ENCOURAGER_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_QUIET_S", "1.75"))
-# Owner decision 2026-09-01 (solo pilot, F3/D1): in GOLDEN at most ONE
-# encourager per golden window, "go on" only, issued only once the quiet has
-# reached this length, and never after the window has run. The rotation
-# through three phrases on an 8 s cooldown (AUTO_ENCOURAGER_COOLDOWN_S,
-# retired in the same decision) invited more talk every ~8 s for the whole
-# of GOLDEN and was the livelock's engine in 482 and 483.
-AUTO_ENCOURAGER_MIN_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_MIN_QUIET_S", "5.0"))
+# Golden window encouragers (owner decision 2026-09-09, after consultations
+# 487–490; reversing the 1 Sept one-per-window rule). In GOLDEN, before the
+# window has run, an encourager may be spoken every time the patient has
+# been quiet for this long — the quiet counted from the later of the
+# patient's last speech and the end of Alba's own last phrase (the client's
+# span restarts at both), at most one per quiet span. Two phrasings
+# alternate: go_on ("Go on.") and tell_me_more_short ("Please, tell me
+# more."). After AUTO_ENCOURAGER_MAX_UNANSWERED encouragers with no patient
+# speech between them, the NEXT qualifying silence sets golden_window_ran
+# early (audited auto.golden_window_ran, reason unanswered_encouragers) so
+# the questions begin exactly as when the window elapses; none once the
+# window has run. The 1 Sept rule replaced a rotation through three phrases
+# on an 8 s cooldown that was the livelock's engine in 482 and 483; this
+# rule keeps its brakes — the minimum quiet, none after the window — and
+# adds the unanswered count as the loop's end.
+AUTO_ENCOURAGER_MIN_QUIET_S = float(os.getenv("AUTO_ENCOURAGER_MIN_QUIET_S", "4.0"))
+AUTO_ENCOURAGER_MAX_UNANSWERED = int(os.getenv("AUTO_ENCOURAGER_MAX_UNANSWERED", "2"))
 # Quiet this long triggers the end-of-turn officer (app/cds.py).
 AUTO_EOT_QUIET_S = float(os.getenv("AUTO_EOT_QUIET_S", "3.0"))
 # Officer fail-soft: with the officer unavailable, quiet this long counts as
@@ -1819,7 +1829,15 @@ def _new_auto_state() -> dict:
         "queue": agenda_queue.AgendaQueue(max_pending=AUTO_QUEUE_MAX,
                                           absent_passes=AUTO_QUEUE_ABSENT_PASSES,
                                           topic_threshold=AUTO_TOPIC_MATCH_THRESHOLD),
-        "golden_encourager_used": False,   # the window's ONE encourager, spent at issue
+        # Golden window encouragers (owner decision 2026-09-09): how many
+        # this window has spoken (the phrasing alternates on it), how many
+        # since the patient last spoke (the early end's count), the quiet
+        # span the last one was issued in (one per span), and a counter of
+        # every fresh quiet span whatever began it.
+        "golden_encourager_count": 0,
+        "golden_unanswered": 0,
+        "golden_encourager_span": None,
+        "quiet_span_seq": 0,
         "last_quiet_s": None,         # to notice a fresh quiet span
         "officer_task": None,         # the in-flight end-of-turn call, if any
         "officer_quiet_s": None,      # the quiet the running officer was asked about
@@ -1908,7 +1926,9 @@ def _reset_golden(auto: dict) -> None:
     the has-run flag — belongs to one run of the golden minutes."""
     auto["golden_spent"] = 0.0
     auto["golden_window_ran"] = False
-    auto["golden_encourager_used"] = False
+    auto["golden_encourager_count"] = 0
+    auto["golden_unanswered"] = 0
+    auto["golden_encourager_span"] = None
 
 
 def _auto_on(ctl: auto_mode.AutoModeController) -> bool:
@@ -1928,6 +1948,7 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
         "golden_s": AUTO_GOLDEN_MINUTES_S,
         "encourager_quiet_s": AUTO_ENCOURAGER_QUIET_S,
         "encourager_min_quiet_s": AUTO_ENCOURAGER_MIN_QUIET_S,
+        "encourager_max_unanswered": AUTO_ENCOURAGER_MAX_UNANSWERED,
         "eot_quiet_s": AUTO_EOT_QUIET_S,
         "eot_fallback_s": AUTO_EOT_FALLBACK_S,
         "officer_timeout_s": cds_module.AUTO_OFFICER_TIMEOUT_S,
@@ -4421,23 +4442,35 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         return auto["golden_spent"] + auto["controller"].seconds_in_phase()
 
     async def _note_golden_window(auto: dict, elapsed: float, *, seen_on: str,
-                                  quiet_s: float) -> None:
+                                  quiet_s: float, reason: str = "elapsed") -> None:
         """Owner decision 2026-09-01 (pilot D1): the first observation of
         elapsed >= AUTO_GOLDEN_MINUTES_S in GOLDEN — on a quiet report or
         a verdict — sets golden_window_ran and audits it once
         (auto.golden_window_ran, with golden_s). Before this the window's
         end was invisible unless it coincided with an exit; in 482 and 483
-        it did not, and the record could not say when the minutes ran."""
-        if auto["golden_window_ran"] or elapsed < AUTO_GOLDEN_MINUTES_S:
+        it did not, and the record could not say when the minutes ran.
+
+        A window can also end EARLY (owner decision 2026-09-09): the
+        caller passes reason="unanswered_encouragers" when
+        AUTO_ENCOURAGER_MAX_UNANSWERED encouragers have gone unanswered and
+        a further qualifying silence has arrived; the row then carries that
+        reason and a golden_s short of window_s, which is how the record
+        tells the two ends apart."""
+        if auto["golden_window_ran"]:
+            return
+        if reason == "elapsed" and elapsed < AUTO_GOLDEN_MINUTES_S:
             return
         auto["golden_window_ran"] = True
         await audit.log(user["id"], "auto.golden_window_ran", None, None,
                         {"session_id": session_id, "golden_s": round(elapsed, 1),
                          "window_s": AUTO_GOLDEN_MINUTES_S, "seen_on": seen_on,
-                         "quiet_s": round(quiet_s, 1),
+                         "reason": reason, "quiet_s": round(quiet_s, 1),
+                         **({"encouragers": auto["golden_encourager_count"],
+                             "unanswered": auto["golden_unanswered"]}
+                            if reason == "unanswered_encouragers" else {}),
                          "at_audio_s": round(session.audio_seconds, 1)})
-        logger.info("Live session %s: golden window ran (%.1fs of %.0fs, seen on %s)",
-                    session_id, elapsed, AUTO_GOLDEN_MINUTES_S, seen_on)
+        logger.info("Live session %s: golden window ran (%.1fs of %.0fs, seen on %s, %s)",
+                    session_id, elapsed, AUTO_GOLDEN_MINUTES_S, seen_on, reason)
 
     async def _exit_golden(auto: dict, detail: dict, why: str) -> auto_mode.Transition:
         """GOLDEN → OPEN (the golden_timer_elapsed edge): the window has run
@@ -4566,10 +4599,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # read as speech, the cautious side.
             auto["officer_last_run_quiet_s"] = None
             auto["officer_verdict"] = None
+            auto["quiet_span_seq"] += 1      # every fresh span, whatever began it
             if payload.get("since") != "playback":
                 auto["turn_ended"] = False
                 auto["span_seq"] += 1        # the patient's span moved on (E4: a late verdict is stale)
                 auto["awaiting_speech"] = False   # the patient has spoken since the question (F5)
+                auto["golden_unanswered"] = 0     # the patient spoke: the encouragers were answered
         auto["last_quiet_s"] = quiet_s
         in_golden = ctl.phase is auto_mode.AutoPhase.GOLDEN
         in_questions = ctl.phase in auto_mode.QUESTION_PHASES
@@ -4595,6 +4630,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             #    when a verdict is applied (owner decision 2026-09-01).
             elapsed = _golden_elapsed(auto)
             await _note_golden_window(auto, elapsed, seen_on="quiet", quiet_s=quiet_s)
+            encourager_due = (not auto["golden_window_ran"]
+                              and quiet_s >= AUTO_ENCOURAGER_MIN_QUIET_S
+                              and auto["golden_encourager_span"] != auto["quiet_span_seq"])
+            if encourager_due and auto["golden_unanswered"] >= AUTO_ENCOURAGER_MAX_UNANSWERED:
+                # Owner decision 2026-09-09: AUTO_ENCOURAGER_MAX_UNANSWERED
+                # encouragers with no patient speech between them, and now
+                # a further qualifying silence — the patient has nothing
+                # more to add. The window ends early, audited with the
+                # reason, and the questions begin exactly as when the
+                # seconds elapse (the exit below, on this or a later
+                # report, once the quiet reaches the fallback).
+                await _note_golden_window(auto, elapsed, seen_on="quiet", quiet_s=quiet_s,
+                                          reason="unanswered_encouragers")
             if (auto["golden_window_ran"] and quiet_s >= AUTO_EOT_FALLBACK_S
                     and ctl.is_legal(auto_mode.AutoEvent.GOLDEN_TIMER_ELAPSED)):
                 verdict = auto["officer_verdict"]
@@ -4648,29 +4696,42 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await _end_turn(auto, by="quiet_fallback", quiet_s=quiet_s,
                             verdict=auto["officer_verdict"])
         free = not session.speaking and entry["pending_utterance"] is None
-        # 1. The encourager (owner decision 2026-09-01). In GOLDEN: at most
-        #    ONE per golden window, "go on" only, after
-        #    AUTO_ENCOURAGER_MIN_QUIET_S of quiet, never once the window has
-        #    run. In the question phases: the single bridge while the
-        #    revision runs AND there is nothing to ask (spec §5: the queue
-        #    empty, nothing planned or queued), at AUTO_ENCOURAGER_QUIET_S,
-        #    one per revision as before — the same phrase. With a question
-        #    in preparation the bridge would land a second before it. No
-        #    cooldown: each rule is stricter than the 8 s rotation cooldown
-        #    it replaces.
+        # 1. The encourager. In GOLDEN (owner decision 2026-09-09, reversing
+        #    the 1 Sept one-per-window rule): one per quiet span, whenever
+        #    the patient has been quiet for AUTO_ENCOURAGER_MIN_QUIET_S —
+        #    the client's span restarts at the patient's speech AND at the
+        #    end of Alba's own phrase, so the quiet is counted from the
+        #    later of the two — never once the window has run; go_on and
+        #    tell_me_more_short alternate; spent at issue (a politeness
+        #    abort drops it, and the patient's voice that caused it starts
+        #    the next span). In the question phases: the single bridge
+        #    while the revision runs AND there is nothing to ask (spec §5:
+        #    the queue empty, nothing planned or queued), at
+        #    AUTO_ENCOURAGER_QUIET_S, one per revision as before. With a
+        #    question in preparation the bridge would land a second before
+        #    it.
         golden_wants = (in_golden and not auto["golden_window_ran"]
-                        and not auto["golden_encourager_used"]
-                        and quiet_s >= AUTO_ENCOURAGER_MIN_QUIET_S)
+                        and quiet_s >= AUTO_ENCOURAGER_MIN_QUIET_S
+                        and auto["golden_encourager_span"] != auto["quiet_span_seq"])
         nothing_to_ask = (auto["queued"] is None and not auto["queue"].has_pending
                           and (auto["plan_task"] is None or auto["plan_task"].done()))
         bridge_wants = (not in_golden and auto["revision"] is not None and nothing_to_ask
                         and not auto["bridge_used"] and quiet_s >= AUTO_ENCOURAGER_QUIET_S)
         if (golden_wants or bridge_wants) and free:
-            prepared = await auto_issue(auto_mode.PhraseUtterance(speech.ENCOURAGER_ID),
-                                        phase=ctl.phase, trigger={"quiet_s": round(quiet_s, 1)})
+            phrase_id = (speech.GOLDEN_ENCOURAGER_IDS[auto["golden_encourager_count"]
+                                                     % len(speech.GOLDEN_ENCOURAGER_IDS)]
+                         if in_golden else speech.ENCOURAGER_ID)
+            prepared = await auto_issue(auto_mode.PhraseUtterance(phrase_id),
+                                        phase=ctl.phase,
+                                        trigger={"quiet_s": round(quiet_s, 1),
+                                                 **({"encourager": auto["golden_encourager_count"] + 1,
+                                                     "unanswered": auto["golden_unanswered"] + 1}
+                                                    if in_golden else {})})
             if prepared is not None:
                 if in_golden:
-                    auto["golden_encourager_used"] = True   # spent at issue, like the nudge
+                    auto["golden_encourager_count"] += 1     # spent at issue, like the nudge
+                    auto["golden_unanswered"] += 1
+                    auto["golden_encourager_span"] = auto["quiet_span_seq"]
                 else:
                     auto["bridge_used"] = True
                 free = False

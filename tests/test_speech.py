@@ -58,6 +58,7 @@ def agenda_with(*questions: str, reasoning: str = "why these questions") -> spee
 def test_phrase_table_holds_exactly_the_specified_phrases():
     assert set(speech.PHRASES) == {
         "disclosure", "invitation", "mm-hm", "i_see", "go_on",
+        "tell_me_more_short",   # owner decision 2026-09-09, the golden window's second phrasing
         "examination_handover",
         "sound_check",   # spec Part 10, added 2026-07-25
         "silence_nudge",  # session 3, the ONLY autonomous utterance in 7a/7b

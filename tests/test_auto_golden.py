@@ -38,6 +38,7 @@ import os
 import secrets
 import struct
 import sys
+import time
 
 import numpy as np
 import psycopg
@@ -272,6 +273,13 @@ def live(state, user=None):
     session_id = secrets.token_hex(8)
     with client.websocket_connect("/ws/transcribe") as ws:
         ws.send_json({"session_id": session_id})
+        # The server creates the entry when it has processed the handshake;
+        # a test whose first line reads the entry must not race it (the
+        # suite's slower database showed the race twice on 2026-09-09).
+        for _ in range(300):
+            if session_id in state.live_sessions:
+                break
+            time.sleep(0.01)
         yield Session(state, ws, session_id)
 
 
@@ -673,19 +681,21 @@ def test_enable_is_idempotent_and_only_the_owner_may_toggle(gate):
 # ==========================================================================
 # GOLDEN: encouragers
 
-def test_a_quiet_report_in_golden_earns_the_one_encourager_go_on_after_the_minimum_quiet(gate):
+def test_a_quiet_report_in_golden_earns_the_first_encourager_go_on_after_the_minimum_quiet(gate):
     """REPINNED 2026-09-01 (owner decision, solo pilot F3/D1): slice 3
     pinned an encourager at AUTO_ENCOURAGER_QUIET_S (1.75 s), rotated from
-    three. That property is deliberately replaced, not weakened: in GOLDEN
-    the encourager is "go on" only, and it is issued only once the quiet
-    has reached AUTO_ENCOURAGER_MIN_QUIET_S (5.0 s) — reports at 1.8 s and
-    4.9 s earn nothing. The row still carries via/phase/trigger."""
+    three; replaced by "go on" only after AUTO_ENCOURAGER_MIN_QUIET_S.
+    REPINNED again 2026-09-09 (owner decision, after consultations
+    487–490): the minimum quiet is now 4.0 s — reports at 1.8 s, 3.0 s and
+    3.9 s earn nothing, 4.2 s earns "Go on." — and the row's trigger
+    counts the encourager and how many stand unanswered."""
+    assert appmain.AUTO_ENCOURAGER_MIN_QUIET_S == 4.0
     with live(gate) as s:
         s.enable_to_golden()
-        for q in (1.8, 3.0, 4.9):
+        for q in (1.8, 3.0, 3.9):
             s.quiet(q)
             assert all(m.get("type") != "auto_speak" for m in s.probe()), f"encourager at {q}s"
-        s.quiet(5.2)
+        s.quiet(4.2)
         seen = _collect_until(s.ws, {"auto_speak"})
         encourager = seen[-1]
         assert encourager["text"] == "Go on." and encourager["ref_id"] == "go_on"
@@ -694,26 +704,122 @@ def test_a_quiet_report_in_golden_earns_the_one_encourager_go_on_after_the_minim
     rows = asyncio.run(system_utterances.for_consultation(cid))
     row = next(r for r in rows if r["text"] == "Go on.")
     assert row["ref_detail"] == {"id": "go_on", "via": "auto", "phase": "golden",
-                                 "trigger": {"quiet_s": 5.2}}
+                                 "trigger": {"quiet_s": 4.2, "encourager": 1, "unanswered": 1}}
     assert row["end_reason"] == "complete"
 
 
-def test_at_most_one_encourager_per_golden_window(gate):
-    """REPINNED 2026-09-01 (owner decision): slice 3 pinned a rotation
-    mm-hm → i_see → go_on on an 8 s cooldown. Replaced: ONE encourager per
-    golden window. However long the quiet goes on afterwards — the window
-    not yet run, the room still silent — nothing more is said."""
+def test_repeated_encouragers_at_four_seconds_quiet_alternate_and_count_from_albas_phrase_end(gate):
+    """REPINNED 2026-09-09 (owner decision, after consultations 487–490;
+    reversing the 1 Sept one-per-window rule that this test pinned). In
+    GOLDEN an encourager may be spoken every time the patient has been
+    quiet for AUTO_ENCOURAGER_MIN_QUIET_S, the quiet counted from the later
+    of the patient's last speech and the end of Alba's own last phrase
+    (the client's span restarts at both): after "Go on." plays, a span
+    that began at its end earns nothing at 3.9 s and the next phrasing at
+    4.1 s. Two phrasings alternate — go_on, tell_me_more_short, go_on.
+    One per quiet span: a longer report in the same span earns nothing
+    more. The window has not run and the machine stays in GOLDEN."""
     with live(gate) as s:
         s.enable_to_golden()
-        s.quiet(5.5)
+        s.commit_transcript("It started last week, I think, and")
+        s.quiet(4.3)
         first = _until(s.ws, {"auto_speak"})
         assert first["ref_id"] == "go_on"
+        s.quiet(6.0)                                     # the same span: nothing more
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
+        s.play(first["utterance_id"])                    # the span restarts at Alba's phrase end
+        s.quiet(3.9)                                     # since=playback, under the minimum
+        assert all(m.get("type") != "auto_speak" for m in s.probe())
+        s.quiet(4.1)
+        second = _until(s.ws, {"auto_speak"})
+        assert second["ref_id"] == "tell_me_more_short" and second["text"] == "Please, tell me more."
+        s.play(second["utterance_id"])
+        s.commit_transcript("Well, mostly at night.")    # the patient speaks: a fresh span
+        s.quiet(2.0)                                     # (its first report, as a real client sends)
+        s.quiet(4.0)
+        third = _until(s.ws, {"auto_speak"})
+        assert third["ref_id"] == "go_on", "the phrasings alternate"
+        s.play(third["utterance_id"])
+        assert s.phase is AutoPhase.GOLDEN and s.entry["auto"]["golden_window_ran"] is False
+        cid = _stop(s)
+    rows = asyncio.run(system_utterances.for_consultation(cid))
+    spoken = [r["ref_detail"]["id"] for r in rows if r["ref_detail"].get("via") == "auto"
+              and r["ref_detail"]["id"] in speech.GOLDEN_ENCOURAGER_IDS]
+    assert spoken == ["go_on", "tell_me_more_short", "go_on"]
+    third_row = next(r for r in rows if r["ref_detail"]["id"] == "go_on"
+                     and r["ref_detail"]["trigger"]["encourager"] == 3)
+    assert third_row["ref_detail"]["trigger"]["unanswered"] == 1, "the patient's speech reset the count"
+    assert _audit("auto.golden_window_ran", s.session_id) == []
+
+
+def test_two_unanswered_encouragers_then_the_third_silence_ends_the_window_early(gate):
+    """Owner decision 2026-09-09: after AUTO_ENCOURAGER_MAX_UNANSWERED (2)
+    encouragers with no patient speech between them, the NEXT qualifying
+    silence sets golden_window_ran early — audited auto.golden_window_ran
+    with reason unanswered_encouragers and a golden_s short of window_s —
+    and the questions begin exactly as when the 90 s elapse: the exit
+    fires on the fallback quiet, here on the same report. No third
+    encourager is spoken, and none after the window has run."""
+    assert appmain.AUTO_ENCOURAGER_MAX_UNANSWERED == 2
+    gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started last week.")
+        s.quiet(4.2)
+        first = _until(s.ws, {"auto_speak"})
         s.play(first["utterance_id"])
-        for q in (5.5, 9.0, 14.0, 30.0):
-            s.quiet(q)
-            assert all(m.get("type") != "auto_speak" for m in s.probe()), f"a second at {q}s"
-        assert s.phase is AutoPhase.GOLDEN
+        s.quiet(2.0)                                     # since=playback: no speech between
+        s.quiet(4.2)
+        second = _until(s.ws, {"auto_speak"})
+        assert second["ref_id"] == "tell_me_more_short"
+        s.play(second["utterance_id"])
+        assert s.entry["auto"]["golden_unanswered"] == 2
+        s.quiet(2.0)
+        s.quiet(max(4.2, appmain.AUTO_EOT_FALLBACK_S + 0.2))   # the third qualifying silence
+        seen = s.probe()
+        assert all(m.get("type") != "auto_speak" for m in seen), "no third encourager"
+        assert s.entry["auto"]["golden_window_ran"] is True
+        assert s.phase is AutoPhase.OPEN, "the window ended early and the exit followed"
         _stop(s)
+    ran = _audit("auto.golden_window_ran", s.session_id)
+    assert len(ran) == 1
+    assert ran[0]["reason"] == "unanswered_encouragers"
+    assert ran[0]["golden_s"] < ran[0]["window_s"] == appmain.AUTO_GOLDEN_MINUTES_S
+    assert ran[0]["encouragers"] == 2 and ran[0]["unanswered"] == 2
+    exit_row = next(d for d in _audit("auto.phase", s.session_id) if d["to"] == "open")
+    assert exit_row["trigger"] == "golden_timer_elapsed"
+
+
+def test_patient_speech_between_encouragers_resets_the_unanswered_count(gate):
+    """The count is "with no patient speech between them": speech after
+    the second encourager resets it, so the next silences earn two more
+    encouragers before a further silence can end the window."""
+    gate.cds_engine.verdicts = [OfficerVerdict(False, False)]
+    with live(gate) as s:
+        s.enable_to_golden()
+        s.commit_transcript("It started last week.")
+        for expected in ("go_on", "tell_me_more_short"):
+            s.quiet(2.0)
+            s.quiet(4.2)
+            e = _until(s.ws, {"auto_speak"})
+            assert e["ref_id"] == expected
+            s.play(e["utterance_id"])
+        assert s.entry["auto"]["golden_unanswered"] == 2
+        s.commit_transcript("Oh — and it wakes me at night.")   # the patient answers
+        assert s.entry["auto"]["golden_unanswered"] == 2, "reset on the next report, not the commit"
+        s.quiet(2.0)                                     # since=speech: the count resets
+        s.quiet(4.2)                                     # then a third encourager
+        third = _until(s.ws, {"auto_speak"})
+        assert third["ref_id"] == "go_on" and s.entry["auto"]["golden_unanswered"] == 1
+        s.play(third["utterance_id"])
+        s.quiet(2.0)
+        s.quiet(4.2)
+        fourth = _until(s.ws, {"auto_speak"})
+        assert fourth["ref_id"] == "tell_me_more_short"
+        s.play(fourth["utterance_id"])
+        assert s.phase is AutoPhase.GOLDEN and s.entry["auto"]["golden_window_ran"] is False
+        _stop(s)
+    assert _audit("auto.golden_window_ran", s.session_id) == []
 
 
 def test_no_encourager_while_an_utterance_is_in_flight(gate):
@@ -733,28 +839,43 @@ def test_no_encourager_while_an_utterance_is_in_flight(gate):
 
 
 def test_a_politeness_aborted_encourager_is_dropped_not_requeued(gate):
-    """An aborted encourager is dropped — the moment has passed — and
-    (REPINNED 2026-09-01, owner decision) it was the window's one: spent at
-    issue, like the nudge, so a fresh quiet report earns nothing more."""
+    """An aborted encourager is dropped — the moment has passed — spent at
+    issue like the nudge, so a longer report in the SAME span earns
+    nothing more. REPINNED 2026-09-09 (owner decision, golden window
+    encouragers): the patient's voice that caused the abort begins a fresh
+    span, and that span earns the next phrasing after the minimum quiet —
+    the 1 Sept "the window's one is spent" tail is deliberately replaced."""
     with live(gate) as s:
         s.enable_to_golden()
-        s.quiet(5.5)
+        s.quiet(4.5)
         e = _until(s.ws, {"auto_speak"})
         s.ws.send_text(json.dumps({"type": "speak_ended", "utterance_id": e["utterance_id"],
                                  "seq": s.seq + 1, "reason": "politeness_abort", "rms": 0.07}))
         assert all(m.get("type") != "auto_speak" for m in s.probe())
-        s.quiet(6.5)
+        s.quiet(6.5)                                     # the same span: nothing
         assert all(m.get("type") != "auto_speak" for m in s.probe())
+        s.commit_transcript("Sorry — I was saying, it started last week.")   # the voice that aborted it
+        s.quiet(4.1)
+        again = _until(s.ws, {"auto_speak"})
+        assert again["ref_id"] == "tell_me_more_short", "the next phrasing, on the fresh span"
+        s.play(again["utterance_id"])
         cid = _stop(s)
     rows = asyncio.run(system_utterances.for_consultation(cid))
     assert [r["end_reason"] for r in rows if r["text"] == "Go on."] == ["politeness_abort"]
+    assert [r["end_reason"] for r in rows if r["text"] == "Please, tell me more."] == ["complete"]
 
 
 def test_the_other_two_encouragers_stay_registered_and_tappable(gate):
     """"Mm-hm" and "I see" are unused by the automatic flow, not deleted:
-    still in the phrase table, still a one-tap phrase for the doctor."""
-    assert set(speech.ENCOURAGER_IDS) == {"mm-hm", "i_see", "go_on"}
+    still in the phrase table, still a one-tap phrase for the doctor.
+    Extended 2026-09-09: the golden window's second phrasing,
+    tell_me_more_short ("Please, tell me more."), is registered too and
+    pre-synthesised with the rest of the table."""
+    assert set(speech.ENCOURAGER_IDS) == {"mm-hm", "i_see", "go_on", "tell_me_more_short"}
     assert speech.ENCOURAGER_ID == "go_on"
+    assert speech.GOLDEN_ENCOURAGER_IDS == ("go_on", "tell_me_more_short")
+    assert speech.PHRASES["tell_me_more_short"] == "Please, tell me more."
+    assert "tell_me_more_short" not in speech.DISCLOSURE_GATED_PHRASES
     with live(gate) as s:
         s.enable_to_golden()
         s.ws.send_text(json.dumps({"type": "speak", "ref": {"kind": "phrase", "id": "mm-hm"}}))

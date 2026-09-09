@@ -172,6 +172,25 @@ until the mock-patient round:
   never reach the officer's fallback (482, 483). `mm-hm` and `i_see`
   stay registered, tappable and pre-synthesised — unused by the
   automatic flow, not deleted, like the `affecting_you` template.
+
+  **Golden window encouragers, revised (owner decision 2026-09-09,
+  after consultations 487–490; this reverses the one-per-window rule
+  above).** In GOLDEN, before the window has run, an encourager may be
+  spoken every time the patient has been quiet for
+  `AUTO_ENCOURAGER_MIN_QUIET_S` (now 4.0 s), the quiet counted from the
+  later of the patient's last speech and the end of Alba's own last
+  phrase (the client's span restarts at both, so this is the span's own
+  length), at most one per quiet span, spent at issue. Two phrasings
+  alternate: `go_on` ("Go on.") and `tell_me_more_short` ("Please, tell
+  me more."), the new phrase registered and pre-synthesised. After
+  `AUTO_ENCOURAGER_MAX_UNANSWERED` (2) encouragers with no patient
+  speech between them, the NEXT qualifying silence sets
+  `golden_window_ran` early — audited `auto.golden_window_ran` with
+  `reason: unanswered_encouragers` — so the questions begin exactly as
+  when the seconds elapse (§6: the exit on the fallback quiet). Patient
+  speech between encouragers resets the count. None once the window has
+  run, by either end. The 1 Sept brakes stay: the minimum quiet, none
+  after the window; the unanswered count is the loop's end.
 - `AUTO_EOT_QUIET_S` (default 3.0): outside GOLDEN, a pause this long
   triggers the **end-of-turn officer** — a tiny stateless model call
   (affect-call shape) over the recent committed transcript answering
@@ -334,6 +353,15 @@ with `finished_thought` or `handed_back`, or quiet of
 when a verdict is applied, and whether or not the officer answered.
 The window's end is now visible in the record even when it does not
 coincide with an exit. Before the window, behaviour is as above.
+**A window can end early** (owner decision 2026-09-09, §5): after
+`AUTO_ENCOURAGER_MAX_UNANSWERED` unanswered encouragers, the next
+qualifying silence sets `golden_window_ran` before the seconds have
+elapsed. The record tells the two ends apart on the
+`auto.golden_window_ran` row: `reason` is `elapsed` or
+`unanswered_encouragers`, and for the early end `golden_s` is short of
+`window_s` and the row carries the encourager and unanswered counts.
+The exit that follows is the same `golden_timer_elapsed` edge either
+way; the reason lives on the window row, not the phase row.
 
 **D2 — DECIDED 2026-08-16: strict-revise; re-meant 2026-09-07 by the
 standing question queue (`AGENDA_QUEUE_SPEC.md` §4, §5, D-C option
@@ -682,7 +710,9 @@ and `test_standing_rules.py` extends to the new controls.
   `auto.officer_failed` (fail-soft visibility),
   `auto.golden_window_ran` (once per run: the window's end, with
   `golden_s`, whichever report or verdict first observed it — owner
-  decision 2026-09-01), and
+  decision 2026-09-01; with `reason: elapsed | unanswered_encouragers`
+  and, for the early end, the encourager and unanswered counts — owner
+  decision 2026-09-09), and
   `auto.doctor_tap` gains `confirmed` (owner decision 2026-09-07: true
   when the doctor confirmed displacing a planned or queued question,
   false when nothing was planned) beside `displaced`,
@@ -761,7 +791,8 @@ and `test_standing_rules.py` extends to the new controls.
 | `AUTO_MODE_ENABLED` | `false` | The gate. Owner's flip, after barge-in calibration + mock-patient review |
 | `AUTO_GOLDEN_MINUTES_S` | `90` | Owner range 1–2 min (decided 2026-08-16; prereg amendment A1) |
 | `AUTO_ENCOURAGER_QUIET_S` | `1.75` | Uncalibrated guess; the bridge's quiet (question phases only, from 2026-09-01) |
-| `AUTO_ENCOURAGER_MIN_QUIET_S` | `5.0` | Owner decision 2026-09-01: the golden window's one encourager, after this much quiet |
+| `AUTO_ENCOURAGER_MIN_QUIET_S` | `4.0` | Owner decision 2026-09-09 (was 5.0, the 1 Sept one-per-window rule): a golden encourager every time the patient has been this quiet, one per span, two phrasings alternating |
+| `AUTO_ENCOURAGER_MAX_UNANSWERED` | `2` | Owner decision 2026-09-09: after this many unanswered encouragers, the next qualifying silence ends the golden window early |
 | `AUTO_EOT_QUIET_S` | `3.0` | Uncalibrated guess |
 | `AUTO_EOT_FALLBACK_S` | `5.0` | Officer fail-soft silence |
 | `AUTO_OFFICER_TIMEOUT_S` | `2.0` | Then fall back — with no CDS pass in flight |

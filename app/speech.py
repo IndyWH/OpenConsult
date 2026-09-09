@@ -264,6 +264,10 @@ PHRASES: dict[str, str] = {
     "mm-hm": "Mm-hm.",
     "i_see": "I see.",
     "go_on": "Go on.",
+    # Owner decision 2026-09-09 (golden window encouragers, after
+    # consultations 487–490): the second golden encourager, alternated
+    # with "go_on". Owner wording, verbatim.
+    "tell_me_more_short": "Please, tell me more.",
     # Examination handover: the system never pretends to examine.
     "examination_handover": "Thank you — Dr {doctor} will examine you now.",
     # Sound check (spec Part 10 / D6). Deliberately not clinical and not
@@ -285,13 +289,17 @@ PHRASES: dict[str, str] = {
     "anything_else": "Is there anything else you wanted to talk about today?",
 }
 
-ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on")
+ENCOURAGER_IDS = ("mm-hm", "i_see", "go_on", "tell_me_more_short")
 # The one the automatic flow speaks (owner decision 2026-09-01, after the
-# solo pilot: "we need to get rid of the mm-hm"): at most one per golden
-# window and one bridge per revision, "go on" only. The other two stay
-# registered, tappable and pre-synthesised — unused, not deleted, like
-# the affecting_you template.
+# solo pilot: "we need to get rid of the mm-hm"): "go on" only. "mm-hm" and
+# "i_see" stay registered, tappable and pre-synthesised — unused, not
+# deleted, like the affecting_you template.
 ENCOURAGER_ID = "go_on"
+# The golden window's two phrasings, alternated (owner decision 2026-09-09,
+# reversing the 1 Sept one-per-window rule): an encourager may be spoken
+# every time the patient has been quiet for AUTO_ENCOURAGER_MIN_QUIET_S,
+# go_on then tell_me_more_short then go_on…
+GOLDEN_ENCOURAGER_IDS = ("go_on", "tell_me_more_short")
 
 # Phrases the patient must have heard the disclosure before (hard rule 4).
 # The encouragers are exempt: "mm-hm" is not a clinical interaction, and
