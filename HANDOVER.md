@@ -7170,3 +7170,210 @@ or the database changed. Docs-only commit; the suite was not run for it.
 - **H4** — a successful topic call writes no row (`main.py:3953–3963`): the
   three open-form asks' lay wordings, the compound question's among them, are
   not on the record; no `model.call` of kind topic; q12's text never surfaced.
+
+## Pilot fix slice 5 — the owner's decisions after consultation 491, built (2026-09-10)
+
+**What landed.** The five items of the owner's decisions of 10 Sept 2026
+(report `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_491_2026-09-10.md`,
+findings H1–H4; prompt `~/Downloads/cc_prompt.md`) — the minimum so auto
+mode works at a basic level before the repository goes public. One commit
+each, the full suite green before every commit. The lay wording, the
+compound question, the floor and the thresholds are v1.1 work and were
+not touched. `.env` untouched (`AUTO_MODE_ENABLED=false`, and the new
+flag is not in it); `PHASE_7C_EVAL_PREREG.md`, `OPEN_CLOSED_RULE.md`,
+`help/`, `vendor/` untouched. **Needs a restart to be live** (the
+owner's act) — and live only behind the flag, as before.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `c113102` | H1: the machine must not hear its own voice as the patient — client meter guarded while our audio plays and 300 ms after; server reads a "speech" span that began inside our own utterance window as playback, `own_voice` on `auto.quiet_report` | 1124 → 1129 |
+| 2 | `b7ed1d1` | the re-ranker re-orders only, never drops; `AUTO_RERANK_DROPS_ENABLED` (default false) guards the old path; `drops_advised` and `drops_enabled` on `auto.queue_reranked`; spec §3/§7 amended | 1129 → 1132 |
+| 3 | `17ccb3c` | H3: the quiet span starts at silence — the reporter no longer restarts on a final or a changed partial (the nudge keeps both); `last_word_to_span_start_s`, `commit_latency_s` and friends on `auto.turn_ended` | 1132 → 1136 |
+| 4 | `6ea5116` | the suite does not read the live `.env`: conftest pins `AUTO_MODE_ENABLED` off (environment and attribute) unless a test opts in; the three pre-7c speech stubs gain a no-op `presynthesise_phrases` | 1136 (green with `AUTO_MODE_ENABLED=true` in the environment and without, same count) |
+| 5 | (this commit) | README § *Auto mode*; this entry | 1136 |
+
+Final suite: **1136 passed** (from 1124 at `8728e6e`), and from this
+slice on it is run plainly — `uv run pytest` — whatever the machine's
+`.env` says.
+
+**What is live after the restart (behind the flag).**
+
+- *Our own voice.* The client's meter counts no energy as activity while
+  `speaking` or in the 300 ms after `stopSpeaking` (`OWN_VOICE_TAIL_MS`,
+  live.html); the playback-end path is as it was, so "Let me think" now
+  really leaves the span running and every other utterance's end stamps
+  `playback`. The server keeps each session's last eight utterance
+  windows — `speech.requested` to the utterance's end (`speak_ended`,
+  politeness abort, server cut, reconnect) plus `AUTO_OWN_VOICE_TAIL_S`
+  (0.3) — and a fresh span stamped `speech` whose start (`now − quiet_s`)
+  falls in one is read as playback: `turn_ended` stands, `span_seq` does
+  not move, `awaiting_speech` and the golden unanswered count are
+  untouched; the report row says `own_voice: true` with the utterance id
+  (`false` on every other row).
+- *The re-ranker.* `queue.apply_rerank(order, drops, apply_drops=False)`:
+  the verdict's drops still pass through the module's no-invention guard
+  (unknown ids listed as `ignored`), the known ones are returned as
+  `drops_advised` (id, text, reason text) and none is applied. An advised
+  item the order names keeps its place; one it does not name follows the
+  named ones (`unmentioned`). The row carries `drops` (empty while off),
+  `drops_advised`, `drops_enabled`; `auto.enabled` records
+  `rerank_drops_enabled`. Nothing else about the re-ranker changed: it
+  runs at every answered turn end, with one item pending and with a pass
+  in flight, and the plan follows its order.
+- *The span.* Keyed on energy and on our playback's end only. The nudge
+  still resets on a final and a changed partial. Every quiet report
+  records the span's start on the session clock (`auto["span_start"]`),
+  every commit records `entry["last_final"]` (the last word's end, the
+  audio time it was committed at, when), and every `auto.turn_ended` row
+  carries `last_word_end_s`, `span_start_s`, `last_word_to_span_start_s`
+  (span start minus last word; ≈ 3 s before this slice, expected near 0
+  now), `commit_latency_s` (the transcriber's own: commit minus last word,
+  ≥ the 2 s commit margin) and `last_final_age_s`; the two headline keys
+  are null when either side is unknown.
+
+**Settings and constants added.** One setting: `AUTO_RERANK_DROPS_ENABLED`
+(default false; in `.env.example` with its comment; **not** in `.env`).
+Two constants, not settings, by the owner's number: `AUTO_OWN_VOICE_TAIL_S`
+= 0.3 in `app/main.py` and `OWN_VOICE_TAIL_MS` = 300 in live.html, pinned
+equal by a test.
+
+**Build decisions taken where the owner's text was silent — for the
+owner to confirm or overrule:**
+
+- **H1 — the window opens at the request, not at `speak_started`.** The
+  prompt named `speech.requested`; it also happens to be the safe end —
+  a synthesis cache miss puts up to a second between the two, and the
+  meter cannot tell that second from playback. It closes at the
+  utterance's end whatever the reason (a politeness abort that never
+  played closes at the abort, so its window is only the request's own
+  few ms). A window whose end was never seen counts only while its
+  utterance is still the pending one, so a lost `speak_ended` can never
+  make the machine deaf to every later span.
+- **H1 — an own-voice span is a fresh span, like a playback span.** It
+  bumps `quiet_span_seq` and resets the officer's per-span state exactly
+  as a `since: playback` span does — so in GOLDEN it can earn the next
+  encourager, as Alba's own phrase end always could ("the voice that
+  aborted it begins the next span"). Nothing new there, but now it holds
+  for the trailing energy too.
+- **H1 — a barge-in.** The patient speaking over Alba cuts her (the
+  detector is untouched); `stopSpeaking('barge_in')` stamps `playback`,
+  and the patient's continuing voice begins a `speech` span once the
+  300 ms tail has passed. A patient utterance that lies entirely inside
+  the tail is invisible to the reporter (never to the transcript). The
+  server-side check catches the same shape from an older page.
+- **Re-ranker — the protected item.** The planned item is still popped
+  from the drops before the module sees them, so it appears on the row as
+  `protected_dropped_by_verdict`, not in `drops_advised`. Everything else
+  the verdict advised is on the row with its reason, whether or not the
+  flag is on.
+- **H3 — the turn end may now precede the answer's last commit.** This
+  is the point of the change, and its seam: with the span starting at the
+  silence, the officer is asked at 2.0 s of real quiet and the fallback
+  fires at 3.5 s, while the transcriber commits the answer's last segment
+  2–4 s after its last word. The officer's transcript, the re-ranker's
+  excerpt and the pass requested at the turn end can all miss the
+  answer's last words; the officer's "not finished" on a truncated
+  transcript now means something different from before. The row's
+  `last_final_age_s` and a *negative* `last_word_to_span_start_s` (the
+  latest final predates the span) are how the next run will show it. A
+  bound — hold the pass until the transcript has caught up, or ask the
+  officer again when a final lands — is the owner's, after the numbers.
+- **H3 — `span_start` is recorded on every report,** fresh or not (each
+  report of a span re-derives the same instant to within the meter's
+  step); the golden exit's turn end still writes `auto.phase`, not
+  `auto.turn_ended`, so it carries none of the new numbers.
+- **Suite — the pin is two-layered.** `os.environ["AUTO_MODE_ENABLED"] =
+  "false"` before any app import (set, not setdefault: neither the shell
+  nor `.env` can raise it) and an autouse fixture that sets the attribute
+  False before every test; the harnesses' own fixtures set it True after.
+  Under the pin the three stubs' `presynthesise_phrases` is never reached
+  — it is there for the day a test with a stub opts in.
+- **Tests repinned by decision** (each docstring names it and the date):
+  the meter-loop pin (the guarded call) and the activity-source pin
+  (transcript movement is no longer a reporter source) in
+  `test_quiet_reporter_client.py`; the three re-rank tests that read an
+  applied drop as evidence (the drop with its reason, the pass-in-flight
+  verdict, the single stale item) re-pointed to the flag-on case. Nothing
+  weakened or deleted. New files: `tests/test_own_voice.py`,
+  `tests/test_transcript_span_client.py` (the final/partial branches of
+  `onWsMessage` executed under Node around the shipped reporter). Each
+  server-side H1 test and each flag-off re-rank test was checked to fail
+  with its fix disabled.
+
+**What the next run should be read for.**
+
+- *`auto.quiet_report` rows with `own_voice: true`* — how many, after
+  which utterances (expect the thinking phrase and any utterance whose
+  end left a tail above the floor); and `auto.thinking` at most once per
+  `auto.turn_ended` — the fits are gone if the count per wait is ≤ 1.
+- *`auto.turn_ended.last_word_to_span_start_s`* — its distribution
+  (expected near 0; 491 read ≈ 3), the negatives and their
+  `last_final_age_s` (the turn ended before the commit — how often, by how
+  much), and `commit_latency_s` on its own; against them
+  `turn_end_to_speech_ms` on `auto.question_latency` — the number to
+  beat should fall by about the 3 s H3 removes. This is what decides
+  `AUTO_EOT_FALLBACK_S` (3.5 versus lower), as the 491 report said:
+  after H3, not before.
+- *`auto.queue_reranked.drops_advised`* against the transcript — the
+  re-ranker's judgement now costs nothing, so every verdict of the next
+  run is free evidence for `evals/`: does an advised drop ever agree with
+  the transcript? The order it gives, likewise.
+- *Also:* whether the queue now ever runs empty in the question phases
+  (with drops off it should only when every item has been asked); the
+  asked-twice shape of H2 (unchanged in this slice — expect it again).
+
+**`help/`: NOT edited.** Nothing in items 1, 3 or 4 makes a sentence
+untrue — the articles do not say when the machine judges the patient has
+finished, nor that it might hear itself. Item 2 amends one flag already
+owed from slices 3 and 4, all for the owner's wording in one sitting:
+
+- `help/04-the-architecture.md`: "MedGemma 27B does … the two small
+  judgements that pace the spoken interview: has the patient finished
+  speaking, and what a question is about." — three judgements (slice 3),
+  the second also puts the question into plain English (slice 4), and
+  the third now only **orders** the waiting questions — since 2026-09-10
+  it can no longer remove one (the slice-4 flag read "which waiting
+  questions are still worth asking, in what order").
+- `help/01-a-consultations-journey.md` §3: "asking questions of its own
+  choosing" — the slice-4 flag stands ("the head of a standing queue that
+  every pass feeds, re-sorted after each answer"), with the same
+  correction: re-sorted, never pruned, by that step.
+- The slice-4 flags on `help/02-using-it-step-by-step.md` steps 3 and 5,
+  `help/01` §2 and `help/06` stand unchanged.
+
+**v1.1, carried forward from the 491 report and the owner's decisions:**
+
+- **Concrete closed questions instead of category questions** — the
+  owner's clinical verdict: a GP asks "do you smoke?", not "do you have
+  risk factors?". The compound heart-disease question (§2 of the report,
+  four places) and the lay wording's widening ("any other things that
+  might put you at risk") are the same item seen twice; which layer
+  splits, and whether "one sentence" should read "one thing", is the
+  owner's.
+- **H2 — the same-lay-sentence guard:** a lay sentence equal to one
+  already spoken this session is refused (or the original asked
+  verbatim); and/or the merge compares a proposal to answered items by
+  similarity rather than exact token set — the second changes the
+  never-twice guarantee's identity and is the owner's.
+- **H4 — the topic call's audit row:** a `model.call` of kind `topic`
+  with `topic`, `lay`, `similarity` and elapsed on every call, and the
+  merge's `added_items` with text; without it the lay calibration data is
+  two rows per run.
+- **The floor under fan load:** 0.02 by clamp against bursts of
+  0.023–0.032 in the last minute of 491; whether the sound check should
+  be taken with the model loaded, or the margin, or the clamp minimum,
+  is one decision and the number is 0.032.
+- **The re-ranker to `evals/` before it may drop again** (0 for 7 on the
+  record; `AUTO_RERANK_DROPS_ENABLED` stays false until then).
+- Also from the report's §8: `AUTO_EOT_FALLBACK_S` after H3's numbers;
+  `AUTO_LAY_MIN_SIMILARITY` (0.539 accepted a widening); "Let me think"
+  once per 25 s wait, or the speculative pass (D-C (b)); the second
+  urgency pause 1.3 s after RESUME, as designed, for the owner to weigh
+  against D4's intent.
+
+**Watch list, carried forward:** the re-ranker's judgement (now free
+evidence); the lay wordings; the felt length of the window; D10 at the
+room's floor; banner visibility; the slice-4 numbers not yet stressed
+(`AUTO_SHORT_CALLS_HOLD_S`, `AUTO_PRESYNTH_WAIT_S`, `AUTO_ENABLE_RETRIES`,
+`AUTO_ENCOURAGER_MAX_UNANSWERED`); and, new, the H3 seam above — a turn
+end before the answer's last commit.

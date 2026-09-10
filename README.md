@@ -32,6 +32,26 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 
 See PROJECT_PLAN.md for the full plan.
 
+## Auto mode (experimental, off by default)
+
+Auto mode lets the assistant conduct the history-taking itself while the
+doctor supervises. After the fixed disclosure that it is a computer, it
+invites the patient to tell their story, encourages them through silences,
+and then asks the panel's questions aloud one at a time, choosing from a
+standing queue that every assessment pass feeds and re-orders. The doctor
+can take it back with one tap at any moment; an urgency alarm pauses the
+questioning until the doctor acknowledges it; and the machine's own voice
+is excluded from the transcript. It is experimental: it has been run only
+in scripted or acted consultations, and it is **off by default** behind
+`AUTO_MODE_ENABLED` (see `.env.example`). The question wording and the
+cadence — how long it waits before deciding the patient has finished, how
+it phrases the panel's questions, what it says while it thinks — are being
+refined for v1.1 from the pilot runs. The design is in
+`AGENDA_QUEUE_SPEC.md` (the queue, the re-ranker, the number to beat) and
+`PHASE_7C_SPEC.md`; the pilot diagnostics that drive the refinements are
+kept outside the repository, on the reference machine, in
+`~/Documents/Consultation-ai/Solo Pilot Documents/`.
+
 > **New to the project?** Start with the [help series](help/00-introduction.md) — a short, diagram-led tour of what the app does, how it's built, and why it works the way it does (including what an independent security audit found). It's written for reading, not installing.
 
 ## Getting started (Phase 0)
