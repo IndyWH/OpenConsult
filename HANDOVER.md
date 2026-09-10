@@ -7494,3 +7494,15 @@ uv run python scripts/migrate.py --check      # connects with the new password; 
 sudo systemctl restart consultation-ai
 curl -fsS http://127.0.0.1:8000/api/monitor/pulse | head -c 300; echo   # the running app connects
 ```
+
+**Consultation 469 — void verified and purged (owner, 2026-09-10 ~08:30 BST).**
+The paper's Declarations say the recording captured on 14 August was deleted
+on discovery. Verified today on mlrig by the owner: consultation 469 had been
+voided on 2026-08-14 08:57:07 as `clinical_safety`, reason "Not meeting
+project criteria" (audit row 2620), but not purged. Purged today with
+`manage_consultations.py purge-one 469` (launch slice, 2db814d): consultation
+row, 23 transcript turns, 303 raw segments, patient row 276 and
+`data/recordings/consultation_469.wav` removed; audit row 2620 kept; a
+`data.purged` row written by operator indy. Post-purge query returned
+0 / 0 / 0 / 0 / 1 / 1. The Declarations' deletion qualifier now rests on
+this entry.
