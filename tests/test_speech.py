@@ -174,7 +174,7 @@ def test_different_doctors_get_different_cache_entries():
     """The rendered text is the cache key's input, so two doctors cannot
     be served each other's audio."""
     a = speech.cache_key(speech.render_phrase("disclosure", "Herath"), "v")
-    b = speech.cache_key(speech.render_phrase("disclosure", "Victoria"), "v")
+    b = speech.cache_key(speech.render_phrase("disclosure", "Kildare"), "v")
     assert a != b
 
 
