@@ -1846,6 +1846,7 @@ async def issue_auto_speak(state, entry: dict, websocket, utterance: auto_mode.U
     except speech.SpeechFailed as exc:
         await refuse(f"synthesis failed: {exc}", speech.SpeechFailed, tell_client=True)
     entry["pending_utterance"] = prepared
+    _own_voice_requested(entry, prepared.utterance_id)   # H1: our window opens at the request
     if prepared.ref_detail.get("id") == "silence_nudge":
         entry["nudge_used"] = True     # marked used at REQUEST, as for a tap
     await audit.log(user["id"], "speech.requested", None, None,
@@ -2045,6 +2046,59 @@ def _auto_toggled(ctl: auto_mode.AutoModeController, **extra) -> dict:
     return message
 
 
+# H1 (owner decision 2026-09-10, pilot 491): the machine must not hear its
+# own voice as the patient. In 491 "Let me think for a moment." re-armed
+# itself ten times: the phrase, heard by the microphone at 0.05-0.23 RMS,
+# restarted the client's quiet span as "speech", the server cleared the
+# judged turn end, the 3.5 s fallback ended a turn with nothing asked and
+# reset the once-per-wait guard. The client now keeps its meter off our own
+# playback (live.html, OWN_VOICE_TAIL_MS); the server keeps every utterance's
+# window — speech.requested to speech.spoken, plus this tail — and a fresh
+# span stamped "speech" whose start falls inside one is read as playback:
+# the turn end stands, and the report says own_voice on the record.
+AUTO_OWN_VOICE_TAIL_S = 0.3
+_OWN_VOICE_WINDOWS_KEPT = 8
+
+
+def _own_voice_requested(entry: dict, utterance_id: str) -> None:
+    """An utterance of ours was requested: its window opens now (the
+    request precedes the audio, and the meter cannot tell them apart)."""
+    windows = entry.setdefault("own_voice", [])
+    windows.append({"utterance_id": utterance_id,
+                    "requested_at": time.monotonic(), "ended_at": None})
+    del windows[:-_OWN_VOICE_WINDOWS_KEPT]
+
+
+def _own_voice_ended(entry: dict, utterance_id: str) -> None:
+    """The utterance's playback ended (played through, cut, aborted, or
+    cancelled by the server): its window closes now, plus the tail."""
+    for window in reversed(entry.get("own_voice") or ()):
+        if window["utterance_id"] == utterance_id and window["ended_at"] is None:
+            window["ended_at"] = time.monotonic()
+            return
+
+
+def _own_voice_at(entry: dict, at: float) -> str | None:
+    """The utterance of ours whose window the monotonic instant `at` falls
+    in — requested_at to ended_at + AUTO_OWN_VOICE_TAIL_S — or None. A
+    window still open counts only while its utterance is the pending one;
+    a window that never saw its end (a lost speak_ended) cannot swallow
+    every later span."""
+    pending = entry.get("pending_utterance")
+    pending_id = pending.utterance_id if pending is not None else None
+    for window in reversed(entry.get("own_voice") or ()):
+        if at < window["requested_at"]:
+            continue
+        end = window["ended_at"]
+        if end is None:
+            if window["utterance_id"] == pending_id:
+                return window["utterance_id"]
+            continue
+        if at <= end + AUTO_OWN_VOICE_TAIL_S:
+            return window["utterance_id"]
+    return None
+
+
 def _cancel_playback(entry: dict, reason: str, *,
                      unplayed_reason: str = "failed_to_play") -> dict | None:
     """End any in-flight utterance without a client `speak_ended`.
@@ -2061,6 +2115,7 @@ def _cancel_playback(entry: dict, reason: str, *,
     utterance = entry.get("pending_utterance")
     if utterance is None:
         return None
+    _own_voice_ended(entry, utterance.utterance_id)
     session: LiveSession = entry["session"]
     span = session.close_speaking_window(reason) if session.speaking else None
     row = {
@@ -2299,6 +2354,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # Phase 7c slice 5: the utterance the SERVER last cut (auto_stop),
             # so the client's echoed speak_ended is recognised, not refused.
             "server_cancelled_id": None,
+            # H1 (owner decision 2026-09-10, pilot 491): the windows of our
+            # own recent utterances (requested to ended), so a fresh quiet
+            # span that began inside one is read as our voice, not the
+            # patient's (_own_voice_at).
+            "own_voice": [],
         }
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
@@ -2846,6 +2906,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 and not entry["face_manual_off"]):
             await handle_face({"on": True}, via="disclosure_auto")
         quiet_s = payload.get("quiet_s")
+        _own_voice_requested(entry, utterance.utterance_id)   # H1: our window opens at the request
         await audit.log(user["id"], "speech.requested", None, None,
                         {"utterance_id": utterance.utterance_id,
                          "ref_kind": utterance.ref_kind,
@@ -2928,6 +2989,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # released. Requeueing the utterance is the controller's job
             # (slice 3/4); here it is simply not lost from the record.
             record_utterance(utterance, None, "politeness_abort")
+            _own_voice_ended(entry, utterance.utterance_id)   # H1: nothing played; the window closes
             entry["pending_utterance"] = None
             rms = payload.get("rms")
             if utterance.ref_detail.get("via") == "auto":
@@ -2961,6 +3023,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         if reason not in system_utterances.END_REASONS:
             reason = "complete"
         span = session.close_speaking_window(reason)
+        _own_voice_ended(entry, utterance.utterance_id)   # H1: the tail runs from here
         if entry["face"] is not None:
             entry["face"].on_system_speech_ended()
         cut_latency = payload.get("cut_latency_ms")
@@ -4764,6 +4827,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                   "step_ms": int(payload.get("trace_step_ms") or 100),
                                   "floor": payload.get("floor")}
         now = time.monotonic()
+        # H1 (owner decision 2026-09-10, pilot 491): a fresh span the client
+        # stamped "speech" whose start falls inside one of our own utterance
+        # windows (requested to ended, plus AUTO_OWN_VOICE_TAIL_S) is our
+        # voice through the microphone, not the patient's — a page whose
+        # meter still counts our playback, or the room's tail of it. It is
+        # read as playback below and says so on the record.
+        own_voice = None
+        if fresh and payload.get("since") != "playback":
+            own_voice = _own_voice_at(entry, now - quiet_s)
         if fresh or auto["quiet_audit_at"] is None or now - auto["quiet_audit_at"] >= AUTO_QUIET_REPORT_AUDIT_S:
             auto["quiet_audit_at"] = now
             rms = payload.get("rms")
@@ -4772,6 +4844,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                              "span": payload.get("span"), "since": payload.get("since"),
                              "rms": (round(float(rms), 5) if isinstance(rms, (int, float)) else None),
                              "floor": payload.get("floor"), "fresh": fresh,
+                             "own_voice": own_voice is not None,
+                             **({"own_voice_utterance": own_voice} if own_voice else {}),
                              "phase": ctl.phase.value,
                              "at_audio_s": round(session.audio_seconds, 1)})
         if fresh:
@@ -4784,11 +4858,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # had set, so the first ask needed a second judgement in a
             # silent room. The client says what began the span (`since`:
             # "playback" or "speech"); a report without it is read as
-            # speech, the cautious side.
+            # speech, the cautious side — unless its start falls inside our
+            # own utterance window (H1, above): then it is ours.
             auto["officer_last_run_quiet_s"] = None
             auto["officer_verdict"] = None
             auto["quiet_span_seq"] += 1      # every fresh span, whatever began it
-            if payload.get("since") != "playback":
+            if own_voice is not None:
+                logger.info("Live session %s: fresh span at quiet %.1f s began inside our own "
+                            "utterance %s — read as playback", session_id, quiet_s, own_voice)
+            if payload.get("since") != "playback" and own_voice is None:
                 auto["turn_ended"] = False
                 auto["span_seq"] += 1        # the patient's span moved on (E4: a late verdict is stale)
                 auto["awaiting_speech"] = False   # the patient has spoken since the question (F5)

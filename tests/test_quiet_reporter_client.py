@@ -141,10 +141,15 @@ def test_the_shipped_reporter_executed_under_node():
 def test_the_reporter_is_fed_by_the_existing_rms_loop_at_the_speech_floor():
     """Spec §5: the existing ~10 fps RMS loop feeds it. Activity is speech
     — the barge-in absolute floor — not the 1e-4 silence floor; and the
-    report is sent from that loop, only while recording on an open socket."""
+    report is sent from that loop, only while recording on an open socket.
+
+    REPINNED 2026-09-10 (owner decision, pilot 491 H1): energy at the floor
+    is activity only when it is not our own voice — never while our audio
+    plays, nor in the OWN_VOICE_TAIL_MS after it ends (the guard is pinned
+    in tests/test_own_voice.py)."""
     loop = LIVE[LIVE.index("// Level meter: RMS of the analyser"):LIVE.index("refreshDeviceMenu();")]
     assert "if (rms > 1e-4) nudge.activity(now);" in loop         # the nudge, unchanged
-    assert "if (rms >= quietReporter.floor) quietReporter.activity(now);" in loop
+    assert "if (rms >= quietReporter.floor && !ownVoiceNow(now)) quietReporter.activity(now);" in loop
     # ...and that floor is the SESSION's floor from the room (owner decision
     # 2026-09-09, pilot 488 G2: speech_config.auto.floor, derived from the
     # sound check; the barge-in absolute floor only stands in when the

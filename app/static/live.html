@@ -900,7 +900,12 @@ async function initMic() {
     // Phase 7c: the quiet reporter reads the same loop. Speech, not any
     // energy, is activity here (see the reporter's comment); a report goes
     // to the server only while it has confirmed auto mode on.
-    if (rms >= quietReporter.floor) quietReporter.activity(now);
+    // H1 (owner decision 2026-09-10, pilot 491): the microphone hears our
+    // own voice at 0.05-0.23 RMS, far above the floor, so while our audio
+    // plays, and for OWN_VOICE_TAIL_MS after it ends, energy is not the
+    // patient's and begins no span; the playback-end path (stopSpeaking)
+    // stamps the span 'playback' or, for "Let me think", leaves it running.
+    if (rms >= quietReporter.floor && !ownVoiceNow(now)) quietReporter.activity(now);
     quietReporter.sample(rms);
     const quietS = quietReporter.poll(now, speaking !== null || pendingSpeakText !== '');
     if (quietS !== null && recording && ws && ws.readyState === WebSocket.OPEN) {
@@ -1221,6 +1226,18 @@ let autoPhase = 'off';       // server-confirmed phase value
 // already been asked.
 const askedQuestions = new Set();
 let speaking = null;        // {utterance_id, audio, text}
+let lastPlaybackEndMs = null;   // when our audio last stopped, for the own-voice tail (H1)
+// H1 (owner decision 2026-09-10, pilot 491): in 491 "Let me think" re-armed
+// itself ten times — the phrase, heard by the microphone, restarted the
+// quiet span as patient speech. The room's tail of our voice lasts a little
+// past the audio's end; the same 300 ms is applied server-side to its own
+// utterance windows (app/main.py AUTO_OWN_VOICE_TAIL_S) for pages that
+// still report such a span.
+const OWN_VOICE_TAIL_MS = 300;
+function ownVoiceNow(now) {
+  return speaking !== null
+      || (lastPlaybackEndMs !== null && now - lastPlaybackEndMs < OWN_VOICE_TAIL_MS);
+}
 let pendingSpeakText = '';  // what we asked for, to label the pill
 // Phase 7c slice 5: an utterance the SERVER cut (auto_stop) before this
 // page had started playing it — the play command may still be in hand
@@ -1671,6 +1688,7 @@ function stopSpeaking(reason, cutLatencyMs) {
                           ...(cutLatencyMs != null
                               ? {cut_latency_ms: Math.round(cutLatencyMs)} : {})}));
   speaking = null;
+  lastPlaybackEndMs = performance.now();   // the own-voice tail begins (H1)
   bargeIn.end();
   setSpeakingUI(false, '');
   // The silence-nudge window opens ONLY when the invitation played
