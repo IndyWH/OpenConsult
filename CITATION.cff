@@ -20,7 +20,7 @@ date-released: "2026-09-10"
 # Zenodo: archive the v1.0.0 release, then replace the placeholder below
 # with the DOI Zenodo assigns (the concept DOI, so it resolves to every
 # version) and remove this comment.
-doi: "10.5281/zenodo.PLACEHOLDER"
+doi: "10.5281/zenodo.22689260"
 keywords:
   - clinical AI
   - ambient scribe
