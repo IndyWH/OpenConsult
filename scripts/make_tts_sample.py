@@ -4,7 +4,15 @@ For interim testing of the audio pipeline (WhisperX + pyannote) only —
 synthetic voices are NOT the permanent test set (real recordings are, per
 Phase 0). Output goes to data/tts_sample/ (gitignored).
 
-Usage: uv run python scripts/make_tts_sample.py [script.md]
+This script is the one place the project ever touched a cloud service:
+it synthesises the voices through edge-tts, which sends each line of the
+mock script to Microsoft's online text-to-speech endpoint. The app never
+does — its own voice is Piper, local, CPU only (NOTICE). edge-tts was
+removed from the project's dependencies on 2026-09-10 for exactly that
+reason, so this script no longer runs from the plain environment; supply
+it for the one run, and only with a mock script, never anything real:
+
+Usage: uv run --with edge-tts python scripts/make_tts_sample.py [script.md]
 """
 
 from __future__ import annotations
@@ -15,7 +23,13 @@ import sys
 import wave
 from pathlib import Path
 
-import edge_tts
+try:
+    import edge_tts
+except ImportError:  # pragma: no cover - the environment deliberately lacks it
+    sys.exit("edge-tts is not installed (it is not a project dependency: it"
+             " calls Microsoft's online TTS service). Run this disposable"
+             " sample with:\n  uv run --with edge-tts python"
+             " scripts/make_tts_sample.py [script.md]")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
