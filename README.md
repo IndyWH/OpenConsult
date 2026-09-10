@@ -1,5 +1,7 @@
 # OpenConsult
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22689260.svg)](https://doi.org/10.5281/zenodo.22689260)
+
 **A research/educational prototype for AI-assisted medical consultations — fully local, human-in-the-loop, English-only in v1.**
 
 Transcribes a doctor–patient consultation live, offers real-time clinical decision support (differentials, questions to ask, signs to elicit), then produces a diarised transcript, a concise doctor-style note with every claim cited to the transcript, referral letters, and evidence-grounded guideline summaries — all running locally on consumer hardware.
@@ -7,6 +9,10 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 > ⚠️ **Status & intent:** This is an experimental prototype for research, education, and demonstration purposes only. It is **not** a medical device, has not undergone any regulatory assessment, and must never be used with real patients or real patient data. All development and demos use synthetic (scripted/acted) consultations.
 
 ---
+
+**A full consultation, start to finish (5 min 43 s).** An acted patient; the doctor supervises throughout. Live transcript and clinical decision support first, then the note with every claim cited to the transcript, and the referral letter.
+
+https://github.com/user-attachments/assets/84bf3635-54de-479d-8caa-2ebf5787e5e9
 
 ## 1. Why this project
 
@@ -21,14 +27,22 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 2. A rough live transcript appears as the conversation happens.
 3. A side panel updates periodically with: a working differential diagnosis, suggested questions to ask, and clinical signs to look for — helping narrow the differential in real time.
 
+![The live screen: transcript streaming, urgent actions, questions to ask and the differential revising as evidence arrives](help/images/02-3-cds-working.png)
+
 **After the consultation (a background job, takes a minute or two):**
 4. The full recording is re-transcribed at higher quality and **diarised** (labelled *Doctor:* / *Patient:*), with quality gates that refuse to draft from an untrustworthy transcript.
 5. A concise SOAP-style note is drafted — every claim citing the transcript turns it came from — plus a guideline summary grounded in retrieved guideline text (not the model's memory).
 6. The doctor reviews, edits, and signs off the note. Only then is it final — and only from a signed note can referral letters be drafted.
 
+![The drafted note: every claim cites the transcript turn it came from — click a citation and the turn opens](help/images/02-6-citation-click.png)
+
+![A referral letter drafted only from the signed note](help/images/02-8-referral-letter.png)
+
 **Around the edges:**
 - User accounts with roles (doctor, receptionist, admin) — enforced server-side; the receptionist manages the queue and can never open clinical content.
 - A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
+
+The screens above are from 31 July 2026 and carry the project's earlier name; the [help series](help/02-using-it-step-by-step.md) walks through the same consultation step by step.
 
 See PROJECT_PLAN.md for the full plan.
 

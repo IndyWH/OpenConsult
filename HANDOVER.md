@@ -7633,3 +7633,57 @@ touches no code; the count matches the launch slice's 1147).
 
 **Nothing needs a restart.** `help/` is prose in the repository; the
 running app serves none of it.
+
+## README launch visuals (2026-09-10, evening)
+
+Documentation only. `README.md` gains four things, in the order a reader
+meets them, and nothing else in the repository changed — no image was
+added, moved or renamed; the three PNGs were already in `help/images/`,
+where `help/02-using-it-step-by-step.md` references them.
+
+1. **The Zenodo DOI badge**, directly under the `# OpenConsult` heading
+   and above the one-line summary. It is the concept DOI already recorded
+   in `CITATION.cff` (`10.5281/zenodo.22689260`), so it resolves to the
+   latest release rather than to a pinned version.
+2. **The consultation video**, between the status blockquote's rule and
+   §1, under a one-line caption saying what it shows: a full consultation
+   start to finish, 5 min 43 s, an acted patient with the doctor
+   supervising throughout — live transcript and clinical decision support
+   first, then the note with every claim cited, then the referral letter.
+   It is hosted as a GitHub user-attachment (720p, 8.7 MB), not committed
+   to the repository, which is why the clone stays small. The bare URL
+   sits alone on its own line with a blank line on each side: that
+   spacing is what makes GitHub render a player instead of a link, so an
+   editor who reflows the paragraph breaks the video.
+3. **Three screenshots** in §2, each on its own line: the live screen
+   after item 3, and after item 6 the drafted note with its citation
+   chips followed by the referral letter drafted from the signed note.
+4. **A dated caveat** closing §2: the screens are from 31 July 2026 and
+   carry the project's earlier name, with a pointer to the help series
+   for the same consultation step by step.
+
+**The screenshots are owed a recapture** — with auto mode visible and the
+OpenConsult header rather than the old name. That is the owner's to do,
+and the caveat sentence is what stands in until it is done. When they are
+recaptured, the caveat comes out with them.
+
+**Verified.** The three image paths exist in the tree and render as
+images; `help/02-using-it-step-by-step.md` exists; the badge URL returns
+200 `image/svg+xml` and the DOI 302s to Zenodo; the rendered HTML puts
+the video URL alone in its own paragraph.
+
+**One thing to check after the push.** The user-attachment URL is a hard
+404 to an anonymous client today; fetched with the owner's GitHub token
+it is a 200, `video/mp4`, 8 744 173 bytes — so the asset exists and
+matches the caption, but GitHub had not yet made it public at the time of
+this commit. Assets uploaded this way normally become publicly readable
+once the markdown referencing them is saved in a public repository, which
+this commit does. **Open the README in a logged-out browser and confirm
+the player appears.** If it does not, the video needs re-uploading
+through a comment on the public repository and the URL swapping — the
+badge, the screenshots and the caveat are unaffected either way.
+
+**Suite not required and not run:** this commit touches no code, only
+`README.md` and this file.
+
+**Nothing needs a restart.** The running app serves neither file.
