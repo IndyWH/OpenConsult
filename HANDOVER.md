@@ -7687,3 +7687,11 @@ badge, the screenshots and the caveat are unaffected either way.
 `README.md` and this file.
 
 **Nothing needs a restart.** The running app serves neither file.
+
+**Two fixes the same evening (2026-09-10).** The DOI badge moved to a
+shields.io image because GitHub's camo proxy times out on Zenodo's badge
+host and the README showed a broken image; the concept DOI and the link
+target are unchanged. The help-series callout moved from after the Auto
+mode section to the end of §2, immediately before the `PROJECT_PLAN.md`
+pointer, so a new reader meets it right after the user's-eye tour. Docs
+only, no suite.

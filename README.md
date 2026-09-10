@@ -1,6 +1,6 @@
 # OpenConsult
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.22689260.svg)](https://doi.org/10.5281/zenodo.22689260)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22689260-blue)](https://doi.org/10.5281/zenodo.22689260)
 
 **A research/educational prototype for AI-assisted medical consultations — fully local, human-in-the-loop, English-only in v1.**
 
@@ -44,6 +44,8 @@ https://github.com/user-attachments/assets/84bf3635-54de-479d-8caa-2ebf5787e5e9
 
 The screens above are from 31 July 2026 and carry the project's earlier name; the [help series](help/02-using-it-step-by-step.md) walks through the same consultation step by step.
 
+> **New to the project?** Start with the [help series](help/00-introduction.md) — a short, diagram-led tour of what the app does, how it's built, and why it works the way it does (including what an independent security audit found). It's written for reading, not installing.
+
 See PROJECT_PLAN.md for the full plan.
 
 ## Auto mode (experimental, off by default)
@@ -65,8 +67,6 @@ refined for v1.1 from the pilot runs. The design is in
 `PHASE_7C_SPEC.md`; the pilot diagnostics that drive the refinements are
 kept outside the repository, on the reference machine, in
 `~/Documents/Consultation-ai/Solo Pilot Documents/`.
-
-> **New to the project?** Start with the [help series](help/00-introduction.md) — a short, diagram-led tour of what the app does, how it's built, and why it works the way it does (including what an independent security audit found). It's written for reading, not installing.
 
 ## Getting started (Phase 0)
 
