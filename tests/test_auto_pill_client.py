@@ -103,7 +103,7 @@ def test_the_pill_is_hidden_unless_the_server_says_auto_mode_exists():
 
 def test_the_tap_sends_the_servers_message_and_the_pill_sits_in_the_control_row():
     click = _extract("autoPill.addEventListener('click', () => {", "\n});")
-    assert "ws.send(JSON.stringify({type: 'auto', on: !autoOn}));" in click
+    assert "ws.send(JSON.stringify({type: 'auto', on: !autoOn, client: {" in click   # + the machine record (G10, 2026-09-09)
     # Beside Sound check and Face, in the same control row, same class.
     row = LIVE[LIVE.index('id="soundCheckBtn"'):LIVE.index('id="btn"')]
     assert 'id="facePill"' in row and 'id="autoPill"' in row

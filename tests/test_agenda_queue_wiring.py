@@ -1524,3 +1524,109 @@ def test_the_f5_re_asks_latency_row_is_marked_reask_and_carries_no_turn_end_numb
     assert reask["turn_end_to_issue_ms"] is None and reask["turn_end_to_speech_ms"] is None
     assert 0 <= reask["issue_to_speech_ms"] < 5000, "measured from the re-ask's own issue"
     assert len(_audit("auto.reask_no_answer", s.session_id)) == 1
+
+
+# ==========================================================================
+# Pilot fix slice 4, item 10 (owner decision 2026-09-09, pilot 488 G9 and G10)
+
+def test_a_doctors_tap_in_golden_is_recorded_in_the_queue_and_answered_at_the_exit(gate):
+    """G9: 488's two tapped questions in the golden minutes left the queue
+    untouched (the bookkeeping ran only in the question phases), so Alba
+    could have asked them again. Now a tap in GOLDEN consumes a pending
+    match (by=tap) exactly as in the question phases, the golden exit
+    marks it answered, and a later pass proposing it is discarded at the
+    merge — never asked by the machine. A novel tapped question is
+    recorded asked (add_asked) the same way. No answer is awaited in the
+    golden minutes: the flow flags stay the question phases'."""
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        s.to_golden()
+        s.land_pass()                                  # v1 merges in the golden minutes
+        version = s.entry["agenda"].current_version
+        s.seed_agenda("Have you had this before?")     # a panel the queue never held (v2)
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": version, "index": 1}}))   # Q_SLEEP, in GOLDEN
+        ready = _until(s.ws, {"speak_ready"})
+        sleep = queue.find(Q_SLEEP)
+        assert sleep.status is ItemStatus.ASKED, "consumed by the tap, in GOLDEN"
+        assert s.auto["awaiting_answer"] is False, "no answer is awaited in the golden minutes"
+        assert s.phase.value == "golden"
+        s.play(ready["utterance_id"])
+        s.ws.send_text(json.dumps({"type": "speak", "ref": {
+            "kind": "cds_question", "assessment_version": version + 1, "index": 0}}))   # the novel one
+        ready2 = _until(s.ws, {"speak_ready"})
+        novel = queue.find("Have you had this before?")
+        assert novel is not None and novel.status is ItemStatus.ASKED
+        s.play(ready2["utterance_id"])
+        s.to_open()                                    # the exit: the tapped items' answers have ended
+        assert queue.get(sleep.id).status is ItemStatus.ANSWERED
+        assert queue.get(novel.id).status is ItemStatus.ANSWERED
+        first = s.wait_for_auto_speak()
+        assert first["text"] == "Can you tell me more about the chest pain?", "Q_ONSET, the head"
+        s.play(first["utterance_id"])
+        s.turn_end("Tuesday.")                         # pass 2 re-proposes Q_SLEEP: discarded
+        nxt = s.wait_for_auto_speak()
+        assert Q_SLEEP not in nxt["text"] and "sleep" not in nxt["text"]
+        _stop(s)
+    consumed = _audit("auto.queue_consumed", s.session_id)
+    assert (consumed[0]["text"], consumed[0]["by"]) == (Q_SLEEP, "tap")
+    assert consumed[0]["utterance_id"] == ready["utterance_id"]
+    external = _audit("auto.queue_asked_externally", s.session_id)
+    assert [e["text"] for e in external] == ["Have you had this before?"]
+    answered = _audit("auto.queue_answered", s.session_id)
+    assert [(a["text"], a["at"]) for a in answered[:2]] == [(Q_SLEEP, "golden_exit"),
+                                                           ("Have you had this before?", "golden_exit")]
+    merges = _audit("auto.queue_merged", s.session_id)
+    assert merges[-1]["discarded"] >= 1
+    assert Q_SLEEP not in [c["text"] for c in consumed[1:]], "never asked by the machine"
+
+
+def test_auto_enabled_records_the_machine_browser_and_microphone(gate):
+    """G10: 487–490 knew only the sound check's OUTPUT label ("MacBook Air
+    Speakers"). Now the sound check records the input label too, and the
+    auto.enabled row carries `client`: the user agent from the socket's
+    own headers, the platform and the current input label from the
+    toggle, and the output and input labels the sound check recorded."""
+    from auto_harness import _client_for, _make_user
+    doctor = _make_user()
+    client = _client_for(doctor)
+    posted = client.post("/api/speech/sound-check/result", json={
+        "noise_floor_rms": 0.0031, "peak_rms": 0.22, "mean_rms": 0.07, "answer": "yes",
+        "device_label": "Default - MacBook Air Speakers (Built-in)",
+        "input_label": "MacBook Air Microphone (Built-in)"})
+    assert posted.status_code == 200
+    with live(gate, user=doctor) as s:
+        s.disclose()
+        s.ws.send_text(json.dumps({"type": "auto", "on": True, "client": {
+            "platform": "macOS", "input_label": "MacBook Air Microphone (Built-in)"}}))
+        _collect_until(s.ws, {"auto_toggled"})
+        _stop(s)
+    enabled = _audit("auto.enabled", s.session_id)[0]
+    record = enabled["client"]
+    assert record["user_agent"], "from the socket's headers, not the client's say-so"
+    assert record["platform"] == "macOS"
+    assert record["input_label"] == "MacBook Air Microphone (Built-in)"
+    assert record["output_label"] == "Default - MacBook Air Speakers (Built-in)"
+    assert record["sound_check_input_label"] == "MacBook Air Microphone (Built-in)"
+    import os as _os
+    import psycopg as _psycopg
+    with _psycopg.connect(_os.environ["DATABASE_URL"]) as conn:
+        row = conn.execute("SELECT detail FROM audit_event WHERE action = 'speech.sound_check'"
+                           " AND user_id = %s ORDER BY id DESC LIMIT 1", (doctor["id"],)).fetchone()[0]
+    assert row["input_label"] == "MacBook Air Microphone (Built-in)"
+    assert row["device_label"] == "Default - MacBook Air Speakers (Built-in)"
+
+
+def test_auto_enabled_without_a_client_block_or_sound_check_records_nulls_not_nothing(gate):
+    with live(gate) as s:
+        s.disclose()
+        s.toggle(True)
+        _collect_until(s.ws, {"auto_toggled"})
+        _stop(s)
+    record = _audit("auto.enabled", s.session_id)[0]["client"]
+    assert set(record) == {"user_agent", "platform", "input_label", "output_label", "sound_check_input_label"}
+    assert record["platform"] is None and record["input_label"] is None
+    assert record["output_label"] is None and record["sound_check_input_label"] is None

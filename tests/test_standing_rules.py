@@ -276,7 +276,7 @@ def test_the_auto_pill_keeps_all_three_standing_rules():
     assert "autoPill.setAttribute('aria-pressed', String(autoOn));" in apply
     click = live[live.index("autoPill.addEventListener('click'"):]
     click = click[:click.index("\n});")]
-    assert "ws.send(JSON.stringify({type: 'auto', on: !autoOn}));" in click   # rule 1
+    assert "ws.send(JSON.stringify({type: 'auto', on: !autoOn, client: {" in click   # + the machine record (G10, 2026-09-09)   # rule 1
     refused = live[live.index("else if (msg.type === 'auto_refused') {"):]
     refused = refused[:refused.index("\n  }")]
     assert "showSpeakError(msg.detail);" in refused                   # rule 1: refusal shown

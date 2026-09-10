@@ -353,6 +353,10 @@ class SoundCheckResultBody(BaseModel):
     mean_rms: float | None = None
     answer: str | None = None          # 'yes' | 'no' | anything else = skipped
     device_label: str | None = None    # output device, when the browser exposes it
+    # The microphone's label at the time of the check (owner decision
+    # 2026-09-09, pilot G10): the record knew the output device and not the
+    # input; the input track's label was on the page all along.
+    input_label: str | None = None
     # The capture chain the page REQUESTED for the measuring stream
     # (ec/ns/agc booleans, live.html's CAPTURE_CHAIN — the single source
     # that also builds the getUserMedia constraints). The device-label
@@ -435,6 +439,7 @@ async def sound_check_result(
                     {"result": verdict["result"], "answer": verdict["answer"],
                      "discrepancy": verdict["discrepancy"],
                      "device_label": body.device_label,
+                     "input_label": body.input_label,
                      **({"chain": body.chain} if body.chain else {}),
                      # Residual or the reason there is none — never silence.
                      **({"residual": body.residual} if body.residual
@@ -1876,6 +1881,7 @@ def _new_auto_state() -> dict:
         "golden_unanswered": 0,
         "golden_encourager_span": None,
         "quiet_span_seq": 0,
+        "golden_tapped": [],          # queue items the doctor tapped in GOLDEN (G9): answered at the exit
         "last_quiet_s": None,         # the last report's quiet (the fallback fresh-span test)
         "last_span": None,            # the client's span number on the last report (G3: the fresh-span test)
         "officer_task": None,         # the in-flight end-of-turn call, if any
@@ -1973,6 +1979,7 @@ def _reset_golden(auto: dict) -> None:
     auto["golden_encourager_count"] = 0
     auto["golden_unanswered"] = 0
     auto["golden_encourager_span"] = None
+    auto["golden_tapped"] = []
 
 
 def _auto_on(ctl: auto_mode.AutoModeController) -> bool:
@@ -3204,10 +3211,26 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 await refuse_auto("an utterance is in flight — try again when it has finished")
                 return
             floor = auto["floor"]
+            # The machine, browser and microphone on the record (owner
+            # decision 2026-09-09, pilot G10): the user agent from the
+            # socket's own headers, the platform and the current input
+            # label from the client's toggle, and the labels the sound
+            # check recorded — 487–490 knew only "MacBook Air Speakers".
+            raw_client = payload.get("client") if isinstance(payload.get("client"), dict) else {}
+            def _text(value, limit=300):
+                return str(value)[:limit] if isinstance(value, (str, int, float)) and str(value) else None
+            client_record = {
+                "user_agent": _text(websocket.headers.get("user-agent"), 500),
+                "platform": _text(raw_client.get("platform")),
+                "input_label": _text(raw_client.get("input_label")),
+                "output_label": floor.get("sound_check_output_label"),
+                "sound_check_input_label": floor.get("sound_check_input_label"),
+            }
             await audit.log(user["id"], "auto.enabled", None, None,
                             {"session_id": session_id, "via": via,
                              "disclosed": entry["disclosed"],
                              "at_audio_s": round(session.audio_seconds, 1),
+                             "client": client_record,
                              # The floor from the room (G2): the value, the
                              # measurement it came from and the margin — or
                              # that there was no sound check and the minimum
@@ -4236,10 +4259,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             await _end_run_by_tapped_handover(auto, utterance)
             return
         if (utterance.ref_kind == "cds_question"
-                and auto["controller"].phase in auto_mode.QUESTION_PHASES):
-            auto["awaiting_answer"] = True
-            auto["turn_ended"] = False
-            auto["last_asked_text"] = utterance.text
+                and auto["controller"].phase in auto_mode.LISTENING_PHASES):
+            if auto["controller"].phase in auto_mode.QUESTION_PHASES:
+                auto["awaiting_answer"] = True
+                auto["turn_ended"] = False
+                auto["last_asked_text"] = utterance.text
             # The doctor's ask counts too (F4, D-E): a tapped question that
             # is a pending queue item consumes it (by=tap) and Alba
             # continues from the new head; one the queue never held — an
@@ -4249,21 +4273,31 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # one) is awaited the same way. In every case its answer's
             # turn end marks the item answered. An already-answered
             # question the doctor asks again is theirs to ask; nothing is
-            # recorded twice.
+            # recorded twice. In GOLDEN too (owner decision 2026-09-09,
+            # pilot 488 G9): the bookkeeping ran only in the question
+            # phases, so 488's two tapped questions left the queue
+            # untouched and Alba could have asked them again; the flow
+            # flags above stay the question phases' — no answer is awaited
+            # in the golden minutes, and the exit marks the item answered.
             queue: agenda_queue.AgendaQueue = auto["queue"]
             item = queue.find(utterance.text)
-            auto["asked_item_id"] = None
+            asked_id = None
             if item is None:
                 event = queue.add_asked(utterance.text, by="tap",
                                         version=utterance.ref_detail.get("assessment_version"))
                 await _audit_queue_events((event,), {"utterance_id": utterance.utterance_id})
-                auto["asked_item_id"] = event["id"]
+                asked_id = event["id"]
             elif item.pending:
                 await _audit_queue_events((queue.consume(item.id, by="tap"),),
                                           {"utterance_id": utterance.utterance_id})
-                auto["asked_item_id"] = item.id
+                asked_id = item.id
             elif item.status is agenda_queue.ItemStatus.ASKED:
-                auto["asked_item_id"] = item.id
+                asked_id = item.id
+            if auto["controller"].phase is auto_mode.AutoPhase.GOLDEN:
+                if asked_id is not None:
+                    auto["golden_tapped"].append(asked_id)   # every golden tap, answered at the exit
+            else:
+                auto["asked_item_id"] = asked_id
 
     async def _end_run_by_tapped_handover(auto: dict, utterance: speech.Utterance) -> None:
         """The tapped handover phrase IS the handover: the same edge the
@@ -4565,9 +4599,20 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["turn_ended"] = True
         auto["turn_ended_at"] = time.monotonic()
         auto["think_used"] = False           # a new wait begins
+        await _answer_golden_tap(auto)
         auto["repause_block"] = False        # a turn has ended (pilot D4)
         _request_revision(auto, why)
         return transition
+
+    async def _answer_golden_tap(auto: dict) -> None:
+        """A question the doctor tapped in GOLDEN (G9) was answered in the
+        golden minutes; the exit — the golden turn's end — marks its queue
+        item answered, as an answer's turn end does in the question phases."""
+        tapped, auto["golden_tapped"] = list(auto.get("golden_tapped") or ()), []
+        for item_id in tapped:
+            item = auto["queue"].get(item_id)
+            if item is not None and item.status is agenda_queue.ItemStatus.ASKED:
+                await _audit_queue_events((auto["queue"].answered(item_id),), {"at": "golden_exit"})
 
     async def _end_turn(auto: dict, *, by: str, quiet_s: float, verdict=None) -> None:
         """One turn-end rule in every phase (owner decision 2026-09-07,
@@ -5003,6 +5048,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 auto["turn_ended"] = True
                 auto["turn_ended_at"] = time.monotonic()
                 auto["think_used"] = False
+                await _answer_golden_tap(auto)
                 _request_revision(auto, "golden exit: hand-back")
                 return transition
             elapsed = _golden_elapsed(auto)

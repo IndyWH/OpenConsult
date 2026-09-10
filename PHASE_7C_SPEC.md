@@ -81,7 +81,13 @@ with `confirm_displace`) or *let Alba ask* — and a cancelled tap leaves
 the queue untouched; the `auto.doctor_tap` row records `confirmed`
 (true or false) and the displaced text. Taps with nothing planned are
 unchanged. The tapped examination handover is exempt: it ends the run,
-and there is nothing for the machine to ask after it.
+and there is nothing for the machine to ask after it. **A doctor's tap
+in GOLDEN is recorded in the queue exactly as in the question phases**
+(owner decision 2026-09-09, after consultation 488, finding G9): a
+pending match is consumed (`by: tap`), a novel question is `add_asked`,
+so Alba can never ask it later; the golden exit marks the item
+answered. In 488 the bookkeeping ran only in the question phases and the
+two questions tapped in the golden minutes left the queue untouched.
 
 ## 4. What the system may say — the utterance whitelist
 
@@ -759,7 +765,11 @@ and `test_standing_rules.py` extends to the new controls.
   "phase":..., "trigger":{"quiet_s":...,"handed_back":...}}` and
   `cds_rationale` populated from the agenda version as today. New
   `end_reason` values: `politeness_abort`, `urgency_pause`.
-- Audit events: `auto.enabled`, `auto.disabled` (with `reason` and the
+- Audit events: `auto.enabled` (with `client` — the user agent from the
+  socket's headers, the platform and the current input device's label
+  from the toggle, and the output and input labels the sound check
+  recorded; owner decision 2026-09-09, G10 — and `speech.sound_check`
+  now records `input_label` beside `device_label`), `auto.disabled` (with `reason` and the
   measured RMS, floor and attempts when the machine switched itself off
   — `too_loud_to_start`, owner decision 2026-09-09, G1),
   `auto.enable_retry` for every re-issue of the enable's disclosure or

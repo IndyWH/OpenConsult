@@ -2068,6 +2068,9 @@ async function runSoundCheck() {
         mean_rms: heard.mean,
         answer: answer,
         device_label: await outputDeviceLabel(audio),
+        // The microphone's label too (owner decision 2026-09-09, G10): the
+        // record knew the speakers and not the mic.
+        input_label: devNameEl.textContent || null,
         // The chain that made this measurement — the SAME object that
         // built the capture constraints, so the two cannot disagree.
         // Readings across different chains are not comparable (the
@@ -2410,7 +2413,14 @@ const autoPillLabel = document.getElementById('autoPillLabel');
 
 autoPill.addEventListener('click', () => {
   if (!ws || ws.readyState !== WebSocket.OPEN) return;  // disabled anyway; race guard
-  ws.send(JSON.stringify({type: 'auto', on: !autoOn}));
+  // The machine, browser and microphone go on the auto.enabled row (owner
+  // decision 2026-09-09, pilot G10): the platform and the current input
+  // device's label travel with the toggle; the user agent the server reads
+  // from the socket itself.
+  ws.send(JSON.stringify({type: 'auto', on: !autoOn, client: {
+    platform: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || null,
+    input_label: devNameEl.textContent || null,
+  }}));
 });
 
 // The phase indicator (spec §10): what the machine thinks it is doing,
