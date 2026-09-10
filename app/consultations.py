@@ -758,6 +758,68 @@ async def purge_voided(only_ids: list[int] | None = None) -> dict:
     }
 
 
+# Every table that cascades from consultation(id), for the purge-one audit
+# row: the operator reads what was destroyed, not just that something was.
+_CASCADE_TABLES = ("transcript_turn", "raw_segment", "system_utterance",
+                   "assessment_snapshot", "note", "letter", "letter_suggestion")
+
+
+async def purge_one(cid: int) -> dict | None:
+    """Hard-delete ONE already-voided consultation of ANY void class,
+    including clinical_safety — the deliberate, named exception to
+    `purge_voided`'s guard, reachable only from the server shell
+    (scripts/manage_consultations.py purge-one). Added 2026-09-10 for
+    consultation 469: voided as clinical_safety on 14 Aug, which the
+    button skips by design, yet the one record the project undertook to
+    delete with everything derived from it.
+
+    Deletes the consultation row (every dependent table cascades — the
+    per-table counts are returned for the audit row), then the patient
+    row if no other consultation references it. Returns what was removed
+    and the audio path for the caller to unlink after commit, or None
+    when the consultation does not exist or is NOT voided — the guard is
+    in the DELETE's WHERE clause, so an unvoided row can never be deleted
+    by this path whatever the caller checked first.
+    """
+    async with await _conn() as conn:
+        counts = {}
+        for table in _CASCADE_TABLES:
+            counts[table] = (await (await conn.execute(
+                f"SELECT count(*) FROM {table} WHERE consultation_id = %s",
+                (cid,))).fetchone())[0]
+        row = await (
+            await conn.execute(
+                "DELETE FROM consultation WHERE id = %s AND voided_at IS NOT NULL"
+                " RETURNING audio_path, patient_id, void_reason,"
+                " COALESCE(void_reason_class, %s), status",
+                (cid, VOID_CLASS_TEST_DATA),
+            )
+        ).fetchone()
+        if row is None:
+            return None
+        audio_path, patient_id, reason, reason_class, status = row
+        purged_patient = None
+        if patient_id is not None:
+            purged_patient = await (
+                await conn.execute(
+                    "DELETE FROM patient p WHERE p.id = %s AND NOT EXISTS"
+                    " (SELECT 1 FROM consultation c WHERE c.patient_id = p.id)"
+                    " RETURNING p.id",
+                    (patient_id,),
+                )
+            ).fetchone()
+    return {
+        "consultation_id": cid,
+        "status": status,
+        "void_reason": reason,
+        "void_reason_class": reason_class,
+        "cascaded_rows": counts,
+        "patient_id": patient_id,
+        "patient_purged": purged_patient is not None,
+        "audio_path": audio_path,
+    }
+
+
 async def purge_preview(only_ids: list[int] | None = None) -> dict:
     """What a purge WOULD do, without doing it — so the UI's confirmation
     can name the numbers instead of asking for a blind yes."""
