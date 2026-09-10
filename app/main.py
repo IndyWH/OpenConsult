@@ -4727,10 +4727,28 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             logger.info("Live session %s: hand-back detected in %s (quiet %.1fs)",
                         session_id, ctl.phase.value, quiet_s)
         trace = auto.get("last_trace")
+        # H3 (owner decision 2026-09-10, pilot 491): the span start against
+        # the transcript's last word, when both are known. In 491 the span
+        # began at the final's ARRIVAL, 2.1-3.7 s after the last word, and
+        # every answer waited that much longer than the rule; the span is
+        # now keyed on energy alone, so last_word_to_span_start_s should
+        # read near zero (or negative: the final may not have arrived yet,
+        # in which case last_final is the previous turn's — its age says).
+        # commit_latency_s is the transcriber's own: the final's arrival on
+        # the session clock minus its last word's end.
+        last_final, span_start = entry.get("last_final"), auto.get("span_start")
+        if last_final is not None and span_start is not None:
+            latency = {"last_word_end_s": round(last_final["end"], 2),
+                       "span_start_s": round(span_start["audio_s"], 2),
+                       "last_word_to_span_start_s": round(span_start["audio_s"] - last_final["end"], 2),
+                       "commit_latency_s": round(last_final["committed_at_audio_s"] - last_final["end"], 2),
+                       "last_final_age_s": round(time.monotonic() - last_final["at"], 2)}
+        else:
+            latency = {"last_word_to_span_start_s": None, "commit_latency_s": None}
         await audit.log(user["id"], "auto.turn_ended", None, None,
                         {"session_id": session_id, "phase": ctl.phase.value, "by": by,
                          "quiet_s": round(quiet_s, 1), "answer": answer,
-                         "fallback_s": AUTO_EOT_FALLBACK_S,
+                         "fallback_s": AUTO_EOT_FALLBACK_S, **latency,
                          **({"handed_back": verdict.handed_back,
                              "finished_thought": verdict.finished_thought,
                              "officer_ms": verdict.elapsed_ms,
@@ -4860,6 +4878,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         own_voice = None
         if fresh and payload.get("since") != "playback":
             own_voice = _own_voice_at(entry, now - quiet_s)
+        # H3 (owner decision 2026-09-10, pilot 491): where this span began,
+        # on the session clock — for the turn_ended row's comparison with
+        # the transcript's last word.
+        auto["span_start"] = {"audio_s": session.audio_seconds - quiet_s, "at": now - quiet_s,
+                              "span": span if isinstance(span, int) else None}
         if fresh or auto["quiet_audit_at"] is None or now - auto["quiet_audit_at"] >= AUTO_QUIET_REPORT_AUDIT_S:
             auto["quiet_audit_at"] = now
             rms = payload.get("rms")
@@ -5370,6 +5393,14 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     await websocket.send_json(
                         {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
                     )
+                if committed:
+                    # H3 (owner decision 2026-09-10, pilot 491): the last
+                    # transcribed word's end on the session clock, and when
+                    # it was committed — the transcript commit latency the
+                    # auto.turn_ended row measures against the span start.
+                    entry["last_final"] = {"end": committed[-1].end,
+                                           "committed_at_audio_s": session.audio_seconds,
+                                           "at": time.monotonic()}
                 await websocket.send_json({"type": "partial", "text": partial})
 
             # Phase 7c: an officer verdict that has arrived is applied

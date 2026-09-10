@@ -2723,15 +2723,22 @@ function onWsMessage(event) {
   if (msg.type === 'final') {
     addFinal(msg); partialEl.textContent = '';
     nudge.activity(performance.now());   // committed transcript movement
-    quietReporter.activity(performance.now());
+    // H3 (owner decision 2026-09-10, pilot 491): the quiet reporter does
+    // NOT restart its span here. The transcriber commits an answer's last
+    // words 2-4 s after they were spoken, and a span restarted at the
+    // commit made every answer wait that much longer than the rule; the
+    // reporter's span is keyed on energy alone (the meter loop). The
+    // nudge keeps its transcript rule — a phantom partial suppressing the
+    // nudge is acceptable.
   }
   else if (msg.type === 'partial') {
     partialEl.textContent = msg.text;
-    // Transcript MOVEMENT is activity — a phantom partial suppressing
-    // the nudge is acceptable, the reverse is not.
+    // Transcript MOVEMENT is activity for the nudge — a phantom partial
+    // suppressing the nudge is acceptable, the reverse is not. Not for the
+    // quiet reporter (H3, above).
     if (msg.text !== lastPartialText) {
       lastPartialText = msg.text;
-      if (msg.text) { nudge.activity(performance.now()); quietReporter.activity(performance.now()); }
+      if (msg.text) nudge.activity(performance.now());
     }
   }
   else if (msg.type === 'speech_config') {

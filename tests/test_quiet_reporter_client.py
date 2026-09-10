@@ -210,17 +210,26 @@ def test_the_rms_trace_is_a_bounded_ring_sized_by_the_server(monkeypatch):
 
 
 def test_every_activity_source_resets_the_reporter():
-    """The nudge's activity sources, all of them: transcript movement
-    (final and changed partial) and our own playback ending.
+    """The reporter's activity sources: room energy at the floor (the meter
+    loop), the toggle-on confirmation, and our own playback ending.
 
     REPINNED 2026-09-07 (owner decision, pilot 485 E2): our playback ending
     still resets the reporter, and now names itself as the cause
     ('playback'), which every report of that span carries as `since` so the
     server never lets our own voice erase a judged turn end. Every other
-    source stays speech."""
-    assert LIVE.count("quietReporter.activity(performance.now())") >= 3
-    final_block = LIVE[LIVE.index("if (msg.type === 'final') {"):LIVE.index("else if (msg.type === 'partial')")]
-    assert "quietReporter.activity(performance.now())" in final_block
+    source stays speech.
+
+    REPINNED 2026-09-10 (owner decision, pilot 491 H3): transcript movement
+    — a final, a changed partial — is NO LONGER a source: the transcriber
+    commits an answer's last words 2.1-3.7 s after they were spoken, and a
+    span restarted at the commit made every answer wait that much longer
+    than the rule. The nudge keeps its transcript rule (its own test); the
+    reporter's span is keyed on energy alone. Executed under Node in
+    tests/test_transcript_span_client.py."""
+    assert LIVE.count("quietReporter.activity(performance.now())") == 1, "the toggle-on confirmation only"
+    final_block = LIVE[LIVE.index("if (msg.type === 'final') {"):LIVE.index("else if (msg.type === 'speech_config')")]
+    assert "quietReporter.activity(" not in final_block, "a final or partial does not move the span"
+    assert final_block.count("nudge.activity(performance.now())") == 2, "the nudge keeps both"
     stop = LIVE[LIVE.index("function stopSpeaking(reason, cutLatencyMs) {"):]
     stop = stop[:stop.index("\n}")]
     assert "quietReporter.activity(performance.now(), 'playback')" in stop
