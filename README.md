@@ -56,21 +56,40 @@ kept outside the repository, on the reference machine, in
 
 ## Getting started (Phase 0)
 
-Requirements: Linux, [uv](https://docs.astral.sh/uv/) (installs its own Python 3.12), PostgreSQL 18 with pgvector.
+Requirements: Linux, [uv](https://docs.astral.sh/uv/) (installs its own
+Python 3.12), PostgreSQL 18 with pgvector, an NVIDIA GPU with 24 GB of
+VRAM for the full pipeline (the reference machine is one RTX 4090), and
+`ffmpeg` on the PATH. The steps below were followed literally on a fresh
+clone on 10 September 2026; every one is copy-paste.
 
 ```bash
 # 1. Install uv (one-time)
 curl -LsSf https://astral.sh/uv/install.sh | sh
 
-# 2. Install PostgreSQL + pgvector (one-time)
-sudo apt update && sudo apt install -y postgresql postgresql-18-pgvector
+# 2. Install PostgreSQL + pgvector (one-time), then create the role, the
+#    database and the extension. Choose a real password; it goes into
+#    .env in step 4. CREATEDB and the extension in template1 are what the
+#    test suite needs to build and drop its own disposable database
+#    (consultation_ai_test) — it never touches this one.
+sudo apt update && sudo apt install -y postgresql postgresql-18-pgvector ffmpeg
+sudo -u postgres psql <<'SQL'
+CREATE ROLE consultation_app LOGIN PASSWORD 'choose-a-real-password' CREATEDB;
+CREATE DATABASE consultation_ai OWNER consultation_app;
+\c consultation_ai
+CREATE EXTENSION IF NOT EXISTS vector;
+\c template1
+CREATE EXTENSION IF NOT EXISTS vector;
+SQL
 
-# 3. Install project dependencies
+# 3. Install project dependencies. On a fresh machine this downloads the
+#    CUDA and PyTorch wheels — several GB, once.
 uv sync
 
-# 4. Configure: copy the template, then set SECRET_KEY to a real value
-#    (`openssl rand -hex 32`) — the app refuses to start on a missing,
-#    short, or placeholder key
+# 4. Configure: copy the template, then edit .env — put the step-2
+#    password into DATABASE_URL, and set SECRET_KEY to a real value
+#    (`openssl rand -hex 32`): the app refuses to start on a missing,
+#    short, or placeholder key. .env.example documents every setting the
+#    app reads, each with its default; nothing else is required.
 cp .env.example .env
 
 # 5. Create the first admin from the server shell (password prompted) —
@@ -84,6 +103,15 @@ uv run uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 (`--reload` is development-only: it auto-restarts on code edits and must
 never be used for an internet-exposed app.)
+
+**What downloads when.** Nothing in the repository is a model. The live
+transcriber fetches `distil-large-v3` (~1.5 GB) on the first Start. The
+first **Stop** fetches WhisperX `large-v3` (~3 GB), its English alignment
+model and the silero VAD, and the pyannote diarisation weights (gated —
+see the one-time setup below; the first Stop fails without it). MedGemma
+(~17 GB) and embeddinggemma (~600 MB) are pulled through Ollama by the
+commands further down, under the terms in § Model terms. Expect the
+first Stop to take several minutes longer than the second.
 
 Then open http://127.0.0.1:8000/login and register two accounts — one
 receptionist, one doctor. Registrations start pending: approve both from

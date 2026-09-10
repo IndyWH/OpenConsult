@@ -441,6 +441,34 @@ def test_cache_is_not_shared_across_voices(tmp_path):
 
 # --- availability ----------------------------------------------------------
 
+def test_tilde_in_the_model_path_and_executable_is_expanded(tmp_path, monkeypatch):
+    """The template (.env.example) names the paths `uv tool install
+    piper-tts` and the README's voice download produce under `~`, so it
+    is true on any account; the service expands `~` in the model path
+    and in the command's first word — and nowhere else, since no shell
+    is involved. Before 2026-09-10 the template carried one machine's
+    home directory and four TTS tests skipped on every other box."""
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.setattr(speech, "TTS_ENABLED", True)
+    voice = tmp_path / "voices" / "v.onnx"
+    voice.parent.mkdir()
+    voice.write_bytes(b"onnx")
+    exe = tmp_path / "bin" / "piper"
+    exe.parent.mkdir()
+    exe.write_text("#!/bin/sh\nexit 0\n")
+    exe.chmod(0o755)
+
+    service = speech.SpeechService(
+        model_path="~/voices/v.onnx",
+        command="~/bin/piper --model {model} --output-file {output}",
+        cache_dir=tmp_path)
+    assert service.model_path == str(voice)
+    assert service.unavailable_reason() is None
+    # The unexpanded command is what the config said; only argv[0] is
+    # resolved, and the `{model}` substitution sees the expanded path.
+    assert service.command.startswith("~/bin/piper")
+
+
 def test_service_reports_unavailable_without_a_model_path(tmp_path):
     service = speech.SpeechService(model_path="", cache_dir=tmp_path)
     assert service.available is False

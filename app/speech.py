@@ -813,7 +813,13 @@ class SpeechService:
     def __init__(self, voice: str | None = None, model_path: str | None = None,
                  cache_dir: Path | None = None, command: str | None = None) -> None:
         self.voice = voice or TTS_VOICE
-        self.model_path = model_path if model_path is not None else TTS_MODEL_PATH
+        # `~` is expanded in the model path and in the command's executable
+        # (2026-09-10), so .env.example can name the paths `uv tool install
+        # piper-tts` and the README's voice download actually produce, on
+        # any account, instead of one machine's home directory. Nothing
+        # else in the command is expanded: no shell is ever involved.
+        model_path = model_path if model_path is not None else TTS_MODEL_PATH
+        self.model_path = os.path.expanduser(model_path) if model_path else model_path
         self.cache_dir = Path(cache_dir) if cache_dir else SPEECH_CACHE_DIR
         self.command = command if command is not None else TTS_COMMAND
         self._utterances: dict[str, Utterance] = {}
@@ -831,7 +837,7 @@ class SpeechService:
             return "TTS_MODEL_PATH is not set"
         if not Path(self.model_path).exists():
             return f"voice model not found: {self.model_path}"
-        executable = shlex.split(self.command)[0]
+        executable = os.path.expanduser(shlex.split(self.command)[0])
         if shutil.which(executable) is None and not Path(executable).exists():
             return (f"synthesis command not found: {executable} "
                     f"(install it outside the app environment, e.g. "
@@ -857,6 +863,7 @@ class SpeechService:
 
         argv = [part.format(model=self.model_path, output=str(output))
                 for part in shlex.split(self.command)]
+        argv[0] = os.path.expanduser(argv[0])
         try:
             result = subprocess.run(
                 argv, input=text.encode(), capture_output=True,

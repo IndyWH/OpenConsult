@@ -38,8 +38,13 @@ load_dotenv()
 # not sent over plaintext HTTP — so with the production default every
 # authenticated test would lose its session. Turned off HERE and only here;
 # app/main.py defaults it to secure, so a forgotten variable in production
-# fails safe (2026-07-31 audit, Finding 6). Set before any app import.
-os.environ.setdefault("SESSION_COOKIE_SECURE", "false")
+# fails safe (2026-07-31 audit, Finding 6). Set — not setdefault — before
+# any app import: load_dotenv() above has already read .env, and since
+# 2026-09-10 .env.example documents SESSION_COOKIE_SECURE=true explicitly,
+# so a fresh clone's .env would otherwise carry the production value into
+# the suite and fail 33 cookie-bearing tests (the launch-day fresh-clone
+# run found exactly that). The suite's outcome must not depend on .env.
+os.environ["SESSION_COOKIE_SECURE"] = "false"
 
 # app/auth.py refuses to start without a real SECRET_KEY (import-time
 # fail-fast, 2026-08-04). The suite must pass on a box with no .env, and

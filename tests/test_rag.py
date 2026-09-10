@@ -12,24 +12,40 @@ import psycopg
 import pytest
 from dotenv import load_dotenv
 
+from app import rag
 from app.rag import OLLAMA_URL, RAGService
 
 load_dotenv()
 
 
-def _rag_ready() -> bool:
+def _not_ready_reason() -> str | None:
+    """Why these tests cannot run here, or None. Three separate reasons,
+    each named, because the failure they hide is different: no Ollama, no
+    chunks in the database, and — the 10 Sept fresh-clone finding — no
+    corpus manifest, which makes RAGService refuse every query however
+    many chunks the database holds (tests/conftest.py copies the corpus
+    tables from the live database, so a clone next to a loaded server
+    has the chunks and not the manifest)."""
     try:
         httpx.get(f"{OLLAMA_URL}/api/tags", timeout=2.0).raise_for_status()
+    except Exception:
+        return "Ollama not available"
+    try:
         with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
             n = conn.execute("SELECT count(*) FROM guideline_chunk").fetchone()[0]
-        return n > 0
     except Exception:
-        return False
+        return "PostgreSQL not available"
+    if n == 0:
+        return "guideline corpus not ingested (guideline_chunk is empty)"
+    if not rag._MANIFEST.exists():
+        return (f"guideline corpus not loaded: no manifest at {rag._MANIFEST}"
+                " (copy corpus/manifest.example.yaml and run"
+                " scripts/ingest_guidelines.py)")
+    return None
 
 
-pytestmark = pytest.mark.skipif(
-    not _rag_ready(), reason="Ollama or ingested guideline corpus not available"
-)
+_NOT_READY = _not_ready_reason()
+pytestmark = pytest.mark.skipif(_NOT_READY is not None, reason=_NOT_READY or "")
 
 
 def test_retrieval_finds_the_right_guideline():
