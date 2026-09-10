@@ -357,6 +357,31 @@ def test_apply_rerank_drops_pending_items_with_the_reranker_reason():
     assert q.get("q2").status is ItemStatus.DROPPED and q.get("q2").drop_reason == "addressed"
 
 
+def test_apply_rerank_without_apply_drops_re_orders_and_removes_nothing():
+    """§3 as amended 2026-09-10 (owner decision after consultation 491:
+    the re-ranker re-orders only, never drops). The same verdict as the
+    test above, apply_drops=False: nothing changes status, the drop is
+    returned as drops_advised with its text and reason, the unknown id is
+    still ignored (the guard is unchanged), an advised item the order
+    names keeps its place, and one it does not name follows the named
+    ones. A queue can never be emptied this way."""
+    q = make()
+    q.merge(1, [RISK, DURATION, BREATH, NAUSEA])
+    ev = q.apply_rerank(["q4", "q2"], {"q2": "addressed", "q3": "answered", "q77": "done"},
+                        ms=12.0, apply_drops=False)
+    assert ids(q.pending) == ["q4", "q2", "q1", "q3"], "named order first, then the rest"
+    assert ev["drops"] == [] and ev["ignored"] == ["q77"]
+    assert ev["drops_advised"] == [{"id": "q2", "text": DURATION, "reason": "addressed"},
+                                   {"id": "q3", "text": BREATH, "reason": "answered"}]
+    assert ev["unmentioned"] == ["q1", "q3"]
+    assert all(i.status is ItemStatus.PENDING for i in q.pending) and len(q.pending) == 4
+    assert q.get("q2").drop_reason is None and q.get("q3").drop_reason is None
+    # Every item advised, none named: the queue keeps all of them.
+    ev = q.apply_rerank([], {i: "addressed" for i in ("q1", "q2", "q3", "q4")}, apply_drops=False)
+    assert ids(q.pending) == ["q4", "q2", "q1", "q3"] and ev["drops"] == []
+    assert [d["id"] for d in ev["drops_advised"]] == ["q1", "q2", "q3", "q4"]
+
+
 def test_apply_rerank_with_nothing_valid_changes_nothing():
     """Fail-soft's shape: an answer made only of unknown ids leaves the
     order exactly as it was and names every id as ignored."""

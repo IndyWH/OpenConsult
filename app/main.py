@@ -1546,6 +1546,14 @@ AUTO_QUEUE_ABSENT_PASSES = int(os.getenv("AUTO_QUEUE_ABSENT_PASSES", "3"))
 # (AUTO_RERANK_TIMEOUT_S, AUTO_RERANK_MAX_TOKENS).
 AUTO_RERANK_CONTEXT_TURNS = int(os.getenv("AUTO_RERANK_CONTEXT_TURNS", "6"))
 AUTO_RERANK_MAX_CHARS = int(os.getenv("AUTO_RERANK_MAX_CHARS", "1500"))
+# The re-ranker re-orders only, never drops (owner decision 2026-09-10, after
+# consultation 491: 0 for 7 wrong drops on the record across 489-491, every
+# dropped question re-proposed by the very next pass). The verdict's drops
+# are still received and recorded on auto.queue_reranked as drops_advised,
+# with the reason text, but none is applied and nothing changes status.
+# This flag guards the old behaviour so the drop path is not deleted; it
+# may be turned on only after the re-ranker has been through evals/.
+AUTO_RERANK_DROPS_ENABLED = os.getenv("AUTO_RERANK_DROPS_ENABLED", "false").lower() == "true"
 # A cut-off enable disclosure is retried, then the machine switches itself
 # off (owner decision 2026-09-09, pilot 488 G1). In 488 the enable's
 # disclosure was politeness-aborted 105 ms after issue (0.031 RMS against
@@ -2019,6 +2027,7 @@ def _thresholds_in_force(floor: float | None = None) -> dict:
         "rerank_timeout_s": cds_module.AUTO_RERANK_TIMEOUT_S,
         "rerank_max_tokens": cds_module.AUTO_RERANK_MAX_TOKENS,
         "rerank_context_turns": AUTO_RERANK_CONTEXT_TURNS,
+        "rerank_drops_enabled": AUTO_RERANK_DROPS_ENABLED,
         "rerank_max_chars": AUTO_RERANK_MAX_CHARS,
         "politeness_floor_rms": speech.AUTO_FLOOR_MIN if floor is None else floor,
         "floor_margin": speech.AUTO_FLOOR_MARGIN,
@@ -3789,10 +3798,19 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         goes through queue.apply_rerank — pending items only; any id that
         is not a known pending item is ignored and listed in the row (the
         no-invention guard is the module's) — audited auto.queue_reranked
-        with order, drops with reasons, ignored ids and ms. A drop marks
-        the item dropped with the re-ranker's one-word reason; a dropped
-        item is a fresh proposal if a later pass raises it again (slice-1
-        decision).
+        with order, drops with reasons, ignored ids and ms.
+
+        Re-order only, never drop (owner decision 2026-09-10, pilot 491:
+        0 for 7 wrong drops on the record): the verdict's drops are
+        received by the module and written on the row as drops_advised
+        (id, text, the reason text), but with AUTO_RERANK_DROPS_ENABLED
+        false — the default — none is applied: the items keep their
+        pending status; one the order does not name follows the named
+        ones (the protected item is popped before either way). With the
+        flag on (the old behaviour, kept for evals/, never deleted) a drop
+        marks the item dropped with the re-ranker's one-word reason; a
+        dropped item is a fresh proposal if a later pass raises it again
+        (slice-1 decision).
 
         The verdict is applied and the plan made in the same step the
         call returns, BEFORE any audit write: an await between the two is
@@ -3827,10 +3845,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             if protected is not None:
                 drops.pop(protected, None)
                 order = [protected] + [i for i in order if i != protected]
-            event = queue.apply_rerank(order, drops, ms=verdict.elapsed_ms)
-            logger.info("Live session %s: queue re-ranked in %d ms — order %s, dropped %s, "
-                        "ignored %s%s", session_id, verdict.elapsed_ms, event["order"],
-                        [d["id"] for d in event["drops"]], event["ignored"],
+            # The module still receives the drops (its no-invention guard
+            # lists the unknown ids); whether it applies them is the flag's
+            # — off, re-order only (owner decision 2026-09-10).
+            event = queue.apply_rerank(order, drops, ms=verdict.elapsed_ms,
+                                       apply_drops=AUTO_RERANK_DROPS_ENABLED)
+            logger.info("Live session %s: queue re-ranked in %d ms — order %s, dropped %s "
+                        "(advised %s), ignored %s%s", session_id, verdict.elapsed_ms,
+                        event["order"], [d["id"] for d in event["drops"]],
+                        [d["id"] for d in event["drops_advised"]], event["ignored"],
                         f", protected {protected}" if protected else "")
         else:
             logger.info("Live session %s: re-rank failed (%s) after %d ms — the order stands",
@@ -3861,7 +3884,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         else:
             await _audit_queue_events((event,), {
                 "excerpt_turns": excerpt_turns, "excerpt_chars": len(excerpt),
-                "protected": protected, "protected_dropped_by_verdict": protected_dropped})
+                "protected": protected, "protected_dropped_by_verdict": protected_dropped,
+                "drops_enabled": AUTO_RERANK_DROPS_ENABLED})
 
     def _ask_after_pass(auto: dict, version: int, why: str) -> None:
         """The pass auto mode asked for has landed (and merged) or failed.

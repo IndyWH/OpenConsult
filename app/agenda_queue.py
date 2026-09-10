@@ -460,7 +460,7 @@ class AgendaQueue:
             "asked_for_s": None if item.asked_at is None else round(now - item.asked_at, 3)})
 
     def apply_rerank(self, order_ids: Iterable[str], drop_ids: Iterable[str] | Mapping[str, str],
-                     *, ms: float | None = None) -> QueueEvent:
+                     *, ms: float | None = None, apply_drops: bool = True) -> QueueEvent:
         """Apply a re-ranker's answer (§3) to the PENDING items only.
 
         `order_ids` are the ids still worth asking, best first; `drop_ids`
@@ -468,9 +468,18 @@ class AgendaQueue:
         re-ranker's one-word reason, or a bare iterable. Any id that is
         not a known PENDING item is IGNORED and returned in the event's
         `ignored` list — the no-invention guard: the re-ranker cannot add
-        a question, resurrect one, or touch an asked one. An id in both
-        lists is dropped. Pending items the re-ranker did not mention keep
-        their previous relative order after the ones it did.
+        a question, resurrect one, or touch an asked one. Pending items
+        the re-ranker did not mention keep their previous relative order
+        after the ones it did.
+
+        With `apply_drops` (the flag-on case) an id in both lists is
+        dropped and every drop marks its item dropped with the reason.
+        Without it (§3 as amended 2026-09-10, owner decision after
+        consultation 491: the re-ranker re-orders only, never drops) the
+        drops are received, checked against the same guard and returned
+        as `drops_advised` — id, text, reason — but none is applied:
+        nothing changes status, an advised item named in the order keeps
+        its place there, and one not named follows the named ones.
         """
         now = self._clock()
         before = list(self._order)          # the order the verdict was applied to, drops included
@@ -478,12 +487,13 @@ class AgendaQueue:
         reasons: dict[str, str] = (dict(drop_ids) if isinstance(drop_ids, Mapping)
                                    else {str(i): "rerank" for i in drop_ids})
         ignored: list[str] = []
-        drops: list[str] = []
+        advised: list[str] = []
         for item_id in reasons:
-            if item_id in pending and item_id not in drops:
-                drops.append(item_id)
+            if item_id in pending and item_id not in advised:
+                advised.append(item_id)
             elif item_id not in pending:
                 ignored.append(item_id)
+        drops = advised if apply_drops else []
         order: list[str] = []
         for item_id in order_ids:
             item_id = str(item_id)
@@ -500,6 +510,8 @@ class AgendaQueue:
         return QueueEvent("queue_reranked", now, {
             "before": before, "order": list(self._order),
             "drops": [{"id": i, "text": self._items[i].text, "reason": reasons[i]} for i in drops],
+            "drops_advised": [{"id": i, "text": self._items[i].text, "reason": reasons[i]}
+                              for i in advised],
             "ignored": ignored, "unmentioned": rest,
             "ms": ms, "version": self._last_version})
 

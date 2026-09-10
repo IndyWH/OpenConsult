@@ -77,6 +77,17 @@ output that is not a known pending id is ignored and listed in the audit
 row — the re-ranker cannot invent, resurrect or touch an asked question.
 A drop marks the item dropped with the re-ranker's reason; a dropped item
 is a fresh proposal if a later pass raises it again (slice-1 decision).
+**Amended 2026-09-10 (owner decision after consultation 491): the
+re-ranker re-orders only, never drops.** Its record was 0 for 7 — every
+drop in 489–491 wrong against the transcript, and every dropped text
+re-proposed by the very next pass — and a drop of the last pending item
+emptied the queue twice, at 23–27 s a time. The verdict still carries its
+drop list and the row still records it (`drops_advised`, with the reason
+text), but none is applied and nothing changes status: an item the
+verdict would drop is simply unmentioned by the order and follows the
+named ones. `AUTO_RERANK_DROPS_ENABLED` (default false, not in `.env`)
+guards the old behaviour so the path is not deleted; the re-ranker goes
+to `evals/` before it may drop again.
 
 When: after each answered turn end, whenever anything is pending —
 **with one pending item too, and whether or not a full pass is in
@@ -186,7 +197,8 @@ The tap guard and the tapped examination handover are unchanged.
 auto.queue_merged (added / refreshed / discarded, version; seeded=true
 for the merge at toggle-on), auto.queue_reranked (before, order, drops
 with reasons, ignored, unmentioned, ms, excerpt_turns, excerpt_chars,
-protected), auto.queue_consumed (item, by auto or tap),
+protected; drops_advised and drops_enabled since 2026-09-10 — drops is
+empty while drops_enabled is false), auto.queue_consumed (item, by auto or tap),
 auto.rerank_failed (reason, outcome, elapsed_ms), auto.rerank_skipped
 (no_new_turns only, since 2026-09-09), auto.pass_held (hold_ms,
 released, bound_s, pass_version; 2026-09-09), auto.queue_capped, and

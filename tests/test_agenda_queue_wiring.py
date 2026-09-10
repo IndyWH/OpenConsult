@@ -860,14 +860,22 @@ def _probe_until(s, predicate, tries=60):
     raise AssertionError("condition not reached")
 
 
-def test_a_verdict_reorders_the_pending_items_and_drops_one_with_its_reason(gate):
+def test_a_verdict_reorders_the_pending_items_and_drops_one_with_its_reason(gate, monkeypatch):
     """Spec §3, D-B: at the answer's turn end, with no pass in flight and
     three items pending, the re-ranker is called with the pending (id,
     text) pairs and the turns since the last landed pass — here exactly
     the answer — and its verdict is applied: the named order first, the
     drop marked with the re-ranker's one-word reason, and the next ask
     planned from the NEW head. Audited auto.queue_reranked (order, drops
-    with reasons, ignored, ms) and model.call (kind=rerank)."""
+    with reasons, ignored, ms) and model.call (kind=rerank).
+
+    RE-POINTED 2026-09-10 (owner decision after consultation 491: the
+    re-ranker re-orders only, never drops — 0 for 7 wrong drops on the
+    record): the drop path this test pins now lives behind
+    AUTO_RERANK_DROPS_ENABLED, off by default, kept for evals/ and never
+    deleted. The flag is turned on here; the flag-off behaviour is pinned
+    by the two tests that follow the single-stale-item one."""
+    monkeypatch.setattr(appmain, "AUTO_RERANK_DROPS_ENABLED", True)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
@@ -895,6 +903,7 @@ def test_a_verdict_reorders_the_pending_items_and_drops_one_with_its_reason(gate
     row = rows[0]
     assert row["before"] == ["q2", "q3", "q4"] and row["order"] == ["q4", "q2"]
     assert row["drops"] == [{"id": "q3", "text": Q_TABLETS, "reason": "volunteered"}]
+    assert row["drops_advised"] == row["drops"] and row["drops_enabled"] is True
     assert row["ignored"] == [] and row["ms"] == 41 and row["protected"] is None
     assert row["excerpt_turns"] == 1 and row["excerpt_chars"] == len("Tuesday night, quite suddenly.")
     calls = [c for c in _audit("model.call", s.session_id) if c["kind"] == "rerank"]
@@ -932,7 +941,7 @@ def test_an_unknown_id_in_the_verdict_is_ignored_and_appears_in_the_row(gate):
     assert row["unmentioned"] == ["q4"]
 
 
-def test_the_re_ranker_runs_with_a_pass_in_flight_and_its_row_says_so(gate):
+def test_the_re_ranker_runs_with_a_pass_in_flight_and_its_row_says_so(gate, monkeypatch):
     """REPINNED 2026-09-09 (owner decision, pilot 490 G5). Slice 3 pinned
     D-F: with a full pass in flight at the answer's turn end the re-ranker
     was skipped and the ask planned from the head at once. That property
@@ -943,8 +952,15 @@ def test_the_re_ranker_runs_with_a_pass_in_flight_and_its_row_says_so(gate):
     Now the re-ranker runs with the pass in flight, the plan follows its
     verdict, model.call says pass_in_flight=true, and no skip row is
     written. The attack reaches its target: the pass IS running when the
-    answer ends."""
+    answer ends.
+
+    RE-POINTED 2026-09-10 (owner decision after consultation 491, re-order
+    only): the verdict's drop, which this test reads as proof that the
+    verdict was applied, is applied only with AUTO_RERANK_DROPS_ENABLED
+    on — turned on here; what the test is about (the re-ranker running
+    with a pass in flight) is unchanged."""
     import asyncio
+    monkeypatch.setattr(appmain, "AUTO_RERANK_DROPS_ENABLED", True)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
@@ -1122,7 +1138,7 @@ def test_a_verdict_landing_after_the_next_ask_is_planned_leaves_the_planned_item
     assert _audit("auto.rerank_skipped", s.session_id) == [], "it was not in flight when the re-rank started"
 
 
-def test_a_single_stale_pending_item_is_dropped_by_a_verdict_and_a_dropped_item_may_re_enter_on_a_later_pass(gate):
+def test_a_single_stale_pending_item_is_dropped_by_a_verdict_and_a_dropped_item_may_re_enter_on_a_later_pass(gate, monkeypatch):
     """REPINNED 2026-09-09 (owner decision, pilot 490 G5). Slice 3 pinned
     "one pending item: nothing to order, no call, no row". Replaced: the
     re-ranker is consulted with one pending item too, so a lone stale
@@ -1132,7 +1148,15 @@ def test_a_single_stale_pending_item_is_dropped_by_a_verdict_and_a_dropped_item_
     for the pass, whose merge supplies the next ask. And a re-ranker drop
     is still not the never-re-enter guarantee (slice-1 decision): a later
     pass that raises the dropped question again adds it afresh, with a
-    new id."""
+    new id.
+
+    RE-POINTED 2026-09-10 (owner decision after consultation 491: the
+    re-ranker re-orders only, never drops — in 491 exactly this drop of
+    the lone head, wrong every time, emptied the queue twice at 23-27 s a
+    time): the behaviour pinned here is the flag-on case,
+    AUTO_RERANK_DROPS_ENABLED, kept for evals/. The flag-off case — the
+    same verdict removes nothing — is pinned by the next test."""
+    monkeypatch.setattr(appmain, "AUTO_RERANK_DROPS_ENABLED", True)
     engine = gate.cds_engine
     engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
     engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_SLEEP, Q_TABLETS], [Q_RADIATE],
@@ -1172,6 +1196,83 @@ def test_a_single_stale_pending_item_is_dropped_by_a_verdict_and_a_dropped_item_
     assert reranked[1]["before"] == ["q3"] and reranked[1]["drops"][0]["reason"] == "volunteered"
     consumed = [c["text"] for c in _audit("auto.queue_consumed", s.session_id)]
     assert Q_TABLETS not in consumed, "the stale head was never put to the patient"
+
+
+def test_with_drops_off_a_single_pending_item_is_never_removed_by_a_verdict_and_is_asked(gate):
+    """Owner decision 2026-09-10 (after consultation 491, the re-ranker
+    0 for 7): the verdict that drops the lone pending item removes
+    nothing — the item stays PENDING, is asked next, and the empty rule
+    is never reached by a re-rank. The drop is on the record as
+    drops_advised with its reason text; drops is empty and drops_enabled
+    false. Same script as the flag-on test above: the attack reaches its
+    target (the verdict names the only item, and the wiring receives
+    it)."""
+    assert appmain.AUTO_RERANK_DROPS_ENABLED is False, "the default"
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS], [Q_SLEEP, Q_TABLETS], []]   # pass 3 adds nothing
+    engine.rerank_verdicts = [RerankVerdict(("q2", "q3"), {}, elapsed_ms=20),
+                              RerankVerdict((), {"q3": "volunteered"}, elapsed_ms=20),
+                              RerankVerdict((), {}, elapsed_ms=20)]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        s.turn_end("Tuesday night.")
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your sleep?"
+        wait_for_pass(s, 2)
+        s.play(nxt["utterance_id"])
+        assert [i.text for i in queue.pending] == [Q_TABLETS], "one item left pending"
+        s.turn_end("Badly — and my tablets, I keep forgetting them.")   # re-rank 2 advises the drop
+        assert len(engine.rerank_calls) == 2 and engine.rerank_calls[1][0] == [("q3", Q_TABLETS)]
+        _probe_until(s, lambda: s.auto["rerank_task"] is None)
+        tablets = queue.get("q3")
+        assert tablets.status is ItemStatus.PENDING, "advised, not applied: still pending"
+        assert tablets.drop_reason is None
+        assert Q_TABLETS in [i.text for i in queue.pending], "the queue was not emptied"
+        third = s.wait_for_auto_speak()
+        assert third["text"] == "Can you tell me more about your tablets?", "asked from the head"
+        _stop(s)
+    reranked = _audit("auto.queue_reranked", s.session_id)
+    assert len(reranked) >= 2
+    row = reranked[1]
+    assert row["before"] == ["q3"] and row["order"] == ["q3"], "unmentioned by the order: it follows"
+    assert row["drops"] == [] and row["drops_enabled"] is False
+    assert row["drops_advised"] == [{"id": "q3", "text": Q_TABLETS, "reason": "volunteered"}]
+    assert all(i.status is not ItemStatus.DROPPED for i in queue.items)
+    assert [c["text"] for c in _audit("auto.queue_consumed", s.session_id)].count(Q_TABLETS) == 1
+
+
+def test_with_drops_off_a_verdict_that_drops_everything_re_orders_and_empties_nothing(gate):
+    """Owner decision 2026-09-10: a re-rank can never empty the queue.
+    Three pending; the verdict names one and drops the other two — the
+    named one leads, the two it would drop follow in their previous
+    order, every item stays pending, all three are still asked in turn,
+    and the row records the two as drops_advised with no drop applied."""
+    assert appmain.AUTO_RERANK_DROPS_ENABLED is False, "the default"
+    engine = gate.cds_engine
+    engine.verdicts = [OfficerVerdict(True, True), OfficerVerdict(True, False)]
+    engine.agendas = [[Q_ONSET, Q_SLEEP, Q_TABLETS, Q_RADIATE]]
+    engine.rerank_verdicts = [RerankVerdict(("q3",), {"q2": "addressed", "q4": "answered"},
+                                            elapsed_ms=33)]
+    with live(gate) as s:
+        queue = s.auto["queue"]
+        _first_answer_setup(s, engine)
+        assert pending_texts(s) == [Q_SLEEP, Q_TABLETS, Q_RADIATE]
+        s.turn_end("Tuesday night, quite suddenly.")
+        nxt = s.wait_for_auto_speak()
+        assert nxt["text"] == "Can you tell me more about your tablets?", "the verdict's order leads"
+        _probe_until(s, lambda: s.auto["rerank_task"] is None)
+        assert pending_texts(s) == [Q_SLEEP, Q_RADIATE], "nothing removed; the queue is not empty"
+        assert all(i.status is not ItemStatus.DROPPED for i in queue.items)
+        assert queue.get("q2").status is ItemStatus.PENDING and queue.get("q4").status is ItemStatus.PENDING
+        _stop(s)
+    row = _audit("auto.queue_reranked", s.session_id)[0]
+    assert row["before"] == ["q2", "q3", "q4"] and row["order"] == ["q3", "q2", "q4"]
+    assert row["unmentioned"] == ["q2", "q4"] and row["drops"] == [] and row["drops_enabled"] is False
+    assert row["drops_advised"] == [{"id": "q2", "text": Q_SLEEP, "reason": "addressed"},
+                                    {"id": "q4", "text": Q_RADIATE, "reason": "answered"}]
+    assert _audit("auto.queue_dropped", s.session_id) == [], "no drop row of any kind"
 
 
 # ==========================================================================
