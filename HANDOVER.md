@@ -4492,6 +4492,8 @@ history was declined, and the launch-day mitigation is rotating the
 Tailscale host so the address in history goes dead — the owner's task on
 the launch checklist.
 
+*Correction (2026-09-10):* the pre-flight sweep of 10 Sept found two names the 4 Aug pass missed — a first name used as a doctor-name fixture in `tests/test_speech.py`, replaced by the neutral placeholder the file already used (launch slice 3, `dd0887a`); and a quoted clinician's name inside the amendment log of the frozen `evals/2026-07-25_sinhala_confound_prereg.md`, left in place because that file changes only by the owner's logged amendment — his decision, still open at the flip.
+
 **The pre-public repo-contents review (owner's Documents folder,
 2026-07-31) is discharged on its names, usernames and URL items** as of
 this slice. Still open from that review at launch time: the Tailscale
@@ -7416,3 +7418,79 @@ the choice is the owner's. The 4 Aug sentence above, "the working tree
 names no real person except the owner", is untrue by one line
 (`evals/2026-07-25_sinhala_confound_prereg.md:135`) until item 3 is
 decided.
+
+## Launch slice — the pre-flight sweep's fixable items, built (2026-09-10)
+
+The nine items the owner decided from
+`~/Documents/Consultation-ai/PREFLIGHT_PUBLIC_2026-09-10.md` (the
+sweep entry above), one commit each, the suite green before every one
+(1136 passed before the slice; 1147 after). Nothing in `.env`, `evals/`,
+`help/` or `vendor/` was touched; nothing was rotated, voided or
+purged — the two operator actions are written out below for the owner
+to run.
+
+| # | commit | what |
+|---|---|---|
+| 1 | `2db814d` | `scripts/manage_consultations.py purge-one CID` — hard-deletes ONE already-voided consultation of ANY class, including clinical_safety, after the id is typed back: the row and everything that cascades, the patient row if orphaned, every `RECORDINGS_DIR/consultation_CID.*` file, one `data.purged` audit row naming the id, class, reason, operator, per-table counts and file paths; the original void row stays. Refuses anything not voided (the guard is in the DELETE's WHERE). `purge_voided` and its clinical_safety guard are unchanged. Ten tests in `tests/test_purge_one.py`. |
+| 2 | `24ad982` | `.env.example` says `CHANGE_ME` for the database password. **The old value is in private history only, was usable on loopback only (Postgres listens on 127.0.0.1), and is rotated on launch day by the commands below.** The Docker default in `docker-compose.yml` / `docker/db-init/` still uses the old string: there it both creates the role and is handed to the app, so it names nothing once the live one is rotated. |
+| 3 | `dd0887a` | the doctor-name fixture in `tests/test_speech.py` is "Kildare"; nothing else tracked carries the name (the evals JSON's "victoria secret 2012" lines are public benchmark text). |
+| 4 | `c6431b4` | edge-tts removed from `pyproject.toml` and `uv.lock` (the lock diff is that one package; CUDA wheels untouched). Only `scripts/make_tts_sample.py` imported it; the script stays because the 7 July note-quality eval names it, and now exits at import with the one-off invocation (`uv run --with edge-tts …`) and a docstring saying it calls Microsoft's online service. Nothing to add to NOTICE or README. |
+| 5 | `d832697` | `.claude/` ignored. |
+| 6 | `a59226f` | user-facing name OpenConsult: README H1, NOTICE ×2, PROJECT_PLAN ×2, the seven page titles, the sign-in heading, the nav brand, the FastAPI title, main.py's docstring, two header comments, CLAUDE.md (both names). Identifiers untouched (package, folder, unit, database/role names, logger, URLs — v1.1). No test asserted the old title. |
+| 7 | `42f9b09` | CITATION.cff: title OpenConsult, `Herath, M W I`, date-released 2026-09-10, version 1.0.0, repository `IndyWH/OpenConsult`, AGPL-3.0-or-later, `doi: 10.5281/zenodo.PLACEHOLDER` with the replace-after-archiving comment. README § Model terms: MedGemma and embeddinggemma under the Health AI Developer Foundations and Gemma terms, accepted on Hugging Face or by pulling via Ollama, no weights redistributed, the code only calls what the operator's `ollama pull` fetched; one line each for Whisper (MIT; faster-whisper MIT, WhisperX BSD-2-Clause), pyannote (MIT, gated), Piper and the alba voice. |
+| 8 | `94b83d1` | README step 2 creates role (CREATEDB), database and the vector extension in it and template1; ffmpeg; the download sizes at first Start and first Stop. `.env.example` now carries every `os.getenv` in `app/` (34 added; a two-set diff is empty both ways). `tests/test_rag.py` skips with three named reasons, the new one "no corpus manifest" (the clone had the live corpus tables copied by conftest and no manifest). `app/speech.py` expands `~` in `TTS_MODEL_PATH` and the command's first word, so the template's paths are `~/.local/…` and true on any account. And a third, found by the clone run itself: `tests/conftest.py` now *sets* `SESSION_COOKIE_SECURE=false` (it setdefault'ed it after `load_dotenv`), because the template now documents the flag explicitly and a template-derived `.env` had failed 33 cookie tests. |
+| 9 | this commit | this entry and the correction under the 4 Aug sanitisation paragraph. |
+
+**Fresh clone, the stranger's run** (`git clone` from the local path
+into `/tmp/oc-launch`, `cp .env.example .env`, a real SECRET_KEY, this
+server's DATABASE_URL, `uv sync` from cache): **1144 passed, 3 skipped,
+0 failed** — the three skips are `tests/test_rag.py` with the manifest
+reason; the four TTS tests that used to skip now run there.
+
+**Owner decisions surfaced by the slice, not made in it.**
+
+- The four Phase 7b behaviour flags newly documented in `.env.example`
+  (`FACE_AUTO_ON_DISCLOSURE`, `AUTO_INVITATION_AFTER_DISCLOSURE`,
+  `SILENCE_NUDGE_ENABLED`, `CDS_FIRST_CALL_ON_FIRST_TURN`) are written
+  at their code defaults, `true`, per the template's standing convention
+  (template = code default). The prompt said "flags off"; switching an
+  evaluated behaviour off for fresh installs is a product decision. The
+  experimental gates (`AUTO_MODE_ENABLED`, `BARGE_IN_ENABLED`) were
+  already false.
+- **help/ series line — owed the owner's wording.** Ten files carry
+  "*Part of the Consultation AI help series*" (line 3 of `help/00`–`09`)
+  and `help/00-introduction.md:5` opens "Consultation AI is a research
+  and education platform". Owner-verbatim prose, not edited; the app
+  they describe now says OpenConsult on every page.
+- Stale but out of scope, for v1.1: the FastAPI `description` in
+  `app/main.py` and `pyproject.toml`'s description still say "in Sinhala
+  and English"; the orientation section above still says 683 tests.
+- The prereg name (correction under the 4 Aug entry) stays until the
+  owner amends the frozen file or decides to leave it.
+
+**The owner's commands.** Both are his to run; neither was run.
+
+Consultation 469 (void audit row 2620 stays; a `data.purged` row is
+written):
+
+```bash
+cd /home/indy/Projects/consultation-ai
+uv run python scripts/manage_consultations.py purge-one 469   # type 469 at the prompt
+# verify — the WAV:
+ls -l data/recordings/consultation_469.wav    # expect: No such file or directory
+# verify — the rows (expect 0 0 0 0, then 1 and 1):
+psql "$(grep ^DATABASE_URL= .env | cut -d= -f2-)" -c "SELECT (SELECT count(*) FROM consultation WHERE id=469) AS consultation, (SELECT count(*) FROM transcript_turn WHERE consultation_id=469) AS turns, (SELECT count(*) FROM raw_segment WHERE consultation_id=469) AS segments, (SELECT count(*) FROM patient WHERE id=276) AS patient, (SELECT count(*) FROM audit_event WHERE id=2620) AS void_row_kept, (SELECT count(*) FROM audit_event WHERE action='data.purged' AND subject_id=469) AS purged_row;"
+```
+
+Database password rotation (role `consultation_app`, the one the app's
+DATABASE_URL names; `sudo` wants a terminal of its own):
+
+```bash
+cd /home/indy/Projects/consultation-ai
+NEW=$(openssl rand -hex 24)
+sudo -u postgres psql -c "ALTER ROLE consultation_app PASSWORD '$NEW';"
+sed -i "s|^DATABASE_URL=postgresql://consultation_app:[^@]*@|DATABASE_URL=postgresql://consultation_app:${NEW}@|" .env
+uv run python scripts/migrate.py --check      # connects with the new password; "no drift" = it works
+sudo systemctl restart consultation-ai
+curl -fsS http://127.0.0.1:8000/api/monitor/pulse | head -c 300; echo   # the running app connects
+```
