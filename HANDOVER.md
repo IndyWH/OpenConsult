@@ -7377,3 +7377,42 @@ room's floor; banner visibility; the slice-4 numbers not yet stressed
 (`AUTO_SHORT_CALLS_HOLD_S`, `AUTO_PRESYNTH_WAIT_S`, `AUTO_ENABLE_RETRIES`,
 `AUTO_ENCOURAGER_MAX_UNANSWERED`); and, new, the H3 seam above — a turn
 end before the answer's last commit.
+
+## Pre-flight sweep for the public flip (REPORT ONLY, 2026-09-10)
+
+The repository goes public today as OpenConsult. A report-only sweep of
+the nine items in the owner's prompt — tracked data, secrets across the
+whole history, names and addresses since the 4 Aug sanitisation,
+licence and citation, the old name in user-facing text, a literal
+fresh-clone quickstart, consultation 469, one table on consultation
+492, and the owner's launch checklist — is at
+`~/Documents/Consultation-ai/PREFLIGHT_PUBLIC_2026-09-10.md`, outside
+the repository, with file:line, commit and query evidence for each
+verdict. Nothing was changed, voided or purged; this entry is the only
+edit.
+
+The headline, so a reader of this file alone has it: items 1 (tracked
+data) and the licence-consistency half of 4 PASS; 2 has one FAIL (the
+committed `.env.example` database password is the live one on this
+machine — Postgres is loopback-only, so it is a rotation, not an
+emergency); 3 finds two names at HEAD for the owner's decision (a
+quoted name in the prereg's own amendment log, and a first name used as
+a doctor-name fixture in one speech test); 4's CITATION.cff has the old
+title and URL, no date and no DOI placeholder, and README carries no
+acceptance notice for the two Google models; 5 lists 25 user-facing
+strings against the identifiers that wait for v1.1; 6's fresh clone
+runs `uv sync` and the SECRET_KEY refusal as documented, but README
+never creates the database role or database, 34 `app/` settings are
+absent from `.env.example`, and the clone's suite gave 1131 passed, 1
+failed (the covered-answer RAG test, which checks the database for a
+corpus rather than the manifest), 4 skipped (TTS paths under the old
+`/home/wajir`); **7: consultation 469 is voided (14 Aug, class
+clinical_safety) but not purged** — the row, 23 turns, 303 raw
+segments, the patient row and the 40 MB WAV remain, and the "Purge
+voided test data" button skips that class by design
+(`app/consultations.py:701`), so the paper's "deleted with everything
+derived from it" is not yet true; the two routes are in the report and
+the choice is the owner's. The 4 Aug sentence above, "the working tree
+names no real person except the owner", is untrue by one line
+(`evals/2026-07-25_sinhala_confound_prereg.md:135`) until item 3 is
+decided.
