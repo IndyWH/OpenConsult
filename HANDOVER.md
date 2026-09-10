@@ -7125,3 +7125,48 @@ re-rank guesses; and the new uncalibrated numbers of this slice —
 `AUTO_FLOOR_MARGIN/MIN/MAX`, `AUTO_LAY_MIN_SIMILARITY`,
 `AUTO_SHORT_CALLS_HOLD_S`, `AUTO_THINK_THRESHOLD_S`,
 `AUTO_PRESYNTH_WAIT_S`, `AUTO_QUIET_REPORT_AUDIT_S`, `AUTO_TRACE_S`.
+
+## Pilot diagnostic — consultation 491, 10 Sept 2026: the first run with fix slice 4 live (REPORT ONLY, 2026-09-10)
+
+**A report exists**, outside the repository:
+`~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_491_2026-09-10.md`
+— 491 (the flat, mlrig, herath, script 01 solo, `b50a720` live from the
+04:42 restart; session `f728e221`, 04:45:30 → Stop 04:50:13). The owner's
+four findings read against the record: (1) Alba never spoke the compound
+heart-disease sentence — it is the panel's text; she asked "Can you tell me
+more about heart disease risk factors?" and, twice, the lay sentence "Are
+there any other things that might put you at risk for heart problems?";
+(2) the eleven "Let me think" phrases were eight of them re-armed by Alba's
+own voice through the microphone, and the queue was empty because the
+re-ranker had dropped six of six items as "addressed", all wrongly (0 for 7
+across 489–491); (3) nothing was interrupted — 18 utterances complete, no
+politeness abort, two urgency pauses; energy of 0.023–0.032 RMS in the last
+minute (source unrecorded) restarted the span thirteen times and silenced
+Alba for 24 s; (4) MedGemma proposed as many areas as before, the re-ranker
+removed them. The slice-4 mechanisms: G3, G4, G7, G8, G10, G11 closed on
+this evidence (no topic timeout, five cache-hit issues at 21–36 ms, the
+floor and the machine on the record); the enable retry, the encouragers,
+GOLDEN taps and the re-ask were not exercised. **The trace answered G6**:
+the ≈ 3 s of "trailing energy" after every answer was the transcriber's
+commit latency restarting the reporter's span (2.1–3.7 s, mean 2.95 s), not
+energy — the traces end within 0.3 s of the last word, abruptly. Candidate
+defects H1–H4 with file:line at `b50a720`; calibration questions with their
+numbers in §8. Nothing in code, tests, config, flags, prereg, help/, vendor/
+or the database changed. Docs-only commit; the suite was not run for it.
+
+- **H1** — "Let me think" re-arms itself: the phrase, heard by the mic at
+  0.05–0.23 RMS, restarts the client's span as "speech" (`live.html:903`),
+  the server clears the judged turn end (`main.py:4790–4795`), the 3.5 s
+  fallback ends a turn with nothing asked and resets `think_used`
+  (`main.py:4636`); period 5.1 s until the pass lands; the let_me_think
+  exemption (`live.html:1687`) is on the playback-end path only.
+- **H2** — the same lay sentence asked twice, 45 s apart, the second after
+  its answer: q9 and q11 differ by ", family history", so the queue's
+  identity (`agenda_queue.py:105–112`, `289–296`) sees two items and the
+  topic call rendered both as one sentence, accepted at 0.539.
+- **H3** — the quiet span starts at the transcript's arrival
+  (`live.html:2705–2716`), 2.1–3.7 s after the last word: the whole of
+  489/490's "trailing energy"; every answer waits ≈ 3 s longer than the rule.
+- **H4** — a successful topic call writes no row (`main.py:3953–3963`): the
+  three open-form asks' lay wordings, the compound question's among them, are
+  not on the record; no `model.call` of kind topic; q12's text never surfaced.
