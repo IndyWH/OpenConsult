@@ -49,6 +49,17 @@ os.environ.setdefault("SESSION_COOKIE_SECURE", "false")
 # tests/test_secret_key_guard.py, never weakened here.
 os.environ["SECRET_KEY"] = secrets.token_hex(32)
 
+# The suite must not read the live .env's AUTO_MODE_ENABLED (pilot fix
+# slice 5, 2026-09-10): app/main.py binds the gate at import, and the
+# pre-7c tests pin the app's behaviour with the gate DOWN. Pinned off here
+# for the whole session — set, not setdefault, so neither the shell's
+# environment nor .env can raise it — and again per test by the autouse
+# fixture below, so the count and the outcome are the same with
+# AUTO_MODE_ENABLED=true in the environment as without. A test that wants
+# the machine opts in with monkeypatch.setattr(appmain, "AUTO_MODE_ENABLED",
+# True) (tests/auto_harness.py's gate fixture does).
+os.environ["AUTO_MODE_ENABLED"] = "false"
+
 TEST_DB_NAME = "consultation_ai_test"
 
 _ONE_TIME_HELP = (
@@ -165,6 +176,19 @@ def _reset_auth_rate_limits():
 
         ratelimit.login_limiter.reset()
         ratelimit.register_limiter.reset()
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _auto_mode_gate_down(monkeypatch):
+    """Every test starts with the Phase 7c gate down (see the module
+    docstring's note on AUTO_MODE_ENABLED); a test that wants auto mode
+    sets the attribute itself, after this fixture, and monkeypatch restores
+    it either way."""
+    if _DB_READY:  # app modules are only imported once the test DB exists
+        from app import main as appmain
+
+        monkeypatch.setattr(appmain, "AUTO_MODE_ENABLED", False)
     yield
 
 

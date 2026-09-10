@@ -53,6 +53,12 @@ class StubSpeech:
     def get(self, utterance_id):
         return self.utterances.get(utterance_id)
 
+    def presynthesise_phrases(self, doctor=None):
+        """No-op: the auto-mode warm (app/main.py, behind AUTO_MODE_ENABLED)
+        calls this at service start and session start; a pre-7c stub must
+        survive a flag-on environment (pilot fix slice 5, 2026-09-10)."""
+        return {}
+
 
 class SilentTranscriber:
     def transcribe(self, buffer):
