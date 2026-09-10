@@ -6856,3 +6856,272 @@ microphone beyond the sound check's output-device label (G10). Candidate
 defects G1–G14 with file:line at `6e24542`; nothing in code, tests,
 config, flags or the database changed. Docs-only commit; the suite was
 not run for it.
+
+## Pilot fix slice 4 — the owner's eleven decisions after consultations 487–490, built (2026-09-09/10)
+
+**What landed.** The eleven items of the owner's decisions of 9 Sept 2026
+(report `~/Documents/Consultation-ai/Solo Pilot Documents/PILOT_DIAGNOSTIC_487-490_2026-09-09.md`,
+findings G1–G14; prompt `~/Downloads/cc_prompt.md`), one commit each, the
+full suite green before every commit (`AUTO_MODE_ENABLED=false uv run
+pytest`), spec truth-ups in the same commit as the code they describe.
+`AUTO_MODE_ENABLED` is untouched and `.env` reads `false`;
+`PHASE_7C_EVAL_PREREG.md` untouched (the golden window stays 90 s, the
+metric-3 zero point unchanged); `help/`, `vendor/`, `OPEN_CLOSED_RULE.md`
+untouched. **Needs a restart to be live** (the owner's act) — and live
+only behind the flag, as before.
+
+| # | commit | what | suite |
+|---|---|---|---|
+| 1 | `7c57618` | G1: a cut-off enable disclosure is retried on the next quiet report, then the machine switches itself off (`too_loud_to_start`); the enable never reports success before the disclosure has played (`starting`) | 1073 → 1077 |
+| 2 | `ee7f8cb` | G2: the floor comes from the room — `noise_floor_rms × 3.0`, clamped [0.02, 0.08], per session from the doctor's newest sound check; the flat stays at exactly 0.02 | 1077 → 1087 |
+| 3 | `5c7f01e` | G4/G5: the re-ranker and the topic call before the pass (held ≤ 4 s); the re-ranker runs with a pass in flight and with one pending item; a `model.call` row for every pass | 1087 → 1089 |
+| 4 | `6e0f4e0` | D1 extension: the topic call returns `lay`; Alba speaks it for a verbatim ask; the original stays the identity; the subject guard (≥ 0.3) | 1089 → 1108 |
+| 5 | `622f93a` | Golden encouragers every 4 s of quiet, `go_on`/`tell_me_more_short` alternating, the window ends early after two unanswered | 1108 → 1110 |
+| 6 | `363b3eb` | `let_me_think` replaces the bridge; the empty-queue rule as restated; `AUTO_ENCOURAGER_QUIET_S` retired | 1110 → 1112 |
+| 7 | `728ecba` | G6: `AUTO_EOT_FALLBACK_S` 3.5, `AUTO_EOT_QUIET_S` 2.0; quiet reports audited (bounded); an RMS trace on every `auto.turn_ended` | 1112 → 1116 |
+| 8 | `a85a4df` | G3: the client numbers its spans; the server keys the fresh-span test on the number | 1116 → 1118 |
+| 9 | `c1dfec1` | G7: the issue waits for the pre-synthesis (≤ 2 s), then falls back and audits; G8: the re-ask's latency row is marked `reask` with only issue → speech | 1118 → 1121 |
+| 10 | `fdd8085` | G9: a tap in GOLDEN is recorded in the queue and answered at the exit; G10: `auto.enabled.client` — user agent, platform, input label, the sound check's two labels | 1121 → 1124 |
+| 11 | (this commit) | this entry; `help/` flags | 1124 |
+
+Final suite: **1124 passed** (from 1073 at `de36a0e`). Every commit
+message carries the why; this entry carries the seams and the decisions
+the owner's text left open.
+
+**What is live after the restart (behind the flag).**
+
+- *The enable.* The auto disclosure (or chained invitation) is an
+  "enable chain": a politeness abort is retried on the next quiet report
+  (`auto.enable_retry`, attempt and RMS), at most `AUTO_ENABLE_RETRIES`
+  (3) attempts in all inside `AUTO_ENABLE_RETRY_WINDOW_S` (30) of the
+  first issue; spent → `auto.disabled` reason `too_loud_to_start` with
+  RMS, floor and attempts, and the pill told "Too loud to start: 0.031
+  against 0.020". The echo at issue is `auto_toggled on starting=true`
+  ("Auto: starting…"); the on-echo follows the disclosure's completion.
+- *The floor.* `speech.auto_floor` at session start from the newest
+  `speech.sound_check` row for the doctor; sent as
+  `speech_config.auto.floor`; one number on the page for the reporter
+  and the politeness abort; on `auto.enabled` (floor, noise_floor_rms,
+  margin, floor_source, floor_clamped, sound_check_age_s) and every
+  `speech.politeness_abort` row. Cafe → 0.0255; flat → 0.02; no check →
+  0.02 with `floor_source: no_sound_check`.
+- *The turn end.* Re-rank → topic call → (pass launches; `auto.pass_held`
+  when it waited; `queued_ms` on the pass's `model.call` row, kind
+  `pass`) → the ask. The re-ranker runs with a pass in flight
+  (`pass_in_flight: true` on its row) and with one item pending;
+  `auto.rerank_skipped` keeps only `no_new_turns`.
+- *What Alba says.* A verbatim ask is spoken in the topic call's `lay`
+  wording when it passes the guard (`lay_similarity` on the row;
+  `spoken` and `lay` beside the original on `auto.queue_consumed`;
+  `auto.lay_rejected` on a miss, verbatim spoken). In GOLDEN an
+  encourager every 4 s of quiet (from the later of the patient's last
+  speech and Alba's own phrase end), alternating, one per span; after
+  two unanswered the next silence ends the window early
+  (`auto.golden_window_ran` reason `unanswered_encouragers`). In the
+  question phases "Let me think for a moment." once per wait
+  (`auto.thinking`, reason `empty_queue` | `slow_preparation`), never
+  the bridge; it does not restart the client's span.
+- *The record.* `auto.quiet_report` (bounded: the first of each span,
+  then ≤ 1/s), the RMS `trace` on every `auto.turn_ended`,
+  `auto.presynth_fallback`, `auto.question_latency.reask`,
+  `auto.enabled.client`, `speech.sound_check.input_label`, `span` on
+  every report.
+
+**Build decisions taken where the owner's text was silent — for the
+owner to confirm or overrule:**
+
+- **G1 — what "AUTO_ENABLE_RETRIES (default 3)" counts.** Built as the
+  total number of attempts, the enable's own issue being the first, so
+  that "three aborts switch the machine off" holds at the default (the
+  test the decision named). If the owner meant three *re-issues* (four
+  aborts), the change is one comparison. The window is measured from the
+  first issue of each chain step (disclosure, then invitation), not from
+  the toggle; both steps retry.
+- **G1 — reporting success.** The pill says "Auto: starting…" from the
+  toggle until the disclosure has played through, because the client's
+  quiet reporter must be armed for the retry to ride on its reports (an
+  echo saying off would have left nothing to retry on). The
+  already-disclosed enable (invitation only) keeps the plain on-echo.
+- **G2 — no recency bound on the sound check.** The newest
+  `speech.sound_check` row for the doctor is used whatever its age; the
+  age is on `auto.enabled` (`sound_check_age_s`). A check from another
+  room days ago would set that room's floor. A bound is the owner's
+  number to set if wanted.
+- **G4 — the hold applies to every pass launch while a short call is
+  out**, not only the answered turn end's pass (a growth pass would hog
+  the slot the same way); the officer is not yet scheduled (E4's
+  deferral stands) and there is no urgency pre-emption — that remains
+  slice 6 of the queue. `auto.pass_held` is written only when a pass was
+  actually held (with a fast engine the short calls return inside one
+  tick and no row is written). `hold_ms` counts from the moment the pass
+  became due and was held, a tick after the short calls began, so it
+  reads a little under the bound.
+- **G4 — the pass's `model.call` row** carries `queued_ms` and
+  `elapsed_ms`; `run_ms` and `tokens` are null until slice 6 gives the
+  pass's three calls their own numbers. `version` is on pass rows only.
+- **Lay wording — where it applies.** Only the verbatim ask; the
+  open-form template ask is unchanged (its topic is already plain). The
+  guard is enforced twice: in the wiring (audits `auto.lay_rejected`,
+  speaks verbatim) and in `speech.resolve_utterance` as the last line (a
+  drifting wording is *refused*, whatever the caller checked). This adds
+  a fourth whitelist type, `LayUtterance` — an agenda reference plus a
+  guarded wording, no standalone sentence slot; the hard-rule-1 surface
+  test is repinned to say so. Spec §4 lists it as a fifth source.
+- **Lay wording — one call.** The topic call's schema is now two
+  required strings; a reply with a usable `lay` and an unusable `topic`
+  still speaks the lay wording (the topic's failure only means no
+  open-form ask). The similarity is the shared normaliser's token-set
+  ratio; "Do you smoke?" scores 1.0 against itself and 0.3 is an
+  uncalibrated guess — the next run's `auto.queue_consumed.spoken` and
+  `auto.lay_rejected` rows are the calibration data.
+- **Golden encouragers — "one per span".** "Every time the patient has
+  been quiet for 4 s" is built as at most one encourager per client
+  quiet span (the span restarts at the patient's speech and at Alba's
+  phrase end, so the quiet is the span's own length); a politeness abort
+  spends it, and the voice that aborted it begins the next span. The
+  early end needs a *further qualifying silence* after the second
+  unanswered encourager, on a fresh span; with the fallback at 3.5 s and
+  the minimum quiet at 4.0 s the exit fires on that same report.
+- **"Let me think" — "predicted to exceed".** Built as "has already run
+  AUTO_THINK_THRESHOLD_S since the turn end with nothing ready": the
+  preparation's worst-case bounds (re-rank 2 s + topic 2 s + synthesis)
+  always exceed 3 s, so a true prediction would speak it at every turn
+  end. `AUTO_ENCOURAGER_QUIET_S` is retired (it governed only the
+  bridge). The phrase is not disclosure-gated (like the encouragers).
+  "Never resets the quiet clock" is built on both sides: the client
+  keeps its span across the phrase, and the server's judged turn end
+  stands; the queued question issues on that span's next report.
+- **G6 — the trace travels with every report** (~80 numbers at ≤ 1 Hz),
+  not on request, so the `auto.turn_ended` row can carry it at the
+  moment of the decision; the golden exit's turn end (in `auto.phase`)
+  carries no trace. `AUTO_QUIET_REPORT_AUDIT_S` (1.0) is the bound the
+  decision left unnumbered.
+- **G3 — a report without a span** (an older page) keeps the old
+  `quiet_s < last` test; the two other test harnesses (the golden and
+  question files' own `Session` copies) still send no span and so
+  exercise that fallback; the shared harness numbers its spans.
+- **G7 — the wait blocks the receive loop** for at most
+  `AUTO_PRESYNTH_WAIT_S` (2.0, an uncalibrated guess): the reports that
+  queue behind it are handled when it returns. The alternative (skip
+  this report, try the next) was cheaper on the loop and up to a second
+  slower on the ask. `turn_end_to_issue_ms` is read after the wait.
+- **G8 — the re-ask row is written, marked `reask: true`**, with only
+  `issue_to_speech_ms`; the mean of `turn_end_to_speech_ms` excludes it
+  by the mark (the decision allowed either).
+- **G9 — several taps in GOLDEN** are all kept (`golden_tapped`) and all
+  marked answered at the exit; the flow flags (`awaiting_answer`,
+  `turn_ended`, `last_asked_text`) stay the question phases' — no answer
+  is awaited in the golden minutes.
+- **G10 — the user agent comes from the socket's headers**, the platform
+  and current input label from the toggle message, the sound check's
+  output and input labels from its row; nulls are recorded, not omitted.
+- **Tests repinned by decision** (each docstring names it and the date):
+  the one-tap start echo, the pill harness and standing-rules pin
+  (`starting`); the two client floor pins and the config equality; the
+  D-F skip test, the one-pending-item test, the never-behind-a-pass
+  test, the race test (bound shortened), two `model.call` counts filtered
+  by kind, the one-pass-per-answer pin extended; the topic call's schema
+  and prompt-closing pins, the whitelist surface (four types); the
+  minimum-quiet test (4.0), the one-per-window test (replaced by the
+  repeated-encourager pin), the aborted-encourager tail, the
+  encourager-id set, the phrase table, the pause file's
+  across-a-pause encourager test; the bridge tests (four), the empty-
+  rule-one test, the reporter's threshold keys; nine numeric pins on
+  the old 5.0/3.0. Nothing weakened or deleted. Two harness robustness
+  fixes: `live()` waits for the session entry (a pre-existing flake seen
+  twice), and `probe()` plays a thinking phrase through and records it
+  (`thinking_heard`), `play()` returning what the server said meanwhile.
+
+**What the next run should be read for.**
+
+- *The trailing energy.* Every `auto.turn_ended` row now carries `trace`
+  (8 s at 100 ms, newest last) with `floor`: is the ≈ 3 s between the
+  transcript's last word and the reporter's span start AGC recovery
+  (energy decaying smoothly through the floor), a breath or chair
+  (spikes), or the room? The `auto.quiet_report` rows give each span's
+  start and `since`. This is what decides 3.5 s versus 2.5 s.
+- *The lay wordings spoken.* `auto.queue_consumed.spoken` beside `text`
+  on every ask, `lay: true`, and `lay_similarity` on the utterance row;
+  every `auto.lay_rejected` with its score — the calibration data for
+  `AUTO_LAY_MIN_SIMILARITY` (0.3), and the wordings themselves for the
+  owner to judge (does the model add, narrow or widen?).
+- *The floor chosen.* `auto.enabled` (floor, noise_floor_rms, margin,
+  floor_source, the check's age) and every `speech.politeness_abort`
+  (rms against floor): does 0.0255 let the cafe's disclosure play, and
+  does the cafe's GOLDEN now see quiet spans at all?
+- *The early window ends.* `auto.golden_window_ran.reason` — how often
+  `unanswered_encouragers` ends the window, and after how many seconds
+  (`golden_s`); against it, whether two encouragers into a quiet
+  narrator cut a story short (the transcript around the end).
+- *Also:* `auto.pass_held` (how long the pass waits, how often the bound
+  releases it) and the topic call's timeout rate now that it goes first;
+  `auto.thinking` (which reason, how often, and whether the phrase
+  lands into a finished answer as the bridge did); `auto.enable_retry`
+  and any `too_loud_to_start`; `auto.presynth_fallback` (whether 2 s is
+  enough); the re-ranker's verdicts with `pass_in_flight: true` (does a
+  late verdict ever displace a plan — `protected` on the row).
+
+**`help/`: NOT edited.** Every sentence items 1, 4, 5 and 6 make untrue
+or incomplete, quoted, with the sentences already flagged in slices 2
+and 3 — all for the owner's wording in one sitting:
+
+- `help/02-using-it-step-by-step.md` step 3: "If auto mode is enabled
+  and switched on, the assistant takes the history instead — it
+  invites, listens, encourages and asks aloud, one question at a time,
+  while you supervise and can take over with one tap." — incomplete
+  (items 1, 4, 5, 6): switching it on now says "starting" until the
+  disclosure has been heard, and the assistant switches itself off if
+  the room is too loud to start and says so; during the golden minutes
+  it encourages every few seconds of quiet, with two phrasings, and
+  begins its questions once two encouragements go unanswered; it asks
+  its questions in plain English rather than the panel's clinical
+  wording; and between questions it may say "Let me think for a
+  moment." — that is not a question.
+- `help/02-using-it-step-by-step.md` step 3: "The transcript streams
+  in, questions come and go as they are answered" — true of the panel;
+  the assistant's own asking does not wait for the assessment (slice 2).
+- `help/02-using-it-step-by-step.md` step 5: "**Questions to ask.**
+  Suggestions that update as the conversation moves. Tap the small
+  speaker icon and the assistant asks that question aloud, in its own
+  voice" — still true of a tap (a tap speaks the panel's wording, not
+  the lay wording); incomplete since slice 2: with auto mode on, tapping
+  a question also takes it off the assistant's own queue, and — item 10
+  — that is so in the golden minutes too; and (item 4) when the
+  assistant chooses the question itself it may speak a plain-English
+  wording of it, with the panel's wording kept as the question's
+  identity.
+- `help/01-a-consultations-journey.md` §3: "if auto mode is enabled,
+  the app can conduct the history-taking itself, inviting, encouraging
+  and asking questions of its own choosing while the doctor supervises"
+  — incomplete: its choosing is the head of a standing queue that every
+  pass feeds, re-sorted after each answer (slices 2, 3); it asks in
+  plain English (item 4); its encouraging in the golden minutes is every
+  few seconds of quiet and ends the golden minutes early when
+  unanswered (item 5).
+- `help/01-a-consultations-journey.md` §2: "Each update *revises* the
+  previous one under rules: condition names stay put, reasoning must
+  absorb new evidence, answered questions drop off the list." — still
+  true of the assessment's own list; incomplete for auto mode, where the
+  list the machine asks from is a standing queue (slice 2).
+- `help/04-the-architecture.md`: "MedGemma 27B does the differential,
+  the red-flag watch, the guideline summaries, the note and the letters
+  — and, when auto mode is enabled, the two small judgements that pace
+  the spoken interview: has the patient finished speaking, and what a
+  question is about." — now three judgements (slice 3: which waiting
+  questions are still worth asking, in what order), and the second of
+  them (item 4) also puts the question into plain English.
+- `help/06-safety-by-construction.md` — no sentence made untrue: the
+  lay wording is a new source of spoken words, bound to an agenda
+  question and guarded in code; the article's claim that the browser
+  can supply no words still holds. The owner may want a clause that the
+  machine can now re-word a question, and how that is bounded.
+
+**Watch list, carried forward and added:** the re-ranker's judgement
+(now consulted far more often — every verdict of the next run against
+the transcript, `evals/` material); the lay wordings (above); the felt
+length of the window under the new encourager rule; D10 (the politeness
+abort) now at the room's floor; banner visibility; the two uncalibrated
+re-rank guesses; and the new uncalibrated numbers of this slice —
+`AUTO_FLOOR_MARGIN/MIN/MAX`, `AUTO_LAY_MIN_SIMILARITY`,
+`AUTO_SHORT_CALLS_HOLD_S`, `AUTO_THINK_THRESHOLD_S`,
+`AUTO_PRESYNTH_WAIT_S`, `AUTO_QUIET_REPORT_AUDIT_S`, `AUTO_TRACE_S`.
