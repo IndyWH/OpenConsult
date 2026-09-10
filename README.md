@@ -223,6 +223,41 @@ origin the microphone needs** in a single-machine demo; any other
 address requires TLS. The suite runs in-container on a fresh clone:
 `docker compose run --rm app pytest`.
 
+## Model terms
+
+This repository redistributes no model weights. Every model is fetched
+by the operator, under that model's own terms, using the commands in
+this README; the code only ever calls a model that is already present
+(the app talks to a local Ollama server and to weights on the local
+disk, and never downloads MedGemma or embeddinggemma itself).
+
+- **MedGemma 27B** (`hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M`,
+  the community GGUF of Google's `medgemma-27b-text-it`) is distributed
+  under Google's [Health AI Developer Foundations terms of use](https://developers.google.com/health-ai-developer-foundations/terms)
+  and the [Gemma terms of use](https://ai.google.dev/gemma/terms). You
+  must accept them — on the [model's Hugging Face page](https://huggingface.co/google/medgemma-27b-text-it),
+  or by the act of pulling through Ollama, which the terms treat as
+  acceptance — before use. What the code does: `ollama pull` fetches the
+  GGUF onto your machine, and the app then calls it through Ollama's
+  local API.
+- **embeddinggemma** (`ollama pull embeddinggemma`) is distributed under
+  the [Gemma terms of use](https://ai.google.dev/gemma/terms); accept them
+  on [Hugging Face](https://huggingface.co/google/embeddinggemma-300m) or
+  by pulling through Ollama, as above.
+- **Whisper**: `distil-large-v3` ([distil-whisper](https://huggingface.co/distil-whisper/distil-large-v3),
+  MIT) for the live path and `large-v3` ([OpenAI Whisper](https://github.com/openai/whisper),
+  MIT) for the final pass, run through [faster-whisper](https://github.com/SYSTRAN/faster-whisper)
+  (MIT) and [WhisperX](https://github.com/m-bain/whisperX) (BSD-2-Clause);
+  downloaded from Hugging Face on first use.
+- **pyannote** `speaker-diarization-3.1` ([Hugging Face](https://huggingface.co/pyannote/speaker-diarization-3.1),
+  MIT, gated): accept its access agreement on Hugging Face before your
+  first Stop, as described above.
+- **The voice**: [Piper](https://github.com/OHF-Voice/piper1-gpl)
+  (GPL-3.0-or-later) runs as a separate process, never linked, with the
+  `en_GB-alba-medium` voice from [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices),
+  whose training data is CC BY 4.0 and whose weights state no licence of
+  their own — see `NOTICE` for the exact position.
+
 ## Licence
 
 This project's own code is licensed **AGPL-3.0-or-later** — see

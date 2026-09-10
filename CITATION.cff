@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
-title: "Consultation AI: a fully local, open-source AI consultation assistant"
+title: "OpenConsult"
 abstract: >-
   A fully local, GDPR-conscious AI consultation assistant, developed by a
   practising clinician as an open research and education platform (not a
@@ -10,11 +10,17 @@ abstract: >-
   running entirely on a single consumer GPU.
 type: software
 authors:
-  - given-names: "Herath Mudiyanselage Wajira Indika"
-    family-names: "Herath"
+  - family-names: "Herath"
+    given-names: "M W I"
     orcid: "https://orcid.org/0009-0008-6367-1588"
-repository-code: "https://github.com/IndyWH/consultation-ai"
+repository-code: "https://github.com/IndyWH/OpenConsult"
 license: AGPL-3.0-or-later
+version: "1.0.0"
+date-released: "2026-09-10"
+# Zenodo: archive the v1.0.0 release, then replace the placeholder below
+# with the DOI Zenodo assigns (the concept DOI, so it resolves to every
+# version) and remove this comment.
+doi: "10.5281/zenodo.PLACEHOLDER"
 keywords:
   - clinical AI
   - ambient scribe
@@ -22,5 +28,3 @@ keywords:
   - clinical decision support
   - retrieval-augmented generation
   - local-first
-# version: "1.0.0"        # <- set to the tagged release at launch
-# date-released: "2026-08-XX"   # <- set on release
