@@ -19,9 +19,11 @@ __pycache__/
 # Test artifacts
 .pytest_cache/
 
-# Editors
+# Editors and assistant tooling. .claude/ holds per-machine permission
+# settings for the coding assistant; never part of the project.
 .vscode/
 .idea/
+.claude/
 
 # Audio recordings and model files are large — decide per-file what to track
 *.wav
