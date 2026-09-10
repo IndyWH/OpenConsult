@@ -35,7 +35,7 @@ function esc(value) {
   const header = document.createElement('header');
   header.className = 'app';
   const brand = document.createElement('a');
-  brand.className = 'brand'; brand.href = '/today'; brand.textContent = 'Consultation AI';
+  brand.className = 'brand'; brand.href = '/today'; brand.textContent = 'OpenConsult';
   header.appendChild(brand);
 
   const nav = document.createElement('nav');

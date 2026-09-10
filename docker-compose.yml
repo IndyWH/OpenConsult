@@ -1,4 +1,4 @@
-# Consultation AI — Compose deployment (DOCKER_DEMO_SPEC.md, signed off
+# OpenConsult — Compose deployment (DOCKER_DEMO_SPEC.md, signed off
 # 2026-08-04). Three services: db (bundled), app, and ollama behind a
 # profile — the DEFAULT path is a host Ollama install (owner decision 1:
 # a second copy wastes ~17 GB of models).

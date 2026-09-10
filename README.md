@@ -1,4 +1,4 @@
-# Consultation AI — Project Plan
+# OpenConsult
 
 **A research/educational prototype for AI-assisted medical consultations — fully local, human-in-the-loop, English-only in v1.**
 

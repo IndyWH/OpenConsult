@@ -7,9 +7,11 @@ it.
 
 ## What this project is
 
-Consultation AI transcribes a doctor–patient consultation live, offers
-clinical decision support while it runs, and afterwards produces a
-diarised transcript and a cited draft note the doctor edits and approves.
+OpenConsult (called Consultation AI until 10 September 2026 — the older
+name is what `HANDOVER.md` and the specs use) transcribes a
+doctor–patient consultation live, offers clinical decision support while
+it runs, and afterwards produces a diarised transcript and a cited draft
+note the doctor edits and approves.
 Everything runs locally on one machine — no cloud inference.
 
 **It is a research and education prototype. It is not a medical device,

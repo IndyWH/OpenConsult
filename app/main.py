@@ -1,4 +1,4 @@
-"""Consultation AI — application entry point.
+"""OpenConsult — application entry point.
 
 Phase 0: a minimal FastAPI app proving the environment works.
 Later phases add the audio gateway, live transcription, and the
@@ -144,7 +144,7 @@ async def finalize_worker(app: FastAPI) -> None:
 
 
 app = FastAPI(
-    title="Consultation AI",
+    title="OpenConsult",
     description=(
         "Research/educational prototype for AI-assisted medical "
         "consultations in Sinhala and English. Not a medical device; "

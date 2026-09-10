@@ -1,4 +1,4 @@
-# Consultation AI — Project Plan
+# OpenConsult — Project Plan
 
 **A research/educational prototype for AI-assisted medical consultations — English in v1, with code-switched clinical Sinhala as its founding research question.**
 
@@ -167,7 +167,7 @@ Browser (mic + UI)
 
 ### Scope decision: English-only for v1 (2026-07-25, owner)
 
-**Consultation AI is English-only for v1.** Sinhala transcription, the
+**OpenConsult is English-only for v1.** Sinhala transcription, the
 translation layer, and dual-language transcript generation are **out of
 scope for v1**.
 
