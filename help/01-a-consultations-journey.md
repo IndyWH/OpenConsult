@@ -1,6 +1,6 @@
 # A consultation's journey — from sound waves to a signed note
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `ef6c583`).*
+*Part of the OpenConsult help series. True as of v1.0.0 (2026-09-10).*
 
 Every other article in this folder hangs off this one. It follows a single
 consultation from the first word spoken to the moment a doctor signs the
@@ -35,7 +35,8 @@ The **assessment** is a careful reviser. It keeps a differential diagnosis,
 questions worth asking (ordered by clinical priority) and signs worth
 examining. Each update *revises* the previous one under rules: condition
 names stay put, reasoning must absorb new evidence, answered questions drop
-off the list.
+off the list. In auto mode that list feeds the queue the assistant asks from
+(§3).
 
 The **urgency officer** is deliberately forgetful. It reads the current
 transcript fresh every time, with no memory of what it said before — so
@@ -55,9 +56,11 @@ flowchart TB
 
 The doctor can tap a suggested question and the app asks it aloud — and if
 auto mode is enabled, the app can conduct the history-taking itself,
-inviting, encouraging and asking questions of its own choosing while the
-doctor supervises. Either way it speaks only after telling the patient, in a
-fixed disclosure, that it is a computer. This creates the project's sharpest
+inviting, encouraging and asking questions while the doctor supervises. Its
+questions come from a standing queue that every assessment pass feeds and
+re-orders as answers arrive, and it puts each one to the patient in plain
+English. Either way it speaks only after telling the patient, in a fixed
+disclosure, that it is a computer. This creates the project's sharpest
 safety problem: **if the system's own voice reached the transcript, it could
 put words in the patient's mouth**, and the note would faithfully cite them.
 

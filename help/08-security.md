@@ -1,6 +1,6 @@
 # Is AI-written code safe? — how this app was hardened, and audited by an adversary
 
-*Part of the Consultation AI help series. True as of the security-hardening
+*Part of the OpenConsult help series. True as of the security-hardening
 commit it ships with — see the repository history.*
 
 There is a fair criticism of software written with heavy AI help: models

@@ -1,6 +1,6 @@
 # Safety by construction — why this app refuses instead of warning
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `536312b`).*
+*Part of the OpenConsult help series. True as of v1.0.0 (2026-09-10).*
 
 Most software safety works by checking: let the system act, inspect the
 result, warn if something looks wrong. This project takes a different view
@@ -49,6 +49,12 @@ The same thinking runs through the speech system itself: the browser may
 only *reference* a question from the on-screen list — it can never send
 free text to be spoken. A request carrying its own words is rejected and
 logged, not cleaned up. Sanitising would make it a filter.
+
+Auto mode adds one more source of spoken words: the assistant may put a
+question into plainer English before asking it. That wording is produced on
+the server, is always tied to a question already on the list, and passes the
+same checks before it is spoken. The browser still supplies no words of its
+own.
 
 ## Refusing rather than warning: the gates
 

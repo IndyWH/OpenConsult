@@ -1,8 +1,8 @@
 # A consultation assistant that runs entirely in the room
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `ef6c583`).*
+*Part of the OpenConsult help series. True as of 2026-07-31 (HEAD `ef6c583`).*
 
-> **Read this first:** Consultation AI is a research and education platform.
+> **Read this first:** OpenConsult is a research and education platform.
 > It is **not a medical device** and it must **never be used with real
 > patients**. Every consultation it has ever heard was scripted or acted.
 

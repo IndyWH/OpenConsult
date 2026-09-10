@@ -1,6 +1,6 @@
 # Using it, step by step — a hand-held tour with screenshots
 
-*Part of the Consultation AI help series. Screens shown are from a real
+*Part of the OpenConsult help series. Screens shown are from a real
 session with the prototype on 31 July 2026; every name and clinical detail
 is synthetic — "Ranjit Perera" is an acted script, not a person. Buttons
 may move as the app develops, but the flow shown here is the flow.*
@@ -38,10 +38,13 @@ on this one screen. Matching the numbers on the picture:
    control and a status line showing what the assistant is doing.
 4. **The assistant's face** — a listening presence for the patient, on
    only if you turn it on (or accept it at the disclosure).
-5. **Questions to ask.** Suggestions that update as the conversation
-   moves. Tap the small speaker icon and the assistant asks that question
-   aloud, in its own voice — its words never enter the patient's
-   transcript, by construction.
+5. **Questions to ask.** Suggestions that update as the conversation moves.
+   Tap the small speaker icon and the assistant asks that question aloud, in
+   its own voice, exactly as written — its words never enter the patient's
+   transcript, by construction. With auto mode on, the panel is also the
+   assistant's own list: tapping a question takes it off that list, so the
+   assistant will not ask it again, and when the assistant picks a question
+   itself it may put it into plainer words for the patient.
 6. **Say to patient.** One-tap spoken phrases: the disclosure, small
    acknowledgements, a hand-over line for examining.
 7. **Signs to check** — examination findings worth eliciting, appearing
@@ -65,6 +68,24 @@ arranged. With auto mode on, an alarm also pauses the assistant's
 questioning: the panel asks you to acknowledge it and stays until you do —
 then you resume the assistant, or take over yourself. If the same concern
 fires again, it pauses again.
+
+When you switch it on it shows "starting" until the patient has heard the
+disclosure, and if the room is too loud to hear the patient it switches
+itself off and says so.
+
+Before that happens, run the sound check. Press the **Sound check** button
+beside Start the first time you open OpenConsult on any given day in a given
+room. It plays a short phrase so you can confirm the room can hear the
+assistant and the assistant can hear the room. A new room, a moved
+microphone or a change in background noise is a reason to run it again; you
+do not need to repeat it for every consultation in the same room that day.
+
+In the opening minutes it lets the patient tell their story, with a brief
+word of encouragement after each few seconds of quiet; once two of those go
+unanswered it begins its questions. It puts each question in plain English
+rather than the panel's clinical wording, and between questions it may say
+"Let me think for a moment" — that is not a question, and it is waiting for
+the next one to be ready.
 
 ![The panels mid-consultation: urgent actions, questions, differential](images/02-3-cds-working.png)
 

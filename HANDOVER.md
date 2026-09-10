@@ -7506,3 +7506,130 @@ row, 23 transcript turns, 303 raw segments, patient row 276 and
 `data.purged` row written by operator indy. Post-purge query returned
 0 / 0 / 0 / 0 / 1 / 1. The Declarations' deletion qualifier now rests on
 this entry.
+
+## Help wording sitting (2026-09-10, evening)
+
+The owner's wording for every `help/` sentence the auto-mode slices had
+flagged, plus the OpenConsult rename of the series line, applied verbatim
+in one docs-only commit. `git diff --stat` shows `help/` and this file and
+nothing else: no code, tests, config, flags, specs or `vendor/` were
+touched, and no `help/` prose was rephrased — every new sentence is the
+owner's, as supplied.
+
+**The eight items, as applied.**
+
+1. **The series line, all ten files.** Line 3 of `help/00`–`09` now reads
+   "*Part of the OpenConsult help series*"; the rest of each line 3 is
+   unchanged except where item 2 replaces it. `help/00-introduction.md:5`
+   opens "OpenConsult is a research and education platform".
+   `grep -rn "Consultation AI" help/` returns nothing.
+2. **The date line, three files.** `help/01-a-consultations-journey.md`,
+   `help/04-the-architecture.md` and `help/06-safety-by-construction.md`
+   line 3 is now exactly "*Part of the OpenConsult help series. True as of
+   v1.0.0 (2026-09-10).*" The other seven keep their existing date or
+   screenshot note.
+3. **`help/02` Step 3 — three new paragraphs** after "…it pauses again."
+   and before the image: the "starting" state until the disclosure has
+   been heard and the self-switch-off when the room is too loud; the sound
+   check (the **Sound check** button beside Start, once per room per day,
+   and the three reasons to run it again); and the opening minutes — the
+   encouragement every few seconds of quiet, the two unanswered that end
+   them, the plain-English wording, and "Let me think for a moment" as not
+   a question.
+4. **`help/02` panel item 5** replaced whole: a tap speaks the question
+   "exactly as written"; with auto mode on the panel is also the
+   assistant's own list, a tap takes the question off it, and the
+   assistant may put a question it picks itself into plainer words.
+5. **`help/01` §3**: "asking questions of its own choosing" becomes
+   "asking questions", with the standing queue that every assessment pass
+   feeds and re-orders as answers arrive, and the plain English. The
+   disclosure sentence that follows stands.
+6. **`help/01` §2**: "In auto mode that list feeds the queue the assistant
+   asks from (§3)." appended to the assessment paragraph.
+7. **`help/04`**: two small judgements become three — end of turn; what a
+   question is about *and how to put it in plain English*; and which of
+   the waiting questions to ask next, with the sentence that the third
+   only orders the queue and cannot remove a question (the 2026-09-10
+   change in fix slice 5). "All are separate calls with separate rules"
+   stands.
+8. **`help/06`**: a new paragraph after "Sanitising would make it a
+   filter." — auto mode's lay wording as one more source of spoken words,
+   server-produced, tied to a question already on the list, through the
+   same checks; the browser still supplies no words of its own.
+   **Applied: all three claims verified against the code first** — see
+   below.
+
+**The help/06 verification (a), (b), (c).** Checked before the paragraph
+was written in, as the sitting required:
+
+- **(a) server-side.** The wording is the `lay` field of the topic call:
+  schema `app/cds.py:486`, prompt `app/cds.py:501` ("the SAME question in
+  plain spoken English… nothing the question did not ask"), the call
+  `CDSEngine.topic_for` at `app/cds.py:788`, the field cleaned by
+  `clean_lay_wording` (`app/cds.py:553`) at `app/cds.py:816-818`. That is
+  the FastAPI process talking to local Ollama; the browser neither
+  produces the wording nor sees it before it is spoken. The client's
+  `speak` handler reads only `payload["ref"]` (`app/main.py:2883`) and
+  `resolve()` takes a ref and never a string (`app/speech.py:17`, `:545`).
+- **(b) keyed to an existing queue/agenda item.** `_prepare_question` is
+  entered with the queue item and its agenda reference
+  (`app/main.py:4003`); the lay wording is only used for the item being
+  prepared, as `LayUtterance(version, index, verdict.lay)` at
+  `app/main.py:4067`, and the item's identity stays the original text
+  (`spoken = text` at `app/main.py:4063`, `"question": text` on the plan
+  at `app/main.py:4081`). The type itself is bound, not free text:
+  `app/auto_mode.py:170-186`, and the whitelist note at
+  `app/auto_mode.py:189-191`. Before it can be spoken the reference is
+  re-resolved from the versioned `AgendaLog`
+  (`app/speech.py:646-648` → `app/speech.py:545`), so a wording whose
+  question is not on the list is refused there.
+- **(c) the same spoken-text path and checks as a tap.**
+  `resolve_utterance` resolves a `LayUtterance` through exactly the
+  `{"kind": "cds_question", …}` resolution a tap uses — same stale rule,
+  same rationale (`app/speech.py:645-660`) — and adds the subject guard
+  `lay_accepted` (`app/speech.py:156`, `AUTO_LAY_MIN_SIMILARITY` at
+  `app/speech.py:153`), which refuses drift at `app/speech.py:652-656`
+  whatever the caller checked. `prepare_auto` (`app/speech.py:958`) then
+  synthesises through the same cache and the same
+  `SPEECH_MAX_UTTERANCE_S` cap as `prepare` (`app/speech.py:947`) and
+  registers the same `Utterance`; the issue path opens the same own-voice
+  window, writes the same `speech.requested` audit row and sends the
+  message built by the same `_speak_message` a tap sends
+  (`app/main.py:1857-1866`, `app/main.py:2918-2932`, `app/main.py:1746`),
+  so the exclusion span and the separate system-utterance channel are the
+  same ones. The whitelist is enforced twice — the type union
+  (`app/auto_mode.py:191`) and the runtime check at
+  `app/main.py:1824-1829` — and the wiring's own pre-check
+  (`app/main.py:4064-4079`) speaks the original verbatim and audits
+  `auto.lay_rejected` when the guard fails.
+
+**Flags discharged.** The `help/` flags carried "for the owner's wording
+in one sitting" are all answered by this commit, and the sitting is
+closed:
+
+- *Fix slice 2* (`help/01` §2 and §3, `help/02` step 5, `help/02` step 3,
+  `help/04`'s "two small judgements") — discharged by items 3–7.
+- *Fix slice 3* (the third judgement in `help/04`) — discharged by item 7,
+  in the form fix slice 5 left it: the third only orders.
+- *Fix slice 4* (`help/02` step 3's "starting", the too-loud
+  self-switch-off, the golden-minute encouragers, the plain English and
+  "Let me think for a moment"; `help/02` step 5's lay wording; `help/01`
+  §3's plain English; `help/06`'s clause about re-wording a question) —
+  discharged by items 3, 4, 5 and 8.
+- *Fix slice 5* (the same `help/04` and `help/01` §3 sentences with the
+  re-order-only correction, and the slice-4 flags it carried forward) —
+  discharged by items 5 and 7.
+- *Launch slice* ("help/ series line — owed the owner's wording": the ten
+  series lines and `help/00-introduction.md:5`) — discharged by item 1.
+
+No `help/` flag is outstanding. The one `help/` sentence still held is
+unrelated to this sitting and stays held: `help/05`'s "one consultation
+keeps that model busy roughly a minute", from the Phase 7c closing
+micro-slice.
+
+**Suite: 1147 passed** (`uv run pytest`, unchanged by this commit — it
+touches no code; the count matches the launch slice's 1147).
+`AUTO_MODE_ENABLED` is no longer read by the suite, so it was run plainly.
+
+**Nothing needs a restart.** `help/` is prose in the repository; the
+running app serves none of it.

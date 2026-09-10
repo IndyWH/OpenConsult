@@ -1,6 +1,6 @@
 # What the room taught us — five runs, five defects no test caught
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `f465eff`).*
+*Part of the OpenConsult help series. True as of 2026-07-31 (HEAD `f465eff`).*
 
 This project has hundreds of automated tests, and they were green on every
 day described below. It also has a rule: before a feature that touches a

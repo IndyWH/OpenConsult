@@ -1,6 +1,6 @@
 # Installing and running it — choose your path first
 
-*Part of the Consultation AI help series. True as of the first-admin
+*Part of the OpenConsult help series. True as of the first-admin
 hardening commit it ships with — see the repository history.*
 
 ```mermaid

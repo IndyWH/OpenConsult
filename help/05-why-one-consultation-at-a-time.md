@@ -1,6 +1,6 @@
 # Why one consultation at a time — and what more would take
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `ef6c583`).*
+*Part of the OpenConsult help series. True as of 2026-07-31 (HEAD `ef6c583`).*
 
 Try to start a second consultation while one is running and the app refuses,
 naming who holds the slot. That looks like a limitation. It is actually one

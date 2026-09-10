@@ -1,6 +1,6 @@
 # The architecture — one machine, five models, no cloud
 
-*Part of the Consultation AI help series. True as of 2026-07-31 (HEAD `ef6c583`).*
+*Part of the OpenConsult help series. True as of v1.0.0 (2026-09-10).*
 
 The whole system runs on a single desktop computer with one graphics card.
 That constraint shaped every design decision, so this article is really the
@@ -47,8 +47,10 @@ Three things the map can't show, and each is a deliberate choice:
 
 MedGemma 27B does the differential, the red-flag watch, the guideline
 summaries, the note and the letters — and, when auto mode is enabled, the
-two small judgements that pace the spoken interview: has the patient
-finished speaking, and what a question is about. All are separate calls with
+three small judgements that pace the spoken interview: has the patient
+finished speaking, what a question is about and how to put it in plain
+English, and which of the waiting questions to ask next. That last one only
+orders the queue; it cannot remove a question. All are separate calls with
 separate rules, never one conversation. All clinical output runs at
 temperature zero with a fixed seed: ask the same transcript twice, get the
 same answer. A system being evaluated must be repeatable, and a clinical

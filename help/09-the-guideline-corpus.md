@@ -1,6 +1,6 @@
 # Where the guidelines come from — a corpus you build, not download
 
-*Part of the Consultation AI help series. The example manifest in the
+*Part of the OpenConsult help series. The example manifest in the
 repository shows the format; the corpus your instance holds is defined
 by your own local manifest.*
 
