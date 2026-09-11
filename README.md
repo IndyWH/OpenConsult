@@ -14,6 +14,31 @@ Transcribes a doctor–patient consultation live, offers real-time clinical deci
 
 https://github.com/user-attachments/assets/84bf3635-54de-479d-8caa-2ebf5787e5e9
 
+## What I'd like feedback on
+
+I am a practising GP and I built this mostly in my own time. I would rather
+hear what is wrong with it than what is good about it. Three things in
+particular.
+
+**Where it breaks in a real clinic.** Everything here has been tested in a
+quiet room with a scripted or acted patient. That is not a clinic. Background
+noise, a third person in the room, a patient who talks across the doctor, a
+cheap microphone, a machine without a 24 GB card — tell me what you think
+falls over first.
+
+**The code, which is mostly AI-written.** I wrote the specifications and
+reviewed the work, an AI assistant wrote most of the code, and I refereed. I
+have not hidden that, and I have not tidied away what it cost: five runs in a
+real room turned up four serious defects that the test suite had passed.
+Each one is written up with the reason no test caught it. If you think the
+review was not careful enough, the whole history is here to check.
+
+**Security.** An audit found twelve issues, one of them critical. What they
+were and what was done about them is in [help/08-security.md](help/08-security.md).
+I would like to know what that audit missed.
+
+Open a [Discussion](../../discussions) or an issue. Blunt is welcome.
+
 ## 1. Why this project
 
 - **Low-resource language clinical NLP — closed with a published negative result.** This project began with Sri Lanka's real workflow in mind: consultations in Sinhala, heavily code-switched with English medical terms, documented in English. A pre-registered evaluation then showed that no available model transcribes code-switched clinical Sinhala safely — drug names and key numbers did not survive in any candidate — so v1 is English-only by explicit decision, and the evaluation records in `evals/` are kept as a standalone research contribution. Sinhala is out of scope, not postponed.
