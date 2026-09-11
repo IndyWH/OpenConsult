@@ -55,6 +55,7 @@ Open a [Discussion](../../discussions) or an issue. Blunt is welcome.
 ![The live screen: urgent actions, questions to ask, and the differential revising as evidence arrives — cauda equina syndrome has climbed to high on the patient's own words](docs/images/openconsult-live-cds.png)
 
 **After the consultation (a background job, takes a minute or two):**
+
 4. The full recording is re-transcribed at higher quality and **diarised** (labelled *Doctor:* / *Patient:*), with quality gates that refuse to draft from an untrustworthy transcript.
 5. A concise SOAP-style note is drafted — every claim citing the transcript turns it came from — plus a guideline summary grounded in retrieved guideline text (not the model's memory).
 6. The doctor reviews, edits, and signs off the note. Only then is it final — and only from a signed note can referral letters be drafted.
