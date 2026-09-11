@@ -52,7 +52,7 @@ Open a [Discussion](../../discussions) or an issue. Blunt is welcome.
 2. A rough live transcript appears as the conversation happens.
 3. A side panel updates periodically with: a working differential diagnosis, suggested questions to ask, and clinical signs to look for — helping narrow the differential in real time.
 
-![The live screen: transcript streaming, urgent actions, questions to ask and the differential revising as evidence arrives](help/images/02-3-cds-working.png)
+![The live screen: urgent actions, questions to ask, and the differential revising as evidence arrives — cauda equina syndrome has climbed to high on the patient's own words](docs/images/openconsult-live-cds.png)
 
 **After the consultation (a background job, takes a minute or two):**
 4. The full recording is re-transcribed at higher quality and **diarised** (labelled *Doctor:* / *Patient:*), with quality gates that refuse to draft from an untrustworthy transcript.
@@ -67,7 +67,7 @@ Open a [Discussion](../../discussions) or an issue. Blunt is welcome.
 - User accounts with roles (doctor, receptionist, admin) — enforced server-side; the receptionist manages the queue and can never open clinical content.
 - A patient database holding consultations, transcripts (both languages), notes, and an audit trail of who did what and what the AI suggested when.
 
-The screens above are from 31 July 2026 and carry the project's earlier name; the [help series](help/02-using-it-step-by-step.md) walks through the same consultation step by step.
+The note and letter screens above are from 31 July 2026 and carry the project's earlier name; the [help series](help/02-using-it-step-by-step.md) walks through the same consultation step by step.
 
 > **New to the project?** Start with the [help series](help/00-introduction.md) — a short, diagram-led tour of what the app does, how it's built, and why it works the way it does (including what an independent security audit found). It's written for reading, not installing.
 
@@ -92,6 +92,8 @@ refined for v1.1 from the pilot runs. The design is in
 `PHASE_7C_SPEC.md`; the pilot diagnostics that drive the refinements are
 kept outside the repository, on the reference machine, in
 `~/Documents/Consultation-ai/Solo Pilot Documents/`.
+
+![Auto mode running: the assistant has asked its first question aloud and is speaking the next one — the doctor can take it back with one tap at any moment](docs/images/openconsult-automode-speaking.png)
 
 ## Getting started (Phase 0)
 
