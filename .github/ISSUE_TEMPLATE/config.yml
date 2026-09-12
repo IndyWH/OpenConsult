@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: A question, an idea, or anything open-ended
+    url: https://github.com/IndyWH/OpenConsult/discussions
+    about: Discussions are the better place for these.
+  - name: A security vulnerability
+    url: https://github.com/IndyWH/OpenConsult/security/advisories/new
+    about: Please report this privately rather than in a public issue. See SECURITY.md.
