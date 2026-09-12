@@ -103,6 +103,55 @@ them once recorded, add the `_uk` filenames to the urgency dict with their
 dimension (breadth / over-commitment) is a **new** metric — its pass/fail criteria
 are written into each 11–13 header pending a harness of its own.
 
+## Auto-mode actor briefs (16–18, `_auto` suffix)
+
+A **different format**, written for Phase 7c auto mode. The 01–15 scripts write
+out both sides of the conversation, which works when the doctor asks the
+questions. In auto mode Alba asks them, so nobody can know in advance what will
+be asked and a two-hander script is unusable. These files split the consultation
+where auto mode splits it.
+
+1. **The golden minutes.** A word-for-word monologue in the patient's voice, read
+   aloud from the moment Alba's invitation ends. It fills the golden window,
+   during which Alba may only encourage and may never ask. Each script is about
+   220 words, roughly 90 s at conversational pace, matching the
+   `AUTO_GOLDEN_MINUTES_S` default. Each contains one deliberate mid-narrative
+   dry-up, so the golden encouragers ("Go on." / "Please, tell me more.") are
+   exercised where a real patient would falter.
+2. **A background paragraph.** Prose, not a checklist, so the actor improvises in
+   character and stays consistent. They answer from it once the questions start,
+   giving only what was asked.
+
+Each file also carries its **Expected clinical content** and **Expected
+urgent_actions** marking schemes, written before any run, exactly as 11–15 do.
+
+| # | Case | Role in the evals |
+|---|------|-------------------|
+| 16 | Viral URTI demanding antibiotics, 47 M | **Difficult patient** — irritable, self-important, openly sceptical of the machine, pressing hard for an antibiotic he must not have. Restraint case: the alarm must **stay silent**. Carries an omission test — a minimised penicillin allergy he never volunteers. |
+| 17 | Perimenopause, 48 F | **Common presentation, undifferentiated** — a scatter of symptoms the interview has to assemble. Calibration: name the menopause without dropping thyroid disease and iron deficiency. Alarm silent. Omission test — past migraine with aura. |
+| 18 | Ectopic pregnancy, 31 F | **Emergency by omission** — the answer turns on asking when the last *normal* period was and whether she could be pregnant. She supplies a plausible wrong answer twice. Alarm must **fire**. |
+
+**How the actor plays them** is written into each file as numbered steps, so the
+brief handed to a role-player is one self-contained page per case.
+
+**A note on the golden script and the parser.** Each monologue is written as
+consecutive `**PATIENT:**` lines, so `app/mock_scripts.py` parses it like any
+other script and `as_live_transcript` yields a frozen reference for the first 90
+seconds of every run. Stage directions and the actor's instructions sit outside
+the turn lines and are ignored by the parser. Nothing after the golden minutes
+has a reference transcript, and cannot have one — the questions phase is
+improvised by construction.
+
+**Wiring into the harnesses (deliberately not done).** As with `_uk`, neither
+harness picks `_auto` files up: the urgency harness runs an explicit
+filename→expected dict and the notes harness globs `[01]*_en.md`. To evaluate
+these once recorded, add them to the urgency dict with their `Should fire` values
+(16/17 → False, 18 → True).
+
+**Prereg status.** These three sit **outside** the frozen five `_uk` scripts named
+in `PHASE_7C_EVAL_PREREG.md` § Run design. Runs made from them are logged as
+pilot runs, not gate data, and the prereg stays untouched.
+
 ## Recording guidance
 
 - **Two speakers, real voices** — doctor and patient read by different people
