@@ -25,6 +25,11 @@ __pycache__/
 .idea/
 .claude/
 
+# Drafts written with the orchestration assistant — essays, posts and
+# outreach copy in progress. Working documents, not part of the project,
+# and kept out of a repository whose history is public.
+/Claude outputs/
+
 # Audio recordings and model files are large — decide per-file what to track
 *.wav
 *.mp3
