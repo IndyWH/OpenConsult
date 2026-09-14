@@ -93,6 +93,85 @@ with who and when: approvals, corrections, voids, log-ins, even the machine
 being told to speak. When this project says something happened, it can
 point at the row.
 
+## Dwarfs perched on the shoulders of giants
+
+*Bernard of Chartres, as recorded by John of Salisbury, 1159*
+
+Bernard taught at Chartres in the early 1100s. Almost nothing he wrote
+survives. The line reaches us only because a student of his students wrote it
+down decades after he died: we are dwarfs perched on the shoulders of giants,
+and we see further than they did — not because our sight is keener, but
+because their size lifts us up.
+
+Here are the giants.
+
+```mermaid
+flowchart BT
+    subgraph IDEAS["The bedrock — published research"]
+        I1["Transformers\nand attention · 2017"]
+        I2["Weakly supervised\nspeech recognition"]
+        I3["Speaker diarisation"]
+        I4["Retrieval-augmented\ngeneration · 2020"]
+    end
+    subgraph BASE["The floor — languages, kernels, drivers"]
+        B1["C · 1972"]
+        B2["Linux · 1991"]
+        B3["Python · 1991"]
+        B4["CUDA · 2007"]
+    end
+    subgraph ENGINES["The engines — numerical libraries"]
+        E1["FFmpeg · 2000"]
+        E2["NumPy · 2006"]
+        E3["PyTorch · 2016"]
+        E4["CTranslate2 · llama.cpp"]
+    end
+    subgraph WEIGHTS["The weights — models, openly released"]
+        W1["Whisper · 2022"]
+        W2["pyannote.audio"]
+        W3["MedGemma 27B · 2025"]
+        W4["EmbeddingGemma"]
+        W5["Piper voices"]
+    end
+    subgraph PLUMBING["The plumbing — serving, storage, the web"]
+        P1["PostgreSQL · 1986"]
+        P2["Ollama"]
+        P3["faster-whisper · WhisperX"]
+        P4["FastAPI · Uvicorn · HTMX"]
+    end
+    KNOW["The knowledge —\nguidelines and literature written by clinicians,\nfrom trials that patients agreed to join"]
+    TOP["OpenConsult"]
+    IDEAS --> BASE
+    BASE --> ENGINES
+    ENGINES --> WEIGHTS
+    WEIGHTS --> PLUMBING
+    PLUMBING --> TOP
+    KNOW --> TOP
+```
+
+Some figures behind that picture.
+
+The C language is over fifty years old. PostgreSQL descends from a project
+begun at Berkeley in 1986. Linux and Python were both released in 1991.
+FFmpeg has been decoding audio since 2000, largely maintained by volunteers.
+
+The transformer architecture that every model here depends on was set out in
+one paper in 2017.
+
+Whisper was trained on 680,000 hours of recorded speech — roughly 78 years of
+continuous audio — and the weights were published rather than sold.
+
+MedGemma has 27 billion parameters. Quantised to four bits it occupies 16 GB
+and runs on a graphics card sold for playing games.
+
+Every guideline the retrieval layer consults was written by clinicians working
+from evidence that other clinicians generated, in trials that patients agreed
+to join. The system knows no medicine. It finds and repeats what people who do
+know wrote down.
+
+Half a century of work, most of it given away, is what this software stands on.
+OpenConsult is the small box at the top: an arrangement of these parts, and a
+set of rules about what they may not do.
+
 ---
 
 ## Where to go next
