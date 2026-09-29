@@ -7877,3 +7877,12 @@ tailscale funnel status    # expect "(tailnet only)"
 Ubuntu, on the Samsung 990 PRO, is frozen as an emergency fallback. Its
 database stopped at 29 Sep 2026. **Consultation 497, and anything later,
 exist only on Omarchy.** Booting Ubuntu would run the app on old data.
+
+### Follow-up (29 Sep 2026, later)
+
+- The phone check and the Chrome check both passed on 29 Sep 2026,
+  reported by the owner. The phone reaches the address with Tailscale on
+  and fails with it off. In Chrome at the https address, doctor login
+  works and the recording of consultation 496 plays.
+- `CLAUDE.md`, section *Running it*, now describes Omarchy (commit
+  02a0e04).
