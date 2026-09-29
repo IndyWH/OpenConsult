@@ -7695,3 +7695,185 @@ target are unchanged. The help-series callout moved from after the Auto
 mode section to the end of §2, immediately before the `PROJECT_PLAN.md`
 pointer, so a new reader meets it right after the user's-eye tour. Docs
 only, no suite.
+
+## Move from Ubuntu to Omarchy on mlrig (2026-09-29)
+
+The machine now runs Omarchy (Arch Linux). Ubuntu is kept only as an
+emergency fallback. The plan and the logs for every stage live outside
+the repo, in the owner's review folder (`MIGRATION_PLAN.md` and
+`migration-logs/`). This entry records what a future reader needs. The
+old entries above are unchanged; read their Ubuntu lines with the table
+below.
+
+### What moved where
+
+- **On the encrypted Omarchy drive:** the repo, at the same path
+  (`/home/indy/Projects/consultation-ai`); `.env` (mode 0600); the
+  recordings (`data/recordings`, inside the repo, gitignored); and the
+  database.
+- **On `/mnt/fastdata`:** the Ollama store (`/mnt/fastdata/ollama/models`,
+  16 GB) and the Hugging Face cache (`/mnt/fastdata/huggingface`, already
+  there). These are the large files.
+- **Kept at their home paths:** the Alba voice
+  (`~/.local/share/piper-voices/en_GB-alba-medium/`, 63 MB) and the torch
+  cache (`~/.cache/torch`, 426 MB: pyannote, WhisperX alignment, silero
+  VAD). The config already names these paths, so keeping them meant no
+  new settings.
+- **The database** was copied by dump and restore, not by copying the
+  data folder. A fresh restore rebuilds every index under Omarchy's
+  text-sorting rules, so the collation warning is gone for good. The
+  cluster is `en_US.UTF-8`, like Ubuntu's database; Ubuntu's `en_GB`
+  display settings, `datestyle (iso, dmy)` and timezone were copied
+  across. All 14 tables matched Ubuntu's row counts.
+- **The database has its own btrfs subvolume, `@postgres`,** mounted at
+  `/var/lib/postgres` by an fstab line. The data folder is
+  `/var/lib/postgres/data`. Copy-on-write is off on it. It sits at the
+  top level, beside `@`, `@home`, `@pkg` and `@log`, so it is outside
+  snapper's root snapshots. Why: if Omarchy is ever rolled back after a
+  bad update, the rollback must not rewind the consultations. Copy-on-write
+  off is the usual advice for a database on btrfs.
+- `HF_HOME` for shells is set in `~/.bashrc`. Omarchy has no
+  `~/.profile`. The service does not read either; it sets `HF_HOME` in
+  its own unit.
+
+### The units as installed
+
+Read from `/etc/systemd/system` on 29 Sep 2026. Neither file holds a
+secret, so nothing is masked.
+
+`/etc/systemd/system/consultation-ai.service`:
+
+```ini
+[Unit]
+Description=Consultation AI
+After=network-online.target postgresql.service ollama.service
+Wants=postgresql.service ollama.service
+RequiresMountsFor=/mnt/fastdata
+
+[Service]
+User=indy
+WorkingDirectory=/home/indy/Projects/consultation-ai
+Environment=HF_HOME=/mnt/fastdata/huggingface
+ExecStart=/usr/bin/uv run uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+```
+
+`/etc/systemd/system/ollama.service.d/openconsult.conf`, a drop-in on
+top of the package's `/usr/lib/systemd/system/ollama.service`:
+
+```ini
+[Unit]
+RequiresMountsFor=/mnt/fastdata
+[Service]
+User=indy
+Group=indy
+DynamicUser=no
+ProtectHome=no
+WorkingDirectory=/mnt/fastdata/ollama
+Environment=HOME=/home/indy
+Environment=OLLAMA_MODELS=/mnt/fastdata/ollama/models
+Environment=OLLAMA_KEEP_ALIVE=30m
+```
+
+What differs from Ubuntu:
+
+- **uv is `/usr/bin/uv`** (pacman, 0.12.10), not `~/.local/bin/uv`
+  (0.12.9). One uv on the machine, not two.
+- **`--host 127.0.0.1`**, not `0.0.0.0`. The app no longer listens on the
+  LAN. Tailscale serve reaches it on localhost.
+- **`RequiresMountsFor=/mnt/fastdata`** in both units. Neither starts
+  before the models are there.
+- **Ollama comes from Arch's `ollama-cuda` package** (`/usr/bin/ollama`,
+  0.33.3, the same version Ubuntu had). The drop-in makes it run as
+  `indy`, not the package's `ollama` user, and points it at fastdata.
+- **Persistence mode comes from `nvidia-persistenced`** (from
+  `nvidia-utils`), not the locally made `nvidia-pm.service`
+  (`nvidia-smi -pm 1`). That unit does not exist here.
+- Postgres is `postgresql.service` (18.6), with no `@18-main` instance.
+
+### Arch equivalents for the Ubuntu-only lines above
+
+Line numbers are in this file as it stood before this entry.
+
+| Ubuntu line says | On Omarchy | HANDOVER lines |
+|---|---|---|
+| `postgresql@18-main` | `postgresql.service`. One plain unit; `is-enabled` says `enabled`, not `enabled-runtime`. | 4179, 4196, 4204, 4248, 4748, 4755, 4758, 5912 |
+| `/var/lib/postgresql/18/main` | `/var/lib/postgres/data`, on the `@postgres` subvolume. Line 4609 is the Docker image's path inside its container and does not change. | 4609, 5887, 5895 |
+| `sudo -u postgres psql ...` | Works as it is. | 3200, 3201, 7491 |
+| `/home/indy/.local/opt/ollama` | `/usr/bin/ollama` from `ollama-cuda`, run by the package unit plus the drop-in above. No hand start with `nohup`. | 3176, 4233, 4712, 4777 |
+| Unit texts in `/etc/systemd/system/` | `consultation-ai.service` is still there (text above). Ollama is the package unit plus `ollama.service.d/openconsult.conf`. | 250, 4171, 4763, 4768, 4785, 4795, 4796 |
+| `HF_HOME` in `~/.profile` | `~/.bashrc` for shells; the unit's `Environment=` for the service. | 5899, 5909 |
+| WSL2-era sections | Already historical. No change. | 277 to 4391, 4649 to 4839 |
+| apt, dpkg, pg_ctlcluster, snap, ufw | None in this file. | none |
+| `scripts/` | No absolute paths and no Ubuntu-only commands. | none |
+
+### Tailscale
+
+This machine is the tailnet node **`mlrig-2`**, at
+`https://<your-tailnet-host>.ts.net`. The real address is in the
+migration log, not here, by the standing sanitisation rule above. It is
+**tailnet only**: `tailscale serve --bg 8000` proxies HTTPS to
+`127.0.0.1:8000`, and Funnel is off. The phone and any other device need
+the new address.
+
+To switch Funnel on (public internet):
+
+```bash
+sudo tailscale funnel --bg 8000
+tailscale funnel status    # should no longer say "tailnet only"
+```
+
+To switch it back off (tailnet only):
+
+```bash
+sudo tailscale funnel reset
+sudo tailscale serve --bg 8000    # reset may clear serve too; harmless if not
+tailscale serve status     # expect "(tailnet only)", proxy to 127.0.0.1:8000
+tailscale funnel status    # expect "(tailnet only)"
+```
+
+- **sudo:** yes, to switch on or off. No operator user is set on this
+  node. The status commands need no sudo.
+- **The tailnet policy must allow Funnel for `mlrig-2`.** It is a new
+  node; Ubuntu's was `mlrig-1`. Check the policy in the admin console
+  before the first switch-on.
+- None of these commands was run for this entry.
+
+### Results
+
+- **Suite: 1147 passed, 0 failed, 0 skipped.**
+- **Reboot, all ten checks passed with no hand step** (15:19 boot):
+  fastdata mounted; `@postgres` mounted; Ubuntu drive closed; `ollama`,
+  `postgresql`, `consultation-ai` and `nvidia-persistenced` active and
+  enabled; `/health` ok with PostgreSQL 18.6 and pgvector; port 8000 on
+  `127.0.0.1` only; serve and funnel tailnet only; persistence on, 2224
+  MiB in use at idle; the same two Ollama models with the same manifest
+  hashes; clean journals.
+- **Test consultation 497**, at localhost, synthetic like every
+  consultation here. Checked read only in the database: auto mode,
+  status approved, quality gate pass, 17 transcript turns, 16 Alba
+  utterances (12 phrases, 4 agenda questions), note version 1 approved.
+  All 17 turns carry one role; the single-voice banner fired and was
+  acknowledged.
+- **GPU memory during 497** (601 samples over 5 minutes): idle 2198 MiB,
+  peak **22161 of 24564 MiB**, so 2.4 GB headroom.
+
+### Owed, not done
+
+- **The phone check:** the phone reaches the address with Tailscale on,
+  and fails with it off.
+- **In Chrome at the https address:** doctor login, and 496's recording
+  plays.
+- **Barge-in thresholds** were measured on Ubuntu's audio path. They are
+  unverified on Omarchy. That belongs to v1.1.
+- `CLAUDE.md` § *Running it* still describes Ubuntu, Postgres 18.4 and
+  Ollama in `~/.local/opt`. Not changed in this commit.
+
+### Ubuntu is the frozen fallback
+
+Ubuntu, on the Samsung 990 PRO, is frozen as an emergency fallback. Its
+database stopped at 29 Sep 2026. **Consultation 497, and anything later,
+exist only on Omarchy.** Booting Ubuntu would run the app on old data.
