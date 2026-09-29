@@ -7886,3 +7886,35 @@ exist only on Omarchy.** Booting Ubuntu would run the app on old data.
   works and the recording of consultation 496 plays.
 - `CLAUDE.md`, section *Running it*, now describes Omarchy (commit
   02a0e04).
+
+## Dependabot safe updates (2026-09-29)
+
+Six packages flagged by Dependabot were updated in `uv.lock`, in two
+commits (2347e25, 9ae4ce4):
+
+- anyio 4.14.1 → 4.14.2
+- aiohttp 3.14.1 → 3.14.3
+- lightning 2.6.5 → 2.6.6
+- soupsieve 2.8.4 → 2.9.0
+- setuptools 81.0.0 → 83.0.0 (the lock had split it by platform; it now
+  holds the one version)
+- nltk 3.9.4 → 3.10.3, which adds its new dependency defusedxml 0.7.1
+
+`pyproject.toml` did not change, and the pinned stack (torch,
+transformers, whisperx, pyannote) did not move. Nothing else moved in
+the lock.
+
+**The check.** The first 3 minutes of acted consultation 473 were
+aligned with WhisperX and diarised with pyannote on the CPU, loading the
+models the way `app/finalize.py` does, before and after each update.
+Words, word start and end times, and speaker turns were identical every
+time (343 words, 100 turns), and a repeat of the baseline matched too.
+
+**Suite:** 1147 passed, 0 failed, 0 skipped, before and after each
+update.
+
+**Not live yet.** The service runs the old packages until the owner
+restarts it.
+
+**Still open.** The remaining alerts (transformers, torch, and one nltk
+alert with no fix in any version) wait for owner decisions.
