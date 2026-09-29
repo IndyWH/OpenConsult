@@ -39,9 +39,18 @@ implement those rather than re-litigating them.
 
 ## Running it
 
-One machine: native Ubuntu 26.04 (`indy@mlrig`, project at
-`/home/indy/Projects/consultation-ai`), an RTX 4090 (24 GB), Postgres
-18.4 + pgvector, Ollama in user space at `/home/indy/.local/opt/ollama`.
+One machine: Omarchy (Arch Linux) (`indy@mlrig`, project at
+`/home/indy/Projects/consultation-ai`), an RTX 4090 (24 GB). Postgres
+18.6 + pgvector runs as `postgresql.service`, with its data at
+`/var/lib/postgres/data` on its own btrfs subvolume. Ollama comes from
+Arch's `ollama-cuda` package (`/usr/bin/ollama`), run by the package unit
+plus a drop-in that runs it as `indy` with its models at
+`/mnt/fastdata/ollama/models`. The Hugging Face cache is at
+`/mnt/fastdata/huggingface`. The app listens on `127.0.0.1:8000` only;
+Tailscale serve reaches it, tailnet only. Ubuntu is kept only as a frozen
+emergency fallback. Its database stops at 29 Sep 2026, so development
+never runs there. For the unit files, and the table of Ubuntu lines and
+their Arch equivalents, see the `HANDOVER.md` entry of 29 Sep 2026.
 Credentials live in `.env`, which is gitignored;
 `.env.example` is the template and every new setting belongs there with a
 one-line comment.
