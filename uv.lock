@@ -274,6 +274,7 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "faster-whisper" },
+    { name = "httpx" },
     { name = "numpy" },
     { name = "nvidia-cublas-cu12", version = "12.8.4.1", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform != 'emscripten' and sys_platform != 'win32'" },
     { name = "nvidia-cublas-cu12", version = "12.9.2.10", source = { registry = "https://pypi.org/simple" }, marker = "sys_platform == 'emscripten' or sys_platform == 'win32'" },
@@ -289,7 +290,6 @@ dependencies = [
 [package.dev-dependencies]
 dev = [
     { name = "datasets" },
-    { name = "httpx" },
     { name = "jiwer" },
     { name = "pytest" },
 ]
@@ -299,6 +299,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.15.0" },
     { name = "fastapi", specifier = ">=0.115" },
     { name = "faster-whisper", specifier = ">=1.2.1" },
+    { name = "httpx", specifier = ">=0.28" },
     { name = "numpy", specifier = ">=2.5.1" },
     { name = "nvidia-cublas-cu12", specifier = ">=12" },
     { name = "nvidia-cudnn-cu12", specifier = ">=9" },
@@ -312,7 +313,6 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "datasets", specifier = "==3.6.0" },
-    { name = "httpx", specifier = ">=0.28" },
     { name = "jiwer", specifier = ">=4" },
     { name = "pytest", specifier = ">=8.0" },
 ]

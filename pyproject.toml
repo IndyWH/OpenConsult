@@ -17,6 +17,7 @@ dependencies = [
     "beautifulsoup4>=4.15.0",
     "pyyaml>=6.0.3",
     "whisperx>=3.8.5",
+    "httpx>=0.28",
 ]
 
 [tool.uv]
@@ -46,7 +47,6 @@ pythonpath = ["."]
 [dependency-groups]
 dev = [
     "pytest>=8.0",
-    "httpx>=0.28",
     "datasets==3.6.0",
     "jiwer>=4",
 ]
