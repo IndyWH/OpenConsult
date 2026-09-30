@@ -7918,3 +7918,49 @@ restarts it.
 
 **Still open.** The remaining alerts (transformers, torch, and one nltk
 alert with no fix in any version) wait for owner decisions.
+
+## CDS prompt: weigh a stale list (2026-09-30)
+
+Owner decisions, 30 Sep 2026:
+
+- OpenConsult v1.1 is for UK GPs. The prompts name no country. Sri Lanka
+  went with Sinhala, and no other country replaces it.
+- The dengue examples are out of the urgency prompt.
+- There is no rule to keep the differential list's order or names. The
+  list should follow the transcript as it grows.
+- The earlier list goes to the model as a stale list, condition names
+  only, before the transcript. Likelihoods, rationales, questions and
+  signs are not sent back.
+
+**The evidence.** Replaying acted consultation 495 in the v1.1 review,
+the assessment that revised its own previous answer considered ectopic
+pregnancy in 8 of 13 chains, and the same call without its previous
+answer did in 13 of 13. Without it, the list changed much more from
+pass to pass.
+
+**Commits.**
+
+- d857b0d: `ASSESSMENT_PROMPT` and `URGENCY_PROMPT` name no country, and
+  the urgency examples drop dengue.
+- 749cb62: `ASSESSMENT_PROMPT` is the new system prompt, the same at
+  every pass. The assessment message is the transcript alone on the first
+  pass, and after that the stale list of names, then the updated
+  transcript (`app.cds.assessment_message`). The urgency and affect calls,
+  schema, caps, timeouts and the arranged latch did not change.
+
+Tests in `tests/test_cds_prompts.py` pin both. **Suite:** 1156 passed,
+0 failed, 0 skipped.
+
+**Not live yet.** The service runs the old prompts until the owner
+restarts it.
+
+**A measurement is running**: the new prompt on the same 13 chains of
+495, against a shuffled list, no list, and two other models. Its report
+is kept outside the repo.
+
+**Help now out of date.** `help/01-a-consultations-journey.md` §2 says
+the assessment is "a careful reviser" whose updates revise the previous
+one "under rules: condition names stay put", and its diagram labels the
+assessment "revises". That is no longer true. `help/02-using-it-step-by-step.md`
+says "the differential revises itself as evidence arrives", which may
+still read as true. The owner writes any new wording.
