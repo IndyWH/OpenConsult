@@ -7,9 +7,11 @@ urgency alarm for time-critical presentations.
 
 Architecture: THREE model calls per update, one job each.
 
-1. Assessment call — differentials / questions / signs. Receives its own
-   previous output and revises it under stability rules (don't churn the
-   list; rationales accumulate evidence).
+1. Assessment call — differentials / questions / signs. Since 2026-09-30
+   it reads the transcript afresh each pass; after the first it is also
+   given its previous differentials' names as a stale list to weigh again
+   (assessment_message), with no rule to keep them (the revise-and-keep-
+   stable version anchored on its first guess).
 2. Urgency call — a stateless "safety officer" that sees only the current
    transcript, fresh every update. Evaluation showed the combined call
    failed in both directions: the previous assessment anchored the alarm
@@ -181,41 +183,47 @@ ASSESSMENT_SCHEMA = {
 }
 
 ASSESSMENT_PROMPT = f"""\
-You are a clinical decision support assistant quietly observing a live GP \
-consultation. {ASR_CAVEAT}
+You are a clinical decision support assistant quietly listening to a live \
+GP consultation. {ASR_CAVEAT}
 
-Fill the `reasoning` field FIRST: think through what is new in the \
-transcript since your previous assessment and what it changes. Keep it \
-under 120 words. Then produce the assessment:
-1. differentials — up to 5 diagnoses, MOST LIKELY FIRST, each with a short \
-rationale grounded in what was actually said.
-2. questions_to_ask — up to 4 questions the doctor has NOT yet asked that \
-would best narrow the differential, ORDERED BY CLINICAL PRIORITY: the most \
-clinically appropriate next question FIRST. Re-rank freely as new \
-information changes what matters most — the order is living, not pinned. \
-Remove a question once the transcript shows it was asked or answered.
-3. signs_to_check — up to 4 focused examination findings worth checking. \
-Remove one once the transcript shows it was examined.
+Read the transcript and do these things. Fill the reasoning field FIRST, in \
+under 120 words: what the transcript tells you. Then:
+1. differentials: up to 5 diagnoses, ranked on the evidence in the \
+transcript, most likely first. Each has a short rationale grounded in what \
+was actually said.
+2. questions_to_ask: up to 4 questions the doctor has NOT yet asked that \
+would best narrow the differential, most important first.
+3. signs_to_check: up to 4 focused examination findings worth checking.
 
-REVISION RULES — you are REVISING your previous assessment, not writing a \
-new one:
-- Differential list: keep each kept condition's NAME verbatim, and keep the \
-list's order, UNLESS new transcript content gives a concrete reason to add, \
-remove, reorder, or re-grade. Do not churn the list.
-- Rationales are living evidence summaries: whenever the transcript adds \
-material evidence for or against a differential (risk factors, radiation of \
-pain, family history, examination findings), UPDATE that rationale to cite \
-the strongest current evidence, and re-grade the likelihood if warranted.
-- Before output, re-check every question in questions_to_ask against the \
-transcript: if it has been asked or its answer is now known, REMOVE it. \
-Same for signs_to_check once examined. Stale items are errors.
-- Early in the consultation, with little information, prefer a short list \
-over speculation.
+Before output, check every question and sign against the transcript. \
+Remove any that has been asked, answered or examined.
+When little has been said, prefer a short list over guessing.
 
 This is a research prototype processing a scripted, synthetic consultation. \
 Your output is a draft aid for a qualified doctor, who makes all decisions. \
 Output JSON only.\
 """
+
+
+def assessment_message(transcript: str, previous: dict | None) -> str:
+    """The assessment call's user message (owner decisions 2026-09-30).
+
+    First pass, or a previous with no differentials: the transcript alone.
+    Later passes: the previous differentials' condition names, in their
+    existing order, one per line, framed as a stale list from a shorter
+    transcript, BEFORE the transcript, so the evidence is read last. Names
+    only: no likelihood, rationale, questions or signs, and no rule to keep
+    the list's names or order (Task 3b/3c of the v1.1 review: the revise-
+    and-keep-stable message anchored the list on its first guess)."""
+    names = [d["condition"] for d in ((previous or {}).get("differentials") or [])
+             if isinstance(d, dict) and d.get("condition")]
+    if not names:
+        return f"Here is the transcript of the consultation so far:\n{transcript}"
+    stale = "\n".join(names)
+    return ("We have more information.\n\n"
+            "This is a stale list of possibilities, made from an earlier, shorter transcript:\n"
+            f"{stale}\n\n"
+            f"Here is the updated transcript of the consultation so far:\n{transcript}")
 
 # ------------------------------------------------------------------- urgency
 
@@ -926,7 +934,7 @@ class CDSEngine:
         return json.loads(body["message"]["content"]), meta
 
     async def update(self, transcript: str, previous: dict | None = None) -> dict:
-        """One CDS pass: transcript so far + previous assessment → new assessment.
+        """One CDS pass: transcript so far + previous assessment's names → new assessment.
 
         Returns the assessment fields plus `urgency_check` (the safety
         officer's booleans and reasoning), `urgent_actions` (already
@@ -936,19 +944,6 @@ class CDSEngine:
         The returned shape is unchanged by that split: `patient_affect`
         sits at the top level exactly where it always has.
         """
-        if previous:
-            stable_fields = {
-                k: previous[k]
-                for k in ("differentials", "questions_to_ask", "signs_to_check")
-                if k in previous
-            }
-            prev_text = (
-                "YOUR PREVIOUS ASSESSMENT (revise this, keeping it stable):\n"
-                + json.dumps(stable_fields, indent=1)
-            )
-        else:
-            prev_text = "This is your FIRST assessment of this consultation."
-
         transcript_text = f"LIVE TRANSCRIPT SO FAR:\n{transcript}"
 
         runaway: CDSRunaway | None = None
@@ -958,7 +953,7 @@ class CDSEngine:
             # the call and the same value as the HTTP timeout beneath it.
             assessment = await asyncio.wait_for(
                 self._chat(
-                    ASSESSMENT_PROMPT, f"{prev_text}\n\n{transcript_text}", ASSESSMENT_SCHEMA,
+                    ASSESSMENT_PROMPT, assessment_message(transcript, previous), ASSESSMENT_SCHEMA,
                     timeout=CDS_ASSESSMENT_TIMEOUT_S, num_predict=CDS_ASSESSMENT_MAX_TOKENS,
                     call="assessment"),
                 timeout=CDS_ASSESSMENT_TIMEOUT_S)
