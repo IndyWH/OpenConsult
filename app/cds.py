@@ -182,7 +182,7 @@ ASSESSMENT_SCHEMA = {
 
 ASSESSMENT_PROMPT = f"""\
 You are a clinical decision support assistant quietly observing a live GP \
-consultation in Sri Lanka. {ASR_CAVEAT}
+consultation. {ASR_CAVEAT}
 
 Fill the `reasoning` field FIRST: think through what is new in the \
 transcript since your previous assessment and what it changes. Keep it \
@@ -247,7 +247,7 @@ URGENCY_SCHEMA = {
 }
 
 URGENCY_PROMPT = f"""\
-You are the urgency safety-check for a live GP consultation in Sri Lanka. \
+You are the urgency safety-check for a live GP consultation. \
 You have ONE job: decide whether anything in this consultation is \
 time-critical. {ASR_CAVEAT}
 
@@ -259,12 +259,8 @@ bar? Examples that DO: possible ACS or NEW cardiac-sounding chest pain \
 (new angina needs an ECG at this visit even if currently stable); a \
 resolved episode of focal weakness or slurred speech (TIA until proven \
 otherwise); GI bleeding (melaena counts); pulmonary embolism; sepsis or a \
-shocked/drowsy/mottled child; severe asthma; meningitis; dengue WITH \
-warning signs (severe abdominal pain, persistent vomiting, bleeding, \
-drowsiness, not drinking, no urine, cold peripheries) — suspected dengue \
-in an alert, drinking child is handled with same-day testing and review, \
-which is routine care, not an alarm. Judge on reasonable SUSPICION, not \
-confirmation — this alarm exists to prompt action before the picture is \
+shocked/drowsy/mottled child; severe asthma; meningitis. Judge on \
+reasonable SUSPICION, not confirmation — this alarm exists to prompt action before the picture is \
 complete.
 
 Examples that do NOT meet the bar, however much they deserve proactive \
