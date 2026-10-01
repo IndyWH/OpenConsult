@@ -7964,3 +7964,58 @@ one "under rules: condition names stay put", and its diagram labels the
 assessment "revises". That is no longer true. `help/02-using-it-step-by-step.md`
 says "the differential revises itself as evidence arrives", which may
 still read as true. The owner writes any new wording.
+
+## Sri Lankan mock scripts removed (2026-10-01)
+
+**Owner decision, 1 Oct 2026.** OpenConsult is for UK general practice.
+The four mock consultations set in Sri Lanka are removed:
+
+- `mock_consultations/02_febrile_child_en.md`
+- `mock_consultations/09_septic_child_en.md`
+- `mock_consultations/01_chest_pain_si.md`
+- `mock_consultations/03_diabetes_review_si.md`
+
+Git history and the v1.0.0 tag keep them.
+
+**What changed (c9e5f7c).** The urgency harness
+(`scripts/evaluate_urgency.py`) now runs 8 scripts, and its docstring
+matches. `tests/test_mock_scripts.py` expects 8 English scripts: 4
+routine, 3 red-flag variants, 1 held-out. `mock_consultations/README.md`
+no longer describes the four. No prompt and no app code changed. The
+recordings under `mock_consultations/recordings/` and everything in
+`evals/` are untouched.
+
+**Suite:** 1156 passed, 0 failed.
+
+**Still named elsewhere, not edited.** Outside this file,
+`PROJECT_PLAN.md` and `evals/`, these places still name a removed
+script. Only the first would fail if run.
+
+- `scripts/evaluate_asr_stack.py:79` maps recording 67 to
+  `02_febrile_child_en`. `reference_for(67)` parses the `.md`, and
+  recording 67 is on disk, so a default run raises FileNotFoundError.
+  A run with `--cids` that leaves out 67 does not. **Would fail.**
+- `scripts/evaluate_asr_stack.py:81,83` map recording 70 to
+  `03_diabetes_review_si`. Its reference is the kept
+  `recordings/refs/03_diabetes_review_si.txt`, not the `.md`. Would not
+  fail.
+- `scripts/calibrate_transcript_quality.py:11,74,77` name recordings 67
+  and 70. It parses a script only for 66 and 68, so these are labels.
+  Would not fail.
+- `scripts/evaluate_rag.py:43` and
+  `scripts/evaluate_retrieval_composition.py:72` keep the case
+  "dengue child (script 02)". It is a label and a condition list, and
+  no file is read. Would not fail.
+- `tests/test_calibrate_transcript_quality.py:150,153`,
+  `tests/test_transcript_quality.py:29,32` and
+  `tests/test_evaluate_asr_stack.py:96` name them as labels or as the
+  kept reference file. They pass.
+- `mock_consultations/recordings/refs/01_chest_pain_si.txt`,
+  `03_diabetes_review_si.txt` and `03_diabetes_review_si.terms.txt` are
+  the kept references for the removed Sinhala scripts.
+- `TRANSCRIPT_QUALITY_GATE_SPEC.md:96,221,225` and `PHASE_7_SPEC.md:82`
+  are spec text.
+
+A comment in `scripts/evaluate_urgency.py`, above `UK_EXPECTATIONS`,
+still says "the canonical ten-script urgency_results.json". It was left
+because the task allowed no other change to that file.
