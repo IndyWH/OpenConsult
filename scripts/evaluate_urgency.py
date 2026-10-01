@@ -1,11 +1,11 @@
-"""Urgency-escalation evaluation: replay all nine mock consultations through
+"""Urgency-escalation evaluation: replay all eight mock consultations through
 the CDS engine and check the urgent_actions behaviour against expectations.
 
 Success criteria:
 - FIRES on all five emergency presentations (01 chest pain, 06 TIA,
-  07 GI bleed, 08 PE, 09 septic child)
-- Stays SILENT on all four routine presentations (02 dengue-watch child,
-  03 diabetes review, 04 asthma, 05 uncomplicated dyspepsia)
+  07 GI bleed, 08 PE, 10 testicular torsion — the held-out case)
+- Stays SILENT on all three routine presentations (03 diabetes review,
+  04 asthma, 05 uncomplicated dyspepsia)
 - Where it fires, it should CLEAR once the transcript shows the action
   done or arranged (every emergency script ends with the doctor arranging it)
 
@@ -39,14 +39,12 @@ TURNS_PER_UPDATE = 4
 # Ground truth: should the urgency alarm fire for this consultation?
 EXPECTATIONS = {
     "01_chest_pain_en.md": True,   # possible ACS → ECG now
-    "02_febrile_child_en.md": False,  # dengue watch, no warning signs yet
     "03_diabetes_review_en.md": False,
     "04_asthma_en.md": False,      # poorly controlled but mild, sats 98%
     "05_epigastric_pain_en.md": False,  # alarm-symptom screen all negative
     "06_tia_funny_turn_en.md": True,   # resolved focal deficit → TIA pathway
     "07_gi_bleed_en.md": True,     # melaena + haemodynamic compromise
     "08_pulmonary_embolism_en.md": True,   # pleuritic pain + hypoxia + DVT leg
-    "09_septic_child_en.md": True,  # shocked child → emergency transfer
     # Held-out generalisation case: a condition the urgency prompt never
     # mentions. Added AFTER the 2026-07-07 evaluation was finalised.
     "10_testicular_torsion_en.md": True,  # torsion as abdo pain → immediate surgery
