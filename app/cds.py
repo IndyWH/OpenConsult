@@ -127,6 +127,35 @@ CDS_ASSESSMENT_TIMEOUT_S = float(os.getenv("CDS_ASSESSMENT_TIMEOUT_S", "60.0"))
 AUTO_RERANK_TIMEOUT_S = float(os.getenv("AUTO_RERANK_TIMEOUT_S", "2.0"))
 AUTO_RERANK_MAX_TOKENS = int(os.getenv("AUTO_RERANK_MAX_TOKENS", "200"))
 
+# CDS_THINK (Task 3j, 2026-10-02): whether a chat request to CDS_MODEL
+# carries Ollama's think field. Gemma 4 can think before it answers, and
+# every Gemma 4 request in the Task 3i benchmark carried think false;
+# MedGemma's requests must stay exactly as they were. So: unset or empty
+# sends no field (the request body is byte-for-byte what it was before);
+# false or true sends that boolean; low, medium or high sends the word;
+# anything else sends no field and logs one warning. Read at call time,
+# as CDS_TEMPERATURE is.
+_THINK_LEVELS = ("low", "medium", "high")
+_THINK_WARNED: set[str] = set()
+
+
+def think_field() -> dict:
+    """The think field for a chat request to CDS_MODEL, or nothing — to
+    spread into the request body (`**think_field()`)."""
+    raw = os.getenv("CDS_THINK", "").strip()
+    if not raw:
+        return {}
+    value = raw.lower()
+    if value in ("false", "true"):
+        return {"think": value == "true"}
+    if value in _THINK_LEVELS:
+        return {"think": value}
+    if raw not in _THINK_WARNED:
+        _THINK_WARNED.add(raw)
+        logger.warning("CDS_THINK=%r is not one of false, true, low, medium or high; "
+                       "sending no think field", raw)
+    return {}
+
 
 class CDSRunaway(Exception):
     """A model call hit its output cap or its timeout (pilot 486 F3). For
@@ -916,6 +945,7 @@ class CDSEngine:
                     "stream": False,
                     "keep_alive": "30m",  # avoid a 30 s reload stall mid-consultation
                     "options": options,
+                    **think_field(),
                 },
             )
             response.raise_for_status()

@@ -25,6 +25,8 @@ import httpx
 import psycopg
 from dotenv import load_dotenv
 
+from app.cds import think_field
+
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
@@ -274,6 +276,7 @@ async def _chat(system: str, user: str, schema: dict) -> dict:
                     "seed": int(os.getenv("CDS_SEED", "42")),
                     "num_ctx": 8192,
                 },
+                **think_field(),
             },
         )
         response.raise_for_status()
