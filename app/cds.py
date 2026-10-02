@@ -254,6 +254,47 @@ def assessment_message(transcript: str, previous: dict | None) -> str:
             f"{stale}\n\n"
             f"Here is the updated transcript of the consultation so far:\n{transcript}")
 
+
+# ------------------------------------------------------------- patient line
+#
+# Age and sex reach the model (owner ruling 2026-10-02, Task 5). The CDS
+# used to get the transcript and nothing else about the patient, so it
+# guessed the sex: in the Task 3f bench it asked for a pregnancy test on a
+# 15-year-old boy with testicular torsion. One plain line now opens the user
+# message of the ASSESSMENT and URGENCY calls only — never the affect call,
+# the officer, the topic call or the re-ranker — then a blank line, then the
+# message exactly as before. The fresh window stays, so it goes at every
+# pass. No line (an old patient row without age or sex, or a caller with no
+# patient) leaves the message byte for byte what it was.
+
+PATIENT_ADULT_AGE = 18
+
+
+def patient_line(age, sex) -> str | None:
+    """The one line about the patient, or None. Pure.
+
+    "The patient is a 31-year-old woman." — woman or man from 18, girl or
+    boy under 18, and at age 0 "a baby girl, under 1 year old." None when
+    either is missing, when sex is not exactly "F" or "M", or when age is
+    not a whole number from 0 to 120 (the front desk's own bounds)."""
+    if sex not in ("F", "M"):
+        return None
+    if isinstance(age, bool) or not isinstance(age, int) or not 0 <= age <= 120:
+        return None
+    child = "girl" if sex == "F" else "boy"
+    if age == 0:
+        return f"The patient is a baby {child}, under 1 year old."
+    noun = ("woman" if sex == "F" else "man") if age >= PATIENT_ADULT_AGE else child
+    return f"The patient is a {age}-year-old {noun}."
+
+
+def with_patient(message: str, patient: Mapping | None) -> str:
+    """`message` with the patient line first and a blank line after it, or
+    `message` unchanged when there is no line. `patient` holds "age" and
+    "sex"; anything else in it is ignored."""
+    line = patient_line(patient.get("age"), patient.get("sex")) if patient else None
+    return message if line is None else f"{line}\n\n{message}"
+
 # ------------------------------------------------------------------- urgency
 
 URGENCY_SCHEMA = {
@@ -963,7 +1004,8 @@ class CDSEngine:
                            else None)}
         return json.loads(body["message"]["content"]), meta
 
-    async def update(self, transcript: str, previous: dict | None = None) -> dict:
+    async def update(self, transcript: str, previous: dict | None = None,
+                     patient: Mapping | None = None) -> dict:
         """One CDS pass: transcript so far + previous assessment's names → new assessment.
 
         Returns the assessment fields plus `urgency_check` (the safety
@@ -973,8 +1015,13 @@ class CDSEngine:
         the module docstring; it is fail-soft and never fails the pass).
         The returned shape is unchanged by that split: `patient_affect`
         sits at the top level exactly where it always has.
+
+        `patient` ({"age", "sex"}, optional — Task 5, 2026-10-02) opens the
+        assessment and urgency messages with patient_line(); the affect
+        message never carries it. Without it, or without a usable age and
+        sex, every message is exactly what it was before.
         """
-        transcript_text = f"LIVE TRANSCRIPT SO FAR:\n{transcript}"
+        transcript_text = with_patient(f"LIVE TRANSCRIPT SO FAR:\n{transcript}", patient)
 
         runaway: CDSRunaway | None = None
         started = time.perf_counter()
@@ -983,7 +1030,9 @@ class CDSEngine:
             # the call and the same value as the HTTP timeout beneath it.
             assessment = await asyncio.wait_for(
                 self._chat(
-                    ASSESSMENT_PROMPT, assessment_message(transcript, previous), ASSESSMENT_SCHEMA,
+                    ASSESSMENT_PROMPT,
+                    with_patient(assessment_message(transcript, previous), patient),
+                    ASSESSMENT_SCHEMA,
                     timeout=CDS_ASSESSMENT_TIMEOUT_S, num_predict=CDS_ASSESSMENT_MAX_TOKENS,
                     call="assessment"),
                 timeout=CDS_ASSESSMENT_TIMEOUT_S)
