@@ -121,6 +121,24 @@
     border-top: 1px dashed var(--line); padding-top: .3rem;
   }
   .urgent .standing b { font-weight: 600; }
+  /* The earlier alarm (owner decision 2026-10-02, after Task 3f): an
+     urgent action that was shown and then dropped out of a pass, with
+     nothing arranged, stays here as a historical item so a quiet pass is
+     not read as the all-clear. Quieter than a live alarm on purpose — no
+     red, soft ink, smaller type — and it sits inside the urgent list, so
+     the panel keeps its place in the sticky row while it is shown. */
+  .urgent li.earlier {
+    list-style: none; margin: .4rem 0 0 -1.15rem; padding-top: .35rem;
+    border-top: 1px dashed var(--line);
+    font-weight: 400; font-size: .8rem; color: var(--ink-soft);
+  }
+  .urgent li.earlier .elabel {
+    margin: 0 0 .15rem; font-size: .7rem; text-transform: uppercase;
+    letter-spacing: .06em; font-weight: 600; color: var(--ink-soft);
+  }
+  .urgent li.earlier ul { padding-left: 1.15rem; }
+  .urgent li.earlier li { font-weight: 400; font-size: .8rem; color: var(--ink-soft); margin-bottom: .15rem; }
+  .urgent li.earlier .why { font-size: .75rem; color: var(--ink-faint); }
   /* The guarded tap's confirmation (owner decision 2026-09-07): inline,
      beside the control the doctor just tapped — where they are looking. */
   .tapconfirm {
@@ -1089,13 +1107,17 @@ function renderCDS(a) {
   // Phase 7c slice 5: while auto mode is paused the panel stays — the
   // pause banner inside it must outlive a pass that clears the list.
   alarmLive = urgent.length > 0 || pausedLive;
-  updateStickyRow(alarmLive, faceOn);
   urgentListEl.innerHTML = '';
   for (const u of urgent) {
     const li = el('li', null, u.action);
     li.appendChild(el('span', 'why', u.reason));
     urgentListEl.appendChild(li);
   }
+  // The earlier alarm (owner decision 2026-10-02): the server's, sent
+  // beside the assessment; it keeps the panel in the row while shown.
+  appendEarlier(urgentEarlier);
+  if (urgentListEl.children.length > 0) alarmLive = true;
+  updateStickyRow(alarmLive, faceOn);
   // Tap-to-ask: each agenda question gains a speaker affordance. The
   // button carries only the assessment version and the index — never the
   // text. The server resolves that reference against its own copy of the
@@ -1153,6 +1175,41 @@ function renderGuidelines(msg) {
   const p = msg.provenance;
   body.appendChild(el('p', 'provenance',
     `${p.corpus_name} · v${p.corpus_version} · ${p.n_sources} sources, ${p.n_chunks} passages · ingested ${p.date_ingested}`));
+}
+
+// The earlier alarm (owner decision 2026-10-02, after Task 3f): an urgent
+// action that was shown and then dropped out of a pass with nothing
+// arranged. The SERVER decides when it is shown and what it holds — the
+// last non-empty list, every action with its reason, and the audio time
+// of the pass that last flagged it — and this page renders exactly that.
+// It is one entry inside the urgent list, so everything that already
+// decides the panel's membership from the list (renderPause after an
+// acknowledgement included) keeps the panel while it is shown. It never
+// pauses auto mode and is never a pending action: nothing here touches
+// the pause banner, the standing strip or the acknowledgements.
+function appendEarlier(earlier) {
+  if (!earlier || !Array.isArray(earlier.actions) || !earlier.actions.length) return;
+  const item = el('li', 'earlier');
+  item.appendChild(el('p', 'elabel', 'Raised earlier, no longer flagged — last flagged at '
+                                     + formatTime(earlier.last_flagged_s || 0)));
+  const list = el('ul');
+  for (const u of earlier.actions) {
+    const li = el('li', null, u.action);
+    li.appendChild(el('span', 'why', u.reason));
+    list.appendChild(li);
+  }
+  item.appendChild(list);
+  urgentListEl.appendChild(item);
+}
+
+// A reconnect: the server's current earlier alarm replaces the page's.
+function renderEarlier(earlier) {
+  for (const node of Array.from(urgentListEl.children)) {
+    if (node.classList.contains('earlier')) urgentListEl.removeChild(node);
+  }
+  appendEarlier(earlier);
+  alarmLive = urgentListEl.children.length > 0 || pausedLive;
+  updateStickyRow(alarmLive, faceOn);
 }
 
 function formatTime(s) {
@@ -2381,6 +2438,7 @@ const faceToggle = document.getElementById('faceToggle');
 const faceMount = document.getElementById('faceMount');
 let faceOn = false;      // server-confirmed state
 let alarmLive = false;   // maintained by renderCDS
+let urgentEarlier = null;   // the server's earlier alarm, as last pushed (cds / urgent_earlier)
 let faceStage = null;    // the once-initialised renderer node
 
 // Presence logic, all four combinations. Positions NEVER swap: the left
@@ -2765,7 +2823,8 @@ function onWsMessage(event) {
       if (recording) startBargeDetector();
     }
   }
-  else if (msg.type === 'cds') { renderCDS(msg.assessment); }
+  else if (msg.type === 'cds') { urgentEarlier = msg.urgent_earlier || null; renderCDS(msg.assessment); }
+  else if (msg.type === 'urgent_earlier') { urgentEarlier = msg.earlier || null; renderEarlier(urgentEarlier); }   // a reconnect
   else if (msg.type === 'guidelines') { renderGuidelines(msg); }
   else if (msg.type === 'ack') {
     while (pending.length && pending[0].seq <= msg.seq) pending.shift();
