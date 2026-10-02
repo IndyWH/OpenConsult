@@ -1867,6 +1867,32 @@ async def issue_auto_speak(state, entry: dict, websocket, utterance: auto_mode.U
     return prepared
 
 
+def urgent_earlier(assessment: dict | None, last: dict | None) -> dict | None:
+    """The earlier alarm (owner decision 2026-10-02, after Task 3f): an
+    alarm that was shown and then drops out of a pass stays on the live
+    page as a historical item, so a quiet pass is not read as the
+    all-clear. In 495 the alarm fired at pass 2, went quiet at pass 3 and
+    came back at pass 4; for those 45 seconds the panel was empty.
+
+    Shown when all three hold: the current pass has no urgent action; an
+    earlier pass in this session had one (`last`, the session's last
+    non-empty list and the audio time of the pass that carried it); the
+    arranged flag is false. Arranged clears it exactly as it clears the
+    live alarm. Returns what the page shows, or None.
+
+    Display only. It never reaches a model (it is kept beside the
+    assessment, never in it — the assessment is the next pass's
+    `previous`), never pauses auto mode and is never a pending action."""
+    if assessment is None or last is None:
+        return None
+    if assessment.get("urgent_actions"):
+        return None
+    if (assessment.get("urgency_check") or {}).get("already_done_or_arranged"):
+        return None
+    return {"actions": [dict(a) for a in last["actions"]],
+            "last_flagged_s": last["at_audio_s"]}
+
+
 def _new_auto_state() -> dict:
     """Phase 7c: one session's auto-mode state — the pure controller with an
     injected monotonic clock, and the wiring's bookkeeping around it. Only
@@ -2241,6 +2267,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
     session_id = str(config.get("session_id") or os.urandom(8).hex())
 
     entry = sessions.get(session_id)
+    resumed = False
     if config.get("resume") and entry is None:
         # Grace expired: the audio was finalised server-side already.
         await websocket.send_json({
@@ -2257,6 +2284,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 entry["grace_task"].cancel()
             entry["grace_task"] = None
         entry["attached"] = True
+        resumed = True
         # Playback is never resumed across a reconnect (spec §2.3): the
         # client has stopped, so the window must close at whatever it
         # reached rather than keep excluding live patient audio.
@@ -2320,6 +2348,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "cds_sent_len": 0,
             "cds_landed_parts": 0,    # how many transcript_parts the last LANDED pass saw (the re-ranker's excerpt starts after them)
             "urgent_first_fired": {},  # action text → audio time (s)
+            # The earlier alarm (owner decision 2026-10-02): the last
+            # non-empty urgent_actions list with the audio time of the pass
+            # that carried it, and what the page was last told (urgent_earlier).
+            "urgent_last": None,
+            "urgent_earlier_sent": None,
             "last_seq": 0,
             "attached": True,
             "grace_task": None,
@@ -2493,6 +2526,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         await websocket.send_json(_auto_toggled(
             _ctl, **({"pending": sorted(_ctl.pending_actions)}
                      if _ctl.phase is auto_mode.AutoPhase.PAUSED_URGENT else {})))
+    if resumed:
+        # The earlier alarm (owner decision 2026-10-02): a page that
+        # reconnects is told the current state, whatever it last saw.
+        await websocket.send_json({"type": "urgent_earlier",
+                                   "earlier": entry["urgent_earlier_sent"]})
 
     session: LiveSession = entry["session"]
     engine: CDSEngine = state.cds_engine
@@ -2608,9 +2646,15 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     entry["urgent_first_fired"].setdefault(
                         action["action"], round(session.audio_seconds, 1)
                     )
+                # The earlier alarm travels BESIDE the assessment, never in
+                # it: the assessment is the next pass's `previous`.
+                earlier, dropped = _note_urgent()
                 await websocket.send_json(
-                    {"type": "cds", "assessment": entry["assessment"]}
+                    {"type": "cds", "assessment": entry["assessment"],
+                     "urgent_earlier": earlier}
                 )
+                if dropped:
+                    await _audit_urgent_dropped(earlier, assessment_version)
                 # Phase 7b: what the model actually said about the patient,
                 # one line per assessment. Consultation 464 could not be
                 # explained because this verdict was recorded NOWHERE — not
@@ -2680,7 +2724,11 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                                                "patient_affect": "neutral"}
                     entry["assessment"]["urgency_check"] = exc.urgency["urgency_check"]
                     entry["assessment"]["urgent_actions"] = exc.urgency["urgent_actions"]
-                    await websocket.send_json({"type": "cds", "assessment": entry["assessment"]})
+                    earlier, dropped = _note_urgent()
+                    await websocket.send_json({"type": "cds", "assessment": entry["assessment"],
+                                               "urgent_earlier": earlier})
+                    if dropped:
+                        await _audit_urgent_dropped(earlier, entry["agenda"].current_version)
                     if entry["auto"] is not None and exc.urgency["urgent_actions"]:
                         if not await _repause_suppressed(exc.urgency["urgent_actions"],
                                                          entry["agenda"].current_version,
@@ -4586,6 +4634,43 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         auto["standing_sent"] = standing
         await websocket.send_json({"type": "auto_standing", "actions": standing,
                                    "assessment_version": assessment_version})
+
+    def _note_urgent() -> tuple[dict | None, bool]:
+        """The earlier alarm's bookkeeping, run once per landed pass, auto
+        mode on or off (owner decision 2026-10-02): a non-empty
+        urgent_actions becomes the session's `urgent_last` with this
+        pass's audio time; then the rule (urgent_earlier) decides what the
+        page shows. Returns that and whether the alarm has just dropped out
+        with nothing arranged — the caller's cue for the one audit row.
+        Reads the assessment only; the alarm's own bookkeeping (cds.py, the
+        pause, the standing strip) is not touched."""
+        assessment = entry["assessment"]
+        current = assessment.get("urgent_actions") or []
+        if current:
+            entry["urgent_last"] = {
+                "actions": [{"action": a.get("action"), "reason": a.get("reason")}
+                            for a in current],
+                "at_audio_s": round(session.audio_seconds, 1),
+            }
+        earlier = urgent_earlier(assessment, entry["urgent_last"])
+        dropped = earlier is not None and entry["urgent_earlier_sent"] is None
+        entry["urgent_earlier_sent"] = earlier
+        return earlier, dropped
+
+    async def _audit_urgent_dropped(earlier: dict, assessment_version: int | None) -> None:
+        """One row when a shown alarm drops out of a pass with nothing
+        arranged (owner decision 2026-10-02) — the record of what the live
+        page went on showing as an earlier alarm, in the style of
+        auto.paused."""
+        texts = [str(a.get("action", "")) for a in earlier["actions"]]
+        await audit.log(user["id"], "urgent.dropped_out", None, None,
+                        {"session_id": session_id, "actions": texts,
+                         "last_flagged_s": earlier["last_flagged_s"],
+                         "assessment_version": assessment_version,
+                         "at_audio_s": round(session.audio_seconds, 1)})
+        logger.info("Live session %s: urgent action(s) dropped out on v%s with nothing "
+                    "arranged (%s, last flagged at %.1fs) — shown as an earlier alarm",
+                    session_id, assessment_version, texts, earlier["last_flagged_s"])
 
     async def on_urgent_alarm(actions: list[dict], assessment_version: int) -> None:
         """The urgency pause (Phase 7c slice 5, spec §7, hard rule 2).
