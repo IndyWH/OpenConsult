@@ -9,6 +9,10 @@ Success criteria:
 - Where it fires, it should CLEAR once the transcript shows the action
   done or arranged (every emergency script ends with the doctor arranging it)
 
+Each update gives the engine the script's patient (age and sex, from
+app.mock_scripts.SCRIPT_PATIENTS), as the live app does — owner ruling
+2026-10-02, Task 5b. The committed baselines were made without it.
+
 Writes a dated evals/urgency_results_<date>.json beside the committed
 baseline and prints a markdown results table; overwriting the baseline
 itself (evals/urgency_results.json) requires --write-baseline.
@@ -29,7 +33,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.cds import CDSEngine
-from app.mock_scripts import as_live_transcript, parse_script
+from app.mock_scripts import as_live_transcript, parse_script, script_patient
 
 ROOT = Path(__file__).parent.parent
 SCRIPTS_DIR = ROOT / "mock_consultations"
@@ -69,6 +73,9 @@ async def evaluate_script(name: str, expected_fire: bool | None = None) -> dict:
     if expected_fire is None:
         expected_fire = EXPECTATIONS[name]
     turns = parse_script(SCRIPTS_DIR / name)
+    patient = script_patient(name)
+    if patient is None:
+        raise KeyError(f"{name} has no entry in app.mock_scripts.SCRIPT_PATIENTS")
     engine = CDSEngine()
     assessment: dict | None = None
     updates: list[dict] = []
@@ -79,7 +86,7 @@ async def evaluate_script(name: str, expected_fire: bool | None = None) -> dict:
         end_turn = min(cut, len(turns))
         transcript = as_live_transcript(turns[:end_turn])
         started = time.perf_counter()
-        assessment = await engine.update(transcript, assessment)
+        assessment = await engine.update(transcript, assessment, patient=patient)
         dx = [d["condition"] for d in assessment["differentials"]]
         if updates and dx == prev_dx:
             unchanged += 1

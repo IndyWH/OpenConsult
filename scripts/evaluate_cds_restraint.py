@@ -61,7 +61,9 @@ Design choices called out as limitations:
   history.
 
 Deterministic settings: temperature 0, seed 42 (CDS engine defaults),
-same as every CDS eval. Writes evals/cds_restraint_results.json.
+same as every CDS eval. Each update gives the engine the script's patient
+(age and sex) through evaluate_script — Task 5b, 2026-10-02; the committed
+baseline was made without it. Writes evals/cds_restraint_results.json.
 
 Usage: uv run python scripts/evaluate_cds_restraint.py
 """

@@ -3,6 +3,9 @@
 Feeds the script to the engine a few turns at a time — the way a real
 consultation trickles in — and prints how the assessment evolves, plus
 stability metrics (how much the differential list churns between updates).
+Each update gives the engine the script's patient (age and sex, from
+app.mock_scripts.SCRIPT_PATIENTS), as the live app does; a script not in
+that table runs without it, and says so.
 
 Usage:
     uv run python scripts/simulate_cds.py mock_consultations/01_chest_pain_en.md
@@ -20,7 +23,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.cds import CDSEngine
-from app.mock_scripts import as_live_transcript, parse_script
+from app.mock_scripts import as_live_transcript, parse_script, script_patient
 
 
 def churn(prev: list[str], curr: list[str]) -> str:
@@ -42,8 +45,11 @@ def churn(prev: list[str], curr: list[str]) -> str:
 
 async def simulate(script_path: Path, turns_per_update: int) -> None:
     turns = parse_script(script_path)
+    patient = script_patient(script_path.name)
     print(f"=== {script_path.name}: {len(turns)} turns, "
-          f"updating every {turns_per_update} ===\n")
+          f"updating every {turns_per_update} ===")
+    print(f"patient: {patient['age']} {patient['sex']}\n" if patient else
+          "patient: not in app.mock_scripts.SCRIPT_PATIENTS — no age or sex sent\n")
 
     engine = CDSEngine()
     assessment: dict | None = None
@@ -53,7 +59,7 @@ async def simulate(script_path: Path, turns_per_update: int) -> None:
         window = turns[:cut]
         transcript = as_live_transcript(window)
         started = time.perf_counter()
-        new_assessment = await engine.update(transcript, assessment)
+        new_assessment = await engine.update(transcript, assessment, patient=patient)
         elapsed = time.perf_counter() - started
 
         prev_names = [d["condition"] for d in (assessment or {}).get("differentials", [])]
