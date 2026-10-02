@@ -8019,3 +8019,51 @@ script. Only the first would fail if run.
 A comment in `scripts/evaluate_urgency.py`, above `UK_EXPECTATIONS`,
 still says "the canonical ten-script urgency_results.json". It was left
 because the task allowed no other change to that file.
+
+## Gemma 4 QAT as the app model (2026-10-02)
+
+**Owner decision, 2 Oct 2026:** the app switches from MedGemma to Gemma 4
+QAT (`gemma4:26b-a4b-it-qat`) as soon as possible. Auto mode cannot wait
+19 s for a MedGemma pass.
+
+**The evidence**, from the Task 3i benchmark in the v1.1 review. On acted
+consultation 495, Gemma 4 QAT took a median 4.9 s a pass against 18.4 s
+for MedGemma. It matched MedGemma's clinical counts on 495, fired on 7 of
+7 emergencies, and passed every hard travel mark. Each model ran each
+workload once.
+
+**CDS_THINK** (commit abf9f34). Gemma 4 can think before it answers, and
+that costs its speed. Every Gemma 4 request in Task 3i carried think
+false; the app sent no think field. `CDS_THINK` is read at call time.
+Unset or empty sends no field, so MedGemma's requests are exactly what
+they were. `false` or `true` sends the boolean, `low`, `medium` or `high`
+the word, and anything else sends nothing and logs one warning. It goes
+on every chat request to `CDS_MODEL`: the CDS engine (assessment,
+urgency, affect, officer, topic, re-rank), the note, the letters and the
+guideline summary. Not the embedding call, and not the unload at Stop.
+`tests/test_cds_think.py` pins it at all four call sites.
+
+**The switch** is two lines in `.env` on mlrig, then a restart by the
+owner:
+
+    CDS_MODEL=gemma4:26b-a4b-it-qat
+    CDS_THINK=false
+
+Removing the two lines and restarting goes back to MedGemma.
+
+**The code default is unchanged.** It is still MedGemma with no think
+field, so a fresh clone and the README stay true until the owner decides
+otherwise. `.env.example` names the Gemma tag as a commented alternative.
+
+**Measurements** of what Task 3i did not cover (Gemma with CDS_THINK
+forgotten, the short auto-mode calls, the note, the guideline summary
+and letters, memory) are in the review's `v1.1-logs/TASK3J_SWITCH.md`,
+kept outside the repo.
+
+**Untrue once switched.** Nothing changes until the owner sets the two
+lines. After that, these name MedGemma as the model in use:
+`help/03-installing-and-running.md` (line 51) and
+`help/04-the-architecture.md` (lines 27, 48, 67, 70, 131, 163); the
+review page's note header, `app/static/review.html:651`, which prints
+"MedGemma 27B · draft"; and comments and log lines in `app/`, most in
+`app/finalize.py`. The owner writes any new help wording.
