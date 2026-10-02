@@ -8067,3 +8067,86 @@ lines. After that, these name MedGemma as the model in use:
 review page's note header, `app/static/review.html:651`, which prints
 "MedGemma 27B · draft"; and comments and log lines in `app/`, most in
 `app/finalize.py`. The owner writes any new help wording.
+
+## The earlier alarm (2026-10-02)
+
+**Owner decision, 2 Oct 2026:** an urgent alarm that was shown and then
+disappears stays in the alarm area as a historical item. In Task 3f the
+alarm on consultation 495 fired at pass 2, went quiet at pass 3 and came
+back at pass 4. The live page rebuilt the urgent panel from the current
+pass alone, so for those 45 seconds it showed nothing, and a doctor could
+take that as the all-clear.
+
+**Server** (commit 3d6b379, `app/main.py`). Each live session keeps
+`urgent_last`: its last non-empty `urgent_actions` list and the audio
+time of the pass that carried it, taken when the pass lands, as
+`urgent_first_fired` is. The pure function `urgent_earlier()` shows that
+list when three things are true: the current pass has no urgent action,
+an earlier pass had one, and the arranged flag
+(`urgency_check.already_done_or_arranged`) is false. A live alarm
+replaces it, and arranged clears it as it clears the live alarm.
+
+The earlier alarm goes to the page as an `urgent_earlier` field next to
+the assessment in the `cds` message, never inside it. The assessment is
+the next pass's `previous`, so this keeps the earlier alarm away from
+every model. A page that reconnects gets an `urgent_earlier` message
+with the current state. One audit row, `urgent.dropped_out`, is written
+when an alarm drops out with nothing arranged. It follows the style of
+`auto.paused`: session_id, action texts, last_flagged_s,
+assessment_version, at_audio_s. The rule runs whether auto mode is on or
+off and whether its gate is up or down.
+
+**Unchanged:** prompts, schemas and model requests; the bookkeeping in
+`CDSEngine.update`; the pause, the pending set, the acknowledgements and
+the standing strip, which all read only `urgent_actions`. Also the review
+page, help/, .env, evals/ and vendor/.
+
+**Page** (commit 6bb18c4, `app/static/live.html`). The earlier alarm is
+one `li.earlier` entry inside `#urgentList`. It lists every action with
+its reason under "Raised earlier, no longer flagged — last flagged at
+m:ss", in audio time into the consultation. It has soft ink, normal
+weight and .8rem type, against a live item's 1.02rem, and no red.
+
+*Fragile:* the entry sits inside the list on purpose. `updateStickyRow`
+and `renderPause` are executed verbatim by Node harnesses in
+`tests/test_face_sticky.py` and `tests/test_auto_pause_client.py`, so
+neither may read a new global. Both already decide the panel's
+membership from the list, so the panel stays for an earlier alarm after
+an acknowledgement clears the pause, and neither function was edited.
+`renderCDS(a)` keeps its signature because `test_auto_pause_client.py`
+finds it by that exact text. The `cds` handler sets `urgentEarlier`
+before calling it.
+
+Tests: `tests/test_urgent_earlier.py` (server, 13) and
+`tests/test_urgent_earlier_client.py` (page under Node, 6). Suite 1185
+before, 1204 after, green.
+
+**Not pushed and not live.** The three commits are local on mlrig. The
+owner pushes and restarts the service after the Cowork check.
+
+**For the owner — choices made, not decided:**
+- When only an earlier alarm is shown, the panel keeps its red frame and
+  its red "⚠ Urgent actions" heading. Only the entry itself is quiet.
+  Quieting the frame too is a visual call left to the owner.
+- The time shown is audio time into the consultation (m:ss), the same
+  clock as `first_fired_s` on the review page. It is not wall-clock time.
+- Several quiet passes in a row write one `urgent.dropped_out` row, not
+  one row per pass.
+
+**Review page (read only, not changed).** At Stop, `_complete_session`
+saves `urgent_actions` only when the *last* assessment still lists them.
+So an alarm that dropped out with nothing arranged and stayed out until
+Stop reaches the review page as nothing: no banner and no acknowledgement
+gate. This was true before this change. The live page now shows such an
+alarm until the end, but the review page still does not. The new
+`urgent.dropped_out` row is on the audit record, but the review page
+does not read it. Whether the review banner should carry dropped-out
+alarms is an owner decision.
+
+**Help.** No article is made untrue. `help/01-a-consultations-journey.md`
+(the urgency officer paragraph) says the red banner "stays until the
+transcript shows the action was done or arranged".
+`help/02-using-it-step-by-step.md` (Step 3) says it "clears when the
+transcript shows the action arranged". This change brings the live page
+closer to both. Neither article mentions the earlier alarm. The owner
+writes any new wording.
