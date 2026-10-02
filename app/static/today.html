@@ -16,15 +16,17 @@
 <h1 class="page">Today's queue</h1>
 <form id="addForm" class="queue" style="display:none">
   <input name="name" placeholder="Patient name (synthetic)" required>
-  <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem">
-  <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
+  <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem" required>
+  <select name="sex" required><option value="">—</option><option>F</option><option>M</option></select>
   <button class="primary">Add to queue</button>
+  <span class="err" id="addErr" role="alert"></span>
 </form>
 <form id="walkinForm" class="queue" style="display:none">
   <input name="name" placeholder="Walk-in patient name (synthetic)" required>
-  <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem">
-  <select name="sex"><option value="">—</option><option>F</option><option>M</option></select>
+  <input name="age" type="number" placeholder="Age" min="0" max="120" style="width:5.5rem" required>
+  <select name="sex" required><option value="">—</option><option>F</option><option>M</option></select>
   <button class="primary">Start walk-in consultation</button>
+  <span class="err" id="walkinErr" role="alert"></span>
 </form>
 <p class="hint" id="hint"></p>
 <label class="hint" style="display:block;margin-bottom:.5rem">
@@ -188,12 +190,19 @@ document.getElementById('showClosed').addEventListener('change', refresh);
 document.getElementById('walkinForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target).entries());
+  const errEl = document.getElementById('walkinErr');
+  errEl.textContent = '';
   const response = await fetch('/api/queue/walk-in', {
     method: 'POST', headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({name: data.name, age: data.age ? +data.age : null,
                           sex: data.sex || null})});
   if (response.status === 409) { offerResume(await response.json()); return; }
-  if (!response.ok) { refresh(); return; }
+  if (!response.ok) {
+    // Say why, in the server's words (e.g. age and sex are required).
+    errEl.textContent = await serverError(response);
+    refresh();
+    return;
+  }
   const started = await response.json();
   location.href = `/live?queue=${started.entry_id}`;
 });
@@ -201,12 +210,29 @@ document.getElementById('walkinForm').addEventListener('submit', async (e) => {
 document.getElementById('addForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const data = Object.fromEntries(new FormData(e.target).entries());
-  await fetch('/api/queue', {method: 'POST', headers: {'Content-Type': 'application/json'},
+  const errEl = document.getElementById('addErr');
+  errEl.textContent = '';
+  const response = await fetch('/api/queue', {method: 'POST',
+    headers: {'Content-Type': 'application/json'},
     body: JSON.stringify({name: data.name, age: data.age ? +data.age : null,
                           sex: data.sex || null})});
+  if (!response.ok) {
+    // The form is kept as typed, and the server says what is missing.
+    errEl.textContent = await serverError(response);
+    return;
+  }
   e.target.reset();
   refresh();
 });
+
+// A refusal's own message ({"error": ...}), or its status when it has none.
+async function serverError(response) {
+  try {
+    const body = await response.json();
+    if (body && typeof body.error === 'string' && body.error) return body.error;
+  } catch (err) { /* no JSON body */ }
+  return `Refused (error ${response.status}).`;
+}
 </script>
 </body>
 </html>

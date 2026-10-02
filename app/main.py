@@ -14,6 +14,7 @@ import os
 import time
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 import psycopg
 from dotenv import load_dotenv
@@ -694,8 +695,26 @@ async def admin_purge_preview(user: dict = Depends(api_user("admin"))) -> dict:
 
 class QueueAddBody(BaseModel):
     name: str
-    age: int | None = None
-    sex: str | None = None
+    # Typed loosely on purpose: _age_sex_refusal checks both, so a bad value
+    # is a 400 with a plain message rather than FastAPI's 422 detail list.
+    age: Any = None
+    sex: Any = None
+
+
+def _age_sex_refusal(body: QueueAddBody) -> JSONResponse | None:
+    """Age and sex are required when a consultation entry is created (owner
+    ruling 2026-10-02, Task 5): they open the CDS assessment and urgency
+    messages (app/cds.py, patient_line), so the model no longer guesses the
+    sex. A 400 with a plain message, or None when both are usable. Rows
+    already in the patient table are not touched; for them the model gets
+    no line, as before."""
+    age = body.age
+    if isinstance(age, bool) or not isinstance(age, int) or not 0 <= age <= 120:
+        return JSONResponse(status_code=400, content={
+            "error": "age is required: a whole number of years from 0 to 120"})
+    if body.sex not in ("F", "M"):
+        return JSONResponse(status_code=400, content={"error": "sex is required: F or M"})
+    return None
 
 
 @app.get("/api/queue")
@@ -728,11 +747,14 @@ async def queue_entry_detail(
 @app.post("/api/queue")
 async def queue_add(
     body: QueueAddBody, user: dict = Depends(api_user("receptionist", "admin"))
-) -> dict:
+) -> JSONResponse:
+    refusal = _age_sex_refusal(body)
+    if refusal is not None:
+        return refusal
     entry = await frontdesk.add_to_queue(body.name.strip(), body.age, body.sex)
     await audit.log(user["id"], "queue.patient_added", "queue_entry",
                     entry["entry_id"], {"patient_id": entry["patient_id"]})
-    return entry
+    return JSONResponse(content=entry)
 
 
 @app.post("/api/queue/{entry_id}/move")
@@ -797,6 +819,9 @@ async def queue_walk_in(
     name = body.name.strip()
     if not name:
         return JSONResponse(status_code=400, content={"error": "name is required"})
+    refusal = _age_sex_refusal(body)
+    if refusal is not None:
+        return refusal
     entry = await frontdesk.start_walk_in(name, body.age, body.sex)
     if entry is None:  # concurrency guard: another consultation is active
         await audit.log(user["id"], "live.slot_rejected", None, None,
@@ -2224,6 +2249,35 @@ def _detach_for_grace(app_state, session_id: str, entry: dict) -> None:
                    "for reconnect (%.0fs grace)", session_id, LIVE_RECONNECT_GRACE_S)
 
 
+async def _cds_patient(patient_id, session_id: str) -> dict | None:
+    """Age and sex for the CDS (owner ruling 2026-10-02, Task 5), read once
+    from the patient row when a live session starts and handed to every
+    pass, the runaway path's urgency call included (app/cds.py, update).
+    Age and sex only: the name never goes near the model. None when the
+    session has no linked patient or the row cannot be read — the model then
+    gets no patient line, exactly as before. A linked row without a usable
+    age and sex (one made before the front desk insisted) is logged, so a
+    pass without the line is never a silent one."""
+    if isinstance(patient_id, bool) or not isinstance(patient_id, int):
+        return None
+    try:
+        row = await frontdesk.get_patient(patient_id)
+    except Exception as exc:  # noqa: BLE001 - the consultation runs without the line
+        logger.warning("Live session %s: could not read patient %s for the CDS (%s: %s); "
+                       "the model gets no age or sex", session_id, patient_id,
+                       type(exc).__name__, exc)
+        return None
+    if row is None:
+        logger.warning("Live session %s: no patient row %s; the model gets no age or sex",
+                       session_id, patient_id)
+        return None
+    patient = {"age": row["age"], "sex": row["sex"]}
+    if cds.patient_line(patient["age"], patient["sex"]) is None:
+        logger.warning("Live session %s: patient %s has no usable age and sex; the model "
+                       "gets no patient line", session_id, patient_id)
+        return None
+    return patient
+
 @app.websocket("/ws/transcribe")
 async def ws_transcribe(websocket: WebSocket) -> None:
     """Receive 16 kHz 16-bit mono PCM frames; stream transcript JSON back.
@@ -2343,6 +2397,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             "user": user,
             "patient_id": config.get("patient_id"),
             "queue_entry_id": config.get("queue_entry_id"),
+            # Age and sex for every CDS pass (owner ruling 2026-10-02, Task
+            # 5), read once from the patient row just below; None = no line.
+            "cds_patient": None,
             "transcript_parts": [],   # confirmed text, the CDS engine's input
             "assessment": None,
             "cds_sent_len": 0,
@@ -2402,6 +2459,7 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # patient's (_own_voice_at).
             "own_voice": [],
         }
+        entry["cds_patient"] = await _cds_patient(entry["patient_id"], session_id)
         sessions[session_id] = entry
         logger.info("Live session %s started by %s", session_id, user["username"])
         if entry["auto"] is not None:
@@ -2810,8 +2868,12 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             cds_pre_answer = bool(entry["auto"] is not None and entry["auto"]["repause_block"])
             cds_task_parts = len(entry["transcript_parts"])
             cds_task_launched_at = time.monotonic()
+            # The patient goes only when there is one, so an engine whose
+            # update takes (transcript, previous) alone still works; with no
+            # patient the call is exactly what it was before Task 5.
+            patient_kw = {"patient": entry["cds_patient"]} if entry["cds_patient"] else {}
             cds_task = asyncio.create_task(
-                engine.update(transcript, entry["assessment"])
+                engine.update(transcript, entry["assessment"], **patient_kw)
             )
 
     async def maybe_run_guidelines() -> None:

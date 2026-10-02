@@ -170,9 +170,9 @@ def test_monitor_pulse_counts_slot_rejections(clients):
     monitor.invalidate_cache()
     before = TestClient(app).get("/api/monitor/pulse").json()
 
-    first = doctor.post("/api/queue/walk-in", json={"name": "Pulse Guard Patient"})
+    first = doctor.post("/api/queue/walk-in", json={"name": "Pulse Guard Patient", "age": 50, "sex": "M"})
     assert first.status_code == 200
-    blocked = doctor.post("/api/queue/walk-in", json={"name": "Pulse Second Patient"})
+    blocked = doctor.post("/api/queue/walk-in", json={"name": "Pulse Second Patient", "age": 50, "sex": "F"})
     assert blocked.status_code == 409  # the guard fired…
 
     monitor.invalidate_cache()
@@ -268,10 +268,10 @@ def test_zombie_lifecycle_resume_close_and_concurrency_guard(clients):
 
     # (3) Concurrency guard: starting anything else while the zombie is
     # active is refused, and the refusal names the active entry.
-    blocked = doctor.post("/api/queue/walk-in", json={"name": "Second Patient"})
+    blocked = doctor.post("/api/queue/walk-in", json={"name": "Second Patient", "age": 40, "sex": "M"})
     assert blocked.status_code == 409
     assert blocked.json()["active"]["entry_id"] == zombie["entry_id"]
-    waiting = recep.post("/api/queue", json={"name": "Waiting Patient", "age": 25}).json()
+    waiting = recep.post("/api/queue", json={"name": "Waiting Patient", "age": 25, "sex": "F"}).json()
     blocked = doctor.post(f"/api/queue/{waiting['entry_id']}/start")
     assert blocked.status_code == 409
     assert blocked.json()["active"]["entry_id"] == zombie["entry_id"]
