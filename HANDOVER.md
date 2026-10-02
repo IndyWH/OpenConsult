@@ -8247,3 +8247,55 @@ restraint harnesses and the two travel cases. The report is the review's
 
 **Not pushed and not live.** Local commits on mlrig, on top of the Task
 3k commits. The owner pushes and restarts after the Cowork check.
+
+## The alarm harnesses carry age and sex (2026-10-02)
+
+**Owner ruling, 2 Oct 2026 (Task 5b):** the alarm harness must have age
+and sex. Task 5 (§ *Age and sex reach the model*, above) put the patient
+line at the top of the assessment and urgency messages, and the live app
+sends it. The harness scripts did not, so run as they were they measured
+the app without the line.
+
+**What changed** (commit 684cbee). `app/mock_scripts.py` holds
+`SCRIPT_PATIENTS`, one table of the age and sex of every script in
+`mock_consultations/` (01, 03 to 08, 10 to 18), and `script_patient(name)`
+gives it as `{"age", "sex"}`. Age is from each script's own **Fictional
+patient** header; sex from the title there (Mr M; Mrs, Miss, Ms F; script
+10, "schoolboy", M). `scripts/evaluate_urgency.py` passes the patient at
+every update; `scripts/evaluate_cds_restraint.py` replays through that
+same `evaluate_script`, so it carries the line too;
+`scripts/simulate_cds.py` passes it as well. No change to `app/cds.py`,
+any prompt text, any schema, the verdict rules, or `evals/`. Tests:
+`tests/test_harness_patient.py`. Suite 1280 before, 1318 after, green.
+
+**The committed baselines are not like for like with a run from now on.**
+`evals/urgency_results.json` and `evals/cds_restraint_results.json` were
+made without the line and have not been rewritten. Any harness run from
+684cbee on sends the line, so a difference against either file may be the
+line and not the change being tested. Whether to write new baselines is
+the owner's decision; nothing here does it. The dated `evals/*.md`
+write-ups describe runs without the line and stay true as records of
+those runs.
+
+*Fragile:* a new script added to `mock_consultations/` needs a row in
+`SCRIPT_PATIENTS`. The table test fails until it has one, and
+`evaluate_script` refuses a script that is not on the table rather than
+run it without the line.
+
+**For the owner — choices made, not decided:**
+- The harness refuses (KeyError) a script with no entry, rather than
+  running it without the line. `simulate_cds.py`, a hand tool that takes
+  any file path, runs a file that is not on the table without the line and
+  prints that it did.
+- Scripts 16 to 18 (the auto-mode actor briefs) are in the table, though
+  no harness runs them today.
+- Sex is read from the title in each header; the headers have no sex
+  field of their own.
+
+**Measured** in the Task 5b bench (report only, nothing committed): every
+harness script 13 times in each arm, without and with the line. The
+report is the review's `v1.1-logs/TASK5B_HARNESS.md`.
+
+**Not pushed and not live.** Local commits on mlrig, on top of the Task 5
+commits. The harness scripts are not part of the running app; the service
+needs no restart for this change.
