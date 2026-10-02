@@ -8150,3 +8150,100 @@ transcript shows the action was done or arranged".
 transcript shows the action arranged". This change brings the live page
 closer to both. Neither article mentions the earlier alarm. The owner
 writes any new wording.
+
+## Age and sex reach the model (2026-10-02)
+
+**Owner ruling, 2 Oct 2026 (Task 5):** age and sex must go to the model
+from now on. Until then the CDS got the transcript and nothing else about
+the patient, so it guessed the sex. In the Task 3f bench it asked for a
+pregnancy test on a 15-year-old boy with testicular torsion, wrote
+"Ectopic pregnancy (if applicable)", and on consultation 495 did not list
+ectopic pregnancy until the patient mentioned her period.
+
+**The owner's design, implemented as decided:**
+- Age and sex go to the assessment call and the urgency call. Not to the
+  affect call, the end-of-turn officer, the topic call, the re-ranker, the
+  note, the letters or the guideline summary.
+- One plain line is the first line of the user message, then a blank
+  line, then the message exactly as before: "The patient is a 31-year-old
+  woman." Woman or man from 18, girl or boy under 18, and at age 0 "The
+  patient is a baby girl, under 1 year old." (or baby boy).
+- The fresh window stays, so the line goes at every pass.
+- The app insists on age and sex when the consultation entry is created:
+  adding a patient to the queue, and a walk-in.
+
+**Model side** (commit c08c8cf, `app/cds.py`). `patient_line(age, sex)`
+is the one pure function that builds the line; `with_patient(message,
+patient)` puts it first. `CDSEngine.update(transcript, previous,
+patient=None)` takes `{"age", "sex"}`. With no patient, or no usable age
+and sex, every request is byte for byte what 1354d49 sent (checked against
+1354d49's own `app/cds.py`). No system prompt text, schema, stale list or
+bookkeeping changed. The runaway path's urgency call carries the line
+too. Tests: `tests/test_cds_patient_line.py`.
+
+**Live path and front desk** (commit 23527da). The live session reads age
+and sex once from the patient row when it starts (`_cds_patient` in
+`app/main.py`, from the session's `patient_id`) and passes them at every
+pass. Age and sex only; the name never reaches the model. `POST
+/api/queue` and `POST /api/queue/walk-in` refuse a request without an age
+(a whole number from 0 to 120) and a sex (F or M) with a 400 and a plain
+`{"error"}` message, before anything is written and, for the walk-in,
+before the slot guard. The forms on `today.html` and `live.html` mark both
+fields required and show the server's message inside the form. Tests:
+`tests/test_patient_age_sex.py`; four requests in `tests/test_rbac.py`
+were given an age and a sex, nothing else changed. Suite 1204 before,
+1280 after, green.
+
+**Old rows are not touched.** No migration: `patient.age` and
+`patient.sex` still take NULL. A linked patient without a usable age and
+sex gets no line, exactly as before, and the session logs a warning
+naming the patient id, so a pass without the line is never silent.
+
+*Fragile:* the live pass passes `patient=` only when there is one. Eight
+test stubs (and any engine written like them) define
+`update(transcript, previous=None)`; calling them with a `patient`
+keyword would break them, and the test rules allow no other edit to
+existing tests. An engine meant to receive the patient must accept the
+keyword.
+
+**Not covered, on purpose or by scope:**
+- `scripts/evaluate_urgency.py`, `scripts/evaluate_cds_restraint.py` and
+  `scripts/simulate_cds.py` call `update(transcript, previous)` with no
+  patient. Run as they are, they measure the app without the line. The
+  Task 5 bench gives the harness scripts their patients by wrapping the
+  engine, not by editing the harnesses; changing the harnesses is a
+  separate decision.
+- The age sent is the age entered at the front desk. Nothing ages it
+  across days, and there is no edit route for a patient row.
+
+**For the owner — choices made, not decided:**
+- `patient_line` gives no line for an age that is not a whole number from
+  0 to 120 (the front desk's bounds), so a bad old row gives no line
+  rather than a nonsense one.
+- Sex must be exactly "F" or "M"; "f" or "female" is refused at the front
+  desk and gives no line. The forms only offer F and M.
+- The refusal messages are "age is required: a whole number of years from
+  0 to 120" and "sex is required: F or M". A non-number age is the same
+  400, not FastAPI's 422 detail list.
+- Age and sex are read once when the live session starts, not at every
+  pass. The row cannot change mid-consultation through the app.
+- The Today add form used to ignore a refused POST and clear itself, which
+  swallowed the action. It now keeps what was typed and shows the
+  message. The sex dropdown keeps its "—" placeholder.
+
+**Measured** in the Task 5 bench (report only, nothing committed): two
+arms on the same day, no line and with the line, on 495, the urgency and
+restraint harnesses and the two travel cases. The report is the review's
+`v1.1-logs/TASK5_AGE_SEX.md`.
+
+**Help — now untrue, for the owner's wording** (help/ is not edited):
+- `help/02-using-it-step-by-step.md`, Step 1: "Type a name into the
+  walk-in box, press **Start walk-in consultation**". Age and sex are now
+  required as well; a name alone is refused.
+- `help/01-a-consultations-journey.md`, section 2: the model "reads" the
+  committed transcript, and the diagram shows the transcript as the only
+  input to the assessment and the urgency officer. Both now also get the
+  patient's age and sex.
+
+**Not pushed and not live.** Local commits on mlrig, on top of the Task
+3k commits. The owner pushes and restarts after the Cowork check.
