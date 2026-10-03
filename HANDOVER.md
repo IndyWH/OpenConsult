@@ -8321,3 +8321,66 @@ revises itself as evidence arrives" stays. The 30 Sep entry flagged it as
 possibly still true, and it is: the list on screen changes as the
 transcript grows. "Revises" there describes the screen, not the old
 keep-the-names rule. No help flag from 30 Sep or Task 5 is left open.
+
+## The letters use the shared context setting (2026-10-03)
+
+**Owner decision, 3 Oct 2026:** the referral letters use `CDS_NUM_CTX`,
+like every other model call. Built in 8e6fe9a.
+
+**Why.** Session 5 (§ *Phase 7b — session 5*) gave every model call one
+context length, so Ollama would stop reloading the model between them.
+The letters were missed. `app/letters.py` sent `num_ctx` 8192, typed in,
+while the CDS engine, the note and the guideline summary send 16384. Task
+3l in the v1.1 review found the cost: a letter waited for a reload,
+pushed embeddinggemma out of the GPU, and the next CDS call reloaded the
+model again at 16384.
+
+**The change.** `app/letters.py` imports `CDS_NUM_CTX` from `app.cds`, as
+`app/notes.py` and `app/rag.py` do, and sends it. Nothing else in the
+letters changes: not the prompt, not the other options, not
+`validate_letter`. One `_chat` serves both letter calls, so the referral
+suggestions move to 16384 as well. The comment in `app/cds.py` that
+lists the modules importing the setting now names `app/letters.py`.
+
+**Measured before the change** (the review's Task 3m, kept outside the
+repo in `v1.1-logs/TASK3M_LETTERS.md`). Gemma 4 QAT, think false. Letters
+from the notes of acted consultations 495 (Gynaecology) and 496 (ENT),
+three runs each. Each letter met the state a real letter meets: the model
+loaded at 16384 by a note request, and embeddinggemma loaded.
+
+| | at 8192 (before) | at 16384 (after) |
+|---|---|---|
+| letter, median wall time (495 / 496) | 5.7 s / 5.0 s | 2.5 s / 1.7 s |
+| of which loading the model | 3.2 s (8.0 s once) | none |
+| embeddinggemma still loaded after the letter | 0 of 6 | 6 of 6 |
+| next assessment request | 6.4 s (3.0 s reloading) | 3.7 s |
+
+The 8.0 s was the first 8192 letter of the run, straight after
+embeddinggemma had loaded. Ollama waited 5.0 s before it decided to
+evict; the other five times it decided within 0.3 s. The cause was not
+established.
+
+**The letters themselves did not change.** At each context the model's
+reply was byte-identical across the three runs, and identical between
+8192 and 16384. The grounding counts from `validate_letter` were the same
+too. GPU memory during the letter at 16384 was no higher than the state
+it met: 20127 MiB used, 3.9 GB free, with both models loaded.
+
+**Tests.** `tests/test_letters.py` pins that both letter requests carry
+`CDS_NUM_CTX`. `tests/test_shared_context.py` scans every module in
+`app/` and fails if any `num_ctx` is given as anything but the shared
+name. It covers a dict entry, a keyword and a subscript assignment, and
+it shows that the scan reaches the four call sites and catches a typed-in
+number in each form. No existing test pinned 8192.
+
+**Live only after the owner restarts the service.** Not pushed. No help
+article describes the letters' context or timing, so none is made untrue.
+
+**Seen in passing, not changed.** In the 495 letter the model opened with
+"this 32-year-old woman". The patient is 31, and the model never sees
+the patient record. `validate_letter` caught the unmatched number and put
+the placeholder in place of the whole first sentence, which also held
+"a two-week history of nausea, decreased appetite, and increased bowel
+frequency". The same happened at both contexts and in every run. It is
+the gate working as designed, but the letter loses its opening. Whether
+to give the letter model the patient's age is the owner's call.
