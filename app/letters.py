@@ -25,7 +25,7 @@ import httpx
 import psycopg
 from dotenv import load_dotenv
 
-from app.cds import think_field
+from app.cds import CDS_NUM_CTX, think_field
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -274,7 +274,7 @@ async def _chat(system: str, user: str, schema: dict) -> dict:
                     # Deterministic like every clinical output in the app.
                     "temperature": float(os.getenv("CDS_TEMPERATURE", "0.0")),
                     "seed": int(os.getenv("CDS_SEED", "42")),
-                    "num_ctx": 8192,
+                    "num_ctx": CDS_NUM_CTX,
                 },
                 **think_field(),
             },

@@ -72,8 +72,9 @@ logger = logging.getLogger(__name__)
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
 CDS_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_K_M")
 
-# ONE context length for every MedGemma call in the app — CDS, RAG and
-# the note (app/rag.py and app/notes.py import this). Session 5, owner
+# ONE context length for every MedGemma call in the app — CDS, RAG, the
+# note and the letters (app/rag.py, app/notes.py and app/letters.py import
+# this; the letters since 3 Oct 2026, owner decision). Session 5, owner
 # decision: Ollama RELOADS the model whenever num_ctx changes between
 # calls, and the live path (8192) and note path (16384) used to differ —
 # a reload measured at 3.9 s warm in the VRAM investigation and ~10 s on

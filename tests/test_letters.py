@@ -6,15 +6,17 @@ the two model calls so the flow runs without MedGemma.
 """
 
 import asyncio
+import json
 import os
 import secrets
 
+import httpx
 import psycopg
 import pytest
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
-from app import audit, auth, consultations, letters
+from app import audit, auth, cds, consultations, letters
 from app.letters import (PLACEHOLDER, assemble_letter, citable_line_numbers,
                          format_note_lines, note_lines, validate_letter)
 
@@ -187,6 +189,50 @@ def test_assemble_letter_uses_server_demographics():
     assert body.startswith("Dear Colleague,")
     assert "Re: Nimal Perera, 54 y, M" in body
     assert body.rstrip().endswith("Yours faithfully,\nDr S. Herath")
+
+
+# ------------------------------------------- the model request (no DB)
+
+_REAL_CLIENT = httpx.AsyncClient      # captured before any monkeypatch
+
+
+def _capture_letter_requests(monkeypatch) -> list[dict]:
+    """Stub the letters' HTTP layer at httpx's transport and record every
+    request body; each call site gets a reply it can parse."""
+    seen: list[dict] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        body = json.loads(request.content)
+        seen.append(body)
+        reply = ({"reasoning": "", "paragraphs": []}
+                 if body["messages"][0]["content"] == letters.LETTER_PROMPT
+                 else {"reasoning": "", "referrals": []})
+        return httpx.Response(200, json={"message": {"content": json.dumps(reply)}})
+
+    monkeypatch.setattr(letters.httpx, "AsyncClient",
+                        lambda **kw: _REAL_CLIENT(transport=httpx.MockTransport(handler), **kw))
+    return seen
+
+
+def test_letter_requests_carry_the_shared_context(monkeypatch):
+    """Owner decision 3 Oct 2026 (Task 3m): the letters use CDS_NUM_CTX
+    like every other model call. They sent 8192, typed in, and Ollama
+    reloads the model whenever the context changes: the letter waited
+    3.2-8.0 s for the reload, embeddinggemma was pushed out of the GPU,
+    and the next CDS call paid about 3 s to reload at 16384. Both letter
+    calls (the draft and the suggestions) go through the same _chat."""
+    seen = _capture_letter_requests(monkeypatch)
+    note = "S:\n  Chest tightness since last night.\nP:\n  Refer cardiology.\n"
+    asyncio.run(letters.draft_letter(note, "Cardiology",
+                                     {"name": "Nimal Perera", "age": 54, "sex": "M"},
+                                     "Dr S. Herath"))
+    asyncio.run(letters.suggest_referrals(note))
+    assert [body["messages"][0]["content"] for body in seen] == [
+        letters.LETTER_PROMPT, letters.SUGGEST_PROMPT]   # both reached the stub
+    for body in seen:
+        assert body["options"]["num_ctx"] == cds.CDS_NUM_CTX
+        assert body["model"] == letters.LETTER_MODEL
+    assert letters.CDS_NUM_CTX is cds.CDS_NUM_CTX
 
 
 # --------------------------------------------------- endpoint flow (DB)
