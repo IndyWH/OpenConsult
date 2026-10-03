@@ -8446,6 +8446,8 @@ needs new wording is the owner's call.
 
 ## The note model is given the patient's age and sex, checked against the record (2026-10-03)
 
+**Superseded 3 Oct 2026: reverted in b1a4eac, see the entry of that date below.**
+
 **Owner decision, 3 Oct 2026 (Task 5d):** the SOAP note gets the patient
 line, and the code treats age and sex as coming from the record. This
 replaces, for the note, the line in § *The letter model is given the
@@ -8545,3 +8547,56 @@ and without the patient, 13 chains each, pass marks fixed beforehand.
   model with the transcript", is now true of the note model as well.
 
 **Live only after the owner restarts the service.** Not pushed.
+
+## The note does not get the patient line (2026-10-03)
+
+**Owner decision, 3 Oct 2026:** f83caf8 (previous entry) does not go
+live. It was reverted in b1a4eac on 3 Oct 2026, before the push.
+`app/notes.py`, `app/finalize.py` and `app/cds.py` are as at 86e5ad2,
+and `tests/test_note_patient.py` is gone. The note model does not get
+the patient line. The assessment, the alarm and the referral letters
+keep it.
+
+**Why.** The review's Task 5d (outside the repo,
+`v1.1-logs/TASK5D_NOTE.md`) failed two hard marks fixed before the run.
+With the line, 9 notes of 195 were refused against 3 without, 7 of them
+on mock script 04, and one note stated a wrong age.
+
+**The cause of the empty note,** from the review's Task 5e on script 04
+(`v1.1-logs/TASK5E_EMPTY.md`). After its reasoning the model gives
+0.99999 to ending the reply. The schema makes it write the four lists,
+and it closes each one empty. With `minItems` 1 on `subjective` the same
+reply went on to a full note in 13 of 13. The line does not cause this;
+it tips a near-even choice of reply layout. Empty notes also happen
+without the line, so the live note call has this fault today.
+
+**The model never sees the schema.** The request has the same prompt
+tokens with the format and without it, and the note prompt does not
+describe the shape of the answer.
+
+**Not reproducible from one run to the next.** The same request does
+not give the same reply on this machine, even at temperature 0 with
+seed 42. Any evaluation that counts on fixed chains must allow for this.
+
+**Parked by the owner on 3 Oct 2026 for debugging, nothing built:**
+- the empty note;
+- the record check reading an age in words in the cited turn ("sixty")
+  as a mismatch;
+- the review page showing a record mismatch as low-confidence audio.
+
+The note is the one open exception to the owner's rule that every model
+call about the patient carries the patient line.
+
+**Correction to the previous entry.** Under *What the check cannot see*,
+it says an age written in words in the turn passes unread. It did not: a
+relative's age spoken in words was flagged.
+
+**Pushed and restarted by the owner** on the evening of 3 Oct 2026, at
+b1a4eac. Seen by the owner on the live app:
+- the walk-in form refuses a name alone (the message shown is the
+  browser's own, because the fields are marked required);
+- one auto-mode consultation;
+- one referral letter, at once, opening with the right age and sex.
+
+Not seen: an alarm that drops out and stays as the earlier line, because
+the alarm did not drop out.
