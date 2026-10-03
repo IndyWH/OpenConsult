@@ -101,6 +101,7 @@
      paused. It lists EVERY pending action text (spec §7: an
      acknowledgement covers only what the doctor actually saw) and offers
      the two one-tap resolutions. Hidden entirely unless paused. */
+  .hint.engine { color: var(--red); font-weight: 600; }
   .pausebanner { display: none; margin-top: .7rem; padding-top: .6rem;
                  border-top: 1px dashed var(--line); }
   .pausebanner.on { display: block; }
@@ -467,6 +468,9 @@
        supervising doctor always knows what the machine thinks it is doing.
        Follows the server's live auto_phase push; hidden unless auto is on. -->
   <div id="autoPhase" class="hint autophase" hidden aria-live="polite"></div>
+  <!-- Task 13: why Start is disabled while the Nemotron engine is not
+       ready, and a mid-consultation engine failure. Hidden on whisper. -->
+  <div id="speechEngine" class="hint engine" hidden role="alert"></div>
 </div>
 
 <!-- STICKY TOP ROW — Phase 7b session 3, revised variant A (owner-approved
@@ -776,8 +780,8 @@ async function loadPatientBanner() {
   PATIENT.id = entry.patient_id;          // server-sourced binding for the record
   PATIENT.queue = entry.entry_id;
   walkinPane.style.display = 'none';
-  btn.disabled = false;
-  btn.title = '';
+  btn.disabled = !!SPEECH_BLOCK;          // Task 13: the engine must be ready too
+  btn.title = SPEECH_BLOCK || '';
   linkedChip.style.display = '';
   nameEl.textContent = entry.name;
   const demo = [entry.age != null ? `${entry.age} y` : null, entry.sex || null]
@@ -785,6 +789,34 @@ async function loadPatientBanner() {
   demoEl.textContent = demo;
   document.title = 'Consultation — ' + entry.name;
 }
+// Task 13: the live speech engine. With SPEECH_PIPELINE=nemotron the
+// separate Nemotron process must be ready before recording can start
+// (there is no fallback to Whisper); while it is not, Start is disabled
+// and the reason is shown beside it, re-checked every 5 s. The server
+// refuses the socket anyway — this is the explanation, not the wall. On
+// the whisper path the server always says ready and nothing shows.
+let SPEECH_BLOCK = null;
+const speechEngineEl = document.getElementById('speechEngine');
+function applySpeechStatus(st) {
+  SPEECH_BLOCK = st.ready ? null : (st.detail || 'The speech engine is not ready. Recording cannot start.');
+  if (recording) return;                  // never touch a running consultation's button
+  speechEngineEl.textContent = SPEECH_BLOCK || '';
+  speechEngineEl.hidden = !SPEECH_BLOCK;
+  if (PATIENT.id) {
+    btn.disabled = !!SPEECH_BLOCK;
+    btn.title = SPEECH_BLOCK || '';
+  }
+}
+async function checkSpeechPipeline() {
+  let st = null;
+  try {
+    const response = await fetch('/api/speech-pipeline');
+    if (response.ok) st = await response.json();
+  } catch (e) { /* unreachable server: the socket will say so at Start */ }
+  if (st !== null) applySpeechStatus(st);
+  if (st !== null && !st.ready) setTimeout(checkSpeechPipeline, 5000);
+}
+checkSpeechPipeline();
 const patientReady = loadPatientBanner();
 
 // In-place walk-in for the no-patient state: same endpoint and audit
@@ -2870,6 +2902,21 @@ function onWsMessage(event) {
     // so stand down completely: worklet, timer, flags, button.
     standDown(msg.detail);
   }
+  else if (msg.type === 'speech_unavailable') {
+    // Task 13: the server would not start recording — the Nemotron engine
+    // is not ready. Stand down as for busy, then keep Start disabled with
+    // the reason beside it until the engine says it is ready.
+    standDown(msg.detail);
+    applySpeechStatus({ready: false, detail: msg.detail});
+    setTimeout(checkSpeechPipeline, 5000);
+  }
+  else if (msg.type === 'speech_failed') {
+    // Task 13: the engine failed mid-consultation. The recording carries
+    // on; the doctor is told now, in red beside the controls, that this
+    // transcript will be refused at Stop.
+    speechEngineEl.textContent = msg.detail;
+    speechEngineEl.hidden = false;
+  }
   else if (msg.type === 'face_state') {
     if (window.kindaliveFace) window.kindaliveFace.setTargets(msg);
   }
@@ -3019,6 +3066,7 @@ async function attemptReconnect() {
 
 async function start() {
   if (!PATIENT.id) return;  // unlinked recording is impossible, not warned
+  if (SPEECH_BLOCK) return; // Task 13: the reason is already beside the button
   btn.disabled = true;
   if (!stream) {            // permission was denied at load — try again now
     try { await acquireStream(null); }

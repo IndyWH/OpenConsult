@@ -52,7 +52,9 @@ logger = logging.getLogger(__name__)
 MODULE_NAMES = ("auth", "frontdesk", "consultations", "letters",
                 "system_utterances", "raw_segments", "audit",
                 # Phase 7c slice 5: references consultation(id), so after it.
-                "assessment_snapshots")
+                "assessment_snapshots",
+                # Task 13 (v1.1): Nemotron live lines; references consultation(id).
+                "live_segments")
 
 
 class _Rollback(Exception):

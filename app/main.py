@@ -26,8 +26,8 @@ from fastapi import Depends
 from pydantic import BaseModel
 
 from app import (agenda_queue, assessment_snapshots, audit, auth, auto_mode, consultations,
-                 face, frontdesk, letters, monitor, ratelimit, raw_segments, retention,
-                 schema, speech, system_utterances)
+                 face, frontdesk, letters, live_segments, monitor, ratelimit, raw_segments,
+                 retention, schema, speech, speech_pipeline, system_utterances)
 from app.auth import COOKIE_NAME, CLINICAL_ROLES, api_user, page_user
 from app import cds
 from app.cds import CDSEngine, OfficerVerdict, turn_finished
@@ -85,7 +85,22 @@ async def lifespan(app: FastAPI):
     # refuse-to-start check would turn a self-healing restart into an outage.
     schema.ensure_all()
     RECORDINGS_DIR.mkdir(parents=True, exist_ok=True)
-    app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
+    # Task 13: which engine transcribes live. whisper is today's path,
+    # untouched. nemotron starts its own worker process, which loads its
+    # models while the app serves; faster-whisper is NOT loaded then (its
+    # GPU memory is what makes room beside the CDS model), and recording
+    # waits until the worker is ready — no fallback to whisper.
+    app.state.speech_worker = None
+    if speech_pipeline.uses_nemotron():
+        app.state.transcriber = None
+        if speech_pipeline.configuration_error() is None:
+            app.state.speech_worker = speech_pipeline.start_worker()
+        try:
+            await live_segments.purge_unlinked()
+        except Exception:  # noqa: BLE001 - housekeeping must not stop the app
+            logger.exception("Could not purge unlinked live speech lines")
+    else:
+        app.state.transcriber = await asyncio.to_thread(LiveTranscriber)
     # Speech is constructed unconditionally; the Piper voice loads lazily
     # on first synthesis, so a machine without piper-tts starts normally
     # and simply cannot speak.
@@ -129,6 +144,8 @@ async def lifespan(app: FastAPI):
     app.state.speech_presynth.cancel()
     app.state.retention_task.cancel()
     app.state.finalize_worker.cancel()
+    if app.state.speech_worker is not None:
+        await asyncio.to_thread(app.state.speech_worker.stop)
 
 async def finalize_worker(app: FastAPI) -> None:
     """Single consumer for the finalisation queue. Never dies: a failed
@@ -720,6 +737,14 @@ def _age_sex_refusal(body: QueueAddBody) -> JSONResponse | None:
 @app.get("/api/queue")
 async def queue_list(user: dict = Depends(api_user())) -> list[dict]:
     return await frontdesk.today_queue()
+
+
+@app.get("/api/speech-pipeline")
+async def speech_pipeline_status(user: dict = Depends(api_user())) -> dict:
+    """Task 13: which live speech engine is in use and whether recording can
+    start. The live page disables Start, with this detail beside it, while
+    `ready` is false. Whisper is always ready (its model loads at startup)."""
+    return speech_pipeline.status(getattr(app.state, "speech_worker", None))
 
 
 @app.get("/api/queue/current")
@@ -2392,8 +2417,36 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 with contextlib.suppress(RuntimeError):
                     stale["grace_task"].cancel()
             await _complete_session(state, stale, connection_lost=True)
+        # Task 13: with SPEECH_PIPELINE=nemotron the live engine is the
+        # separate worker. Not ready means recording does not start, and the
+        # page says why in plain words. There is no fallback to whisper.
+        if speech_pipeline.uses_nemotron():
+            worker = getattr(state, "speech_worker", None)
+            pipeline_status = speech_pipeline.status(worker)
+            live_session = None
+            if pipeline_status["ready"]:
+                live_session = speech_pipeline.NemotronLiveSession(
+                    worker, session_id, live_segments)
+                try:
+                    await live_session.open()
+                except speech_pipeline.WorkerError:
+                    live_session = None
+                    pipeline_status = speech_pipeline.status(worker)
+            if live_session is None:
+                await audit.log(user["id"], "live.speech_unavailable", None, None,
+                                {"pipeline": pipeline_status["pipeline"],
+                                 "state": pipeline_status["state"],
+                                 "detail": pipeline_status["detail"]})
+                await websocket.send_json({
+                    "type": "speech_unavailable",
+                    "detail": pipeline_status["detail"]
+                    or "The speech engine is not ready. Recording cannot start."})
+                await websocket.close(code=4503)
+                return
+        else:
+            live_session = LiveSession(state.transcriber)
         entry = {
-            "session": LiveSession(state.transcriber),
+            "session": live_session,
             "user": user,
             "patient_id": config.get("patient_id"),
             "queue_entry_id": config.get("queue_entry_id"),
@@ -5540,6 +5593,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                     await websocket.send_json(
                         {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
                     )
+                if isinstance(session, speech_pipeline.NemotronLiveSession):
+                    for notice in session.take_notices():   # Task 13: engine failed
+                        await websocket.send_json(notice)
                 if committed:
                     # H3 (owner decision 2026-09-10, pilot 491): the last
                     # transcribed word's end on the session clock, and when

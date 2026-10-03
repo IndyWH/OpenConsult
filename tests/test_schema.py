@@ -38,7 +38,8 @@ def test_ensure_all_covers_every_module_in_one_order():
     # after consultations because its table references consultation(id).
     assert set(names) == {"auth", "frontdesk", "consultations", "letters",
                           "system_utterances", "raw_segments", "audit",
-                          "assessment_snapshots"}   # 7c slice 5, after consultations
+                          "assessment_snapshots",   # 7c slice 5, after consultations
+                          "live_segments"}          # Task 13, after consultations
 
 
 def test_ensure_all_is_idempotent():

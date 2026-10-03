@@ -191,6 +191,7 @@ class Stream:
         self.feat_t = 0                             # frames written so far
         self.step = 0
         self.emitted: dict[int, dict] = {}     # id(sentence) -> what was sent
+        self.next_id = 0
         self.late_changes = 0                  # committed lines NeMo extended later
         self.step_seconds: list[float] = []
         self.flushed = False
@@ -292,32 +293,46 @@ class Stream:
                 yield spk_idx, sentence, pos == len(sentences) - 1
 
     def _collect(self, final: bool) -> dict:
+        """New committed lines, revisions to lines already sent, the
+        watermark, and the open (uncommitted) text as a partial.
+
+        A line is sent once, with an id. If NeMo later extends a line that
+        was already sent (Part 1 saw two: a trailing full stop each), the
+        new text goes out as a REVISION of that id, so the stored line ends
+        as NeMo's final text. What the live page and the CDS already read
+        is not rewritten."""
         head = self.processed_s()
-        new, open_starts = [], []
+        new, revisions, open_lines = [], [], []
         for spk_idx, sentence, is_last in self._sentences():
             text = (sentence.get("words") or "").strip()
             key = id(sentence)
+            end = float(sentence["end_time"])
             if key in self.emitted:
-                if text != self.emitted[key]["text"]:
+                sent = self.emitted[key]
+                if text != sent["text"] or round(end, 3) != sent["end"]:
                     self.late_changes += 1
-                    self.emitted[key]["text"] = text   # counted once per change seen
+                    sent["text"], sent["end"] = text, round(end, 3)
+                    revisions.append({"id": sent["id"], "text": text, "end": sent["end"]})
                 continue
             if not text:
                 continue
-            end = float(sentence["end_time"])
             if final or not is_last or end < head - COMMIT_MARGIN_S:
-                line = {"speaker": int(spk_idx), "start": round(float(sentence["start_time"]), 3),
+                line = {"id": self.next_id, "speaker": int(spk_idx),
+                        "start": round(float(sentence["start_time"]), 3),
                         "end": round(end, 3), "text": text}
+                self.next_id += 1
                 self.emitted[key] = dict(line)
                 new.append(line)
             else:
-                open_starts.append(float(sentence["start_time"]))
+                open_lines.append((float(sentence["start_time"]), text))
         if final:
             watermark = None                        # everything has been sent
         else:
-            watermark = round(min([head - COMMIT_MARGIN_S] + open_starts), 3)
+            watermark = round(min([head - COMMIT_MARGIN_S] + [s for s, _ in open_lines]), 3)
         new.sort(key=lambda line: line["start"])
-        return {"segments": new, "watermark": watermark, "processed_s": round(head, 3)}
+        partial = " ".join(text for _, text in sorted(open_lines))
+        return {"segments": new, "revisions": revisions, "watermark": watermark,
+                "partial": partial, "processed_s": round(head, 3)}
 
     def stats(self) -> dict:
         steps = self.step_seconds
