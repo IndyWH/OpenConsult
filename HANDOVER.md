@@ -8299,3 +8299,23 @@ report is the review's `v1.1-logs/TASK5B_HARNESS.md`.
 **Not pushed and not live.** Local commits on mlrig, on top of the Task 5
 commits. The harness scripts are not part of the running app; the service
 needs no restart for this change.
+
+## Help 01 and 02 match Task 5 and the 30 Sep prompt (2026-10-03)
+
+**Owner-approved wording, 3 Oct 2026**, written in Cowork and committed
+unchanged in e29f1ed. It clears two help flags:
+
+- § *CDS prompt: weigh a stale list* (30 Sep): `help/01` §2 called the
+  assessment "a careful reviser" whose condition names stay put, and the
+  diagram said "revises". It now says the assessment weighs the whole
+  consultation again at every update. It sees its last list's names as
+  coming from a shorter transcript and is not told to keep them. The
+  diagram says "weighs again".
+- § *Age and sex reach the model* (2 Oct): `help/01` §2 now names the
+  patient's age and sex from the front desk as model input, and the
+  diagram sends them to both the assessment and the urgency officer.
+  `help/02` Step 1 now asks for name, age and sex in the walk-in box.
+
+**Still for the owner:** `help/02` Step 3's "the differential revises
+itself as evidence arrives" is unchanged. The 30 Sep entry flagged it as
+possibly still true. Whether it stays is the owner's judgement.
