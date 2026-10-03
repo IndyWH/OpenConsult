@@ -10,14 +10,6 @@ Confidence flagging is deterministic and code-side: a claim gets
 dose unit, or laterality — the things that hurt when misheard) AND at
 least one of its cited turns has low ASR confidence. The model is not
 asked to judge its own transcription risk.
-
-The patient's age and sex come from the record, not the transcript (owner
-decision 3 Oct 2026, Task 5d). The note call opens with the CDS's patient
-line, and the gate checks every claim's stated age and sex noun against
-the record: one that disagrees, and is not someone else's age spoken in a
-cited turn, gets `record_mismatch: true` and `flagged: true`. Nothing is
-dropped for it. Pronouns are not checked: a note about a woman may rightly
-say "he" of her husband.
 """
 
 from __future__ import annotations
@@ -25,7 +17,6 @@ from __future__ import annotations
 import json
 import os
 import re
-from collections.abc import Mapping
 
 import httpx
 
@@ -34,7 +25,7 @@ NOTE_MODEL = os.getenv("CDS_MODEL", "hf.co/unsloth/medgemma-27b-text-it-GGUF:Q4_
 # The shared MedGemma context length (session 5): one value across CDS,
 # RAG and this note call, so Ollama never reloads the model between the
 # live path and the note path. See the constant's comment in app/cds.py.
-from app.cds import CDS_NUM_CTX, patient_line, think_field, with_patient  # noqa: E402
+from app.cds import CDS_NUM_CTX, think_field  # noqa: E402
 
 LOW_CONFIDENCE = float(os.getenv("ASR_LOW_CONFIDENCE", "0.60"))
 # Below this fraction of validly-cited claims the note is demoted to a
@@ -48,21 +39,6 @@ MIN_CITED_FRACTION = float(os.getenv("NOTE_MIN_CITED_FRACTION", "0.5"))
 _LOAD_BEARING = re.compile(
     r"\d|\b(mg|ml|mcg|microgram|unit|units|left|right|bilateral)\b", re.IGNORECASE
 )
-# A stated age ("47yo", "47 y/o", "47-year-old", "47 year old", "aged 47",
-# "age 47") and the sex nouns the record check reads. "aged 6 months" is not
-# an age in years and is left alone.
-_AGE = re.compile(
-    r"\b(\d{1,3})\s*(?:yo|y/o)\b"
-    r"|\b(\d{1,3})[\s-]*years?[\s-]*old\b"
-    r"|\bage[d]?\s+(\d{1,3})\b(?!\s*(?:months?|weeks?|days?)\b)",
-    re.IGNORECASE,
-)
-_SEX_NOUNS = {"male": "M", "man": "M", "boy": "M", "gentleman": "M",
-              "female": "F", "woman": "F", "girl": "F", "lady": "F"}
-_SEX = r"\b(" + "|".join(_SEX_NOUNS) + r")\b"
-_SEX_AFTER_AGE = re.compile(r"[\s,-]*" + _SEX, re.IGNORECASE)    # "47yo male"
-_SEX_BEFORE_AGE = re.compile(_SEX + r"[\s,]*$", re.IGNORECASE)   # "male, 47yo"
-_SEX_OPENING = re.compile(r"\W*" + _SEX, re.IGNORECASE)          # "Male presenting…"
 
 _CLAIM_LIST = {
     "type": "array",
@@ -134,31 +110,7 @@ def format_turns(turns: list[dict]) -> str:
 SECTIONS = ("subjective", "objective", "assessment", "plan")
 
 
-def record_mismatch(text: str, cited_text: str, age: int, sex: str) -> bool:
-    """Whether a claim states an age or a sex the record contradicts.
-
-    An age that is not the record's is a mismatch unless the number is in
-    the text of the claim's cited turns: then it is someone else's age
-    ("mum died of a stroke aged 72") and the sex noun tied to it is theirs
-    too. A sex noun is read where it is tied to the stated age ("47yo male",
-    "woman aged 31") or opens the claim ("Male presenting with…"). Pronouns
-    are not read."""
-    for match in _AGE.finditer(text):
-        stated = int(next(group for group in match.groups() if group))
-        if stated != age:
-            if re.search(rf"(?<!\d){stated}(?!\d)", cited_text):
-                continue                 # spoken in a cited turn: not the patient's
-            return True
-        tied = [_SEX_AFTER_AGE.match(text, match.end()),
-                _SEX_BEFORE_AGE.search(text[:match.start()])]
-        if any(m and _SEX_NOUNS[m[1].lower()] != sex for m in tied):
-            return True
-    opening = _SEX_OPENING.match(text)
-    return bool(opening and _SEX_NOUNS[opening[1].lower()] != sex)
-
-
-def validate_and_gate(note: dict, turns: list[dict],
-                      patient: Mapping | None = None) -> dict:
+def validate_and_gate(note: dict, turns: list[dict]) -> dict:
     """Validate citations, flag risky claims, and demote ungrounded notes.
 
     Pure post-processing on the model's output — separated from the model
@@ -170,15 +122,7 @@ def validate_and_gate(note: dict, turns: list[dict],
     refusal. A substantially-uncited note is fabrication — the model
     inventing a plausible consultation the transcript never contained —
     and must never be presented for review or approval.
-
-    With a patient whose age and sex are usable (the ones that give the
-    patient line), each claim is also checked against the record
-    (record_mismatch): a claim that contradicts it is kept, cited as
-    before, and gets `record_mismatch: true` and `flagged: true`. Without
-    one, the output is exactly what it was before the check existed.
     """
-    check = patient is not None and patient_line(patient.get("age"),
-                                                 patient.get("sex")) is not None
     by_idx = {t["idx"]: t for t in turns}
     total = cited = 0
     for section in SECTIONS:
@@ -193,11 +137,6 @@ def validate_and_gate(note: dict, turns: list[dict],
                 and _LOAD_BEARING.search(claim["text"])
                 and any(by_idx[n]["confidence"] < LOW_CONFIDENCE for n in valid)
             )
-            if check and record_mismatch(
-                    claim["text"], "\n".join(by_idx[n]["text"] for n in valid),
-                    patient["age"], patient["sex"]):
-                claim["record_mismatch"] = True
-                claim["flagged"] = True
 
     if total == 0 or cited / total < MIN_CITED_FRACTION:
         return {
@@ -221,14 +160,8 @@ def validate_and_gate(note: dict, turns: list[dict],
     return note
 
 
-async def draft_note(turns: list[dict], patient: Mapping | None = None) -> dict:
-    """Generate a cited SOAP note; validate citations; flag risky claims.
-
-    `patient` is the consultation's patient record. Its age and sex open
-    the user message as the CDS's patient line (cds.with_patient), and the
-    gate checks the claims against them. Nothing else in it is read, so
-    the name never reaches the model. Without a usable age and sex the
-    request is byte for byte what it was before."""
+async def draft_note(turns: list[dict]) -> dict:
+    """Generate a cited SOAP note; validate citations; flag risky claims."""
     async with httpx.AsyncClient(timeout=600.0) as client:
         response = await client.post(
             f"{OLLAMA_URL}/api/chat",
@@ -236,8 +169,7 @@ async def draft_note(turns: list[dict], patient: Mapping | None = None) -> dict:
                 "model": NOTE_MODEL,
                 "messages": [
                     {"role": "system", "content": NOTE_PROMPT},
-                    {"role": "user", "content": with_patient(
-                        "TRANSCRIPT:\n" + format_turns(turns), patient)},
+                    {"role": "user", "content": "TRANSCRIPT:\n" + format_turns(turns)},
                 ],
                 "format": NOTE_SCHEMA,
                 "stream": False,
@@ -252,7 +184,7 @@ async def draft_note(turns: list[dict], patient: Mapping | None = None) -> dict:
         )
         response.raise_for_status()
     note = json.loads(response.json()["message"]["content"])
-    return validate_and_gate(note, turns, patient)
+    return validate_and_gate(note, turns)
 
 
 def note_as_plain_text(note: dict) -> str:
