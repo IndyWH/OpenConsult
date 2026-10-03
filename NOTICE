@@ -101,6 +101,35 @@ decision is to inject impulses deterministically from consultation
 events instead (build decision 2).
 
 
+Nemotron speech and diarisation (Task 13) — a separate process, not linked
+--------------------------------------------------------------------------
+
+  Speech      : nvidia/nemotron-3.5-asr-streaming-0.6b
+                https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
+                revision ea30d66debe3740a08b573244286791d423d6b3e
+  Diarisation : nvidia/Nemotron-3-Diarization
+                https://huggingface.co/nvidia/Nemotron-3-Diarization
+                revision f667ed73aee57d40cc39428eb768b4fd87a0a29e
+  Licence     : OpenMDW-1.1, both models (https://openmdw.ai/license/1-1/),
+                as stated on each model card
+  Runtime     : NeMo Speech, https://github.com/NVIDIA-NeMo/Speech
+                commit 1688cc3d6a9ade854f544987810c53f605dc86fc, Apache-2.0
+
+**Relationship, stated deliberately.** This is the Piper arrangement again.
+Neither the models nor NeMo is a dependency of this application. None of
+them is in `pyproject.toml` or `uv.lock`, and nothing in `app/` imports
+them. `speech_nemotron/setup.sh` builds them into their own environment,
+outside the repository, with NeMo's own lockfile, and downloads the
+checkpoints at the pinned revisions into the operator's Hugging Face
+cache. The app starts `speech_nemotron/worker.py` in that environment as
+a **separate process**, and talks to it only over a pipe. This happens
+only when the operator sets `SPEECH_PIPELINE=nemotron`; the default is
+whisper. Nothing is vendored and no weights are committed.
+
+Anyone redistributing this project should read the OpenMDW-1.1 terms
+themselves rather than relying on this note. Nothing here is legal advice.
+
+
 Clinical guideline corpus
 -------------------------
 
@@ -122,6 +151,9 @@ Models used at runtime
   pyannote speaker-diarization-3.1        — diarisation (gated model;
                                             licence accepted on Hugging
                                             Face by the operator)
+  Nemotron 3.5 ASR streaming 0.6b and     — optional live speech and
+  Nemotron-3-Diarization (OpenMDW-1.1)      diarisation, SPEECH_PIPELINE=
+                                            nemotron only; see their entry
 
 These are obtained by the operator through Ollama and Hugging Face and are
 subject to their own licences and, in pyannote's case, an access
