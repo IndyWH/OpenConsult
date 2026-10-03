@@ -8443,3 +8443,105 @@ and "only" no longer describe everything the model sees. Whether that
 needs new wording is the owner's call.
 
 **Live only after the owner restarts the service.** Not pushed.
+
+## The note model is given the patient's age and sex, checked against the record (2026-10-03)
+
+**Owner decision, 3 Oct 2026 (Task 5d):** the SOAP note gets the patient
+line, and the code treats age and sex as coming from the record. This
+replaces, for the note, the line in § *The letter model is given the
+patient's age and sex* that said the note does not get it. Built in
+f83caf8.
+
+**Why.** The note model was told nothing about the patient and called a
+man "they" ("Thinks they need strong antibiotics", 8 of 13 notes for the
+496 recording). In the Task 5c bench, with the line put in by hand, 8 of
+13 notes for the same 47-year-old man opened "47yo male presenting
+with…", which is how a GP writes it. But that claim cited turn 3, which
+says nothing about age or sex: they come from the front desk, and
+`validate_and_gate` only checked that a cited turn exists.
+
+**The change.**
+- `draft_note(turns, patient=None)` in `app/notes.py` wraps its user
+  message in `cds.with_patient`: "The patient is a 47-year-old man.", a
+  blank line, then the message exactly as before. Only age and sex are
+  read, so the name never reaches the model. With no usable age and sex
+  the request is byte for byte what it was.
+- `validate_and_gate(note, turns, patient=None)` checks each claim
+  (`record_mismatch` in `app/notes.py`). It reads a stated age (47yo,
+  47 y/o, 47-year-old, 47 year old, 47 years old, aged 47, age 47; "aged
+  6 months" is not an age in years) and a sex noun (male, female, man,
+  woman, boy, girl, gentleman, lady) tied to that age ("47yo male",
+  "woman aged 31") or opening the claim ("Male presenting with…").
+  - An age or sex noun that equals the record: nothing changes.
+  - An age that is not the record's and is not in the text of the
+    claim's cited turns, or a sex noun that contradicts the record: the
+    claim gets `record_mismatch: true` and `flagged: true`. It is kept,
+    its citation is as before, and the note is never refused for it.
+  - A different age that is in a cited turn is someone else's ("father
+    MI aged 52", the patient having said 52), and so is the sex noun
+    tied to it. Neither is checked.
+  - Pronouns are not checked: a note about a woman may rightly say "he"
+    of her husband.
+  - The key is only added to a claim that mismatches. Without a patient,
+    or without a usable age and sex (the same rule as the line,
+    `cds.patient_line`), the output is exactly what it was.
+- `app/finalize.py`: both callers, the pipeline after the transcript
+  gates and `regenerate_note`, pass `note_patient(cid)`, the age and sex
+  of the consultation's patient row (`frontdesk.get_patient`), or None
+  when the consultation has no linked row.
+- Unchanged: the note's system prompt, its schema, the citation rule,
+  the refusal rule (`MIN_CITED_FRACTION`), the review page.
+  `scripts/evaluate_notes.py` still calls `draft_note(turns)` without a
+  patient.
+
+**How the review page shows a `record_mismatch` claim today.** The page
+does not read `record_mismatch`. It reads `flagged`, so the claim looks
+exactly like a low-confidence-audio claim: amber dotted underline, the
+mark "⚠ low-confidence audio", the tooltip "Contains a number/drug/side
+resting on a low-confidence transcript segment — click its citation chip
+to verify against what was heard", and it is counted in the footer as
+"N flagged for low-confidence audio". So the doctor is told to look, but
+given the wrong reason: the audio may be fine, and the citation chip
+leads to a turn that does not hold the age or sex at all. The claim's
+text is not changed and approval is not blocked by it. A label of its
+own on the review page is a product decision for the owner; the task
+ruled out changing the page.
+
+**What the check cannot see.** It reads the forms above only: "47M",
+"47 yrs", an age written in words in the turn ("seventy-two") and
+pronouns all pass unread. A spoken age in a cited turn exempts that
+number in that claim, even if the note pins it on the patient. A sex
+noun opening a claim about someone else ("Male partner present", for a
+woman) is flagged. Each of these is a flag or a miss, never a dropped
+claim.
+
+**Tests:** `tests/test_note_patient.py`, 43, with today's note message
+written out by hand: the line first and the rest of the request
+unchanged; no line and no check without a usable patient; the right age
+and sex pass in every form; a wrong age is flagged and kept; a wrong sex
+noun is flagged; a relative's age spoken in a cited turn is not flagged,
+and is when cited elsewhere; pronouns are not read; the name never
+reaches the model; both finalize callers pass the record's age and sex
+and nothing else. Against the old `notes.py` the 42 note tests fail. No
+existing test pinned the note message or the gate's output, and none was
+changed. Suite 1331 before, 1374 after, green.
+
+**Measured** in the review's Task 5d (outside the repo,
+`v1.1-logs/TASK5D_NOTE.md`): 495, 496 and the 13 harness scripts, with
+and without the patient, 13 chains each, pass marks fixed beforehand.
+
+**Help flag (the owner writes the wording).**
+- `help/01-a-consultations-journey.md` §5: "Numbers, doses and
+  left/right statements that rest on low-confidence audio carry a ⚠
+  flag." The ⚠ flag now also marks a claim whose age or sex disagrees
+  with the patient record, and the diagram's "⚠ on shaky numbers" says
+  the same. "Each sentence of the draft cites the transcript lines it
+  came from" also no longer covers everything: the note's age and sex
+  can now come from the record, while the claim cites a transcript turn.
+- `help/06-safety-by-construction.md`, *Code decides*: "The ⚠ flag on
+  risky numbers is a deterministic rule" is still true (the record check
+  is deterministic too), but the flag now marks more than risky numbers.
+- `help/02-using-it-step-by-step.md` Step 1, "the age and sex go to the
+  model with the transcript", is now true of the note model as well.
+
+**Live only after the owner restarts the service.** Not pushed.
