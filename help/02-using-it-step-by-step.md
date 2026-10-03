@@ -13,10 +13,12 @@ for that person) and that you can log in.
 
 ## Step 1 — Add the patient to today's queue
 
-Open the **Today** tab. Type a name into the walk-in box, press **Start
-walk-in consultation**, and the patient appears in the queue. In a
-two-role practice the receptionist does this half and the doctor takes
-over from here; on your own you can do both.
+Open the **Today** tab. Type the patient's name, age and sex into the
+walk-in box and press **Start walk-in consultation**. The patient appears
+in the queue. The app asks for all three: the age and sex go to the model
+with the transcript, so it knows who it is hearing about. In a two-role
+practice the receptionist does this half and the doctor takes over from
+here; on your own you can do both.
 
 ![The Today tab: the walk-in box and the queue](images/02-1-todays-queue.png)
 

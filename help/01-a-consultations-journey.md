@@ -27,16 +27,18 @@ flowchart LR
 
 ## 2 · The two hats: one model, two very different jobs
 
-As committed transcript accumulates, a clinical model reads it and does two
-jobs — kept **strictly separate**, because combining them failed every way
-it was tried.
+As committed transcript accumulates, a clinical model reads it, along with
+the patient's age and sex from the front desk, and does two jobs — kept
+**strictly separate**, because combining them failed every way it was
+tried.
 
-The **assessment** is a careful reviser. It keeps a differential diagnosis,
-questions worth asking (ordered by clinical priority) and signs worth
-examining. Each update *revises* the previous one under rules: condition
-names stay put, reasoning must absorb new evidence, answered questions drop
-off the list. In auto mode that list feeds the queue the assistant asks from
-(§3).
+The **assessment** weighs the whole consultation again at every update. It
+keeps a differential diagnosis, questions worth asking (ordered by clinical
+priority) and signs worth examining. Each time, it is shown the names on
+its last list and told they came from a shorter transcript. It is not told
+to keep them: the list follows the evidence, not the first guess. Questions
+that have been asked or answered drop off. In auto mode that list feeds the
+queue the assistant asks from (§3).
 
 The **urgency officer** is deliberately forgetful. It reads the current
 transcript fresh every time, with no memory of what it said before — so
@@ -46,8 +48,10 @@ arranged. The bookkeeping that clears the alarm is code, not the model.
 
 ```mermaid
 flowchart TB
-    T["Committed transcript"] --> A["🩺 Assessment\nrevises: differential ·\nquestions · signs"]
+    T["Committed transcript"] --> A["🩺 Assessment\nweighs again: differential ·\nquestions · signs"]
     T --> U["🚨 Urgency officer\nfresh eyes, every time"]
+    D["Patient's age and sex\n(front desk)"] --> A
+    D --> U
     A --> P["Questions panel"]
     U --> R["Red-flag banner —\nstays until resolved"]
 ```
