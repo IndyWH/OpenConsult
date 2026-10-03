@@ -8384,3 +8384,62 @@ the placeholder in place of the whole first sentence, which also held
 frequency". The same happened at both contexts and in every run. It is
 the gate working as designed, but the letter loses its opening. Whether
 to give the letter model the patient's age is the owner's call.
+
+## The letter model is given the patient's age and sex (2026-10-03)
+
+**Owner ruling, 3 Oct 2026 (Task 5c):** the patient line goes in from
+here on, and the letter model gets age and sex. This replaces, for the
+referral letter only, the line in § *Age and sex reach the model* that
+kept the letters out. Built in c8eb06b.
+
+**Why.** The model that writes a referral letter was told nothing about
+the patient. In Task 3m (previous entry) it opened the 495 letter, for a
+31-year-old woman, with "this 32-year-old woman". `validate_letter` found
+32 in neither the cited lines nor the allowed age and replaced the whole
+sentence with the placeholder, so the letter lost its opening and the
+two-week history. For the 496 letter, a man, it wrote "The patient's
+expectations are that they want".
+
+**The change.** `draft_letter` in `app/letters.py` wraps its user message
+in `cds.with_patient`, so the line comes from the same `patient_line` as
+the CDS: "The patient is a 31-year-old woman.", then a blank line, then
+the message exactly as before. The age and sex come from the patient
+record `draft_letter` already receives. The letter route passes it
+(`frontdesk.get_patient`: name, age, sex), so the route did not change.
+`with_patient` reads only age and sex. The name never reaches the model
+and stays in the code-written Re: line. With no usable age and sex (the
+route's fallback when the consultation has no patient row, or an old row
+with NULLs) there is no line and the request is byte for byte what it
+was. Unchanged: the letter's system prompt, its schema,
+`validate_letter`, `assemble_letter` and the Re: line. The referral
+suggestion call and the SOAP note do not get the line. The comment above
+`patient_line` in `app/cds.py` now says so.
+
+**Tests** (`tests/test_letters.py`, today's message written out by hand):
+the line is first and the rest of the request is unchanged; no line when
+age or sex is missing or unusable, including the route's fallback; the
+name never reaches the model, while the record's age and sex do and the
+name is in the Re: line. Against the old `letters.py` the line tests fail
+and the no-line tests pass. No existing test pinned the letter message.
+Suite 1321 before, 1331 after, green.
+
+**Measured** in the review's Task 5c (outside the repo, in
+`v1.1-logs/TASK5C_LETTERS.md`). The letters of 495 and 496 were run with
+and without the line, 13 chains each, with pass marks fixed beforehand.
+The SOAP note was measured there too, with and without the line, with no
+change to `app/notes.py`. Whether the note gets the line is the owner's
+call.
+
+**Help flag (the owner writes the wording).** Two help sentences describe
+the letter's input as the approved note and nothing else. With this
+change the letter model is also given the patient's age and sex from the
+front desk:
+- `help/01-a-consultations-journey.md` §6: "generated from the signed
+  note alone, never from the raw transcript".
+- `help/02-using-it-step-by-step.md` Step 7: "The letter is drafted
+  **only from the approved note**, never from the raw transcript".
+Both still hold for the clinical content and for the transcript. "Alone"
+and "only" no longer describe everything the model sees. Whether that
+needs new wording is the owner's call.
+
+**Live only after the owner restarts the service.** Not pushed.
