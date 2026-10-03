@@ -266,7 +266,10 @@ def assessment_message(transcript: str, previous: dict | None) -> str:
 # the officer, the topic call or the re-ranker — then a blank line, then the
 # message exactly as before. The fresh window stays, so it goes at every
 # pass. No line (an old patient row without age or sex, or a caller with no
-# patient) leaves the message byte for byte what it was.
+# patient) leaves the message byte for byte what it was. Outside the CDS,
+# the referral letter's drafting call opens with the same line (owner ruling
+# 3 Oct 2026, Task 5c, app/letters.py draft_letter); the referral
+# suggestions and the SOAP note do not get it.
 
 PATIENT_ADULT_AGE = 18
 

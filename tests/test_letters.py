@@ -235,6 +235,69 @@ def test_letter_requests_carry_the_shared_context(monkeypatch):
     assert letters.CDS_NUM_CTX is cds.CDS_NUM_CTX
 
 
+# Owner ruling 3 Oct 2026 (Task 5c): the letter model is told the patient's
+# age and sex. It had been guessing: in Task 3m it wrote "this 32-year-old
+# woman" for a woman of 31, and the gate replaced the whole opening
+# sentence. Today's letter message for this note, written out by hand: the
+# patient line goes in front of exactly this, and nothing else changes.
+_LINE_NOTE = ("S:\n  Chest tightness since last night.\nA:\n  Possible angina.\n"
+              "P:\n  Refer cardiology.\n")
+_TODAY_LETTER_MESSAGE = (
+    "SPECIALTY: Cardiology\n\nAPPROVED CONSULTATION NOTE:\n"
+    "[1] S:\n[2] Chest tightness since last night.\n[3] A:\n"
+    "[4] [assessment — withheld from referral letters]\n[5] P:\n[6] Refer cardiology.")
+
+
+def _draft_with(monkeypatch, patient: dict) -> tuple[dict, dict]:
+    """The one letter request draft_letter sends for this patient, and what
+    draft_letter returned."""
+    seen = _capture_letter_requests(monkeypatch)
+    drafted = asyncio.run(letters.draft_letter(_LINE_NOTE, "Cardiology", patient,
+                                               "Dr S. Herath"))
+    assert [b["messages"][0]["content"] for b in seen] == [letters.LETTER_PROMPT]
+    return seen[0], drafted
+
+
+@pytest.mark.parametrize("age, sex, line", [
+    (31, "F", "The patient is a 31-year-old woman."),
+    (47, "M", "The patient is a 47-year-old man."),
+    (15, "M", "The patient is a 15-year-old boy."),
+])
+def test_the_letter_message_opens_with_the_patient_line(monkeypatch, age, sex, line):
+    with_line, _ = _draft_with(monkeypatch, {"name": "Nimal Perera", "age": age, "sex": sex})
+    without, _ = _draft_with(monkeypatch, {"name": "Nimal Perera"})
+    assert line == cds.patient_line(age, sex)            # the shared function's line
+    assert with_line["messages"][1]["content"] == f"{line}\n\n{_TODAY_LETTER_MESSAGE}"
+    # Only the user message differs: system prompt, schema, options, model.
+    with_line["messages"][1]["content"] = without["messages"][1]["content"]
+    assert with_line == without
+
+
+@pytest.mark.parametrize("patient", [
+    {"name": "Nimal Perera"},                            # the route's no-record fallback
+    {"name": "Nimal Perera", "age": None, "sex": None},  # an old row: no age or sex
+    {"name": "Nimal Perera", "age": None, "sex": "F"},
+    {"name": "Nimal Perera", "age": 31, "sex": None},
+    {"name": "Nimal Perera", "age": 31, "sex": "X"},
+    {"name": "Nimal Perera", "age": 31},
+])
+def test_no_patient_line_without_a_usable_age_and_sex(monkeypatch, patient):
+    request, _ = _draft_with(monkeypatch, patient)
+    assert request["messages"][1]["content"] == _TODAY_LETTER_MESSAGE
+
+
+def test_the_patient_name_never_reaches_the_letter_model(monkeypatch):
+    name = "Zephyrine Quillfeather"
+    request, drafted = _draft_with(monkeypatch, {"name": name, "age": 31, "sex": "F"})
+    sent = json.dumps(request, ensure_ascii=False)
+    # The record did reach the letter code: its age and sex are in the
+    # message and its name is in the code-written Re: line.
+    assert request["messages"][1]["content"].startswith("The patient is a 31-year-old woman.")
+    assert f"Re: {name}, 31 y, F" in drafted["body"]
+    for part in (name, "Zephyrine", "Quillfeather"):
+        assert part not in sent
+
+
 # --------------------------------------------------- endpoint flow (DB)
 
 def _db_ready() -> bool:

@@ -25,7 +25,7 @@ import httpx
 import psycopg
 from dotenv import load_dotenv
 
-from app.cds import CDS_NUM_CTX, think_field
+from app.cds import CDS_NUM_CTX, think_field, with_patient
 
 load_dotenv()
 DATABASE_URL = os.getenv("DATABASE_URL", "")
@@ -450,12 +450,20 @@ def assemble_letter(body_paragraphs: list[str], patient: dict,
 
 async def draft_letter(note_text: str, specialty: str, patient: dict,
                        doctor_name: str) -> dict:
-    """Draft + validate a referral letter body from the approved note."""
+    """Draft + validate a referral letter body from the approved note.
+
+    The user message opens with the patient line (owner ruling 3 Oct
+    2026, Task 5c): cds.with_patient takes the age and sex from `patient`,
+    the server-side record the Re: line also reads, and never the name.
+    The model had been guessing: in Task 3m it wrote "this 32-year-old
+    woman" for a woman of 31, and the gate replaced the whole opening
+    sentence. Without a usable age and sex the message is exactly what it
+    was before."""
     lines = note_lines(note_text)
     result = await _chat(
         LETTER_PROMPT,
-        f"SPECIALTY: {specialty}\n\nAPPROVED CONSULTATION NOTE:\n"
-        + format_note_lines(lines, for_letter=True),
+        with_patient(f"SPECIALTY: {specialty}\n\nAPPROVED CONSULTATION NOTE:\n"
+                     + format_note_lines(lines, for_letter=True), patient),
         LETTER_SCHEMA,
     )
     allowed = {str(patient["age"])} if patient.get("age") is not None else set()
