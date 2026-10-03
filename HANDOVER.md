@@ -8600,3 +8600,117 @@ b1a4eac. Seen by the owner on the live app:
 
 Not seen: an alarm that drops out and stays as the earlier line, because
 the alarm did not drop out.
+
+## Nemotron live speech and diarisation, behind a switch (2026-10-03)
+
+The review's Task 13 (outside the repo: prompt `v1.1-logs/TASK13_PROMPT.md`,
+report `v1.1-logs/TASK13_NEMOTRON.md`). Commits 47eba3c, 02d1a26, 996ca7b,
+5531633 and 9640d9b. Research and education prototype; consultation 66 is
+acted and synthetic.
+
+**What it is.** `SPEECH_PIPELINE` is `whisper` (the default) or `nemotron`.
+With whisper nothing changes: faster-whisper live, then at Stop the CDS
+model unloads and WhisperX and pyannote re-read the recording. With nemotron:
+
+- NVIDIA `nemotron-3.5-asr-streaming-0.6b` (en-GB) and
+  `Nemotron-3-Diarization` run live, paired through NeMo Speech's
+  `SpeakerTaggedASR` as Option 2 of the diarisation card's
+  `ASR_INTEGRATION_GUIDE.md`.
+- They run in a separate worker process (`speech_nemotron/worker.py`),
+  from their own environment outside the repo, built by
+  `speech_nemotron/setup.sh`. NeMo, its torch and both checkpoints are
+  pinned. The app's `uv.lock` is untouched.
+- Each speaker-tagged line is stored as it arrives
+  (`live_speech_segment`).
+- At Stop, the final transcript is built from those lines.
+  **Nothing loads or unloads**: the CDS model stays in memory, and
+  WhisperX and pyannote are never imported.
+- `SPEECH_MAX_SPEAKERS` defaults to 2, today's pyannote count (owner's
+  instruction at approval).
+
+**How to turn it on and off:** the exact steps are at the top of the
+report.
+
+**Owner decisions at approval (3 Oct 2026), built:**
+- **No silent fallback.** If the worker is not ready, recording does not
+  start, and the live page says why beside Start. An unknown
+  `SPEECH_PIPELINE` value blocks the same way.
+- **S2 cannot be measured.** Nemotron gives no confidence, so turns carry
+  NULL; `transcript_turn.confidence` now allows NULL, and whisper turns
+  always carry a value. Every Nemotron transcript is **flagged** (P2,
+  "speech-recognition confidence not checked"), so approval waits on the
+  acknowledged banner.
+- **"Who spoke?" keeps its question and its wait.** "Only the patient"
+  labels every line Patient. Otherwise the first-speaker rule applies, as
+  today: the speaker of the first line is Doctor and every other speaker
+  is Patient.
+- **Lines reach `transcript_parts` in start-time order**, up to the
+  worker's watermark, whatever order the speakers' lines commit in.
+- **An engine failure refuses (P1).** This covers a failure mid-session,
+  and a Stop flush with no answer within `FLUSH_TIMEOUT_S` (20 s). Lines
+  committed before the failure are stored but never used. This holds
+  even with `TRANSCRIPT_GATE_ENABLED=false`.
+- **Auto mode is not blocked.** It runs on the Nemotron session through
+  the same `LiveSession` hooks, with no change to auto-mode logic. A test
+  drives the harness's auto run and checks that every sample inside the
+  exclusion spans reached the worker as zero.
+
+**Measured (Part 1, consultation 66, beside Gemma 4 QAT at 16384).**
+The figures are in the report; the ones that matter:
+- **Speed:** 0.027 × real time.
+- **VRAM:** peak 21.9 GiB of 24, or 20.6 GiB without the live
+  service's Whisper, which is not loaded on this path. The worst case,
+  with embeddinggemma loaded too, peaked at 22.7 GiB.
+- **WER 13.1 %, against WhisperX's 3.7 %** on the same recording, with
+  clinically relevant errors ("jaw" became "tool").
+- **3 of 22 lines got a different speaker:** the diariser held one voice
+  for the first 50 s, so the patient's presenting complaint was labelled
+  Doctor.
+
+**Fragile — do not undo without reading why** (comments at each site):
+- **The checkpoints restore on the CPU, then move to the GPU.** Restoring
+  straight onto the GPU doubled the ASR model's 2.4 GB for a moment, and
+  that ran out of memory beside Gemma.
+- **CUDA graphs are off in the RNNT decoder.** With them on, the session
+  after a full-length one crashed with an illegal memory access.
+  `reset_cuda_graphs_state()` did not cure it.
+- **The warm-up runs the ASR for every count of active speakers.**
+  Silence alone does not warm it, because cache gating skips the ASR, and
+  the first real batch then took 2.2 s.
+- **The live feed recomputes only the last 8 feature frames.** The first
+  version recomputed everything and ran cuFFT out of memory. The cuFFT
+  plan cache is capped at 8.
+- **`COMMIT_MARGIN_S` is 3.0 in `nemotron_stream.py`.** A line commits
+  about 3.3 s after it ends (median in Part 1), against Whisper's 2 s
+  margin. Auto mode's officer runs at 2.0 s of quiet and the fallback
+  at 3.5 s, so on this path the officer may more often judge a turn one
+  line short. Unmeasured in a room.
+- **`transcript_turn.confidence` NULL means "not measured".** Code that
+  compares it must check for None; JavaScript reads `null < 0.6` as true.
+
+**Not done, and owed:**
+- No consultation in the room on this path. Auto-mode timing on it is
+  unmeasured.
+- The worker log is `~/.local/share/openconsult-nemotron/worker.log`.
+- Unlinked lines are purged after a day, at app start, on the
+  nemotron path only.
+- The approve endpoint's 409 text for a flagged transcript does not
+  mention unchecked confidence (the banner does). The wording is the
+  owner's.
+- `data/recordings/consultation_68.wav` was overwritten on 17 Aug and
+  holds 11 s, not mock script 03. The July ASR-stack harness would now
+  score the wrong audio for 68.
+
+**Help articles made untrue, ONLY while the switch is on** (flagged, not
+edited; the owner writes the wording):
+- `help/04-the-architecture.md`, lines 26–29 and 60–74: live
+  transcription is not faster-whisper, and Stop neither unloads the CDS
+  model nor runs WhisperX and pyannote.
+- `help/01-a-consultations-journey.md`, lines 100–110: no line is marked
+  low-confidence, and the whole transcript carries the "not checked" flag
+  instead.
+
+With the switch off, every article stays true.
+
+**Restart owed** before any of it is live. The restart applies the schema:
+the new table, two consultation columns, and the NULL-able confidence.
