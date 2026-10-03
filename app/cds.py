@@ -268,8 +268,10 @@ def assessment_message(transcript: str, previous: dict | None) -> str:
 # pass. No line (an old patient row without age or sex, or a caller with no
 # patient) leaves the message byte for byte what it was. Outside the CDS,
 # the referral letter's drafting call opens with the same line (owner ruling
-# 3 Oct 2026, Task 5c, app/letters.py draft_letter); the referral
-# suggestions and the SOAP note do not get it.
+# 3 Oct 2026, Task 5c, app/letters.py draft_letter), and so does the SOAP
+# note call, whose gate checks the note's stated age and sex against the
+# record (owner decision 3 Oct 2026, Task 5d, app/notes.py); the referral
+# suggestions do not get it.
 
 PATIENT_ADULT_AGE = 18
 

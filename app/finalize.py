@@ -36,7 +36,7 @@ import time
 
 import httpx
 
-from app import audit, consultations, speech, system_utterances, transcript_quality
+from app import audit, consultations, frontdesk, speech, system_utterances, transcript_quality
 # Aliased: transcribe_and_diarise's local `raw_segments` (the
 # post-invariant list) predates this module and keeps its name.
 from app import raw_segments as raw_segments_store
@@ -810,7 +810,7 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
                            "gate: %s", cid,
                            transcript_quality.refusal_summary(verdict["flags"]))
 
-        note = await draft_note(await consultations.get_turns(cid))
+        note = await draft_note(await consultations.get_turns(cid), await note_patient(cid))
         await consultations.save_note(cid, note)
         await consultations.set_status(cid, "awaiting_review")
         logger.info("Consultation %d ready for review", cid)
@@ -822,7 +822,21 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
                         {"error": str(exc)[:300]})
 
 
+async def note_patient(cid: int) -> dict | None:
+    """The age and sex of the consultation's patient record, for the note
+    (owner decision 3 Oct 2026, Task 5d): the note model is given them and
+    the note's gate checks the claims against them. Age and sex only, so
+    the name never goes near the model. None when the consultation has no
+    linked patient row; draft_note then sends today's request and the gate
+    checks nothing."""
+    consultation = await consultations.get_consultation(cid)
+    if not consultation or not consultation["patient_id"]:
+        return None
+    row = await frontdesk.get_patient(consultation["patient_id"])
+    return {"age": row["age"], "sex": row["sex"]} if row else None
+
+
 async def regenerate_note(cid: int) -> None:
     """Re-draft after transcript corrections; keeps prior versions."""
-    note = await draft_note(await consultations.get_turns(cid))
+    note = await draft_note(await consultations.get_turns(cid), await note_patient(cid))
     await consultations.save_note(cid, note)
