@@ -1715,6 +1715,20 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
         await consultations.save_urgent_actions(cid, unresolved)
         logger.info("Consultation %d: %d unresolved urgent action(s) recorded",
                     cid, len(unresolved))
+    # Task 13: on the Nemotron path the transcript IS the live lines. A
+    # session that never reached Stop (grace expiry) is flushed here, so its
+    # last lines are not lost; then the lines are linked to the consultation
+    # and the pipeline — with any engine failure, including a flush that did
+    # not answer — is recorded for finalisation, which refuses on a failure.
+    if isinstance(session, speech_pipeline.NemotronLiveSession):
+        if not session.flushed and session.failure is None:
+            await session.flush()
+        linked = await live_segments.link(session.session_id, cid)
+        await consultations.set_speech_pipeline(cid, speech_pipeline.NEMOTRON, session.failure)
+        await audit.log(user["id"], "speech.nemotron_session", "consultation", cid,
+                        {"session_id": session.session_id, "lines": linked,
+                         "failure": session.failure,
+                         "order_violations": session.order_violations})
     if connection_lost:
         await consultations.set_connection_lost(cid)
     # Hand the recording to the serialised finalisation worker: with one

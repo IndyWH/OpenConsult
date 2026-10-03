@@ -24,6 +24,12 @@ Triggered by the Stop button. Steps, in order:
    independently. See TRANSCRIPT_QUALITY_GATE_SPEC.md §11.
 7. Draft the SOAP note with MedGemma — which reloads onto the now-free
    GPU on its first call.
+
+Task 13 (v1.1): a consultation recorded with SPEECH_PIPELINE=nemotron takes
+`finalize_nemotron` instead (end of this module). Its transcript and speaker
+labels were made live and stored line by line, so steps 1, 2-4 and 7's
+reload do not happen: nothing unloads, WhisperX and pyannote are never
+loaded, and the CDS model stays in memory.
 """
 
 from __future__ import annotations
@@ -36,7 +42,8 @@ import time
 
 import httpx
 
-from app import audit, consultations, speech, system_utterances, transcript_quality
+from app import (audit, consultations, live_segments, speech, system_utterances,
+                 transcript_quality)
 # Aliased: transcribe_and_diarise's local `raw_segments` (the
 # post-invariant list) predates this module and keeps its name.
 from app import raw_segments as raw_segments_store
@@ -693,6 +700,12 @@ def attribute_roles(turns: list[dict]) -> tuple[list[dict], bool]:
 
 async def finalize_consultation(cid: int, wav_path: str) -> None:
     """The full pipeline; sets consultation status as it progresses."""
+    # Task 13: a consultation recorded on the Nemotron live path is finalised
+    # from its stored live lines (finalize_nemotron). Decided by what
+    # recorded it, stored at Stop — not by today's setting.
+    if (await consultations.speech_pipeline_of(cid))["pipeline"] == "nemotron":
+        await finalize_nemotron(cid, wav_path)
+        return
     await consultations.set_status(cid, "processing", audio_path=wav_path)
     try:
         await unload_medgemma()
@@ -826,3 +839,154 @@ async def regenerate_note(cid: int) -> None:
     """Re-draft after transcript corrections; keeps prior versions."""
     note = await draft_note(await consultations.get_turns(cid))
     await consultations.save_note(cid, note)
+
+
+# --- Task 13: the Nemotron live path -------------------------------------------
+#
+# With SPEECH_PIPELINE=nemotron the transcript and the speaker labels were
+# made live, by the separate worker, and stored line by line as they
+# arrived (app/live_segments.py). So at Stop nothing loads or unloads: the
+# CDS model stays in memory, WhisperX and pyannote are never imported, and
+# the final transcript is built from the stored lines through the SAME
+# steps as today — the silence invariant on raw segments, the merge, the
+# first-speaker rule, S4 on the original audio, the quality gate, the note.
+# It deliberately repeats finalize_consultation's later steps rather than
+# refactoring them, so that the whisper path is not touched at all.
+#
+# Owner decisions (Task 13 approval, 3 Oct 2026):
+# - "Who spoke?" keeps its question and its wait. "Only the patient" labels
+#   every line Patient (one cluster, as pyannote forced to one gives today);
+#   "Both of us" or Skip leaves the first-speaker rule on the diariser's
+#   speakers.
+# - Nemotron gives no confidence: turns carry NULL, S2 is not measured, and
+#   every transcript is FLAGGED (P2) — approval waits on the acknowledged
+#   banner.
+# - An engine failure during the consultation or at the Stop flush REFUSES
+#   (P1): no transcript is built from a partial flush. This holds even with
+#   the gate's break-glass switch off.
+
+
+def nemotron_raw_segments(lines: list[dict], *, one_voice: bool = False) -> list[dict]:
+    """Stored live lines in the shape the merge and the raw view read: one
+    pseudo-word per word, each carrying the line's speaker as a cluster
+    name like pyannote's, and NO score — Nemotron gives none, so nothing
+    downstream can mistake a default for a measurement."""
+    segments = []
+    for line in sorted(lines, key=lambda ln: (float(ln["start"]), ln.get("id", 0))):
+        cluster = "SPEAKER_00" if one_voice else f"SPEAKER_{int(line['speaker']):02d}"
+        segments.append({"start": float(line["start"]), "end": float(line["end"]),
+                         "text": line["text"],
+                         "words": [{"speaker": cluster} for _ in line["text"].split()]})
+    return segments
+
+
+def _read_wav(wav_path: str):
+    """The recording as mono 16 kHz float32, without WhisperX (which is not
+    loaded on this path). The app wrote it: 16 kHz, mono, 16-bit."""
+    import wave
+
+    import numpy as np
+
+    with wave.open(wav_path, "rb") as w:
+        if (w.getframerate(), w.getnchannels(), w.getsampwidth()) != (SAMPLE_RATE, 1, 2):
+            raise ValueError(f"unexpected WAV format in {wav_path}")
+        pcm = w.readframes(w.getnframes())
+    audio = np.frombuffer(pcm, dtype="<i2").astype(np.float32) / 32768.0
+    return audio, len(audio) / SAMPLE_RATE
+
+
+async def finalize_nemotron(cid: int, wav_path: str) -> None:
+    await consultations.set_status(cid, "processing", audio_path=wav_path)
+    try:
+        record = await consultations.speech_pipeline_of(cid)
+        failure = record["failure"]
+        spans = await system_utterances.exclusion_spans(cid)
+        audio, audio_duration_s = _read_wav(wav_path)
+        limits = check_exclusion_limits(spans_to_seconds(spans), audio_duration_s)
+        excluded_s = limits["spans"]
+        for anomaly in limits["anomalies"]:
+            await audit.log(None, "transcript.exclusion_anomaly", "consultation", cid,
+                            {**anomaly, "excluded_fraction": limits["fraction"]})
+        pipeline = {"engine": "nemotron", "confidence_measured": False, "failure": failure}
+
+        if failure:
+            # Never a transcript from a partial flush: no turns are built.
+            signals = transcript_quality.compute_signals(
+                [], audio_duration_s=audio_duration_s, excluded_spans_s=excluded_s,
+                speech_pipeline=pipeline)
+            verdict = transcript_quality.evaluate(signals)
+            fired = verdict["fired"] or [{"signal": "P1", "detail": failure}]
+            await consultations.save_quality(cid, signals, transcript_quality.OUTCOME_REFUSED)
+            await consultations.set_status(cid, transcript_quality.STATUS_UNRELIABLE)
+            await audit.log(None, "consultation.quality_refused", "consultation", cid,
+                            {"fired": fired,
+                             "summary": transcript_quality.refusal_summary(fired)})
+            logger.warning("Consultation %d refused: the Nemotron engine failed (%s)",
+                           cid, failure)
+            return
+
+        # "Who spoke?" — the question and its wait stay (owner decision).
+        bound = declaration_bound(cid)
+        why = await await_declaration(cid)
+        speakers = await consultations.speakers_for_diarisation(cid, DEFAULT_SPEAKERS)
+        lines = await live_segments.for_consultation(cid)
+        logger.info("Consultation %d: %d Nemotron line(s); declaration %s (bound %.0fs), "
+                    "%d speaker(s)", cid, len(lines), why, bound, speakers)
+
+        raw = nemotron_raw_segments(lines, one_voice=(speakers == 1))
+        kept, hallucinated = drop_segments_in_excluded_spans(raw, excluded_s)
+        raw_view = raw_segment_records(raw, hallucinated)
+        turns = merge_into_turns(kept)
+        for turn in turns:
+            turn.pop("weight", None)
+            turn["confidence"] = None            # not measured, never a default
+        trailing_speech = transcript_quality.measure_trailing_speech(
+            audio, SAMPLE_RATE, turns, audio_duration_s, excluded_spans_s=excluded_s)
+
+        if hallucinated:
+            logger.error("Consultation %d: %d Nemotron line(s) inside muted spans — "
+                         "dropped. This should not happen; see "
+                         "drop_segments_in_excluded_spans.", cid, len(hallucinated))
+            await audit.log(None, "transcript.silence_hallucination", "consultation", cid,
+                            {"dropped": len(hallucinated), "spans": len(excluded_s),
+                             "segments": [{"start": t.get("start"), "end": t.get("end"),
+                                           "text": (t.get("text") or "")[:200]}
+                                          for t in hallucinated[:10]]})
+
+        turns, single_voice = attribute_roles(turns)
+        for i, turn in enumerate(turns):
+            turn["idx"] = i
+        await consultations.save_turns(cid, turns)
+        await raw_segments_store.save(cid, raw_view)
+        if single_voice:
+            await consultations.set_single_voice(cid)
+            await audit.log(None, "transcript.single_voice", "consultation", cid,
+                            {"turns": len(turns)})
+
+        signals = transcript_quality.compute_signals(
+            turns, audio_duration_s=audio_duration_s, excluded_spans_s=excluded_s,
+            trailing_speech=trailing_speech, speech_pipeline=pipeline)
+        verdict = transcript_quality.evaluate(signals)
+        await consultations.save_quality(cid, signals, verdict["outcome"])
+        if verdict["outcome"] == transcript_quality.OUTCOME_REFUSED:
+            await consultations.set_status(cid, transcript_quality.STATUS_UNRELIABLE)
+            await audit.log(None, "consultation.quality_refused", "consultation", cid,
+                            {"fired": verdict["fired"],
+                             "summary": transcript_quality.refusal_summary(verdict["fired"])})
+            logger.warning("Consultation %d refused by the transcript-quality gate: %s",
+                           cid, transcript_quality.refusal_summary(verdict["fired"]))
+            return
+        if verdict["outcome"] == transcript_quality.OUTCOME_FLAGGED:
+            await audit.log(None, "consultation.quality_flagged", "consultation", cid,
+                            {"flags": verdict["flags"],
+                             "summary": transcript_quality.refusal_summary(verdict["flags"])})
+
+        note = await draft_note(await consultations.get_turns(cid))
+        await consultations.save_note(cid, note)
+        await consultations.set_status(cid, "awaiting_review")
+        logger.info("Consultation %d ready for review (Nemotron path, no model swap)", cid)
+    except Exception as exc:
+        logger.exception("Finalisation failed for consultation %d", cid)
+        await consultations.set_status(cid, "failed", error=str(exc))
+        await audit.log(None, "finalisation.failed", "consultation", cid,
+                        {"error": str(exc)[:300]})

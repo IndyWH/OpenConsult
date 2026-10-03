@@ -529,10 +529,14 @@ function renderTranscript() {
 
 function renderTurn(t) {
   {
+    // null = not measured (the Nemotron pipeline, Task 13): no low-confidence
+    // mark — JavaScript would read null < 0.6 as true — and the transcript's
+    // own amber notice says confidence was not checked.
+    const lowconf = t.confidence != null && t.confidence < 0.6;
     const div = el('div', 'turn ' + (t.role === 'Doctor' ? 'doctor' : 'patient') +
-                          (t.confidence < 0.6 ? ' lowconf' : ''));
+                          (lowconf ? ' lowconf' : ''));
     div.id = 'turn-' + t.idx;
-    if (t.confidence < 0.6) div.title = `ASR confidence ${t.confidence.toFixed(2)} on this turn`;
+    if (lowconf) div.title = `ASR confidence ${t.confidence.toFixed(2)} on this turn`;
     div.appendChild(el('span', 'n', String(t.idx)));
     // PER-TURN ROLE CORRECTION (2026-07-28). The answer to a split speaker
     // cluster, which Swap Doctor/Patient cannot fix — swapping a split makes
@@ -909,6 +913,10 @@ function renderQualityBanner() {
   if (trunc.gap_s != null && trunc.gap_s > trunc.refuse_above_s)
     reasons.push(`${trunc.gap_s.toFixed(1)}s of audio after the last transcribed` +
                  ` segment (tolerance ${trunc.refuse_above_s}s)`);
+  const pipeline = (signals.speech_pipeline || {});        // Task 13
+  if (pipeline.failure)
+    reasons.push(`the ${pipeline.engine || 'live'} speech engine failed during the` +
+                 ` consultation (${pipeline.failure}), so the transcript is incomplete`);
   const ul = document.createElement('ul');
   for (const r of reasons) ul.appendChild(el('li', null, r));
   box.appendChild(ul);
@@ -947,6 +955,11 @@ function renderQualityFlagBanner(banner) {
       && trunc.gap_s > trunc.flag_above_s)
     reasons.push(`${trunc.gap_s.toFixed(1)}s of audio after the last transcribed` +
                  ` segment was not transcribed (flagged above ${trunc.flag_above_s}s)`);
+  const pipe = (signals.speech_pipeline || {});            // Task 13
+  if (pipe.confidence_measured === false && !pipe.failure)
+    reasons.push(`speech-recognition confidence was not checked: the ${pipe.engine || 'live'}` +
+                 ' speech engine gives no confidence score, so low-confidence passages' +
+                 ' are not marked');
   const rep = (signals.s3_repetition || {});
   if (rep.max_within_segment_share_floored != null && rep.flag_above_floored != null
       && rep.max_within_segment_share_floored > rep.flag_above_floored)

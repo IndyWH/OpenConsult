@@ -184,6 +184,10 @@ def s2_weighted_confidence(turns: list[dict]) -> float | None:
     garbled stretch is not cancelled by a short clean one."""
     total = weight = 0.0
     for turn in turns:
+        if turn.get("confidence", 0) is None:
+            # Not measured (the Nemotron pipeline gives no confidence, Task
+            # 13): absent from the mean, never counted as 0 or as 1.
+            continue
         duration = max(0.0, float(turn.get("end", 0)) - float(turn.get("start", 0)))
         total += float(turn.get("confidence", 0)) * duration
         weight += duration
@@ -456,7 +460,8 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
                     language_probability: float | None = None,
                     excluded_spans_s: list[tuple[float, float]] | None = None,
                     trailing_speech: dict | None = None,
-                    language_windows: dict | None = None) -> dict:
+                    language_windows: dict | None = None,
+                    speech_pipeline: dict | None = None) -> dict:
     """All four signals. Always computed, always stored (spec §3, §7).
 
     `excluded_spans_s` are the Phase 7a speaking windows in seconds. Only
@@ -503,6 +508,11 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
             "acts": True,
         },
         "segments": len(turns),
+        # Task 13: present only on the Nemotron live path —
+        # {"engine", "confidence_measured": False, "failure": str | None}.
+        # A failure refuses (P1); unmeasured confidence flags (P2).
+        **({"speech_pipeline": {**speech_pipeline, "acts": True}}
+           if speech_pipeline is not None else {}),
     }
 
 
@@ -573,6 +583,21 @@ def evaluate(signals: dict) -> dict:
                        f"{TRUNCATION_REFUSE_S:.0f}s"),
         })
 
+    # Task 13: the Nemotron live engine failed during the consultation or at
+    # its Stop flush. The transcript is incomplete by construction, so it
+    # refuses whatever the other signals say (no fallback, no partial flush).
+    pipeline = signals.get("speech_pipeline") or {}
+    if pipeline.get("failure"):
+        fired.append({
+            "signal": "P1",
+            "name": "live speech engine failed",
+            "value": None,
+            "threshold": None,
+            "detail": (f"the {pipeline.get('engine', 'live')} speech engine failed during "
+                       f"this consultation ({pipeline['failure']}); the transcript is "
+                       f"incomplete and no note may be drafted from it"),
+        })
+
     # The FLAG tier (spec §11), evaluated only when nothing refused: a
     # refusal already blocks harder than a flag could, and stacking an
     # acknowledgement on top of "no note exists" would gate nothing.
@@ -603,6 +628,19 @@ def evaluate(signals: dict) -> dict:
                 "detail": (f"{gap:.1f}s of audio after the last transcribed "
                            f"segment{measured}; flagged above "
                            f"{TRUNCATION_FLAG_S:.0f}s"),
+            })
+        # Task 13 (owner decision at approval): Nemotron gives no confidence,
+        # so S2 could not be made. Every such transcript is flagged, and its
+        # approval waits on the acknowledged banner, as for any flag.
+        if pipeline and pipeline.get("confidence_measured") is False:
+            flags.append({
+                "signal": "P2",
+                "name": "speech-recognition confidence not checked",
+                "value": None,
+                "threshold": None,
+                "detail": (f"the {pipeline.get('engine', 'live')} speech engine gives no "
+                           f"confidence score, so the average-confidence check (S2) "
+                           f"was not made"),
             })
         # S3, flag tier only (owner decision 2026-07-30, from the
         # measured corridor: #70 at 0.727 vs <= 0.333 everywhere else).

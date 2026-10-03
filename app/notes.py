@@ -135,7 +135,10 @@ def validate_and_gate(note: dict, turns: list[dict]) -> dict:
             claim["flagged"] = bool(
                 valid
                 and _LOAD_BEARING.search(claim["text"])
-                and any(by_idx[n]["confidence"] < LOW_CONFIDENCE for n in valid)
+                # None = not measured (Nemotron, Task 13): no per-claim mark;
+                # the whole transcript carries the "confidence not checked" flag.
+                and any(by_idx[n]["confidence"] is not None
+                        and by_idx[n]["confidence"] < LOW_CONFIDENCE for n in valid)
             )
 
     if total == 0 or cited / total < MIN_CITED_FRACTION:

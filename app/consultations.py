@@ -111,6 +111,18 @@ CREATE TABLE IF NOT EXISTS note (
     approved_at timestamptz,
     approved_text text           -- the doctor-edited plain text, on approval
 );
+-- Task 13 (v1.1): which live speech pipeline recorded the consultation, set
+-- at Stop from the SESSION (not the current setting), so finalisation
+-- follows the pipeline that actually produced the lines. NULL = whisper,
+-- today's path, including every consultation before this column existed.
+-- speech_failure: the Nemotron engine failed during the consultation or at
+-- its Stop flush; finalisation refuses the transcript and says why.
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS speech_pipeline text;
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS speech_failure text;
+-- Nemotron gives no confidence, so its turns carry NULL: "not measured",
+-- never a made-up number (owner, Task 13: S2 is recorded as not measured
+-- and the transcript is flagged). Whisper turns always carry a value.
+ALTER TABLE transcript_turn ALTER COLUMN confidence DROP NOT NULL;
 """
 
 
@@ -209,6 +221,24 @@ async def queued_finalisations() -> list[tuple[int, str]]:
             )
         ).fetchall()
     return [(r[0], r[1]) for r in rows]
+
+
+async def set_speech_pipeline(cid: int, pipeline: str, failure: str | None) -> None:
+    """Task 13: the live pipeline that recorded this consultation, and the
+    engine failure if there was one (finalisation refuses on it)."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET speech_pipeline = %s, speech_failure = %s WHERE id = %s",
+            (pipeline, failure, cid))
+
+
+async def speech_pipeline_of(cid: int) -> dict:
+    async with await _conn() as conn:
+        row = await (await conn.execute(
+            "SELECT speech_pipeline, speech_failure FROM consultation WHERE id = %s",
+            (cid,))).fetchone()
+    return {"pipeline": (row[0] if row else None) or "whisper",
+            "failure": row[1] if row else None}
 
 
 async def set_connection_lost(cid: int) -> None:
