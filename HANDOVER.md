@@ -8316,6 +8316,8 @@ unchanged in e29f1ed. It clears two help flags:
   diagram sends them to both the assessment and the urgency officer.
   `help/02` Step 1 now asks for name, age and sex in the walk-in box.
 
-**Still for the owner:** `help/02` Step 3's "the differential revises
-itself as evidence arrives" is unchanged. The 30 Sep entry flagged it as
-possibly still true. Whether it stays is the owner's judgement.
+**Owner decision, 3 Oct 2026:** `help/02` Step 3's "the differential
+revises itself as evidence arrives" stays. The 30 Sep entry flagged it as
+possibly still true, and it is: the list on screen changes as the
+transcript grows. "Revises" there describes the screen, not the old
+keep-the-names rule. No help flag from 30 Sep or Task 5 is left open.
