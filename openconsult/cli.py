@@ -17,11 +17,15 @@ from openconsult.db import NewerDatabase, open_database
 from openconsult.patients.audit import Audit
 from openconsult.patients.users import MIN_PASSWORD, Users, password_problem
 from openconsult.settings import store
+from openconsult.settings.machine import Machine
 from openconsult.settings.store import LISTEN_ON
 
 
 def main(argv: list[str] | None = None, say: Callable = print,
-         ask: Callable = getpass.getpass, serve: Callable | None = None) -> int:
+         ask: Callable = getpass.getpass, serve: Callable | None = None,
+         machine: Machine | None = None) -> int:
+    """say, ask, serve and machine are passed in so tests run the command
+    with no terminal and the same result on every machine."""
     parser = argparse.ArgumentParser(prog="openconsult")
     parser.add_argument("command", nargs="?", choices=["run", "reset-password"], default="run")
     parser.add_argument("--data-folder", type=Path, help="where the data lives, for a development run")
@@ -29,10 +33,11 @@ def main(argv: list[str] | None = None, say: Callable = print,
     args = parser.parse_args(argv)
     if args.command == "reset-password":
         return reset_password(args.data_folder, say=say, ask=ask)
-    return run(args.data_folder, args.port, say=say, serve=serve or _serve)
+    return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine)
 
 
-def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callable) -> int:
+def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callable,
+        machine: Machine | None = None) -> int:
     settings = store.build(data_folder, port)
     # A taken port is said in plain words, and the app stops. It never
     # moves to another port by itself (spec 15.6; V1_LESSONS 7.6).
@@ -40,7 +45,7 @@ def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callab
         say(words.PORT_TAKEN.format(port=settings.port))
         return 1
     try:
-        app = build_app(settings)
+        app = build_app(settings, machine=machine)
     except NewerDatabase:
         say(words.NEWER_DATABASE)
         return 1

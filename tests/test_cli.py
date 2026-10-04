@@ -43,18 +43,18 @@ def test_7_6_a_taken_port_is_said_in_plain_words_and_the_app_stops(tmp_path):
     assert not (tmp_path / "openconsult.db").exists()
 
 
-def test_ruling_6_the_command_gives_no_way_to_listen_beyond_this_computer(tmp_path):
+def test_ruling_6_the_command_gives_no_way_to_listen_beyond_this_computer(tmp_path, machine):
     served = {}
 
     def serve(app, host, port):
         served.update(host=host, port=port)
 
     said = Said()
-    assert main(["--data-folder", str(tmp_path), "--port", "0"], say=said, serve=serve) == 0
+    assert main(["--data-folder", str(tmp_path), "--port", "0"], say=said, serve=serve, machine=machine) == 0
     assert served["host"] == "127.0.0.1"
     assert words.RUNNING.format(address="http://127.0.0.1:0") in said.text
     with pytest.raises(SystemExit):
-        main(["--host", "0.0.0.0", "--data-folder", str(tmp_path)], say=said, serve=serve)
+        main(["--host", "0.0.0.0", "--data-folder", str(tmp_path)], say=said, serve=serve, machine=machine)
 
 
 def answers(*replies):
