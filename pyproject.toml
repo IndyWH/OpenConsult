@@ -13,6 +13,7 @@ dependencies = [
 
 [project.scripts]
 openconsult = "openconsult.cli:main"
+openconsult-bench = "openconsult.bench.cli:main"
 
 [dependency-groups]
 dev = [

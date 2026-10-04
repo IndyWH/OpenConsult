@@ -275,3 +275,18 @@ def as_markdown(scored: dict) -> str:
     counts = Counter(s["alarm"] for s in scored["per_chain"].values())
     lines.append(f"Distinct alarm strings: {len(counts)}.")
     return "\n".join(lines) + "\n"
+
+
+def call_times(rows: list[dict]) -> dict:
+    """Per job, over the bench's own record: medians of wall, read and
+    write time and of the tokens, and the outcomes (V1_LESSONS 9.7)."""
+    out = {}
+    for job in sorted({r["job"] for r in rows}):
+        mine = [r for r in rows if r["job"] == job]
+        out[job] = {"calls": len(mine), "outcomes": dict(Counter(r["outcome"] for r in mine)),
+                    "wall_ms": med([r["wall_ms"] for r in mine]), "wall_ms_max": max(r["wall_ms"] for r in mine),
+                    "read_ms": med([r["read_ms"] for r in mine]), "write_ms": med([r["write_ms"] for r in mine]),
+                    "prompt_tokens": med([r["prompt_tokens"] for r in mine]),
+                    "output_tokens": med([r["output_tokens"] for r in mine]),
+                    "output_tokens_max": max((r["output_tokens"] or 0) for r in mine)}
+    return out
