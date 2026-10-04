@@ -1,0 +1,7 @@
+We have more information.
+
+This is a stale list of possibilities, made from an earlier, shorter transcript:
+{stale}
+
+Here is the updated transcript of the consultation so far:
+{transcript}

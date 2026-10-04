@@ -1,0 +1,2 @@
+Here is the transcript of the consultation so far:
+{transcript}

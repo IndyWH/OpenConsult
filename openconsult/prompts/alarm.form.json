@@ -1,0 +1,39 @@
+{
+  "type": "object",
+  "properties": {
+    "reasoning": {
+      "type": "string"
+    },
+    "time_critical_possible": {
+      "type": "boolean"
+    },
+    "already_done_or_arranged": {
+      "type": "boolean"
+    },
+    "urgent_actions": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "action",
+          "reason"
+        ]
+      }
+    }
+  },
+  "required": [
+    "reasoning",
+    "time_critical_possible",
+    "already_done_or_arranged",
+    "urgent_actions"
+  ]
+}

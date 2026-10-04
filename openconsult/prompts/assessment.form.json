@@ -1,0 +1,56 @@
+{
+  "type": "object",
+  "properties": {
+    "reasoning": {
+      "type": "string"
+    },
+    "differentials": {
+      "type": "array",
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "properties": {
+          "condition": {
+            "type": "string"
+          },
+          "likelihood": {
+            "type": "string",
+            "enum": [
+              "high",
+              "moderate",
+              "low"
+            ]
+          },
+          "rationale": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "condition",
+          "likelihood",
+          "rationale"
+        ]
+      }
+    },
+    "questions_to_ask": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "string"
+      }
+    },
+    "signs_to_check": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "reasoning",
+    "differentials",
+    "questions_to_ask",
+    "signs_to_check"
+  ]
+}
