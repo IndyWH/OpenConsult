@@ -38,6 +38,7 @@ Think from the patient's side. In teaching mode, from the learner's side.
    incident it pins. Then stop and wait for the owner to type: Approved. Go.
 5. Build. The suite is green before each commit. One logical change in each
    commit. The why goes in the commit message.
+   Each commit ends with the co-author line your stage prompt gives.
 6. Add a HANDOVER.md entry. Say which document your work has made untrue.
 7. Never push. Never start, stop or restart a service. No sudo. The owner
    does these himself.
@@ -75,9 +76,18 @@ Think from the patient's side. In teaching mode, from the learner's side.
   unless asked.
 - A comment says why, in one or two lines. History goes in HANDOVER.md,
   never in the code.
-- The repo root holds README.md, CLAUDE.md, V2_SPEC.md, V1_LESSONS.md,
-  HANDOVER.md, LICENSE and NOTICE. Nothing else.
+- The only documents at the repo root are README.md, CLAUDE.md, V2_SPEC.md,
+  V1_LESSONS.md, HANDOVER.md, LICENSE and NOTICE. Add no other document
+  there. Code, tests and their set-up files are not documents.
 
 ## Running it
 
-Nothing runs yet. Stage 2 writes this section.
+    uv sync                                            # once, from the lock file
+    uv run openconsult                                 # start, on port 8001
+    uv run openconsult --data-folder DIR --port 8765   # a development run
+    uv run openconsult reset-password [--data-folder DIR]
+    uv run pytest                                      # the suite
+    uv run python .github/scripts/start_check.py       # start, answer, stop
+
+Data folder: Linux $XDG_DATA_HOME/openconsult or ~/.local/share/openconsult;
+macOS ~/Library/Application Support/OpenConsult; Windows %LOCALAPPDATA%\OpenConsult.
