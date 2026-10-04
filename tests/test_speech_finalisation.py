@@ -773,3 +773,33 @@ def test_the_phrase_scan_detects_a_deliberate_re_entry():
     final = asyncio.run(consultations.get_turns(cid))
 
     assert _pinned_phrases_in(final) == ["disclosure"]
+
+
+# --- the final pass has no initial prompt (Task 19 item 1) -------------------
+
+def test_the_final_pass_gives_whisperx_no_initial_prompt(tmp_path, monkeypatch):
+    """Task 18: the clinical prompt made WhisperX's batched, no-timestamp
+    decoding skip the opening of some 30 s pieces — safety nets among the
+    losses. The final pass must load Whisper without it. WhisperX is faked;
+    the call is stopped at load_model, which is where the prompt went."""
+    import sys
+    import types
+
+    seen: dict = {}
+
+    class Loaded(Exception):
+        pass
+
+    def load_model(*args, **kwargs):
+        seen.update(kwargs)
+        raise Loaded
+
+    fake = types.SimpleNamespace(
+        load_audio=lambda path: np.zeros(SAMPLE_RATE * 2, dtype=np.float32),
+        load_model=load_model)
+    monkeypatch.setitem(sys.modules, "whisperx", fake)
+    with pytest.raises(Loaded):
+        finalize.transcribe_and_diarise(str(tmp_path / "unused.wav"))
+
+    assert seen, "the attack must reach load_model"
+    assert (seen.get("asr_options") or {}).get("initial_prompt") is None

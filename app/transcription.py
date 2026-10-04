@@ -54,9 +54,9 @@ class Segment:
 
 # Biases recognition toward clinical vocabulary. Whisper reads this as
 # "text that came just before the audio", so phrasing it as a transcript
-# description steers word choice without inventing content. Shared by the
-# live path and the WhisperX finalisation pass (the 2026-07-17 recordings
-# deviation report measured the cost of its absence in the final pass).
+# description steers word choice without inventing content. Live path
+# only: the WhisperX finalisation pass used it from 17 Jul to 4 Oct 2026
+# and it made that pass skip speech (Task 18), so it was taken out there.
 CLINICAL_INITIAL_PROMPT = os.getenv(
     "WHISPER_INITIAL_PROMPT",
     "A general practice consultation between a doctor and a patient, "

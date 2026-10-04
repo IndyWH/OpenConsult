@@ -427,16 +427,17 @@ def transcribe_and_diarise(wav_path: str,
     started = time.perf_counter()
     # Silero VAD: whisperx's default pyannote VAD checkpoint is incompatible
     # with the pinned pyannote 3.4 (see pyproject override note).
-    # Same clinical initial prompt as the live path: the 2026-07-17
-    # recordings deviation report measured the cost of its absence here —
-    # drug names failed at nearly every mention in the final pass
-    # (gliclazide 0/3, salbutamol, losartan) while the prompted live path
-    # was built precisely against that class of error.
-    from app.transcription import CLINICAL_INITIAL_PROMPT
-
+    #
+    # NO initial prompt here (Task 19, owner's option A, 4 Oct 2026). The
+    # clinical prompt the live path uses was added to this pass on 17 Jul
+    # (a4d385c) for drug names, and it deleted speech: with WhisperX's
+    # batched, no-timestamp decoding it made Whisper skip the opening
+    # seconds of some 30 s pieces. 12 gaps of 5 s or more in 10 stored
+    # consultations, safety nets among them (Task 18). Without it the drug
+    # names are worse (gliclazide 0/3 again); the gap check at Stop is
+    # what makes a loss visible, whatever its cause.
     model = whisperx.load_model(
         WHISPERX_MODEL, device, compute_type=compute, vad_method="silero",
-        asr_options={"initial_prompt": CLINICAL_INITIAL_PROMPT},
     )
     # S1 for the transcript-quality gate, taken here because the model is
     # already loaded, BEFORE the forced-English transcribe below. Since
