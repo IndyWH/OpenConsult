@@ -2,10 +2,10 @@
 
 A change to the tables is a new version here, never an edit of an old
 one, so an existing data folder is brought forward step by step.
-Stage 2 makes only the tables it uses (spec 15.6).
+Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 1
+VERSION = 2
 
 MIGRATIONS = {
     1: """
@@ -48,6 +48,33 @@ END;
 CREATE TABLE first_run (
     step TEXT PRIMARY KEY,
     done_at TEXT NOT NULL
+);
+""",
+    # The record of every model call (spec 15.7; 6.5; V1_LESSONS 3.12,
+    # 3.13). Written by the door itself, so no call can skip it. It holds
+    # what the patient said, so it lives in the data folder only. Stage 6
+    # ties each row to its consultation.
+    2: """
+CREATE TABLE model_call (
+    id INTEGER PRIMARY KEY,
+    at TEXT NOT NULL,
+    job TEXT NOT NULL,
+    engine TEXT NOT NULL,
+    engine_version TEXT,
+    model_tag TEXT NOT NULL,
+    model_digest TEXT,
+    prompt_sha256 TEXT NOT NULL,
+    request TEXT NOT NULL,
+    reply TEXT,
+    prompt_tokens INTEGER,
+    output_tokens INTEGER,
+    wall_ms INTEGER NOT NULL,
+    total_ms INTEGER,
+    load_ms INTEGER,
+    read_ms INTEGER,
+    write_ms INTEGER,
+    outcome TEXT NOT NULL,
+    detail TEXT
 );
 """,
 }
