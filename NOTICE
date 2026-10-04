@@ -5,10 +5,44 @@ OpenConsult is a research and education prototype. It is not a medical device.
 
 The project's own code is licensed AGPL-3.0-or-later (see LICENSE).
 
-This branch holds no third-party component yet. Each stage that adds one
-records it here, in the same commit: the component, where it comes from,
-its version, its licence, and how it relates to this code (bundled, linked,
-or run as a separate process).
+Each stage that adds a component records it here, in the same commit: the
+component, where it comes from, its version, its licence, and how it
+relates to this code (bundled, linked, or run as a separate process).
+Versions are the ones in uv.lock at the time of the entry.
+
+Stage 2, 4 Oct 2026. Libraries the app imports (linked at run time):
+
+  fastapi 0.142.2            MIT              https://pypi.org/project/fastapi/
+    starlette 1.7.0          BSD-3-Clause     https://pypi.org/project/starlette/
+    pydantic 2.13.5          MIT              https://pypi.org/project/pydantic/
+    pydantic-core 2.46.5     MIT              https://pypi.org/project/pydantic-core/
+    annotated-types 0.8.0    MIT              https://pypi.org/project/annotated-types/
+    annotated-doc 0.0.5      MIT              https://pypi.org/project/annotated-doc/
+    typing-inspection 0.4.4  MIT              https://pypi.org/project/typing-inspection/
+    typing-extensions 4.16.0 PSF-2.0          https://pypi.org/project/typing-extensions/
+    opentelemetry-api 1.45.0 Apache-2.0       https://pypi.org/project/opentelemetry-api/
+    anyio 4.15.1             MIT              https://pypi.org/project/anyio/
+    idna 3.20                BSD-3-Clause     https://pypi.org/project/idna/
+  uvicorn 0.54.0             BSD-3-Clause     https://pypi.org/project/uvicorn/
+    click 8.5.0              BSD-3-Clause     https://pypi.org/project/click/
+    h11 0.16.0               MIT              https://pypi.org/project/h11/
+  jinja2 3.1.6               BSD-3-Clause     https://pypi.org/project/Jinja2/
+    markupsafe 3.0.4         BSD-3-Clause     https://pypi.org/project/MarkupSafe/
+
+Stage 2. Used only to build the package and to run the tests, never by
+the app:
+
+  uv_build (>=0.12,<0.13)    MIT OR Apache-2.0  https://pypi.org/project/uv-build/
+    The build backend. It is not in the lock file; the range is in pyproject.toml.
+  pytest 9.1.1               MIT              https://pypi.org/project/pytest/
+    iniconfig 2.3.0          MIT              https://pypi.org/project/iniconfig/
+    packaging 26.3           Apache-2.0 OR BSD-2-Clause  https://pypi.org/project/packaging/
+    pluggy 1.6.0             MIT              https://pypi.org/project/pluggy/
+    pygments 2.21.0          BSD-2-Clause     https://pypi.org/project/Pygments/
+    colorama 0.4.6           BSD-3-Clause     https://pypi.org/project/colorama/ (Windows only)
+  httpx2 2.13.1              BSD-3-Clause     https://pypi.org/project/httpx2/
+    httpcore2 2.13.1         BSD-3-Clause     https://pypi.org/project/httpcore2/
+    truststore 0.10.4        MIT              https://pypi.org/project/truststore/
 
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
