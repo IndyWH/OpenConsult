@@ -4,10 +4,14 @@
 <p class="refusal" id="{{ control }}-refusal" role="alert">{% if refused and refused.control == control %}{{ refused.message }}{% endif %}</p>
 {%- endmacro %}
 
-{% macro machine_rows(machine) -%}
+{% macro machine_rows(machine, models=None) -%}
 <table class="plain facts">
   <tr><th>{{ words.ROW_SYSTEM }}</th><td>{{ machine.system }}</td></tr>
   <tr><th>{{ words.ROW_CARD }}</th><td>{{ machine.card_line }}</td></tr>
+  {% if models %}
+  <tr><th>{{ words.ROW_OLLAMA }}</th><td>{{ models.ollama }}</td></tr>
+  <tr><th>{{ words.ROW_MODEL }}</th><td>{{ models.model }}</td></tr>
+  {% endif %}
 </table>
 <p class="sentence">{{ machine.sentence }}</p>
 {%- endmacro %}

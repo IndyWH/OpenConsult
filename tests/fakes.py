@@ -42,6 +42,7 @@ class FakeEngine:
     def __init__(self, script=None, version="0.0-made-up", digest="made-up-digest", present=True):
         self.script = list(script) if script is not None else None
         self.calls: list[Call] = []
+        self.status_calls = 0
         self._version, self._digest, self._present = version, digest, present
 
     def chat(self, call: Call) -> Reply:
@@ -74,6 +75,7 @@ class FakeEngine:
         return self._digest if self._present else None
 
     def status(self, tag: str, timeout_s: float = 2.0) -> EngineStatus:
+        self.status_calls += 1
         if self._version is None:
             return EngineStatus(False, None, None, None)
         return EngineStatus(True, self._version, self._present, self._digest if self._present else None)

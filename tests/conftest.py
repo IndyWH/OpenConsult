@@ -20,6 +20,7 @@ from openconsult import browser as browser_module
 from openconsult.app import build_app
 from openconsult.settings import paths, store
 from openconsult.settings.machine import Card, describe
+from tests.fakes import FakeEngine
 
 pytest_plugins = ["pytester", "tests.noskip"]
 
@@ -89,8 +90,13 @@ def machine():
 
 
 @pytest.fixture
-def app(tmp_path, clock, machine):
-    return build_app(store.build(tmp_path, PORT), machine=machine, clock=clock)
+def engine():
+    return FakeEngine()
+
+
+@pytest.fixture
+def app(tmp_path, clock, machine, engine):
+    return build_app(store.build(tmp_path, PORT), machine=machine, clock=clock, engine=engine)
 
 
 def browser(app, address="127.0.0.1", origin=ORIGIN):

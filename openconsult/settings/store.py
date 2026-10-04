@@ -1,7 +1,7 @@
 """The one settings store (spec 5.1, 15.6). No other code reads a setting
 directly. It is built fresh at each start and for each test.
 
-Stage 2 has only the two values its behaviour uses, both fixed when the
+Stage 3 has only the three values its behaviour uses, all fixed when the
 app starts. A setting a page can change, with its audited from-and-to,
 arrives with the first stage that has one (plan review, a).
 """
@@ -41,6 +41,12 @@ SETTINGS = (
         8001,
         "8001 when run from source, beside v1 on 8000 (spec 14.1).",
     ),
+    Setting(
+        "engine_address",
+        "http://127.0.0.1:11434",
+        "Where Ollama answers on this computer, the same on every system (spec 3.4, 15.7). "
+        "Fixed when the app starts; the engine choice is a question for stage 3b.",
+    ),
 )
 
 _DEFAULTS = {setting.name: setting.default for setting in SETTINGS}
@@ -50,6 +56,7 @@ _DEFAULTS = {setting.name: setting.default for setting in SETTINGS}
 class Settings:
     data_folder: Path
     port: int
+    engine_address: str
 
     @property
     def database_path(self) -> Path:
@@ -64,4 +71,5 @@ def build(data_folder: Path | str | None = None, port: int | None = None) -> Set
     """A fresh store. Only the real default data folder is looked up, and
     only when no folder is given."""
     folder = Path(data_folder) if data_folder is not None else paths.default_data_folder()
-    return Settings(data_folder=folder, port=port if port is not None else _DEFAULTS["port"])
+    return Settings(data_folder=folder, port=port if port is not None else _DEFAULTS["port"],
+                    engine_address=_DEFAULTS["engine_address"])

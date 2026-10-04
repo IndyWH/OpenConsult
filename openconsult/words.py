@@ -26,6 +26,15 @@ MACHINE = {
     "unreadable": "The NVIDIA graphics card could not be read. OpenConsult will use cloud models on this computer.",
 }
 CARD_LINE = "{name}, {gb} GB"
+# The two local-model lines, shown only on a machine with a suitable card
+# (plan review of stage 3, change 2). Drafts for the owner.
+ROW_OLLAMA = "Ollama"
+ROW_MODEL = "Local model"
+OLLAMA_RUNNING = "Running, version {version}"
+OLLAMA_NOT_RUNNING = "Not running"
+MODEL_PRESENT = "Gemma 4 QAT is present."
+MODEL_ABSENT = "Gemma 4 QAT is not present."
+MODEL_UNKNOWN = "Not known, because Ollama is not running."
 CARD_NONE = "None found"
 CARD_UNREADABLE = "Could not be read"
 
@@ -37,8 +46,8 @@ NAV_LOG = "Log"
 NAV_LOGOUT = "Log out"
 HOME_TITLE = "Home"
 HOME_SO_FAR = (
-    "So far this version starts, sets up its one user, and describes the machine it runs on. "
-    "It cannot run a consultation yet."
+    "So far this version starts, sets up its one user, describes the machine it runs on, "
+    "and can reach the local language model. It cannot run a consultation yet."
 )
 
 # The first run.
