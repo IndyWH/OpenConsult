@@ -25,7 +25,9 @@ DB-dependent tests self-skip exactly as before.
 
 import os
 import secrets
+import shutil
 import subprocess
+import tempfile
 import urllib.parse
 
 import psycopg
@@ -64,6 +66,21 @@ os.environ["SECRET_KEY"] = secrets.token_hex(32)
 # the machine opts in with monkeypatch.setattr(appmain, "AUTO_MODE_ENABLED",
 # True) (tests/auto_harness.py's gate fixture does).
 os.environ["AUTO_MODE_ENABLED"] = "false"
+
+# The suite must never write into the owner's recordings (Task 16,
+# 2026-10-04). app/main.py (and scripts/manage_consultations.py,
+# scripts/reset_demo.py) bind RECORDINGS_DIR at import, and .env names the
+# real data/recordings. Until now each test had to opt out with its own
+# monkeypatch; tests/test_live.py never did, so every run wrote the 11 s
+# JFK fixture over consultation_<cid>.wav — and since the suite moved to a
+# fresh test database (2026-07-24), whose consultation ids restart at 1,
+# that cid was a LIVE consultation's number. Consultations 68 and 161 lost
+# their audio that way. Set — not setdefault — after load_dotenv(), for the
+# whole session, so no test, present or future, can reach the real folder
+# by forgetting; the per-test monkeypatches stay and still give each test
+# its own directory. Removed at session end (fixture below).
+_RECORDINGS_TMP = tempfile.mkdtemp(prefix="consultation_ai_test_recordings_")
+os.environ["RECORDINGS_DIR"] = _RECORDINGS_TMP
 
 TEST_DB_NAME = "consultation_ai_test"
 
@@ -207,3 +224,10 @@ def test_database():
             conn.execute(f"DROP DATABASE IF EXISTS {TEST_DB_NAME} WITH (FORCE)")
     except Exception as exc:  # leaving the test DB behind is harmless
         print(f"\n[conftest] could not drop {TEST_DB_NAME}: {exc}")
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _recordings_tmp_dir():
+    """Removes the session's recordings directory (see RECORDINGS_DIR above)."""
+    yield
+    shutil.rmtree(_RECORDINGS_TMP, ignore_errors=True)

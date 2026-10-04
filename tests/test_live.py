@@ -6,6 +6,7 @@ slow part of the suite (a few seconds on GPU).
 """
 
 import json
+import os
 import secrets
 import struct
 import wave
@@ -57,8 +58,19 @@ def test_websocket_streaming_transcription():
                 if msg["type"] == "final":
                     finals.append(msg["text"])
                 elif msg["type"] == "done":
+                    cid = msg["consultation_id"]
                     break
 
     transcript = " ".join(finals).lower()
     assert "ask not what your country can do for you" in transcript
     assert "what you can do for your country" in transcript
+
+    # Task 16: Stop saved the recording, and saved it in the suite's
+    # temporary directory (tests/conftest.py), not the owner's
+    # data/recordings — this test overwrote 83 files there before.
+    tmp_recordings = Path(os.environ["RECORDINGS_DIR"]).resolve()
+    repo_recordings = (Path(__file__).parent.parent / "data" / "recordings").resolve()
+    assert tmp_recordings != repo_recordings
+    saved = tmp_recordings / f"consultation_{cid}.wav"
+    with wave.open(str(saved)) as w:
+        assert abs(w.getnframes() / w.getframerate() - len(pcm) / 2 / 16000) < 0.01
