@@ -97,10 +97,14 @@ works out who said what (the doctor *declares* how many voices were in the
 room — measurement proved less reliable than asking), and drafts the note.
 
 Before any note is drafted, **quality gates** read the transcript first. A
-transcript with badly low confidence or missing speech is *refused* — no
-note at all, because a fluent note over a broken transcript is the most
-dangerous artifact this system can produce. Lesser concerns flag an amber
-banner the doctor must acknowledge before approving.
+transcript with badly low confidence, or with speech left untranscribed at
+the end of the recording, is *refused* — no note at all, because a fluent
+note over a broken transcript is the most dangerous artifact this system
+can produce. Lesser concerns flag an amber banner the doctor must
+acknowledge before approving. One of them is a gap: a stretch of five
+seconds or more where the live transcript heard speech and the accurate
+pass wrote nothing. The banner gives the time of each gap. It cannot find
+speech that the live transcript missed too.
 
 ## 5 · The note: every claim on a leash
 
