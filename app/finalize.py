@@ -313,6 +313,10 @@ def check_exclusion_limits(spans_s: list[tuple[float, float]],
 # its overlap fraction is ~1.0. A genuine turn that merely contains a
 # span got its words from the real audio around it, so its fraction is
 # small — 6.2% in 445's case.
+#
+# Since Task 19 (4 Oct 2026) the same fraction is applied to each WORD
+# when the words carry times, and the segment rule is only the fallback
+# for segments without them — see drop_segments_in_excluded_spans (458).
 SEGMENT_MUTED_FRACTION = float(os.getenv("SEGMENT_MUTED_FRACTION", "0.5"))
 
 
@@ -345,17 +349,34 @@ def drop_segments_in_excluded_spans(
     under consideration is filling with very low-level noise instead of
     pure zeros. Do not change the fill pre-emptively.
 
-    **Discards only segments that are MOSTLY muted** (see
-    `SEGMENT_MUTED_FRACTION` above, and consultation 445). Applied to raw
-    segments before the speaker merge, so a hallucinated fragment is
+    **Mutes WORDS, not segments** (Task 19, owner's option E). When a
+    segment's words carry times (WhisperX's aligned words), each word is
+    judged on its own: it goes when `SEGMENT_MUTED_FRACTION` or more of it
+    lies inside a span. The segment keeps every other word, its text and
+    times rebuilt from them, and is dropped only when no word survives.
+    Consultation 458 is why: the patient spoke in the short pauses between
+    our sentences, WhisperX made one segment of it that was 71 % muted,
+    and the segment rule threw the patient's words away with it.
+
+    A segment with no timed words (the Nemotron lines, whose pseudo-words
+    have no times) keeps the segment rule: it goes when it is MOSTLY muted
+    (see `SEGMENT_MUTED_FRACTION` above, and consultation 445). Applied to
+    raw segments before the speaker merge, so a hallucinated fragment is
     removed on its own rather than taking a legitimate turn with it.
 
-    Returns (kept, dropped).
+    Returns (kept, dropped). A segment dropped whole is in `dropped` as
+    itself; for a trimmed segment, `dropped` holds a new record of just
+    the removed words, marked `"partial": True`, and `kept` a trimmed copy
+    (the original dict is never changed — the raw view reads it).
     """
     if not excluded_spans_s:
         return turns, []
     kept, dropped = [], []
     for turn in turns:
+        words = turn.get("words") or []
+        if any("start" in w and "end" in w for w in words):
+            _split_words(turn, words, excluded_spans_s, kept, dropped)
+            continue
         start, end = float(turn.get("start", 0)), float(turn.get("end", 0))
         duration = end - start
         if duration <= 0:
@@ -364,6 +385,45 @@ def drop_segments_in_excluded_spans(
         fraction = _overlap_seconds(start, end, excluded_spans_s) / duration
         (dropped if fraction >= SEGMENT_MUTED_FRACTION else kept).append(turn)
     return kept, dropped
+
+
+def _word_is_muted(word: dict, spans: list[tuple[float, float]]) -> bool:
+    start, end = float(word["start"]), float(word["end"])
+    if end <= start:
+        return any(a <= start < b for a, b in spans)
+    return _overlap_seconds(start, end, spans) / (end - start) >= SEGMENT_MUTED_FRACTION
+
+
+def _split_words(segment: dict, words: list[dict], spans: list[tuple[float, float]],
+                 kept: list[dict], dropped: list[dict]) -> None:
+    """The word-level rule for one segment. A word WhisperX could not time
+    (a number, say) goes with the timed word before it, or the first timed
+    word when it opens the segment."""
+    muted: list[bool] = []
+    previous = None
+    for word in words:
+        if "start" in word and "end" in word:
+            previous = _word_is_muted(word, spans)
+        muted.append(previous)
+    first = next(m for m in muted if m is not None)
+    muted = [first if m is None else m for m in muted]
+
+    if not any(muted):
+        kept.append(segment)
+        return
+    if all(muted):
+        dropped.append(segment)
+        return
+
+    def piece(chosen: list[dict]) -> dict:
+        timed = [w for w in chosen if "start" in w and "end" in w]
+        start = float(timed[0]["start"]) if timed else float(segment.get("start", 0))
+        end = float(timed[-1]["end"]) if timed else float(segment.get("end", 0))
+        text = " ".join((w.get("word") or "").strip() for w in chosen).strip()
+        return {**segment, "start": start, "end": end, "text": text, "words": chosen}
+
+    kept.append(piece([w for w, m in zip(words, muted) if not m]))
+    dropped.append({**piece([w for w, m in zip(words, muted) if m]), "partial": True})
 
 
 def transcribe_and_diarise(wav_path: str,

@@ -418,6 +418,35 @@ def test_segments_merely_touching_the_boundary_are_kept():
     assert len(kept) == 2 and dropped == []
 
 
+def test_the_patients_words_between_our_sentences_survive():
+    """Consultation 458 (Task 18, fixed in Task 19 item 2): the patient
+    answered in the pauses between our sentences, WhisperX made one
+    segment of it, and that segment was mostly muted. The rule mutes
+    WORDS: the patient's words stay, the words inside the spans go."""
+    def word(text, start, end):
+        return {"word": text, "start": start, "end": end, "score": 0.9,
+                "speaker": "SPEAKER_01"}
+
+    segment = {"start": 0.0, "end": 10.0,
+               "text": "Okay. About three days now. Thank you.",
+               "words": [word("Okay.", 1.0, 2.0),
+                         word("About", 4.2, 4.6), word("three", 4.6, 5.0),
+                         word("days", 5.0, 5.4), word("now.", 5.4, 5.8),
+                         word("Thank", 7.0, 7.5), word("you.", 7.5, 8.0)]}
+    spans = [(0.0, 4.0), (6.0, 10.0)]
+    # Non-vacuous: by the segment rule this segment would go whole.
+    assert (finalize._overlap_seconds(0.0, 10.0, spans) / 10.0
+            >= finalize.SEGMENT_MUTED_FRACTION)
+
+    kept, dropped = finalize.drop_segments_in_excluded_spans([segment], spans)
+
+    assert [k["text"] for k in kept] == ["About three days now."]
+    assert (kept[0]["start"], kept[0]["end"]) == (4.2, 5.8)
+    assert [d["text"] for d in dropped] == ["Okay. Thank you."]
+    assert segment["text"] == "Okay. About three days now. Thank you.", \
+        "the original segment must not be changed (the raw view reads it)"
+
+
 def test_the_invariant_is_a_no_op_without_spans():
     recording = turns((0, 5))
     kept, dropped = finalize.drop_segments_in_excluded_spans(recording, [])
