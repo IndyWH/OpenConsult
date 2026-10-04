@@ -78,3 +78,18 @@ def test_15_6_the_cookie_lasts_only_for_the_browser_session(client):
     cookie = log_in(client).headers["set-cookie"].lower()
     assert "max-age" not in cookie and "expires" not in cookie
     assert "httponly" in cookie and "samesite=strict" in cookie
+
+
+def test_ruling_5_a_refused_settings_form_still_locks_to_the_login_page(logged_in, app, clock):
+    # Pins the fix of 4 Oct 2026 (STAGE_02_FIXES, fix 1): the timed move
+    # from a page sent back by a form post goes to the page's own
+    # address, never to one that takes no GET, so it ends on the login
+    # page with the lock written and not on an error page.
+    seconds = int(LOCK_AFTER.total_seconds())
+    refused = logged_in.post("/settings/you", data={"title": "Dr", "name": "", "current_password": PASSWORD})
+    assert refused.status_code == 400
+    assert f'content="{seconds + 1};url=/settings?quiet"' in refused.text
+    clock.advance(seconds=seconds)
+    moved = logged_in.get("/settings?quiet")
+    assert moved.status_code == 303 and moved.headers["location"] == "/login?why=locked"
+    assert app.state.parts.audit.lines()[0].event == "lock"

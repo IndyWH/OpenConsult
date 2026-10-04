@@ -137,7 +137,8 @@ NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
 
 def _settings_page(request: Request, user, refused=None):
     context = dict(user=user, active="settings", machine=parts(request).machine,
-                   least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")))
+                   least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
+                   page_path="/settings")
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)
     return render(request, "settings.html", **context)

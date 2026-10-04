@@ -37,12 +37,16 @@ async def form_fields(request: Request) -> dict[str, str]:
     return dict(parse_qsl(body, keep_blank_values=True))
 
 
-def render(request: Request, template: str, status: int = 200, **context) -> HTMLResponse:
+def render(request: Request, template: str, status: int = 200,
+           page_path: str | None = None, **context) -> HTMLResponse:
+    """page_path is the address the page's own timed move goes to. A page
+    sent back from a form post gives its own GET address, so the move
+    never lands on an address that takes no GET."""
     seconds_left = getattr(request.state, "seconds_left", None)
     page = _env.get_template(template).render(
         words=words,
         statement=words.STATEMENT,
-        path=request.url.path,
+        path=page_path or request.url.path,
         refresh=None if seconds_left is None else seconds_left + 1,
         **context,
     )
