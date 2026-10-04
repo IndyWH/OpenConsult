@@ -8714,3 +8714,64 @@ With the switch off, every article stays true.
 
 **Restart owed** before any of it is live. The restart applies the schema:
 the new table, two consultation columns, and the NULL-able confidence.
+
+
+## INCIDENT: the test suite overwrote recordings; 68 and 161 lost their audio (2026-10-04)
+
+The review's Task 16 (outside the repo: prompt `v1.1-logs/TASK16_PROMPT.md`,
+report `v1.1-logs/TASK16_RECORDINGS.md`, with the full table of all 144
+files). Commits de87f84 and 4fe8d83, test code only; no app behaviour
+changed. Research and education prototype; every recording is acted and
+synthetic.
+
+**What happened.** `tests/test_live.py` streams `tests/data/jfk.wav`
+(11.0 s) through a real live session and presses Stop, which saves
+`RECORDINGS_DIR/consultation_<cid>.wav`. `RECORDINGS_DIR` is bound at
+import from `.env`, and this one test never redirected it. Before
+2026-07-24 the suite ran in the live database, so each run left a new
+test file (litter). From `a0a4c8a` (2026-07-24) the suite runs in a fresh
+`consultation_ai_test` database whose consultation ids restart at 1 every
+run, so the test overwrote whichever **live** number it was handed —
+lately about 186 to 191, and from 1 on any single-file run.
+
+**The damage, measured 2026-10-04.**
+- 83 of 144 files in `data/recordings` are the JFK clip, sample for
+  sample. (493 is also 11 s but is a genuine recording.)
+- **Two are real consultations: 68** (12 Jul, script 03 English, approved,
+  keep for research; transcript ends at 403.6 s; overwritten 17 Aug) **and
+  161** (21 Jul, approved; transcript ends at 155.7 s; overwritten 9 Sep).
+  Both were lost on Ubuntu, before the move.
+- The other 81 numbers have no live row; every audit event on them is a
+  random test account or the admin voiding them as test data.
+- The old Ubuntu drive's `data/recordings` is byte-identical to the live
+  folder (141 of 141 files), so it restores nothing.
+- **A likely good copy of 68:** `mock_consultations/recordings/03_diabetes_review_en.wav`
+  (408.0 s). The folder's other four files are byte-identical to 66, 67,
+  69 and 70. Not used; putting audio back is the owner's decision. No copy
+  of 161 is known.
+- A backup of the folder as found is at
+  `~/Work/openconsult-review/recordings-backup-2026-10-04/`.
+
+**The fix.**
+- `tests/conftest.py` sets `RECORDINGS_DIR` to a fresh temp directory for
+  the whole session (set after `load_dotenv()`, removed at the end), so no
+  test, present or future, can reach the real folder by forgetting its own
+  monkeypatch. `test_live.py` asserts its recording lands there.
+- **The recordings guard:** conftest snapshots `data/recordings` before
+  any test and fails the run at session end if any file there was
+  created, removed or changed (size, inode, mtime, ctime), naming each.
+  If you record a consultation while the suite runs, it will fail; that
+  is expected. Pinned by `tests/test_recordings_guard.py`.
+
+**Fragile, still open (owner decision):** the app itself overwrites
+silently — `LiveSession.save_recording` opens with `"wb"`. Consultation
+ids are unique within one database, so this bites only when two
+databases share one folder: the test database did; the Ubuntu fallback,
+a restored database or `reset_demo` could. Proposed, not built: create
+exclusively, and on a clash keep both files and audit it.
+
+**Found on the way (report §5 and §6):** Task 15's survey globbed only
+`.wav`, so approved (FLAC) recordings were never considered; 462 and 471
+to 475 are close two-voice readings of scripts 01, 05, 14, 15, 11 and 12.
+Capture changed at `49f11af` (29 Jul 23:03, owner decision of 30 Jul,
+§ *THE CAPTURE-CHAIN DECISION*): 66 to 70 are before it, those six after.
