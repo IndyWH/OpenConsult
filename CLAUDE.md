@@ -85,9 +85,15 @@ Think from the patient's side. In teaching mode, from the learner's side.
     uv sync                                            # once, from the lock file
     uv run openconsult                                 # start, on port 8001
     uv run openconsult --data-folder DIR --port 8765   # a development run
+    uv run openconsult --no-browser                    # start without opening the browser
     uv run openconsult reset-password [--data-folder DIR]
     uv run pytest                                      # the suite
     uv run python .github/scripts/start_check.py       # start, answer, stop
+    uv run openconsult-bench wordcheck --cases DIR --out DIR --v1-calls FILE...  # no model
+    uv run openconsult-bench run --cases DIR --out DIR --digest SHA [--engine URL]
+    uv run openconsult-bench score --out DIR           # the marks, from the result files
+
+The bench writes only under --out, never to the app's data; cases and results stay in the log folder.
 
 Data folder: Linux $XDG_DATA_HOME/openconsult or ~/.local/share/openconsult;
 macOS ~/Library/Application Support/OpenConsult; Windows %LOCALAPPDATA%\OpenConsult.
