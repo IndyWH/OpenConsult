@@ -149,13 +149,30 @@ async def settings_page(request: Request, user=Depends(guards.logged_in)):
     return _settings_page(request, user)
 
 
+def _current_password_refusal(request: Request, fields: dict[str, str]) -> str | None:
+    """A wrong current password in Settings is a wrong password: it is
+    written to the log and it makes the next try wait longer, on the same
+    counter as the login page, so nobody at an unlocked screen can guess
+    without limit (STAGE_02_FIXES, fix 2; spec 15.6)."""
+    p = parts(request)
+    wait = p.logins.wait_left()
+    if wait:
+        return words.NOT_YET.format(wait=words.plain_time(wait))
+    if not p.users.verify(fields.get("current_password", "")):
+        wait = p.logins.wrong_password()
+        return words.WRONG_PASSWORD_NOTHING_CHANGED.format(wait=words.plain_time(wait))
+    p.logins.right_password()
+    return None
+
+
 @router.post("/settings/you")
 async def change_you(request: Request, user=Depends(guards.logged_in)):
     """Title and name. Asks for the current password first (ruling 7)."""
     p = parts(request)
     fields = await form_fields(request)
-    if not p.users.verify(fields.get("current_password", "")):
-        return _settings_page(request, user, ("save-you", words.WRONG_PASSWORD_NOTHING_CHANGED))
+    refusal = _current_password_refusal(request, fields)
+    if refusal:
+        return _settings_page(request, user, ("save-you", refusal))
     if name_problem(fields.get("name", "")):
         return _settings_page(request, user, ("save-you", words.NAME_MISSING))
     p.users.change_details(fields.get("title", ""), fields["name"])
@@ -166,8 +183,9 @@ async def change_you(request: Request, user=Depends(guards.logged_in)):
 async def change_password(request: Request, user=Depends(guards.logged_in)):
     p = parts(request)
     fields = await form_fields(request)
-    if not p.users.verify(fields.get("current_password", "")):
-        return _settings_page(request, user, ("change-password", words.WRONG_PASSWORD_NOTHING_CHANGED))
+    refusal = _current_password_refusal(request, fields)
+    if refusal:
+        return _settings_page(request, user, ("change-password", refusal))
     problem = password_problem(fields.get("new_password", ""), fields.get("new_password_again", ""))
     if problem == "short":
         return _settings_page(request, user, ("change-password", words.NEW_PASSWORD_SHORT.format(least=MIN_PASSWORD)))

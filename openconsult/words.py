@@ -99,7 +99,7 @@ FIELD_NEW_PASSWORD_AGAIN = "New password again"
 CHANGE_PASSWORD = "Change password"
 SAVED = "Saved."
 PASSWORD_CHANGED = "The password is changed. Any other login has ended."
-WRONG_PASSWORD_NOTHING_CHANGED = "Wrong password. Nothing was changed."
+WRONG_PASSWORD_NOTHING_CHANGED = "Wrong password. Nothing was changed. Try again in {wait}."
 NEW_PASSWORD_SHORT = "The new password needs at least {least} characters."
 NEW_PASSWORDS_DIFFER = "The two new passwords do not match."
 
