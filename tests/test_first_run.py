@@ -9,7 +9,7 @@ from tests.conftest import PASSWORD, browser, refusal_on, set_up, text_of
 
 
 def test_ruling_4_every_page_leads_to_the_statement_before_set_up(client):
-    for path in ("/", "/login"):
+    for path in ("/", "/settings", "/log", "/login"):
         response = client.get(path)
         assert response.status_code == 303 and response.headers["location"] == "/first-run", path
     page = client.get("/first-run")

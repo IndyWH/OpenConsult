@@ -82,6 +82,14 @@ class Logins:
         left = login.last_used + LOCK_AFTER - self._clock()
         return max(0, int(left.total_seconds()))
 
+    def renew(self, token: str | None, generation: int) -> None:
+        """The login that changed the password carries on under the new
+        generation; every other one ends (spec 15.6)."""
+        login = self._logins.get(token or "")
+        if login is not None:
+            login.generation = generation
+        self.end_all_except(token)
+
     def tokens(self) -> list[str]:
         return list(self._logins)
 

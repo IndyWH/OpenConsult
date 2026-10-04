@@ -87,3 +87,37 @@ def plain_time(seconds: int) -> str:
         minutes = seconds // 60
         return f"{minutes} minute" if minutes == 1 else f"{minutes} minutes"
     return "1 second" if seconds == 1 else f"{seconds} seconds"
+
+# The settings page.
+SETTINGS_TITLE = "Settings"
+SECTION_MACHINE = "This machine"
+SECTION_YOU = "You"
+SECTION_PASSWORD = "Change password"
+FIELD_CURRENT_PASSWORD = "Current password"
+FIELD_NEW_PASSWORD = "New password (at least {least} characters)"
+FIELD_NEW_PASSWORD_AGAIN = "New password again"
+CHANGE_PASSWORD = "Change password"
+SAVED = "Saved."
+PASSWORD_CHANGED = "The password is changed. Any other login has ended."
+WRONG_PASSWORD_NOTHING_CHANGED = "Wrong password. Nothing was changed."
+NEW_PASSWORD_SHORT = "The new password needs at least {least} characters."
+NEW_PASSWORDS_DIFFER = "The two new passwords do not match."
+
+# The log page.
+LOG_TITLE = "Log"
+COL_WHEN = "When"
+COL_WHAT = "What"
+COL_DETAILS = "Details"
+LOG_EMPTY = "Nothing yet."
+EVENTS = {
+    "statement.accepted": "Statement accepted",
+    "user.set_up": "User set up",
+    "login": "Logged in",
+    "login.wrong_password": "Wrong password",
+    "logout": "Logged out",
+    "lock": "Locked after 30 minutes with no use",
+    "title.changed": "Title changed",
+    "name.changed": "Name changed",
+    "password.changed": "Password changed",
+    "password.reset": "Password reset from the command",
+}

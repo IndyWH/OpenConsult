@@ -128,3 +128,63 @@ async def logout(request: Request):
         p.audit.record("logout")
     p.logins.end(token)
     raise Redirect("/login?why=logged_out", clear_login=True)
+
+
+# ---------------------------------------------------------------- settings
+
+NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
+
+
+def _settings_page(request: Request, user, refused=None):
+    context = dict(user=user, active="settings", machine=parts(request).machine,
+                   least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")))
+    if refused:
+        return refuse(request, "settings.html", refused[0], refused[1], **context)
+    return render(request, "settings.html", **context)
+
+
+@router.get("/settings")
+async def settings_page(request: Request, user=Depends(guards.logged_in)):
+    return _settings_page(request, user)
+
+
+@router.post("/settings/you")
+async def change_you(request: Request, user=Depends(guards.logged_in)):
+    """Title and name. Asks for the current password first (ruling 7)."""
+    p = parts(request)
+    fields = await form_fields(request)
+    if not p.users.verify(fields.get("current_password", "")):
+        return _settings_page(request, user, ("save-you", words.WRONG_PASSWORD_NOTHING_CHANGED))
+    if name_problem(fields.get("name", "")):
+        return _settings_page(request, user, ("save-you", words.NAME_MISSING))
+    p.users.change_details(fields.get("title", ""), fields["name"])
+    raise Redirect("/settings?done=you")
+
+
+@router.post("/settings/password")
+async def change_password(request: Request, user=Depends(guards.logged_in)):
+    p = parts(request)
+    fields = await form_fields(request)
+    if not p.users.verify(fields.get("current_password", "")):
+        return _settings_page(request, user, ("change-password", words.WRONG_PASSWORD_NOTHING_CHANGED))
+    problem = password_problem(fields.get("new_password", ""), fields.get("new_password_again", ""))
+    if problem == "short":
+        return _settings_page(request, user, ("change-password", words.NEW_PASSWORD_SHORT.format(least=MIN_PASSWORD)))
+    if problem == "differ":
+        return _settings_page(request, user, ("change-password", words.NEW_PASSWORDS_DIFFER))
+    changed = p.users.change_password(fields["new_password"])
+    p.logins.renew(request.cookies.get(guards.COOKIE), changed.generation)
+    raise Redirect("/settings?done=password")
+
+
+# --------------------------------------------------------------------- log
+
+@router.get("/log")
+async def log_page(request: Request, user=Depends(guards.logged_in)):
+    rows = [
+        {"when": line.at[:19].replace("T", " "),
+         "what": words.EVENTS.get(line.event, line.event),
+         "details": line.detail or ""}
+        for line in parts(request).audit.lines()
+    ]
+    return render(request, "log.html", user=user, active="log", rows=rows)

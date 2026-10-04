@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal, machine_rows with context %}
+{% set title = words.SETTINGS_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.SETTINGS_TITLE }}</h1>
+
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.SECTION_MACHINE }}</h2></div>
+  <div class="pane-body">{{ machine_rows(machine) }}</div>
+</section>
+
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.SECTION_YOU }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/settings/you">
+      <label>{{ words.FIELD_TITLE }}<input name="title" value="{{ user.title }}" autocomplete="honorific-prefix"></label>
+      <label>{{ words.FIELD_NAME }}<input name="name" value="{{ user.name }}" autocomplete="name"></label>
+      <label>{{ words.FIELD_CURRENT_PASSWORD }}<input name="current_password" type="password" autocomplete="current-password"></label>
+      <button class="primary" id="save-you" aria-describedby="save-you-refusal">{{ words.SAVE }}</button>
+      {{ refusal("save-you") }}
+      {% if notice == words.SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
+    </form>
+  </div>
+</section>
+
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.SECTION_PASSWORD }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/settings/password">
+      <label>{{ words.FIELD_CURRENT_PASSWORD }}<input name="current_password" type="password" autocomplete="current-password"></label>
+      <label>{{ words.FIELD_NEW_PASSWORD.format(least=least) }}<input name="new_password" type="password" autocomplete="new-password"></label>
+      <label>{{ words.FIELD_NEW_PASSWORD_AGAIN }}<input name="new_password_again" type="password" autocomplete="new-password"></label>
+      <button class="primary" id="change-password" aria-describedby="change-password-refusal">{{ words.CHANGE_PASSWORD }}</button>
+      {{ refusal("change-password") }}
+      {% if notice == words.PASSWORD_CHANGED %}<p class="notice">{{ notice }}</p>{% endif %}
+    </form>
+  </div>
+</section>
+{% endblock %}

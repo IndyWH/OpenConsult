@@ -88,3 +88,4 @@ table.facts td { border-top: none; }
 
 /* The standing statement, on every page */
 footer.disclaimer { text-align: center; font-size: .72rem; color: var(--ink-faint); padding: .6rem 1rem 1.2rem; }
+td.when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-soft); }

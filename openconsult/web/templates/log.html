@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% set title = words.LOG_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.LOG_TITLE }}</h1>
+<div class="pane">
+{% if rows %}
+<table>
+  <thead><tr><th>{{ words.COL_WHEN }}</th><th>{{ words.COL_WHAT }}</th><th>{{ words.COL_DETAILS }}</th></tr></thead>
+  <tbody>
+  {% for row in rows %}
+  <tr><td class="when">{{ row.when }}</td><td>{{ row.what }}</td><td>{{ row.details }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="pane-body">{{ words.LOG_EMPTY }}</div>
+{% endif %}
+</div>
+{% endblock %}
