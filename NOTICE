@@ -1,0 +1,16 @@
+NOTICE - third-party components used by OpenConsult v2
+======================================================
+
+OpenConsult is a research and education prototype. It is not a medical device.
+
+The project's own code is licensed AGPL-3.0-or-later (see LICENSE).
+
+This branch holds no third-party component yet. Each stage that adds one
+records it here, in the same commit: the component, where it comes from,
+its version, its licence, and how it relates to this code (bundled, linked,
+or run as a separate process).
+
+The NOTICE file on the main branch is the record for v1. It is the starting
+point for any component that v2 carries from v1.
+
+Nothing here is legal advice.

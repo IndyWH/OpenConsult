@@ -1,0 +1,66 @@
+# OpenConsult v2: the ignore list, from the first commit (V1_LESSONS 10.6).
+
+# Secrets and settings. Never commit these.
+# The example file is the one exception, and it holds no real value.
+.env
+.env.*
+!.env.example
+
+# The user's data: the database file, recordings, anything the app writes.
+/data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+*.sqlite3-journal
+*.sqlite3-wal
+*.sqlite3-shm
+
+# Audio. Recordings never enter the repo.
+# A stage that needs a small test clip adds a narrow exception for that one
+# folder, in the same commit as the clip.
+*.wav
+*.flac
+*.mp3
+*.ogg
+*.opus
+*.webm
+*.m4a
+
+# Model files and downloaded packs.
+/models/
+*.gguf
+*.onnx
+*.safetensors
+*.pt
+
+# The guideline corpus is fetched locally and never committed (copyright).
+/corpus/
+
+# Working documents that may name a live weakness.
+/*FINDINGS*.md
+/*REVIEW*.md
+/*AUDIT*.md
+
+# Logs.
+/logs/
+*.log
+
+# Python.
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+dist/
+
+# Editors, the system, and the coding assistant's per-machine settings.
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
