@@ -960,6 +960,10 @@ function renderQualityFlagBanner(banner) {
     reasons.push(`speech-recognition confidence was not checked: the ${pipe.engine || 'live'}` +
                  ' speech engine gives no confidence score, so low-confidence passages' +
                  ' are not marked');
+  const gaps = ((signals.s5_live_gaps || {}).gaps || []);  // Task 19
+  for (const g of gaps)
+    reasons.push(`Speech heard live from ${fmt(g.start_s)} to ${fmt(g.end_s)}` +
+                 ` (${Math.round(g.length_s)} s) is missing from this transcript.`);
   const rep = (signals.s3_repetition || {});
   if (rep.max_within_segment_share_floored != null && rep.flag_above_floored != null
       && rep.max_within_segment_share_floored > rep.flag_above_floored)
@@ -970,6 +974,9 @@ function renderQualityFlagBanner(banner) {
   const ul = el('ul');
   for (const r of reasons) ul.appendChild(el('li', null, r));
   box.appendChild(ul);
+  if (gaps.length) box.appendChild(el('p', null,
+    'Check what was said at these times before approving. This check cannot'
+    + ' find speech the live transcript also missed.'));
   box.appendChild(el('p', null,
     'A draft note was generated, but the transcript it rests on is '
     + 'borderline. Check the transcript against what was actually said — '

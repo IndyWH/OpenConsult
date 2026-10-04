@@ -593,6 +593,15 @@ def transcribe_and_diarise(wav_path: str,
 
     turns = merge_into_turns(raw_segments)
 
+    # Task 19: the final transcript's word times, for the gap check against
+    # the live transcript (transcript_quality.live_gaps). A segment whose
+    # words all lack times stands in with its own span.
+    final_words = []
+    for seg in raw_segments:
+        timed = [(float(w["start"]), float(w["end"])) for w in seg.get("words", [])
+                 if "start" in w and "end" in w]
+        final_words.extend(timed or [(float(seg["start"]), float(seg["end"]))])
+
     # S4's content check, measured here because this is where both the original
     # audio and the final turn boundaries exist at the same time. Deliberately
     # NOT a second silero VAD pass: the VAD finding no speech is frequently what
@@ -621,6 +630,7 @@ def transcribe_and_diarise(wav_path: str,
             "exclusion_anomalies": limits["anomalies"],
             "excluded_fraction": limits["fraction"],
             "trailing_speech": trailing_speech,
+            "final_words": final_words,
             "raw_segments": raw_view}
 
 
@@ -854,6 +864,12 @@ async def finalize_consultation(cid: int, wav_path: str) -> None:
             # value travels with it and is stored in quality_signals, so the
             # threshold can be set from real data rather than re-guessed.
             trailing_speech=transcription.get("trailing_speech"),
+            # Task 19: the gap check — the final transcript against the
+            # live one kept at Stop. Not measured when none was kept.
+            live_gaps=transcript_quality.live_gaps(
+                await consultations.live_transcript_of(cid),
+                transcription.get("final_words") or [],
+                transcription.get("excluded_spans_s")),
         )
         verdict = transcript_quality.evaluate(signals)
         await consultations.save_quality(cid, signals, verdict["outcome"])

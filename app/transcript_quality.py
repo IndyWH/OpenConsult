@@ -131,6 +131,20 @@ MIN_AVG_CONFIDENCE_FLAG = float(os.getenv("TRANSCRIPT_MIN_AVG_CONFIDENCE_FLAG", 
 # flag never overrides that.
 TRUNCATION_FLAG_S = float(os.getenv("TRANSCRIPT_TRUNCATION_FLAG_S", "10"))
 
+# S5, the gap check at Stop (Task 19, owner's option F, 4 Oct 2026). The
+# final transcript is compared with the live one; a stretch where the live
+# transcript has words and the final has none, this long or longer, FLAGS.
+# 5 s is the owner's number. Task 18 found 13 of 59 stored consultations
+# with such gaps, 7 of them approved, and nothing had marked any of them.
+GAP_MIN_S = float(os.getenv("TRANSCRIPT_GAP_MIN_S", "5"))
+# How close a final word must be to count as covering live speech, and the
+# longest pause that still joins two uncovered stretches into one gap.
+# Fixed, not settings: they are Task 18's measuring method, which found
+# the 13 consultations. Live line times are segment times, so the
+# tolerance absorbs their offset against WhisperX's aligned word times.
+GAP_WORD_TOLERANCE_S = 1.0
+GAP_JOIN_PAUSE_S = 3.0
+
 # Measured, not acted on. Kept here so the stored signals are
 # self-describing; changing them changes no behaviour.
 EXPECTED_LANGUAGE = os.getenv("TRANSCRIPT_EXPECTED_LANGUAGE", "en")
@@ -455,13 +469,82 @@ def s4_truncation_gap(turns: list[dict], audio_duration_s: float | None,
     return max(0.0, gap)
 
 
+def _subtract(intervals: list[tuple[float, float]],
+              cuts: list[tuple[float, float]]) -> list[tuple[float, float]]:
+    """`intervals` with every `cuts` interval removed, sorted."""
+    out = sorted(intervals)
+    for c0, c1 in sorted(cuts):
+        nxt = []
+        for a, b in out:
+            if c1 <= a or c0 >= b:
+                nxt.append((a, b))
+                continue
+            if a < c0:
+                nxt.append((a, c0))
+            if c1 < b:
+                nxt.append((c1, b))
+        out = nxt
+    return out
+
+
+def live_gaps(live_lines: list[dict] | None,
+              final_words: list[tuple[float, float]],
+              excluded_spans_s: list[tuple[float, float]] | None = None) -> dict:
+    """S5: where the live transcript heard words and the final has none.
+
+    Time inside the live lines, more than GAP_WORD_TOLERANCE_S from any
+    final word and outside the muted spans, is uncovered. Uncovered
+    stretches separated by a pause of GAP_JOIN_PAUSE_S or less, with no
+    final word in the pause, are one gap. A gap counts when it lasts
+    GAP_MIN_S or more, muted time not counted.
+
+    `live_lines` None means no live transcript was kept (consultations
+    before Task 19): not measured, never a pass or a fail by default. The
+    check cannot see speech the live transcript also missed, and a live
+    mishearing of noise can raise a false gap; both are stated on the
+    banner, not hidden.
+    """
+    if live_lines is None:
+        return {"measured": False, "gaps": [], "min_gap_s": GAP_MIN_S, "acts": True}
+    tol = GAP_WORD_TOLERANCE_S
+    covered = [(float(a) - tol, float(b) + tol) for a, b in final_words]
+    spoken = [(float(ln["start"]), float(ln["end"])) for ln in live_lines
+              if (ln.get("text") or "").strip() and float(ln["end"]) > float(ln["start"])]
+    pieces = _subtract(_subtract(spoken, covered), list(excluded_spans_s or []))
+
+    joined: list[list[float]] = []
+    for a, b in pieces:
+        if joined:
+            pause = (joined[-1][1], a)
+            if (a - joined[-1][1] <= GAP_JOIN_PAUSE_S
+                    and _subtract([pause], covered) == [pause]):
+                joined[-1][1] = max(joined[-1][1], b)
+                continue
+        joined.append([a, b])
+
+    gaps = []
+    for a, b in joined:
+        muted = sum(max(0.0, min(b, e) - max(a, s)) for s, e in (excluded_spans_s or []))
+        length = (b - a) - muted
+        if length >= GAP_MIN_S:
+            gaps.append({"start_s": round(a, 1), "end_s": round(b, 1),
+                         "length_s": round(length, 1)})
+    return {"measured": True, "gaps": gaps, "min_gap_s": GAP_MIN_S, "acts": True}
+
+
+def _clock(seconds: float) -> str:
+    seconds = int(seconds)          # floored, as the review page's fmt()
+    return f"{seconds // 60}:{seconds % 60:02d}"
+
+
 def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
                     detected_language: str | None = None,
                     language_probability: float | None = None,
                     excluded_spans_s: list[tuple[float, float]] | None = None,
                     trailing_speech: dict | None = None,
                     language_windows: dict | None = None,
-                    speech_pipeline: dict | None = None) -> dict:
+                    speech_pipeline: dict | None = None,
+                    live_gaps: dict | None = None) -> dict:
     """All four signals. Always computed, always stored (spec §3, §7).
 
     `excluded_spans_s` are the Phase 7a speaking windows in seconds. Only
@@ -513,6 +596,9 @@ def compute_signals(turns: list[dict], *, audio_duration_s: float | None = None,
         # A failure refuses (P1); unmeasured confidence flags (P2).
         **({"speech_pipeline": {**speech_pipeline, "acts": True}}
            if speech_pipeline is not None else {}),
+        # Task 19: present only on the Whisper path, where a live transcript
+        # exists to compare with (see live_gaps). Flags; never refuses.
+        **({"s5_live_gaps": live_gaps} if live_gaps is not None else {}),
     }
 
 
@@ -641,6 +727,21 @@ def evaluate(signals: dict) -> dict:
                 "detail": (f"the {pipeline.get('engine', 'live')} speech engine gives no "
                            f"confidence score, so the average-confidence check (S2) "
                            f"was not made"),
+            })
+        # S5 (Task 19, owner's option F): speech the live transcript heard
+        # and the final transcript lacks. The note still drafts; approval
+        # waits on the acknowledged banner, which gives each gap's time.
+        s5 = signals.get("s5_live_gaps") or {}
+        if s5.get("gaps"):
+            where = ", ".join(f"{_clock(g['start_s'])} to {_clock(g['end_s'])} "
+                              f"({g['length_s']:.0f} s)" for g in s5["gaps"])
+            flags.append({
+                "signal": "S5",
+                "name": "speech missing against the live transcript",
+                "value": len(s5["gaps"]),
+                "threshold": s5.get("min_gap_s"),
+                "detail": (f"speech heard live is missing from this transcript at "
+                           f"{where}"),
             })
         # S3, flag tier only (owner decision 2026-07-30, from the
         # measured corridor: #70 at 0.727 vs <= 0.333 everywhere else).

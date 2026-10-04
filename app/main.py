@@ -1126,7 +1126,8 @@ async def approve(
             status_code=409,
             content={"error": "The transcript-quality gate flagged this"
                      " transcript (marginal confidence, a long untranscribed"
-                     " tail, or a repetition loop). Review the transcript with"
+                     " tail, a repetition loop, or speech missing against the"
+                     " live transcript). Review the transcript with"
                      " care and acknowledge the notice first."},
         )
     note = await consultations.latest_note(cid)
@@ -1729,6 +1730,11 @@ async def _complete_session(app_state, entry: dict, *, connection_lost: bool) ->
                         {"session_id": session.session_id, "lines": linked,
                          "failure": session.failure,
                          "order_violations": session.order_violations})
+    else:
+        # Task 19: the live Whisper lines, for the gap check at finalisation.
+        # Not on the Nemotron path: there the live lines ARE the final
+        # transcript, so there is nothing to compare.
+        await consultations.save_live_transcript(cid, entry.get("live_lines") or [])
     if connection_lost:
         await consultations.set_connection_lost(cid)
     # Hand the recording to the serialised finalisation worker: with one
@@ -2468,6 +2474,9 @@ async def ws_transcribe(websocket: WebSocket) -> None:
             # 5), read once from the patient row just below; None = no line.
             "cds_patient": None,
             "transcript_parts": [],   # confirmed text, the CDS engine's input
+            # The same lines with their times, kept for the gap check at
+            # Stop (Task 19): the final transcript is compared with them.
+            "live_lines": [],
             "assessment": None,
             "cds_sent_len": 0,
             "cds_landed_parts": 0,    # how many transcript_parts the last LANDED pass saw (the re-ranker's excerpt starts after them)
@@ -5604,6 +5613,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
                 committed, partial = await session.process()
                 for seg in committed:
                     entry["transcript_parts"].append(seg.text)
+                    entry["live_lines"].append(
+                        {"start": seg.start, "end": seg.end, "text": seg.text})
                     await websocket.send_json(
                         {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
                     )
@@ -5637,6 +5648,8 @@ async def ws_transcribe(websocket: WebSocket) -> None:
         # Client pressed stop: transcribe the tail end and finish cleanly.
         for seg in await session.flush():
             entry["transcript_parts"].append(seg.text)
+            entry["live_lines"].append(
+                {"start": seg.start, "end": seg.end, "text": seg.text})
             await websocket.send_json(
                 {"type": "final", "text": seg.text, "start": seg.start, "end": seg.end}
             )

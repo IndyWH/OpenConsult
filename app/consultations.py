@@ -123,6 +123,12 @@ ALTER TABLE consultation ADD COLUMN IF NOT EXISTS speech_failure text;
 -- never a made-up number (owner, Task 13: S2 is recorded as not measured
 -- and the transcript is flagged). Whisper turns always carry a value.
 ALTER TABLE transcript_turn ALTER COLUMN confidence DROP NOT NULL;
+-- Task 19 (v1.1): the live Whisper transcript's lines as the doctor saw
+-- them, [{start, end, text}] on the recording clock, kept at Stop so the
+-- gap check can compare the final transcript with it. NULL = not kept
+-- (every consultation before this column, and the Nemotron path, whose
+-- lines are already in live_speech_segment and ARE the final transcript).
+ALTER TABLE consultation ADD COLUMN IF NOT EXISTS live_transcript jsonb;
 """
 
 
@@ -239,6 +245,22 @@ async def speech_pipeline_of(cid: int) -> dict:
             (cid,))).fetchone()
     return {"pipeline": (row[0] if row else None) or "whisper",
             "failure": row[1] if row else None}
+
+
+async def save_live_transcript(cid: int, lines: list[dict]) -> None:
+    """Task 19: the live Whisper lines, for the gap check at finalisation."""
+    async with await _conn() as conn:
+        await conn.execute(
+            "UPDATE consultation SET live_transcript = %s WHERE id = %s",
+            (json.dumps(lines), cid))
+
+
+async def live_transcript_of(cid: int) -> list[dict] | None:
+    """The stored live lines, or None when none were kept."""
+    async with await _conn() as conn:
+        row = await (await conn.execute(
+            "SELECT live_transcript FROM consultation WHERE id = %s", (cid,))).fetchone()
+    return row[0] if row else None
 
 
 async def set_connection_lost(cid: int) -> None:
