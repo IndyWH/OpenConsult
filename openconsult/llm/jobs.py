@@ -31,7 +31,7 @@ JOBS = {
     ),
     "assessment": Job(
         name="assessment", prompt="assessment", form="assessment",
-        frames=("assessment.frame.first", "assessment.frame.later"),
+        frames=("assessment.first", "assessment.later"),
         max_tokens=1500, timeout_s=60.0,
         on_failure="The alarm's result stands; the earlier differential names stay the stale "
                    "list for the next pass.",
