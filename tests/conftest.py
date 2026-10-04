@@ -29,6 +29,7 @@ import shutil
 import subprocess
 import tempfile
 import urllib.parse
+from pathlib import Path
 
 import psycopg
 import pytest
@@ -231,3 +232,64 @@ def _recordings_tmp_dir():
     """Removes the session's recordings directory (see RECORDINGS_DIR above)."""
     yield
     shutil.rmtree(_RECORDINGS_TMP, ignore_errors=True)
+
+
+# The recordings guard (Task 16, 2026-10-04). RECORDINGS_DIR above keeps
+# every test away from the owner's data/recordings; this proves it, every
+# run. The folder is snapshotted when this conftest loads — before any test
+# — and compared at session end: a file created, removed or changed there
+# fails the run and is named. Size, inode, mtime and ctime are compared, so
+# a rewrite with identical bytes (the JFK fixture over itself) is caught
+# too. Recording a consultation in the running app during a suite run will
+# also trip it; that is the honest result, not a false alarm to silence.
+# Pinned by tests/test_recordings_guard.py.
+_REPO_RECORDINGS = (Path(__file__).parent.parent / "data" / "recordings").resolve()
+
+
+def recordings_snapshot(directory: Path) -> dict[str, tuple[int, int, int, int]]:
+    """name -> (size, inode, mtime_ns, ctime_ns); {} if the folder is absent."""
+    try:
+        entries = list(os.scandir(directory))
+    except FileNotFoundError:
+        return {}
+    snapshot = {}
+    for entry in entries:
+        st = entry.stat(follow_symlinks=False)
+        snapshot[entry.name] = (st.st_size, st.st_ino, st.st_mtime_ns, st.st_ctime_ns)
+    return snapshot
+
+
+def recordings_changes(before: dict, after: dict) -> list[str]:
+    return ([f"created {n}" for n in sorted(after.keys() - before.keys())]
+            + [f"removed {n}" for n in sorted(before.keys() - after.keys())]
+            + [f"changed {n}" for n in sorted(before.keys() & after.keys())
+               if before[n] != after[n]])
+
+
+def apply_recordings_guard(session, before: dict, directory: Path) -> list[str]:
+    """Fail the session if `directory` moved since `before`; returns the changes."""
+    changes = recordings_changes(before, recordings_snapshot(directory))
+    if changes:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+    return changes
+
+
+_RECORDINGS_BEFORE = recordings_snapshot(_REPO_RECORDINGS)
+_recordings_guard_report: list[str] = []
+
+
+def pytest_sessionfinish(session, exitstatus):
+    _recordings_guard_report[:] = apply_recordings_guard(
+        session, _RECORDINGS_BEFORE, _REPO_RECORDINGS)
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    if _recordings_guard_report:
+        terminalreporter.section("RECORDINGS GUARD FAILED", sep="!", red=True, bold=True)
+        terminalreporter.write_line(
+            f"This run touched the owner's recordings in {_REPO_RECORDINGS}:")
+        for change in _recordings_guard_report:
+            terminalreporter.write_line(f"  {change}", red=True)
+        terminalreporter.write_line(
+            "Tests must write recordings only to RECORDINGS_DIR (a temp dir,"
+            " set in tests/conftest.py). Check the backup before anything else.")
