@@ -8775,3 +8775,93 @@ exclusively, and on a clash keep both files and audit it.
 to 475 are close two-voice readings of scripts 01, 05, 14, 15, 11 and 12.
 Capture changed at `49f11af` (29 Jul 23:03, owner decision of 30 Jul,
 § *THE CAPTURE-CHAIN DECISION*): 66 to 70 are before it, those six after.
+
+## INCIDENT: the final pass dropped speech for eleven weeks; fixed, with a gap check at Stop (2026-10-04)
+
+The review's Tasks 18 and 19 (outside the repo: report
+`v1.1-logs/TASK18_DROPPED_SPEECH.md`, prompt `v1.1-logs/TASK19_PROMPT.md`).
+Research and education prototype; every recording is scripted or acted.
+
+**Cause.** On 2026-07-17 (`a4d385c`) the final pass started giving
+WhisperX the clinical initial prompt, for drug names. With WhisperX's
+batched, no-timestamp decoding, the prompt sometimes makes Whisper skip
+the opening seconds of a 30 s piece of audio. The audio is there and the
+voice-activity step passes it on. Whisper writes nothing for it, and
+nothing downstream noticed. Every lost stretch is the opening of a piece.
+Removing the prompt alone brought every stretch back on the seven
+scripted recordings. A second, smaller cause: the exclusion rule dropped
+a whole segment when 50 % or more of it was muted, so in **458** the
+patient's words between Alba's sentences went with it (7.7 s).
+
+**Affected: 13 of 59 stored consultations** have at least one gap of 5 s
+or more against the live transcript, 264.2 s in all (Task 18 §2; a lower
+bound — the live model is the yardstick):
+79, 445, 448, 458, 462, 472, 474, 475, 477, 481, 487, 488, 496.
+- **Approved (7):** 79, 462, 472, 474, 475, 477, 487. In 462 and 475 the
+  missing words are the action part of the safety net.
+- **Awaiting review (5):** 448, 458, 481, 488, 496.
+- **Refused by the gate (1):** 445, lost to the old any-overlap exclusion
+  rule (fixed 2026-07-25).
+- By cause: the prompt, 10 consultations (12 gaps, 174.9 s); the segment
+  exclusion rule, 458; the old rule, 445; not explained, 79.
+- **79 is not explained.** It was finalised on 15 Jul, before the prompt
+  existed: 8 short stretches, 48.6 s. Removing the prompt does not bring
+  them back. The live model may be hearing noise there. Open.
+- **The stored transcripts were not regenerated.** Every one above,
+  approved or not, still holds the text it was finalised with.
+  Regenerating would change other text too; that is the owner's decision.
+- **v1.0 on GitHub has the same fault.** The tag `v1.0.0` (2026-09-10) and
+  `origin/main` both give WhisperX the prompt in the final pass. A note to
+  its users is owed (owner's decision).
+
+**The fix (owner chose Task 18 options A, E and F).**
+- `ac4ea69` — no initial prompt in the final pass. The live path keeps
+  it. Cost, accepted: drug and test names on the ten scripted readings
+  fall from 45 to 37 of 53 (gliclazide 0 of 3 again; measured again in
+  Task 19 on the fixed code, 37 of 53).
+- `db642b3` — the exclusion rule mutes words, never a whole segment, when
+  the words carry times. Segments without word times (the Nemotron lines)
+  keep the 50 % segment rule. The raw-transcript view shows a trimmed
+  segment's original text, unflagged; only segments dropped whole are
+  flagged there.
+- `47dc8df` — **the gap check at Stop (S5).** Stop now keeps the live
+  Whisper lines (`consultation.live_transcript`). Finalisation compares
+  the final words with them. A stretch of `TRANSCRIPT_GAP_MIN_S` (5 s) or
+  more where the live transcript has words and the final has none flags
+  the transcript through the amber tier: the note drafts, the banner gives
+  each gap's time, approval waits on the acknowledgement, and the
+  acknowledgement is audited (`quality.acknowledged`). The 1 s word
+  tolerance and the 3 s pause join are fixed, from Task 18's method.
+  Skipped on the Nemotron path, where the live lines are the final
+  transcript. Consultations from before this change have no stored live
+  lines: S5 is "not measured" and never flags them.
+- **Limits of the check:** it cannot see speech the live transcript also
+  missed, and a live mishearing of noise can raise a false gap (79 is the
+  likely shape). Both are said on the banner.
+
+**Proof (Task 19 item 5, read only, nothing stored).** The fixed pass on
+the recordings, against the stored transcripts:
+- 462: the safety net is back — "if you get this pain at rest, lasting
+  more than 15 minutes … go straight to the hospital, to the emergency
+  department", the patient's teach-back, and "ECG now … referral letter".
+- 475: "… you go to A&E or call 999, not wait for me", and the teach-back.
+- 458: 18 words now in the stretch (63.8 to 83.7 s, ±1 s) where the stored
+  transcript has none; the word rule dropped
+  nothing there.
+- S5 against Task 18's live text: no gap on any of the three.
+Files: `v1.1-logs/task19_proof.py`, `task19-proof.json`,
+`task19-proof-analysis.out`.
+
+**Help.** `help/01-a-consultations-journey.md` §4 said a transcript with
+"missing speech is *refused*"; only missing speech at the end was. It now
+carries the owner's approved wording (`0799d00`). `help/00-introduction.md`
+says the app "re-listens to the whole recording"; that was true throughout
+and stays true.
+
+**Lesson for v2:** every change to the speech path is tested on whole
+recordings for dropped speech, not only for the thing it was meant to
+improve. The prompt was tested for drug names and never for completeness.
+See `LESSONS_FOR_V2.md`.
+
+**Needs the restart:** items 1 to 3 are code, and `live_transcript` is a
+new column (applied by the app's schema step at start).
