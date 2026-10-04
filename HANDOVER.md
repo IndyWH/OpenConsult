@@ -67,10 +67,20 @@ re-renders a page, so a page with a form in progress needs the script to
 hold the refresh off while typing. The consultation_running flag on
 Logins is the hook for the live page.
 
-Measurements:
-- 74 tests, 1.65 s, none skipped. The twins and the parametrised cases
+Three fixes after Cowork's check, same day (stage-prompts/STAGE_02_FIXES.md):
+- A page sent back by a form post now names its own GET address for the
+  timed move, so a refused Settings form left alone locks to the login
+  page and writes the lock line, instead of ending on a 405.
+- A wrong current password in Settings is written to the log and counts
+  on the same growing wait as the login page; while the wait runs both
+  forms refuse and change nothing. The refusal sentence now says the wait.
+- No test runs the real nvidia-smi: the command takes the machine like
+  its saying and serving functions, and its test gives a made-up one.
+
+Measurements (after the fixes):
+- 76 tests, 1.9 s, none skipped. The twins and the parametrised cases
   are counted as pytest counts them.
-- App code 1,323 lines in 20 Python files; largest routes.py, 190 lines.
+- App code about 1,350 lines in 20 Python files; largest routes.py, 207 lines.
   Templates and the style sheet, 261 lines. Tests 959 lines.
 - Largest function: well under 80 lines. No file near 600.
 - The private word check printed nothing before every commit.
