@@ -1,8 +1,6 @@
 """Logins in memory, the 30 minute lock and the growing wait
 (spec 15.6; ruling 5; V1_LESSONS 10.2)."""
 
-from datetime import datetime, timedelta, timezone
-
 import pytest
 
 from openconsult.db import open_database
@@ -10,20 +8,8 @@ from openconsult.patients.audit import Audit
 from openconsult.patients.logins import LOCK_AFTER, LONGEST_WAIT, Logins
 
 
-class FakeClock:
-    def __init__(self):
-        self.now = datetime(2026, 10, 4, 9, 0, tzinfo=timezone.utc)
-
-    def __call__(self):
-        return self.now
-
-    def advance(self, **kwargs):
-        self.now += timedelta(**kwargs)
-
-
 @pytest.fixture
-def logins(tmp_path):
-    clock = FakeClock()
+def logins(tmp_path, clock):
     audit = Audit(open_database(tmp_path / "openconsult.db"), clock=clock)
     return Logins(audit, clock=clock), clock, audit
 

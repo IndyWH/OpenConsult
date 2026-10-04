@@ -44,6 +44,10 @@ the app:
     httpcore2 2.13.1         BSD-3-Clause     https://pypi.org/project/httpcore2/
     truststore 0.10.4        MIT              https://pypi.org/project/truststore/
 
+Stage 2. Carried from v1 (this project's own code, AGPL-3.0-or-later):
+the password hashing method of app/auth.py, and the style sheet
+app/static/theme.css, cut to what v2 uses.
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 

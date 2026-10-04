@@ -1,0 +1,90 @@
+/* OpenConsult: the look approved for v1 in July 2026, carried to v2 and
+   cut to what these pages use (spec 15.6 ruling 8). Light theme only. */
+
+:root {
+  --paper: #FAF6F1;          /* warm cream canvas */
+  --panel: #FFFFFF;          /* cards and panes */
+  --ink: #29231F;            /* warm near-black */
+  --ink-soft: #6E645C;       /* secondary text */
+  --ink-faint: #A39A91;      /* metadata */
+  --line: #E9E1D8;           /* hairline borders */
+  --plum: #4E2A3A;           /* the one brand accent: primary action */
+  --plum-hover: #3E2130;
+  --red: #C2402F;            /* a refusal */
+  --green: #2E7D4F;          /* done */
+  --radius: 10px;
+  --serif: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--paper); color: var(--ink);
+  font-family: var(--sans); font-size: 15px; line-height: 1.55;
+}
+
+/* The header */
+header.app {
+  display: flex; align-items: center; gap: 1.5rem;
+  padding: .65rem 1.4rem; border-bottom: 1px solid var(--line);
+  background: var(--paper); position: sticky; top: 0; z-index: 5;
+}
+.brand { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; letter-spacing: .01em; color: var(--ink); text-decoration: none; }
+nav.tabs { display: flex; gap: .25rem; flex-wrap: wrap; }
+nav.tabs a { text-decoration: none; color: var(--ink-soft); padding: .35rem .8rem; border-radius: 999px; font-size: .9rem; }
+nav.tabs a.active { background: #EFE7DE; color: var(--ink); font-weight: 600; }
+.spacer { flex: 1; }
+.whoami { font-size: .82rem; color: var(--ink-faint); text-align: right; line-height: 1.3; display: flex; align-items: center; gap: .8rem; }
+.whoami b { color: var(--ink-soft); font-weight: 600; }
+.whoami form { margin: 0; }
+
+/* The page */
+.wrap { max-width: 1080px; margin: 1.1rem auto 2rem; padding: 0 1.4rem; }
+.wrap.narrow { max-width: 520px; margin-top: 2.5rem; }
+h1.page { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margin: 0 0 .6rem; }
+h1.page.centred { text-align: center; font-size: 1.6rem; }
+p.statement { font-weight: 600; }
+p.sentence { font-weight: 600; margin: .8rem 0 1rem; }
+p.why { color: var(--ink-soft); margin: 0 0 .6rem; }
+
+/* Buttons */
+button {
+  font-family: var(--sans); font-size: .9rem; cursor: pointer;
+  border-radius: 999px; padding: .5rem 1.2rem;
+  background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft);
+}
+button:hover { border-color: #D8CEC3; color: var(--ink); }
+button.primary { background: var(--plum); border: none; color: #FBF6F1; font-weight: 600; margin-top: 1rem; }
+button.primary:hover { background: var(--plum-hover); color: #FBF6F1; }
+button.link { border: none; background: none; padding: 0; color: var(--ink-faint); font-size: .82rem; }
+button.link:hover { color: var(--ink-soft); text-decoration: underline; }
+
+/* Forms */
+input {
+  font-family: var(--sans); font-size: .92rem; color: var(--ink);
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 8px; padding: .45rem .7rem; width: 100%; margin-top: .2rem;
+}
+input:focus { outline: none; border-color: #D8CEC3; }
+input[type="checkbox"] { width: auto; margin: 0 .5rem 0 0; }
+label { display: block; font-size: .85rem; color: var(--ink-soft); margin: .6rem 0 .2rem; }
+label.tick { display: flex; align-items: flex-start; color: var(--ink); font-size: .95rem; margin-top: 1rem; }
+.refusal { color: var(--red); font-size: .85rem; min-height: 1.2em; margin: .4rem 0 0; }
+.notice { color: var(--green); font-size: .85rem; min-height: 1.2em; margin: .4rem 0 0; }
+
+/* Panes */
+.pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 1rem; }
+form.pane { margin-bottom: 0; }
+.pane-head { display: flex; align-items: center; gap: .6rem; padding: .7rem 1.1rem; border-bottom: 1px solid var(--line); }
+.pane-head h2 { font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-faint); margin: 0; font-weight: 600; }
+.pane-body { padding: 1rem 1.1rem; }
+
+/* Tables */
+table { width: 100%; border-collapse: collapse; background: var(--panel); }
+table.plain { background: transparent; }
+th { text-align: left; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-faint); font-weight: 600; padding: .5rem .6rem; }
+td { padding: .5rem .6rem; border-top: 1px solid var(--line); font-size: .92rem; }
+table.facts th { width: 10rem; vertical-align: top; padding-top: .6rem; }
+table.facts td { border-top: none; }
+
+/* The standing statement, on every page */
+footer.disclaimer { text-align: center; font-size: .72rem; color: var(--ink-faint); padding: .6rem 1rem 1.2rem; }

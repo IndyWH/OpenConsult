@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% set title = words.HOME_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.APP_NAME }}</h1>
+<div class="pane"><div class="pane-body">
+  <p class="statement">{{ statement }}</p>
+  <p>{{ words.HOME_SO_FAR }}</p>
+</div></div>
+{% endblock %}

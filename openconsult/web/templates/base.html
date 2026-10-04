@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }} - {{ words.APP_NAME }}</title>
+<link rel="stylesheet" href="/static/theme.css">
+{% if refresh %}<meta http-equiv="refresh" content="{{ refresh }};url={{ path }}?quiet">{% endif %}
+</head>
+<body>
+{% if user %}
+<header class="app">
+  <a class="brand" href="/">{{ words.APP_NAME }}</a>
+  <nav class="tabs">
+    <a href="/" class="{{ 'active' if active == 'home' else '' }}">{{ words.NAV_HOME }}</a>
+    <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">{{ words.NAV_SETTINGS }}</a>
+    <a href="/log" class="{{ 'active' if active == 'log' else '' }}">{{ words.NAV_LOG }}</a>
+  </nav>
+  <span class="spacer"></span>
+  <div class="whoami">
+    <b>{{ user.full_name }}</b>
+    <form method="post" action="/logout"><button class="link">{{ words.NAV_LOGOUT }}</button></form>
+  </div>
+</header>
+{% endif %}
+<main class="wrap{% if not user %} narrow{% endif %}">
+{% block main %}{% endblock %}
+</main>
+<footer class="disclaimer">{{ statement }}</footer>
+</body>
+</html>

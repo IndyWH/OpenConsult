@@ -82,6 +82,9 @@ class Logins:
         left = login.last_used + LOCK_AFTER - self._clock()
         return max(0, int(left.total_seconds()))
 
+    def tokens(self) -> list[str]:
+        return list(self._logins)
+
     def end(self, token: str | None) -> None:
         self._logins.pop(token or "", None)
 

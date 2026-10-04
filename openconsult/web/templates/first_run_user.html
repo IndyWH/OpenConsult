@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.FIRST_RUN_USER_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.FIRST_RUN_USER_TITLE }}</h1>
+<form method="post" action="/first-run/user" class="pane">
+  <div class="pane-body">
+    <p>{{ words.FIRST_RUN_USER_INTRO }}</p>
+    <label>{{ words.FIELD_TITLE }}<input name="title" autocomplete="honorific-prefix"></label>
+    <label>{{ words.FIELD_NAME }}<input name="name" autocomplete="name"></label>
+    <label>{{ words.FIELD_PASSWORD.format(least=least) }}<input name="password" type="password" autocomplete="new-password"></label>
+    <label>{{ words.FIELD_PASSWORD_AGAIN }}<input name="password_again" type="password" autocomplete="new-password"></label>
+    <button class="primary" id="save" aria-describedby="save-refusal">{{ words.SAVE }}</button>
+    {{ refusal("save") }}
+  </div>
+</form>
+{% endblock %}

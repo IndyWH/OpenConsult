@@ -28,3 +28,62 @@ MACHINE = {
 CARD_LINE = "{name}, {gb} GB"
 CARD_NONE = "None found"
 CARD_UNREADABLE = "Could not be read"
+
+# The header and the home page.
+APP_NAME = "OpenConsult"
+NAV_HOME = "Home"
+NAV_SETTINGS = "Settings"
+NAV_LOG = "Log"
+NAV_LOGOUT = "Log out"
+HOME_TITLE = "Home"
+HOME_SO_FAR = (
+    "So far this version starts, sets up its one user, and describes the machine it runs on. "
+    "It cannot run a consultation yet."
+)
+
+# The first run.
+FIRST_RUN_STATEMENT_TITLE = "Before you start"
+FIRST_RUN_MACHINE_TITLE = "This machine"
+FIRST_RUN_MACHINE_INTRO = "OpenConsult looked at this computer. Here is what it found."
+FIRST_RUN_USER_TITLE = "Set yourself up"
+FIRST_RUN_USER_INTRO = "OpenConsult uses your title and name wherever it names the doctor."
+CONTINUE = "Continue"
+SAVE = "Save"
+ROW_SYSTEM = "System"
+ROW_CARD = "Graphics card"
+FIELD_TITLE = "Title (for example Dr). Leave it empty if you have none."
+FIELD_NAME = "Name"
+FIELD_PASSWORD = "Password (at least {least} characters)"
+FIELD_PASSWORD_AGAIN = "Password again"
+TICK_TO_CONTINUE = "Tick the box to continue."
+NAME_MISSING = "Enter your name."
+PASSWORD_SHORT = "The password needs at least {least} characters."
+PASSWORDS_DIFFER = "The two passwords do not match."
+NOT_THIS_COMPUTER = "Set-up works only from the computer OpenConsult runs on."
+
+# Logging in.
+LOGIN_TITLE = "Log in"
+FIELD_LOGIN_PASSWORD = "Password"
+LOG_IN = "Log in"
+WHY = {
+    "plain": "Enter your password.",
+    "set_up": "Your details are saved. Enter your password to start.",
+    "locked": "OpenConsult locked itself after 30 minutes with no use. Enter your password to carry on.",
+    "logged_out": "You have logged out.",
+    "password_changed": "The password was changed. Enter the new one.",
+    "ended": "Your last login has ended. Enter your password.",
+}
+WRONG_PASSWORD = "Wrong password. Try again in {wait}."
+NOT_YET = "Not yet. Try again in {wait}."
+
+# Refusals at the door, as plain text.
+WRONG_HOST = "OpenConsult answers only when addressed as this computer: {address}"
+WRONG_ORIGIN = "This request did not come from OpenConsult's own pages, so it was not done."
+
+
+def plain_time(seconds: int) -> str:
+    """"1 second", "8 seconds", "5 minutes"."""
+    if seconds >= 60 and seconds % 60 == 0:
+        minutes = seconds // 60
+        return f"{minutes} minute" if minutes == 1 else f"{minutes} minutes"
+    return "1 second" if seconds == 1 else f"{seconds} seconds"

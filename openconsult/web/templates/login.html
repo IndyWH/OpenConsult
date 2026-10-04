@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.LOGIN_TITLE %}
+{% block main %}
+<h1 class="page centred">{{ words.APP_NAME }}</h1>
+<form method="post" action="/login" class="pane">
+  <div class="pane-body">
+    <p class="why">{{ why }}</p>
+    <label>{{ words.FIELD_LOGIN_PASSWORD }}<input name="password" type="password" autocomplete="current-password" autofocus></label>
+    <button class="primary" id="login" aria-describedby="login-refusal">{{ words.LOG_IN }}</button>
+    {{ refusal("login") }}
+  </div>
+</form>
+{% endblock %}

@@ -1,0 +1,13 @@
+{# The slot under a control for its refusal (R15). Every control that can
+   act has one, and the helper checks the message landed in it. #}
+{% macro refusal(control) -%}
+<p class="refusal" id="{{ control }}-refusal" role="alert">{% if refused and refused.control == control %}{{ refused.message }}{% endif %}</p>
+{%- endmacro %}
+
+{% macro machine_rows(machine) -%}
+<table class="plain facts">
+  <tr><th>{{ words.ROW_SYSTEM }}</th><td>{{ machine.system }}</td></tr>
+  <tr><th>{{ words.ROW_CARD }}</th><td>{{ machine.card_line }}</td></tr>
+</table>
+<p class="sentence">{{ machine.sentence }}</p>
+{%- endmacro %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal, machine_rows with context %}
+{% set title = words.FIRST_RUN_MACHINE_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.FIRST_RUN_MACHINE_TITLE }}</h1>
+<form method="post" action="/first-run/machine" class="pane">
+  <div class="pane-body">
+    <p>{{ words.FIRST_RUN_MACHINE_INTRO }}</p>
+    {{ machine_rows(machine) }}
+    <button class="primary" id="continue" aria-describedby="continue-refusal">{{ words.CONTINUE }}</button>
+    {{ refusal("continue") }}
+  </div>
+</form>
+{% endblock %}
