@@ -80,7 +80,7 @@ Three fixes after Cowork's check, same day (stage-prompts/STAGE_02_FIXES.md):
 Measurements (after the fixes):
 - 76 tests, 1.9 s, none skipped. The twins and the parametrised cases
   are counted as pytest counts them.
-- App code about 1,350 lines in 20 Python files; largest routes.py, 207 lines.
+- App code about 1,350 lines in 20 Python files; largest routes.py, 209 lines.
   Templates and the style sheet, 261 lines. Tests 959 lines.
 - Largest function: well under 80 lines. No file near 600.
 - The private word check printed nothing before every commit.
