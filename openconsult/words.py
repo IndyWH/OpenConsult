@@ -121,3 +121,19 @@ EVENTS = {
     "password.changed": "Password changed",
     "password.reset": "Password reset from the command",
 }
+
+# The command. Plain ASCII, for every terminal.
+RUNNING = "OpenConsult is running at {address}"
+OPEN_IT = "Open that address in a browser on this computer. Press Ctrl+C to stop."
+DATA_FOLDER = "Data folder: {folder}"
+PORT_TAKEN = (
+    "Port {port} is already in use on this computer, so OpenConsult did not start. "
+    "Stop the other program, or start OpenConsult with --port and another number."
+)
+NEWER_DATABASE = "The data folder was made by a newer OpenConsult, so this one cannot open it."
+ASK_NEW_PASSWORD = "New password: "
+ASK_NEW_PASSWORD_AGAIN = "New password again: "
+RESET_DONE = "The password is changed. Any open login has ended."
+RESET_SHORT = "The password needs at least {least} characters. Nothing was changed."
+RESET_DIFFER = "The two passwords do not match. Nothing was changed."
+RESET_NO_USER = "No user is set up yet. Start OpenConsult and set one up first."
