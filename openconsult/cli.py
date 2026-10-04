@@ -11,7 +11,7 @@ from typing import Callable
 
 import uvicorn
 
-from openconsult import words
+from openconsult import browser, words
 from openconsult.app import build_app
 from openconsult.db import NewerDatabase, open_database
 from openconsult.patients.audit import Audit
@@ -23,21 +23,24 @@ from openconsult.settings.store import LISTEN_ON
 
 def main(argv: list[str] | None = None, say: Callable = print,
          ask: Callable = getpass.getpass, serve: Callable | None = None,
-         machine: Machine | None = None) -> int:
-    """say, ask, serve and machine are passed in so tests run the command
-    with no terminal and the same result on every machine."""
+         machine: Machine | None = None, open_browser: Callable | None = None) -> int:
+    """say, ask, serve, machine and open_browser are passed in so tests run
+    the command with no terminal, no browser and the same result on every
+    machine."""
     parser = argparse.ArgumentParser(prog="openconsult")
     parser.add_argument("command", nargs="?", choices=["run", "reset-password"], default="run")
     parser.add_argument("--data-folder", type=Path, help="where the data lives, for a development run")
     parser.add_argument("--port", type=int, help="the port to listen on; 8001 if not given")
+    parser.add_argument("--no-browser", action="store_true", help="start without opening the browser")
     args = parser.parse_args(argv)
     if args.command == "reset-password":
         return reset_password(args.data_folder, say=say, ask=ask)
-    return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine)
+    return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine,
+               open_browser=None if args.no_browser else (open_browser or browser.start))
 
 
 def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callable,
-        machine: Machine | None = None) -> int:
+        machine: Machine | None = None, open_browser: Callable | None = None) -> int:
     settings = store.build(data_folder, port)
     # A taken port is said in plain words, and the app stops. It never
     # moves to another port by itself (spec 15.6; V1_LESSONS 7.6).
@@ -52,6 +55,10 @@ def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callab
     say(words.RUNNING.format(address=settings.address))
     say(words.OPEN_IT)
     say(words.DATA_FOLDER.format(folder=settings.data_folder))
+    # The browser opens only once the app really answers (ruling 2), so
+    # the wait runs beside the server, never before it.
+    if open_browser is not None:
+        open_browser(settings.address)
     serve(app, LISTEN_ON, settings.port)
     return 0
 

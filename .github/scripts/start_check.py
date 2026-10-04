@@ -42,11 +42,17 @@ def wait_for_answer(address: str, proc: subprocess.Popen) -> str:
     raise SystemExit(f"the app did not answer within {WAIT_S} seconds")
 
 
+def command_for(folder: str, port: int) -> list[str]:
+    """The check never opens a browser (spec 15.7, ruling 2)."""
+    return [sys.executable, "-u", "-m", "openconsult", "--data-folder", folder,
+            "--port", str(port), "--no-browser"]
+
+
 def main() -> int:
     port = free_port()
     folder = tempfile.mkdtemp(prefix="openconsult-check-")
     address = f"http://127.0.0.1:{port}"
-    command = [sys.executable, "-u", "-m", "openconsult", "--data-folder", folder, "--port", str(port)]
+    command = command_for(folder, port)
     with open(f"{folder}.out", "w+", encoding="utf-8") as output:
         proc = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
         try:

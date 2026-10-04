@@ -16,6 +16,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from openconsult import browser as browser_module
 from openconsult.app import build_app
 from openconsult.settings import paths, store
 from openconsult.settings.machine import Card, describe
@@ -25,8 +26,9 @@ pytest_plugins = ["pytester", "tests.noskip"]
 
 @pytest.fixture(autouse=True)
 def r18_guard(tmp_path, monkeypatch):
-    """Fail a test that opens a database outside its temporary folder, or
-    reads the app's environment (R18; V1_LESSONS 8.5, 10.1, 12)."""
+    """Fail a test that opens a database outside its temporary folder, reads
+    the app's environment, or opens a real browser (R18; ruling 2;
+    V1_LESSONS 8.5, 10.1, 12)."""
     monkeypatch.chdir(tmp_path)
     for name in list(os.environ):
         if name.startswith("OPENCONSULT"):
@@ -47,6 +49,11 @@ def r18_guard(tmp_path, monkeypatch):
         pytest.fail("R18: a test tried to read the user's own data folder")
 
     monkeypatch.setattr(paths, "default_data_folder", refuse_real_data_folder)
+
+    def refuse_browser(address, *args, **kwargs):
+        pytest.fail("ruling 2: a test tried to open a real browser")
+
+    monkeypatch.setattr(browser_module, "start", refuse_browser)
 
 
 # ------------------------------------------------------------ the fake clock

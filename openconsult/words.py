@@ -125,6 +125,7 @@ EVENTS = {
 # The command. Plain ASCII, for every terminal.
 RUNNING = "OpenConsult is running at {address}"
 OPEN_IT = "Open that address in a browser on this computer. Press Ctrl+C to stop."
+BROWSER_NOT_OPENED = "The browser could not be opened by itself. Open the address above."
 DATA_FOLDER = "Data folder: {folder}"
 PORT_TAKEN = (
     "Port {port} is already in use on this computer, so OpenConsult did not start. "

@@ -50,7 +50,7 @@ def test_ruling_6_the_command_gives_no_way_to_listen_beyond_this_computer(tmp_pa
         served.update(host=host, port=port)
 
     said = Said()
-    assert main(["--data-folder", str(tmp_path), "--port", "0"], say=said, serve=serve, machine=machine) == 0
+    assert main(["--data-folder", str(tmp_path), "--port", "0", "--no-browser"], say=said, serve=serve, machine=machine) == 0
     assert served["host"] == "127.0.0.1"
     assert words.RUNNING.format(address="http://127.0.0.1:0") in said.text
     with pytest.raises(SystemExit):
