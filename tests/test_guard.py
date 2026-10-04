@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pytest
 
+from openconsult.settings import paths, store
+
 
 def test_r18_guard_refuses_a_database_outside_the_temporary_folder(tmp_path):
     # Pins R18 and V1_LESSONS 10.1: the suite once ran against the live
@@ -18,6 +20,16 @@ def test_r18_guard_refuses_a_database_outside_the_temporary_folder(tmp_path):
     assert not outside.exists()
     inside = sqlite3.connect(tmp_path / "allowed.db")
     inside.close()
+
+
+def test_r18_guard_refuses_the_users_own_data_folder(tmp_path):
+    # Pins R18 and V1_LESSONS 8.5: the suite once read the developer's
+    # own settings. The twin: both doors to the real folder are shut.
+    with pytest.raises(pytest.fail.Exception, match="R18"):
+        paths.default_data_folder()
+    with pytest.raises(pytest.fail.Exception, match="R18"):
+        store.build()
+    assert store.build(tmp_path, port=1).data_folder == tmp_path
 
 
 def test_8_6_a_skipped_test_fails_the_run(pytester):

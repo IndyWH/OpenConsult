@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pytest
 
+from openconsult.settings import paths, store
+
 pytest_plugins = ["pytester", "tests.noskip"]
 
 
@@ -34,3 +36,8 @@ def r18_guard(tmp_path, monkeypatch):
         return real_connect(database, *args, **kwargs)
 
     monkeypatch.setattr(sqlite3, "connect", guarded_connect)
+
+    def refuse_real_data_folder():
+        pytest.fail("R18: a test tried to read the user's own data folder")
+
+    monkeypatch.setattr(paths, "default_data_folder", refuse_real_data_folder)
