@@ -70,7 +70,7 @@ def earlier_names(by_chain: dict, chain: str, point: int) -> tuple[str, ...]:
 
 def check(records: list[dict], cases: list[Case], door: Door) -> dict:
     """The count of v1 calls v2 rebuilds exactly, and every mismatch."""
-    transcripts: dict[str, dict[int, str]] = {}
+    transcripts: dict[str, list[tuple[int, str]]] = {}
     by_chain: dict[tuple[str, str], dict[int, str]] = {}
     for r in records:
         if r["call"] == "assessment":
@@ -81,8 +81,10 @@ def check(records: list[dict], cases: list[Case], door: Door) -> dict:
         key, chain, point = where(r)
         case = _case_for(cases, key)
         if case.name not in transcripts:
-            transcripts[case.name] = dict(case.points())
-        transcript = transcripts[case.name][point]
+            transcripts[case.name] = case.points()
+        points = transcripts[case.name]
+        # v1 numbered a script's points by update (1, 2, ...), the rest by pass or turn.
+        transcript = points[point - 1][1] if r["workload"] in ("urgency", "restraint") else dict(points)[point]
         job = V1_JOB[r["call"]]
         if job == "alarm":
             plain = alarm_message(transcript)
