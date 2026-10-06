@@ -8,6 +8,11 @@ the alarm's own actions before bookkeeping; "fires", "cleared" and
 "clears" from the pass's actions after bookkeeping. A pass whose reply
 is missing meets no rule. A failed script chain fails every mark it
 enters (Task 5b's rule).
+
+Stage 3b (spec 15.8): the differentials a rule reads are the list the
+pass gives, which under ruling 5 is the earlier list when the reply's
+own was empty. Such passes are counted, and Rule A of ruling 10 says
+who is a candidate: an arm that meets every hard mark.
 """
 
 from __future__ import annotations
@@ -249,10 +254,27 @@ def per_chain(results: dict) -> dict:
     return {f"{case}/{chain}": SCORERS[r["group"]](r) for (case, chain), r in sorted(results.items())}
 
 
+def empty_and_kept(results: dict) -> dict:
+    """The empty lists the model gave in replies that fit their form, and
+    the passes where the earlier list was kept for that reason (ruling
+    5). A result written before ruling 5 has no kept mark: its empty
+    lists are counted from the lists themselves."""
+    empty, kept = [], []
+    for (case, chain), r in sorted(results.items()):
+        for p in r["passes"]:
+            a = p["assessment"]
+            if a["ok"] and (a.get("kept") or not a["differentials"]):
+                empty.append(f"{case}/{chain} point {p['point']}")
+                if a.get("kept"):
+                    kept.append(empty[-1])
+    return {"empty_replies": len(empty), "kept_lists": len(kept), "empty_at": empty, "kept_at": kept}
+
+
 def summary(results: dict) -> dict:
     rows = marks(results)
+    hard_met = all(m["met"] for m in rows if m["kind"] == "hard")
     return {"marks": rows,
-            "hard_met": all(m["met"] for m in rows if m["kind"] == "hard"),
+            "hard_met": hard_met, "candidate": hard_met, **empty_and_kept(results),
             "soft_met": sum(m["met"] for m in rows if m["kind"] == "soft"),
             "time_met": all(m["met"] for m in rows if m["kind"] == "time"),
             "chains": len(results), "failed_chains": [f"{c}/{ch}" for (c, ch), r in sorted(results.items()) if r["failed"]],
@@ -273,7 +295,10 @@ def as_markdown(scored: dict) -> str:
                  f"Time marks met: {'yes' if scored['time_met'] else 'NO'}. Chains: {scored['chains']}; "
                  f"failed: {scored['failed_chains'] or 'none'}.")
     counts = Counter(s["alarm"] for s in scored["per_chain"].values())
-    lines.append(f"Distinct alarm strings: {len(counts)}.")
+    lines.append(f"Distinct alarm strings: {len(counts)}. Empty replies: {scored['empty_replies']}. "
+                 f"Kept lists: {scored['kept_lists']}.")
+    missed = ", ".join(m["n"] for m in scored["marks"] if m["kind"] == "hard" and not m["met"])
+    lines.append("Candidate: yes" if scored["candidate"] else f"Candidate: NO, missed {missed}")
     return "\n".join(lines) + "\n"
 
 

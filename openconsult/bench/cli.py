@@ -1,5 +1,5 @@
 """The bench command, openconsult-bench (spec 15.7, 15.8): run, repeat,
-score and wordcheck. It goes through the same door as the app and can be pointed
+score, compare and wordcheck. It goes through the same door as the app and can be pointed
 at any engine by its kind, its address and the name it knows the model
 by. It never writes to the app's data: its results and its own record
 of calls go to the folder it is given."""
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import openconsult
-from openconsult.bench import score, wordcheck
+from openconsult.bench import compare, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
@@ -122,6 +122,20 @@ def cmd_score(args) -> int:
     return 0 if scored["hard_met"] else 1
 
 
+def cmd_compare(args) -> int:
+    """One table that sets the arms side by side (spec 15.8)."""
+    folders = dict(item.split("=", 1) for item in args.arm)
+    arms = {name: ResultWriter(Path(folder)).read_all() for name, folder in folders.items()}
+    found = compare.table(arms, args.baseline, dict(item.split("=", 1) for item in args.pair or []))
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+    (out / "compare.json").write_text(json.dumps(found, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
+    text = compare.as_markdown(found)
+    (out / "compare.md").write_text(text, encoding="utf-8", newline="\n")
+    print(text)
+    return 0
+
+
 def cmd_wordcheck(args) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
@@ -143,11 +157,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="openconsult-bench")
     sub = parser.add_subparsers(dest="command", required=True)
     for name, fn in (("run", cmd_run), ("repeat", cmd_repeat), ("score", cmd_score),
-                     ("wordcheck", cmd_wordcheck)):
+                     ("compare", cmd_compare), ("wordcheck", cmd_wordcheck)):
         p = sub.add_parser(name)
         p.set_defaults(fn=fn)
         p.add_argument("--out", required=True, help="the bench's own folder, outside the repo and the app's data")
-        if name != "score":
+        if name not in ("score", "compare"):
             p.add_argument("--cases", required=True, help="the folder holding the case list and the cases")
             p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
     for name in ("run", "repeat"):
@@ -156,6 +170,10 @@ def main(argv: list[str] | None = None) -> int:
                        help="the kind of engine at that address: ollama, llamacpp or vllm")
         p.add_argument("--model", help="the name the engine knows the model by")
         p.add_argument("--digest", help="refuse to run unless the model has this digest")
+    sub.choices["compare"].add_argument("--arm", action="append", required=True, help="NAME=FOLDER, once for each arm")
+    sub.choices["compare"].add_argument("--baseline", required=True, help="the arm the seconds are held against")
+    sub.choices["compare"].add_argument("--pair", action="append",
+                                        help="TOGETHER=FULL: an arm sent together and the full arm of its engine")
     sub.choices["repeat"].add_argument("--stale-from", required=True,
                                        help="a finished run whose chain A1 gives the earlier lists")
     sub.choices["run"].add_argument("--together", action="store_true",
