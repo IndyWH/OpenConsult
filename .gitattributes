@@ -2,3 +2,5 @@
 # nothing the loader reads, but they are kept LF everywhere anyway.
 openconsult/prompts/* text eol=lf
 tests/*.txt text eol=lf
+# The published engine bench is data with checksums: Git never changes a byte of it.
+engine-bench/** -text

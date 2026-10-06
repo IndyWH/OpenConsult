@@ -15,7 +15,7 @@ from typing import Callable
 from openconsult.bench.cases import Case
 from openconsult.bench.together import run_pass_together
 from openconsult.bench.writer import ResultWriter
-from openconsult.consult.cds_pass import Carried, run_pass
+from openconsult.consult.cds_pass import Carried, PassResult, run_pass
 from openconsult.consult.messages import alarm_message, with_patient
 from openconsult.llm.door import Door, Result
 from openconsult.llm.profile import Sampling
@@ -86,11 +86,24 @@ def arm_differs(held: dict, door: Door, together: bool) -> str | None:
     return f"this folder holds results from {said(then)}; the engine now reports {said(now)}"
 
 
+def pass_row(point: int, wall_ms: int, result: PassResult) -> dict:
+    return {"point": point, "wall_ms": wall_ms, "alarm": asdict(result.alarm),
+            "assessment": asdict(result.assessment), "names": list(result.carried.names)}
+
+
+def why_failed(group: str, point: int, failures: list, unreachable: int) -> str | None:
+    """For a script, any failed call fails the chain there (Task 5b's
+    rule); for 495 and travel a failed pass is recorded and the chain
+    goes on. The engine unreachable twice in a row fails any chain."""
+    if unreachable >= UNREACHABLE_IN_A_ROW:
+        return f"the engine was unreachable {unreachable} times in a row"
+    if failures and group == "script":
+        return f"a call failed at point {point}: {', '.join(failures)}"
+    return None
+
+
 def run_chain(door: Door, case: Case, chain: Chain, log: Callable = print, together: bool = False) -> dict:
-    """One chain of one case. For a script, any failed call fails the
-    chain there (Task 5b's rule); for 495 and travel a failed pass is
-    recorded and the chain goes on. The engine unreachable twice in a
-    row fails any chain. Sent together, the pass's time runs from
+    """One chain of one case. Sent together, the pass's time runs from
     sending until both calls are back."""
     a_pass = run_pass_together if together else run_pass
     sampling = Sampling(chain.temperature, chain.seed)
@@ -102,18 +115,13 @@ def run_chain(door: Door, case: Case, chain: Chain, log: Callable = print, toget
         result = a_pass(door, transcript, case.patient, carried, sampling)
         wall_ms = round(1000 * (time.perf_counter() - t0))
         carried = result.carried
-        row = {"point": point, "wall_ms": wall_ms, "alarm": asdict(result.alarm),
-               "assessment": asdict(result.assessment), "names": list(carried.names)}
-        passes.append(row)
+        passes.append(pass_row(point, wall_ms, result))
         failures = [f for f in (result.alarm.failure, result.assessment.failure) if f]
         log(f"  {case.name} {chain.name} point {point}: {wall_ms} ms"
             + (f" FAILED {failures}" if failures else ""))
         unreachable = unreachable + 1 if "unreachable" in failures else 0
-        if unreachable >= UNREACHABLE_IN_A_ROW:
-            failed = f"the engine was unreachable {unreachable} times in a row"
-            break
-        if failures and case.group == "script":
-            failed = f"a call failed at point {point}: {', '.join(failures)}"
+        failed = why_failed(case.group, point, failures, unreachable)
+        if failed:
             break
     return {"case": case.name, "group": case.group, "chain": chain.name,
             "temperature": chain.temperature, "seed": chain.seed,

@@ -1,8 +1,9 @@
 """The two calls of a pass sent at the same moment (spec 15.8, ruling 8;
 R30). A made-up engine stands behind the door; every transcript is made up."""
 
+import json
 import threading
-from dataclasses import asdict
+from dataclasses import asdict, replace
 
 import pytest
 
@@ -13,7 +14,7 @@ from openconsult.consult.cds_pass import run_pass
 from openconsult.consult.messages import Patient
 from openconsult.db import open_database
 from openconsult.llm.door import Door
-from openconsult.llm.engine import EngineUnreachable
+from openconsult.llm.engine import EngineUnreachable, Reply
 from openconsult.llm.record import ModelCalls
 from tests.fakes import ALARM_FIRES, ALARM_QUIET, ASSESSMENT, FakeEngine
 from tests.test_bench import made_up_folder
@@ -24,7 +25,7 @@ WOMAN = Patient(31, "F")
 
 class ByJob(FakeEngine):
     """Answers each job from its own list, whichever call arrives first.
-    An exception in a list is raised. With a barrier, neither call may
+    An exception in a list is raised, and a Reply is given as it is. With a barrier, neither call may
     return until both have arrived."""
 
     def __init__(self, alarm=None, assessment=None, meet=False):
@@ -40,6 +41,8 @@ class ByJob(FakeEngine):
         item = waiting.pop(0) if waiting else (ALARM_QUIET if call.job == "alarm" else ASSESSMENT)
         if isinstance(item, BaseException):
             raise item
+        if isinstance(item, Reply):
+            return replace(item, request=json.dumps({"job": call.job, "user": call.user}))
         return self.chat_item(call, item)
 
 
