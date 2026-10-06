@@ -20,7 +20,7 @@ from openconsult import browser as browser_module
 from openconsult.app import build_app
 from openconsult.settings import paths, store
 from openconsult.settings.machine import Card, describe
-from tests.fakes import FakeEngine
+from tests.fakes import FakeEngine, MadeUpServer
 
 pytest_plugins = ["pytester", "tests.noskip"]
 
@@ -172,3 +172,21 @@ class _RefusalFinder(HTMLParser):
     def handle_data(self, data):
         if self._in_slot:
             self.text += data
+
+
+# ------------------------------------------------- the bench's made-up server
+
+@pytest.fixture
+def server():
+    made = MadeUpServer()
+    yield made
+    made.stop()
+
+
+@pytest.fixture
+def bench_folders(tmp_path, monkeypatch):
+    """Made-up cases and a folder for results. The bench command checks its
+    folder against the app's data folder; here that is a made-up one."""
+    from tests.test_bench import made_up_folder
+    monkeypatch.setattr(paths, "default_data_folder", lambda: tmp_path / "app-data")
+    return made_up_folder(tmp_path), tmp_path / "out"

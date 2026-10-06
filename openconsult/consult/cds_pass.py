@@ -60,17 +60,32 @@ class PassResult:
     carried: Carried   # for the next pass
 
 
-def run_pass(door: Door, transcript: str, patient: Patient, carried: Carried | None = None,
-             sampling: Sampling | None = None) -> PassResult:
-    carried = carried or Carried()
-    alarm_text = with_patient(alarm_message(transcript), patient)
-    assessment_text = with_patient(assessment_message(transcript, carried.names), patient)
-    alarm = _alarm(door.ask("alarm", alarm_text, sampling), carried.arranged)
-    assessment = _assessment(door.ask("assessment", assessment_text, sampling), carried.differentials)
+def messages(transcript: str, patient: Patient, carried: Carried) -> tuple[str, str]:
+    """The two messages of a pass: the alarm's, and the assessment's with
+    the earlier names. Both open with the patient line (R11)."""
+    return (with_patient(alarm_message(transcript), patient),
+            with_patient(assessment_message(transcript, carried.names), patient))
+
+
+def settle(alarm_result: Result, assessment_result: Result, carried: Carried) -> PassResult:
+    """The bookkeeping, once both calls are back: the latch, the kept
+    list, and what the next pass is handed."""
+    alarm = _alarm(alarm_result, carried.arranged)
+    assessment = _assessment(assessment_result, carried.differentials)
     if not assessment.ok:
         return PassResult(alarm, assessment, Carried(carried.names, alarm.arranged, carried.differentials))
     shown = tuple(assessment.differentials)
     return PassResult(alarm, assessment, Carried(names_of(shown), alarm.arranged, shown))
+
+
+def run_pass(door: Door, transcript: str, patient: Patient, carried: Carried | None = None,
+             sampling: Sampling | None = None) -> PassResult:
+    """The alarm, then the assessment, one after another (R30)."""
+    carried = carried or Carried()
+    alarm_text, assessment_text = messages(transcript, patient, carried)
+    alarm_result = door.ask("alarm", alarm_text, sampling)
+    assessment_result = door.ask("assessment", assessment_text, sampling)
+    return settle(alarm_result, assessment_result, carried)
 
 
 def _alarm(result: Result, arranged_before: bool) -> Alarm:

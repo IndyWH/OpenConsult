@@ -6,8 +6,6 @@ import hashlib
 import json
 import subprocess
 import sys
-import threading
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import pytest
 
@@ -18,82 +16,10 @@ from openconsult.bench.writer import ResultWriter
 from openconsult.cli import main as app_main
 from openconsult.llm.engine import Call
 from openconsult.llm.profile import GEMMA_4_QAT
-from openconsult.settings import paths
-from tests.fakes import ALARM_QUIET, ASSESSMENT
-from tests.test_bench import made_up_folder
+from tests.fakes import CALL, REVISION, answer_by_job, chat_reply, describe
 
-FORM = {"type": "object", "required": ["ok"]}
-CALL = Call(job="alarm", tag="made-up/model", system="SYSTEM WORDS", user="user words", form=FORM,
-            temperature=0.5, seed=7, context=16384, max_tokens=1000, think=False, timeout_s=5.0)
-REVISION = "0123456789abcdef0123456789abcdef01234567"
+FORM = CALL.form
 ENGINES = [LlamaCppEngine, VllmEngine]
-
-
-class MadeUpServer:
-    """A loopback server that answers each path from a table and keeps
-    what it was sent. An answer is (status, body) or a function of the
-    request's body that gives one."""
-
-    def __init__(self):
-        self.routes, self.received = {}, []
-        outer = self
-
-        class Handler(BaseHTTPRequestHandler):
-            def _answer(self, body):
-                outer.received.append((self.path, body))
-                found = outer.routes.get(self.path, (404, {"error": "made-up: no such path"}))
-                status, reply = found(body) if callable(found) else found
-                data = (reply if isinstance(reply, str) else json.dumps(reply)).encode("utf-8")
-                self.send_response(status)
-                self.send_header("Content-Type", "application/json")
-                self.send_header("Content-Length", str(len(data)))
-                self.end_headers()
-                self.wfile.write(data)
-
-            def do_GET(self):
-                self._answer(None)
-
-            def do_POST(self):
-                self._answer(json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
-
-            def log_message(self, *args):
-                pass
-
-        self._server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        self.address = f"http://127.0.0.1:{self._server.server_address[1]}"
-        self._thread = threading.Thread(target=self._server.serve_forever, args=(0.01,), daemon=True)
-        self._thread.start()
-
-    def chats(self):
-        return [body for path, body in self.received if path == "/v1/chat/completions"]
-
-    def stop(self):
-        self._server.shutdown()
-        self._server.server_close()
-        self._thread.join()
-
-
-@pytest.fixture
-def server():
-    made = MadeUpServer()
-    yield made
-    made.stop()
-
-
-def chat_reply(content, finish="stop", **extra):
-    return 200, {"choices": [{"message": {"role": "assistant", "content": content}, "finish_reason": finish}],
-                 "usage": {"prompt_tokens": 50, "completion_tokens": 20}, **extra}
-
-
-def describe(server, engine_class, context=16384, model_path="/made-up/model.gguf", root=f"/made-up/snapshots/{REVISION}"):
-    """What each engine's own pages give for the context, the version and the model."""
-    if engine_class is LlamaCppEngine:
-        server.routes["/props"] = (200, {"default_generation_settings": {"n_ctx": context},
-                                         "build_info": "b1-made-up", "model_path": model_path})
-    else:
-        server.routes["/version"] = (200, {"version": "0.0-made-up"})
-        server.routes["/v1/models"] = (200, {"data": [{"id": "another/model", "root": "/elsewhere", "max_model_len": 1},
-                                                       {"id": CALL.tag, "root": root, "max_model_len": context}]})
 
 
 @pytest.mark.parametrize("engine_class", ENGINES)
@@ -195,18 +121,6 @@ def test_9_6_a_bench_engine_reports_its_version_and_the_model_it_runs(server, tm
     server.stop()
     for gone in (LlamaCppEngine(server.address), VllmEngine(server.address)):
         assert gone.version(timeout_s=0.5) is None and gone.status(CALL.tag, timeout_s=0.5).running is False
-
-
-@pytest.fixture
-def bench_folders(tmp_path, monkeypatch):
-    """The command checks its folder against the app's data folder; here that is a made-up one."""
-    monkeypatch.setattr(paths, "default_data_folder", lambda: tmp_path / "app-data")
-    return made_up_folder(tmp_path), tmp_path / "out"
-
-
-def answer_by_job(body):
-    job = body["response_format"]["json_schema"]["name"]
-    return chat_reply(json.dumps(ALARM_QUIET if job == "alarm" else ASSESSMENT))
 
 
 def test_15_8_the_bench_is_pointed_at_an_engine_by_kind_address_and_model(server, bench_folders, capsys):

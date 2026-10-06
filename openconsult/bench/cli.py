@@ -17,7 +17,7 @@ import openconsult
 from openconsult.bench import score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
-from openconsult.bench.replay import CHAINS, run
+from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.vllm import VllmEngine
 from openconsult.bench.writer import ResultWriter
 from openconsult.db import open_database
@@ -61,7 +61,18 @@ def cmd_run(args) -> int:
     if args.digest and digest != args.digest:
         say(f"STOP: the model's digest is {digest}, not {args.digest}")
         return 3
-    summary = run(door, cases, writer, chains, log=say)
+    held = writer.read_all()
+    differs = arm_differs(next(iter(held.values())), door, args.together) if held else None
+    if differs:
+        say(f"STOP: {differs}")
+        return 5
+    if any(not writer.exists(case.name, chain.name) for case in cases for chain in chains):
+        first = first_call(door, cases[0])
+        say(f"the first call, not measured: {first.wall_ms} ms")
+        if not first.ok:
+            say(f"STOP: the first call failed: {first.failure}: {first.detail}")
+            return 4
+    summary = run(door, cases, writer, chains, log=say, together=args.together)
     say(f"done: ran {summary['run']} chains, kept {summary['kept']}, failed {len(summary['failed'])}")
     for case, chain, why in summary["failed"]:
         say(f"  failed chain {case}/{chain}: {why}")
@@ -74,7 +85,11 @@ def cmd_score(args) -> int:
     scored = score.summary(results)
     calls_db = out / "calls.db"
     if calls_db.exists():
-        scored["calls"] = score.call_times(ModelCalls(open_database(calls_db)).rows())
+        # Only the calls a result names: not the first call of an arm, nor
+        # the calls of a chain that was cut short and run again.
+        named = {p[job]["call_id"] for r in results.values() for p in r["passes"] for job in ("alarm", "assessment")}
+        rows = [row for row in ModelCalls(open_database(calls_db)).rows() if row["id"] in named]
+        scored["calls"] = score.call_times(rows)
     (out / "scores.json").write_text(json.dumps(scored, indent=1, ensure_ascii=False), encoding="utf-8")
     text = score.as_markdown(scored)
     (out / "scores.md").write_text(text, encoding="utf-8")
@@ -114,6 +129,8 @@ def main(argv: list[str] | None = None) -> int:
         p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
                        help="the kind of engine at that address: ollama, llamacpp or vllm")
         p.add_argument("--model", help="the name the engine knows the model by")
+    sub.choices["run"].add_argument("--together", action="store_true",
+                                    help="send the two calls of a pass at the same moment")
     sub.choices["run"].add_argument("--case", nargs="*", help="only these cases")
     sub.choices["run"].add_argument("--chains", nargs="*", help="only these chains, for a check")
     sub.choices["run"].add_argument("--digest", help="refuse to run unless the model has this digest")
