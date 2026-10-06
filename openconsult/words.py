@@ -133,6 +133,12 @@ EVENTS = {
 
 # The command. Plain ASCII, for every terminal.
 RUNNING = "OpenConsult is running at {address}"
+# The owner's wording (spec 15.8, ruling 12), said when the browser will open by itself.
+BROWSER_WILL_OPEN = (
+    "Your browser will open by itself. If it does not, open that address in a browser "
+    "on this computer. Press Ctrl+C to stop."
+)
+# Said for a start with --no-browser.
 OPEN_IT = "Open that address in a browser on this computer. Press Ctrl+C to stop."
 BROWSER_NOT_OPENED = "The browser could not be opened by itself. Open the address above."
 DATA_FOLDER = "Data folder: {folder}"

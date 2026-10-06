@@ -1,5 +1,5 @@
 """The app opens the browser by itself once it answers, and --no-browser
-(spec 15.7, ruling 2). No test opens a real browser."""
+(spec 15.7, ruling 2; spec 15.8, ruling 12). No test opens a real browser."""
 
 import importlib.util
 from pathlib import Path
@@ -49,6 +49,16 @@ def test_ruling_2_no_browser_opens_nothing_and_the_address_is_still_printed(tmp_
     assert main(args, say=said, serve=lambda *a: None, machine=machine,
                 open_browser=started.append) == 0
     assert started == ["http://127.0.0.1:0"]
+
+
+def test_ruling_12_the_terminal_says_the_browser_will_open_by_itself(tmp_path, machine):
+    args = ["--data-folder", str(tmp_path), "--port", "0"]
+    opening, not_opening = Said(), Said()
+    main(args, say=opening, serve=lambda *a: None, machine=machine, open_browser=lambda address: None)
+    assert opening.lines[1] == words.BROWSER_WILL_OPEN and words.OPEN_IT not in opening.lines
+    # The old line stays for a start without a browser on purpose.
+    main([*args, "--no-browser"], say=not_opening, serve=lambda *a: None, machine=machine)
+    assert not_opening.lines[1] == words.OPEN_IT and words.BROWSER_WILL_OPEN not in not_opening.lines
 
 
 def test_ruling_2_no_screen_or_no_browser_is_not_an_error():

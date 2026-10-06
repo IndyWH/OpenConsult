@@ -53,7 +53,7 @@ def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callab
         say(words.NEWER_DATABASE)
         return 1
     say(words.RUNNING.format(address=settings.address))
-    say(words.OPEN_IT)
+    say(words.OPEN_IT if open_browser is None else words.BROWSER_WILL_OPEN)
     say(words.DATA_FOLDER.format(folder=settings.data_folder))
     # The browser opens only once the app really answers (ruling 2), so
     # the wait runs beside the server, never before it.
