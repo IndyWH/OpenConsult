@@ -1,11 +1,13 @@
-"""The bench command, openconsult-bench (spec 15.7): run, score and
+"""The bench command, openconsult-bench (spec 15.7, 15.8): run, score and
 wordcheck. It goes through the same door as the app and can be pointed
-at any engine by its address. It never writes to the app's data: its
-results and its own record of calls go to the folder it is given."""
+at any engine by its kind, its address and the name it knows the model
+by. It never writes to the app's data: its results and its own record
+of calls go to the folder it is given."""
 
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import datetime as dt
 import json
 import sys
@@ -14,24 +16,32 @@ from pathlib import Path
 import openconsult
 from openconsult.bench import score, wordcheck
 from openconsult.bench.cases import load_cases
+from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.replay import CHAINS, run
+from openconsult.bench.vllm import VllmEngine
 from openconsult.bench.writer import ResultWriter
 from openconsult.db import open_database
 from openconsult.llm.door import Door
 from openconsult.llm.ollama import DEFAULT_ADDRESS, OllamaEngine
+from openconsult.llm.profile import GEMMA_4_QAT
 from openconsult.llm.record import ModelCalls
 from openconsult.settings import paths
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
+# The engines the bench can speak to. The app has the first only (R31).
+KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
 
 
 def say(line: str) -> None:
     print(f"[{dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}] {line}", flush=True)
 
 
-def bench_door(out: Path, address: str) -> Door:
-    db = open_database(out / "calls.db")
-    return Door(OllamaEngine(address), ModelCalls(db))
+def bench_door(out: Path, args) -> Door:
+    """The door, with a copy of the one profile that carries the name
+    this engine knows the model by. The app's profile is not touched."""
+    engine = KINDS[args.kind](args.engine)
+    profile = dataclasses.replace(GEMMA_4_QAT, tag=args.model or GEMMA_4_QAT.tag, engine=engine.name)
+    return Door(engine, ModelCalls(open_database(out / "calls.db")), profile)
 
 
 def cmd_run(args) -> int:
@@ -41,9 +51,10 @@ def cmd_run(args) -> int:
     if args.case:
         cases = [c for c in cases if c.name in args.case]
     chains = [c for c in CHAINS if not args.chains or c.name in args.chains]
-    door = bench_door(out, args.engine)
+    door = bench_door(out, args)
     version, digest = door.identity()
-    say(f"engine {args.engine} version {version}; model {door.profile.tag} digest {digest}")
+    say(f"engine {door.profile.engine} at {args.engine} version {version}; "
+        f"model {door.profile.tag} digest {digest}")
     if version is None or digest is None:
         say("STOP: the engine or the model cannot be reached")
         return 2
@@ -98,6 +109,11 @@ def main(argv: list[str] | None = None) -> int:
         if name != "score":
             p.add_argument("--cases", required=True, help="the folder holding the case list and the cases")
             p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
+    for name in ("run",):
+        p = sub.choices[name]
+        p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
+                       help="the kind of engine at that address: ollama, llamacpp or vllm")
+        p.add_argument("--model", help="the name the engine knows the model by")
     sub.choices["run"].add_argument("--case", nargs="*", help="only these cases")
     sub.choices["run"].add_argument("--chains", nargs="*", help="only these chains, for a check")
     sub.choices["run"].add_argument("--digest", help="refuse to run unless the model has this digest")
