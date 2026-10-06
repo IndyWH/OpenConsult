@@ -7,6 +7,7 @@ have no result yet, on the same engine and model only (spec 15.8)."""
 
 from __future__ import annotations
 
+import json
 import time
 from dataclasses import asdict, dataclass
 from typing import Callable
@@ -44,6 +45,18 @@ def stamp(door: Door) -> dict:
 
 
 STEADY = Sampling(0.0, 42)
+
+
+def answer_text(raw: str | None) -> tuple[str | None, str | None]:
+    """The answer's text, and any thinking text, from a raw reply as the
+    record holds it, whichever engine wrote it."""
+    try:
+        body = json.loads(raw or "")
+        message = body["message"] if "message" in body else body["choices"][0]["message"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        return None, None
+    thinking = message.get("thinking") or message.get("reasoning_content") or message.get("reasoning")
+    return message.get("content"), thinking or None
 
 
 def first_call(door: Door, case: Case) -> Result:

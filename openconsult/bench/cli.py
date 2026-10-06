@@ -1,5 +1,5 @@
-"""The bench command, openconsult-bench (spec 15.7, 15.8): run, score and
-wordcheck. It goes through the same door as the app and can be pointed
+"""The bench command, openconsult-bench (spec 15.7, 15.8): run, repeat,
+score and wordcheck. It goes through the same door as the app and can be pointed
 at any engine by its kind, its address and the name it knows the model
 by. It never writes to the app's data: its results and its own record
 of calls go to the folder it is given."""
@@ -17,6 +17,7 @@ import openconsult
 from openconsult.bench import score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
+from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.vllm import VllmEngine
 from openconsult.bench.writer import ResultWriter
@@ -36,25 +37,19 @@ def say(line: str) -> None:
     print(f"[{dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}] {line}", flush=True)
 
 
-def bench_door(out: Path, args) -> Door:
-    """The door, with a copy of the one profile that carries the name
-    this engine knows the model by. The app's profile is not touched."""
-    engine = KINDS[args.kind](args.engine)
-    profile = dataclasses.replace(GEMMA_4_QAT, tag=args.model or GEMMA_4_QAT.tag, engine=engine.name)
-    return Door(engine, ModelCalls(open_database(out / "calls.db")), profile)
-
-
-def cmd_run(args) -> int:
+def open_arm(args, together: bool = False):
+    """The door, its record and the writer of an arm; or the code to stop
+    with, when the engine or the model is not the one this arm needs.
+    The door gets a copy of the one profile that carries the name this
+    engine knows the model by. The app's profile is not touched."""
     out = Path(args.out)
     writer = ResultWriter(out, forbidden=(REPO, paths.default_data_folder()))
-    cases = load_cases(Path(args.cases))
-    if args.case:
-        cases = [c for c in cases if c.name in args.case]
-    chains = [c for c in CHAINS if not args.chains or c.name in args.chains]
-    door = bench_door(out, args)
+    engine = KINDS[args.kind](args.engine)
+    profile = dataclasses.replace(GEMMA_4_QAT, tag=args.model or GEMMA_4_QAT.tag, engine=engine.name)
+    record = ModelCalls(open_database(out / "calls.db"))
+    door = Door(engine, record, profile)
     version, digest = door.identity()
-    say(f"engine {door.profile.engine} at {args.engine} version {version}; "
-        f"model {door.profile.tag} digest {digest}")
+    say(f"engine {profile.engine} at {args.engine} version {version}; model {profile.tag} digest {digest}")
     if version is None or digest is None:
         say("STOP: the engine or the model cannot be reached")
         return 2
@@ -62,20 +57,50 @@ def cmd_run(args) -> int:
         say(f"STOP: the model's digest is {digest}, not {args.digest}")
         return 3
     held = writer.read_all()
-    differs = arm_differs(next(iter(held.values())), door, args.together) if held else None
+    differs = arm_differs(next(iter(held.values())), door, together) if held else None
     if differs:
         say(f"STOP: {differs}")
         return 5
+    return door, record, writer
+
+
+def warm(door: Door, case) -> bool:
+    first = first_call(door, case)
+    say(f"the first call, not measured: {first.wall_ms} ms")
+    if not first.ok:
+        say(f"STOP: the first call failed: {first.failure}: {first.detail}")
+    return first.ok
+
+
+def cmd_run(args) -> int:
+    opened = open_arm(args, args.together)
+    if isinstance(opened, int):
+        return opened
+    door, _, writer = opened
+    cases = load_cases(Path(args.cases))
+    if args.case:
+        cases = [c for c in cases if c.name in args.case]
+    chains = [c for c in CHAINS if not args.chains or c.name in args.chains]
     if any(not writer.exists(case.name, chain.name) for case in cases for chain in chains):
-        first = first_call(door, cases[0])
-        say(f"the first call, not measured: {first.wall_ms} ms")
-        if not first.ok:
-            say(f"STOP: the first call failed: {first.failure}: {first.detail}")
+        if not warm(door, cases[0]):
             return 4
     summary = run(door, cases, writer, chains, log=say, together=args.together)
     say(f"done: ran {summary['run']} chains, kept {summary['kept']}, failed {len(summary['failed'])}")
     for case, chain, why in summary["failed"]:
         say(f"  failed chain {case}/{chain}: {why}")
+    return 0
+
+
+def cmd_repeat(args) -> int:
+    opened = open_arm(args)
+    if isinstance(opened, int):
+        return opened
+    door, record, writer = opened
+    cases = load_cases(Path(args.cases))
+    if not warm(door, cases[0]):
+        return 4
+    summary = run_repeat(door, record, cases, ResultWriter(Path(args.stale_from)), writer, log=say)
+    say(f"done: ran {summary['run']} of the repeat test, kept {summary['kept']}")
     return 0
 
 
@@ -117,23 +142,26 @@ def cmd_wordcheck(args) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="openconsult-bench")
     sub = parser.add_subparsers(dest="command", required=True)
-    for name, fn in (("run", cmd_run), ("score", cmd_score), ("wordcheck", cmd_wordcheck)):
+    for name, fn in (("run", cmd_run), ("repeat", cmd_repeat), ("score", cmd_score),
+                     ("wordcheck", cmd_wordcheck)):
         p = sub.add_parser(name)
         p.set_defaults(fn=fn)
         p.add_argument("--out", required=True, help="the bench's own folder, outside the repo and the app's data")
         if name != "score":
             p.add_argument("--cases", required=True, help="the folder holding the case list and the cases")
             p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
-    for name in ("run",):
+    for name in ("run", "repeat"):
         p = sub.choices[name]
         p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
                        help="the kind of engine at that address: ollama, llamacpp or vllm")
         p.add_argument("--model", help="the name the engine knows the model by")
+        p.add_argument("--digest", help="refuse to run unless the model has this digest")
+    sub.choices["repeat"].add_argument("--stale-from", required=True,
+                                       help="a finished run whose chain A1 gives the earlier lists")
     sub.choices["run"].add_argument("--together", action="store_true",
                                     help="send the two calls of a pass at the same moment")
     sub.choices["run"].add_argument("--case", nargs="*", help="only these cases")
     sub.choices["run"].add_argument("--chains", nargs="*", help="only these chains, for a check")
-    sub.choices["run"].add_argument("--digest", help="refuse to run unless the model has this digest")
     sub.choices["wordcheck"].add_argument("--v1-calls", nargs="+", required=True, help="v1's recorded calls")
     sub.choices["wordcheck"].add_argument("--workload", nargs="*", help="only these v1 workloads")
     args = parser.parse_args(argv)
