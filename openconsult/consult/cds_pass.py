@@ -1,9 +1,10 @@
 """One pass of the clinical decision support (spec 15.7): the alarm
 first, then the assessment (R30). Both read the transcript afresh (R9,
 R12) and open with the patient line (R11). Code does the bookkeeping:
-once the urgent step is arranged it stays arranged. If one call fails
-the other still gives its result, and a failed alarm is said to be not
-judged, never read as no alarm (plan review, change 4).
+once the urgent step is arranged it stays arranged, and an empty list of
+differentials keeps the earlier list (spec 15.8, ruling 5). If one call
+fails the other still gives its result, and a failed alarm is said to be
+not judged, never read as no alarm (plan review, change 4).
 """
 
 from __future__ import annotations
@@ -18,9 +19,11 @@ from openconsult.llm.profile import Sampling
 
 @dataclass(frozen=True)
 class Carried:
-    """What one pass hands the next: the earlier names, and the latch."""
+    """What one pass hands the next: the earlier names, the latch, and
+    the earlier list whole, so an empty reply cannot make it vanish."""
     names: tuple[str, ...] = ()
     arranged: bool = False
+    differentials: tuple = ()
 
 
 @dataclass(frozen=True)
@@ -47,6 +50,7 @@ class Assessment:
     failure: str | None
     detail: str | None
     call_id: int
+    kept: bool = False   # the reply's own list was empty, so this is the earlier pass's list
 
 
 @dataclass(frozen=True)
@@ -62,9 +66,11 @@ def run_pass(door: Door, transcript: str, patient: Patient, carried: Carried | N
     alarm_text = with_patient(alarm_message(transcript), patient)
     assessment_text = with_patient(assessment_message(transcript, carried.names), patient)
     alarm = _alarm(door.ask("alarm", alarm_text, sampling), carried.arranged)
-    assessment = _assessment(door.ask("assessment", assessment_text, sampling))
-    names = names_of(assessment.differentials) if assessment.ok else carried.names
-    return PassResult(alarm, assessment, Carried(names, alarm.arranged))
+    assessment = _assessment(door.ask("assessment", assessment_text, sampling), carried.differentials)
+    if not assessment.ok:
+        return PassResult(alarm, assessment, Carried(carried.names, alarm.arranged, carried.differentials))
+    shown = tuple(assessment.differentials)
+    return PassResult(alarm, assessment, Carried(names_of(shown), alarm.arranged, shown))
 
 
 def _alarm(result: Result, arranged_before: bool) -> Alarm:
@@ -80,11 +86,16 @@ def _alarm(result: Result, arranged_before: bool) -> Alarm:
                  reply.get("reasoning"), raw, None, None, result.call_id)
 
 
-def _assessment(result: Result) -> Assessment:
+def _assessment(result: Result, earlier: tuple) -> Assessment:
+    """An empty list in a reply that fits its form keeps the earlier
+    list, and says so; the record still holds the model's own reply. At
+    the first pass there is no earlier list, so empty stays empty."""
     if not result.ok:
         return Assessment(False, [], [], [], None, result.failure, result.detail, result.call_id)
     reply = result.answer
-    return Assessment(True, list(reply.get("differentials") or []),
+    own = list(reply.get("differentials") or [])
+    kept = not own and bool(earlier)
+    return Assessment(True, list(earlier) if kept else own,
                       list(reply.get("questions_to_ask") or []),
                       list(reply.get("signs_to_check") or []), reply.get("reasoning"),
-                      None, None, result.call_id)
+                      None, None, result.call_id, kept)

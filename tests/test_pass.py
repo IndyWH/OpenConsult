@@ -1,6 +1,8 @@
 """One pass: the alarm, then the assessment, with the bookkeeping in code
 (spec 15.7; R9, R11, R12, R30; V1_LESSONS 3.1, 3.2, 3.14; plan review,
-change 4). Every transcript here is made up."""
+change 4; spec 15.8, ruling 5). Every transcript here is made up."""
+
+import json
 
 import pytest
 
@@ -123,3 +125,61 @@ def test_3_14_time_critical_with_no_action_is_kept_as_such(door_of):
     assert alarm.judged and alarm.time_critical and alarm.flag_without_action and alarm.actions == []
     quiet = run_pass(door_of([ALARM_QUIET, ASSESSMENT])[0], TRANSCRIPT, WOMAN).alarm
     assert not quiet.flag_without_action
+
+
+EMPTY = {**ASSESSMENT, "differentials": []}
+OTHER = {**ASSESSMENT, "differentials": [{"condition": "Made-up condition C", "likelihood": "moderate",
+                                           "rationale": "made up"}]}
+NAMES = ("Made-up condition A", "Made-up condition B")
+
+
+def test_ruling_5_an_empty_list_keeps_the_earlier_list_and_says_so(door_of, tmp_path):
+    door, _ = door_of([ALARM_QUIET, ASSESSMENT, ALARM_QUIET, EMPTY, ALARM_QUIET, OTHER])
+    first = run_pass(door, TRANSCRIPT, WOMAN)
+    assert first.assessment.kept is False
+    second = run_pass(door, TRANSCRIPT, WOMAN, first.carried)
+    # The earlier entries stay whole, and the result says the list was kept.
+    assert second.assessment.ok and second.assessment.kept is True
+    assert second.assessment.differentials == ASSESSMENT["differentials"]
+    assert second.assessment.questions == EMPTY["questions_to_ask"]
+    # The record still holds the model's own empty reply.
+    row = ModelCalls(open_database(tmp_path / "openconsult.db")).get(second.assessment.call_id)
+    assert json.loads(json.loads(row["reply"])["message"]["content"])["differentials"] == []
+    # The twin: a reply with a list replaces the earlier one and is not marked kept.
+    third = run_pass(door, TRANSCRIPT, WOMAN, second.carried)
+    assert third.assessment.kept is False and third.carried.names == ("Made-up condition C",)
+    assert third.assessment.differentials == OTHER["differentials"]
+
+
+def test_ruling_5_an_empty_first_list_stays_empty(door_of):
+    door, engine = door_of([ALARM_QUIET, EMPTY, ALARM_QUIET, EMPTY])
+    first = run_pass(door, TRANSCRIPT, WOMAN)
+    assert first.assessment.ok and first.assessment.differentials == [] and first.assessment.kept is False
+    assert first.carried.names == ()
+    # Nothing to keep at the next pass either, and it is sent the first-pass frame.
+    second = run_pass(door, TRANSCRIPT, WOMAN, first.carried)
+    assert second.assessment.differentials == [] and second.assessment.kept is False
+    assert engine.calls[3].user == engine.calls[1].user
+
+
+def test_ruling_5_the_kept_list_is_handed_to_the_next_pass(door_of):
+    door, engine = door_of([ALARM_QUIET, ASSESSMENT, ALARM_QUIET, EMPTY, ALARM_QUIET, ASSESSMENT])
+    first = run_pass(door, TRANSCRIPT, WOMAN)
+    second = run_pass(door, TRANSCRIPT, WOMAN, first.carried)
+    assert second.carried.names == NAMES
+    run_pass(door, TRANSCRIPT, WOMAN, second.carried)
+    later = f"{LINE}\n\n" + loader.fill(loader.frame("assessment.later"), stale="\n".join(NAMES),
+                                        transcript=TRANSCRIPT)
+    assert engine.calls[3].user == later    # the call that came back empty was given the list
+    assert engine.calls[5].user == later    # and the pass after it is given the same list again
+
+
+def test_ruling_5_two_empty_replies_in_a_row_keep_the_list_twice(door_of):
+    door, _ = door_of([ALARM_QUIET, ASSESSMENT, ALARM_QUIET, EMPTY, ALARM_QUIET, EMPTY])
+    carried = run_pass(door, TRANSCRIPT, WOMAN).carried
+    for _ in range(2):
+        result = run_pass(door, TRANSCRIPT, WOMAN, carried)
+        carried = result.carried
+        assert result.assessment.kept is True
+        assert result.assessment.differentials == ASSESSMENT["differentials"]
+        assert carried.names == NAMES
