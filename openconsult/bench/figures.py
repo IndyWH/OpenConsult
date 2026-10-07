@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from openconsult.bench import export, score
@@ -295,8 +296,18 @@ def write(out: Path, found: dict) -> None:
 
 # ---------------------------------------------------------------- in words
 
-def seconds(ms) -> str:
-    return "-" if ms is None else f"{ms / 1000:.2f}"
+def seconds(ms, places: int = 2) -> str:
+    """Milliseconds as seconds, rounded half up once, from the decimal form
+    of the number and not its binary form: 2,295 ms is 2.30 s, 1,605 is
+    1.61. A median that ends in half a millisecond rounds the same way."""
+    if ms is None:
+        return "-"
+    return str((Decimal(str(ms)) / 1000).quantize(Decimal(1).scaleb(-places), rounding=ROUND_HALF_UP))
+
+
+def two_places(value) -> str:
+    """A time for each token, always with two places: 6.20, not 6.2."""
+    return "-" if value is None else f"{value:.2f}"
 
 
 def shorter_in_words(shorter_by_ms: list) -> str:
@@ -376,10 +387,10 @@ def rounds_table(found: dict) -> str:
             lines.append(f"| {name} | {number} | {r['chain']} | {seconds(r['typical_ms'])} | {seconds(r['slowest_ms'])} | "
                          f"{seconds(r['all_cases_median_ms'])} | {seconds(r['alarm_median_ms'])} | "
                          f"{seconds(r['assessment_median_ms'])} | {t['tokens_written']:,} | "
-                         f"{t['ms_per_token_all_in']} | {t['ms_per_token_writing']} |")
+                         f"{two_places(t['ms_per_token_all_in'])} | {two_places(t['ms_per_token_writing'])} |")
     lines += ["", "Over all chains at each temperature: tokens written, ms for each token all in and writing only.", ""]
     for name, arm in found["arms"].items():
-        parts = [f"{label}: {t['tokens_written']:,} tokens, {t['ms_per_token_all_in']} and {t['ms_per_token_writing']} ms"
+        parts = [f"{label}: {t['tokens_written']:,} tokens, {two_places(t['ms_per_token_all_in'])} and {two_places(t['ms_per_token_writing'])} ms"
                  for label, t in arm["per_token"].items() if t["calls"]]
         lines.append(f"- {name}: " + "; ".join(parts) + ".")
     return "\n".join(lines) + "\n\n"

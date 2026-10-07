@@ -228,3 +228,18 @@ def test_ruling_26_the_same_figures_from_the_public_form_as_from_the_private_one
     assert main(["figures", "--public", str(public), "--out", str(tmp_path / "written")]) == 7
     assert "is never written over" in capsys.readouterr().out
     assert sorted(p.name for p in public.glob("figures.*")) == []
+
+
+def test_change_1_seconds_are_rounded_half_up_from_the_milliseconds_once():
+    """The same milliseconds must read the same everywhere: 2,295 ms is
+    2.30 s and not 2.29, and a time for each token always has two places."""
+    assert [figures.seconds(ms) for ms in (2295, 1605, 1365, 3775)] == ["2.30", "1.61", "1.37", "3.78"]
+    assert figures.seconds(4998.5) == "5.00" and figures.seconds(5004.5) == "5.00" and figures.seconds(5005) == "5.01"
+    assert figures.seconds(3467, 1) == "3.5" and figures.seconds(5115, 1) == "5.1" and figures.seconds(None) == "-"
+    assert figures.two_places(6.2) == "6.20" and figures.two_places(6.0) == "6.00" and figures.two_places(None) == "-"
+    found = figures.figures(ROUNDS, four_arms(other=(1705, 1705, 1705)))
+    assert "2.30 s shorter, then 2.30 s shorter, then 2.30 s shorter" in figures.as_markdown(found)
+    for arm in found["arms"].values():
+        for r in arm["rounds"].values():
+            r["per_token"]["ms_per_token_all_in"] = 6.2
+    assert "| 6.20 |" in figures.rounds_table(found)
