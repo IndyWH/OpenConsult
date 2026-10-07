@@ -11,8 +11,11 @@ enters (Task 5b's rule).
 
 Stage 3b (spec 15.8): the differentials a rule reads are the list the
 pass gives, which under ruling 5 is the earlier list when the reply's
-own was empty. Such passes are counted, and Rule A of ruling 10 says
-who is a candidate: an arm that meets every hard mark.
+own was empty. Such passes are counted. Candidate means ruling 18: every
+hard mark met over the chains at temperature 0, the temperature the app
+uses, and none of those chains failed. The chains at 0.5 are a stress
+test, counted the same way and reported apart; they bar nothing. A
+chain's temperature is read from its result, never from its name.
 """
 
 from __future__ import annotations
@@ -270,11 +273,53 @@ def empty_and_kept(results: dict) -> dict:
     return {"empty_replies": len(empty), "kept_lists": len(kept), "empty_at": empty, "kept_at": kept}
 
 
+def chains_at(results: dict, temperature: float) -> dict:
+    """The chains at one temperature, read from the data (ruling 26)."""
+    return {key: r for key, r in results.items() if r.get("temperature") == temperature}
+
+
+def hard_over(results: dict) -> dict:
+    """The hard marks of 15.7 over these chains, with n their number: n of
+    n where the mark says 13 of 13, and none where it says none."""
+    n = len({chain for _, chain in results})
+    found = {}
+    for m in marks(results):
+        if m["kind"] != "hard":
+            continue
+        value = m["value"]
+        if isinstance(value, dict):
+            met = all(v == 0 for v in value.values()) if m["mark"] == "none" else all(v == n for v in value.values())
+        else:
+            met = value >= n
+        found[m["n"]] = {"rule": m["rule"], "value": value, "of": n, "met": bool(n and met)}
+    return found
+
+
+def at_temperature(results: dict, temperature: float) -> dict:
+    """The hard marks over the chains at one temperature, the chains that
+    failed there, and the soft marks as values beside them."""
+    mine = chains_at(results, temperature)
+    hard = hard_over(mine)
+    return {"temperature": temperature, "chains": len({chain for _, chain in mine}), "hard": hard,
+            "missed": [n for n, m in hard.items() if not m["met"]],
+            "failed": [f"{c}/{ch}" for (c, ch), r in sorted(mine.items()) if r["failed"]],
+            "soft": {m["n"]: m["value"] for m in marks(mine) if m["kind"] == "soft"} if mine else {}}
+
+
+def is_candidate(at_zero: dict) -> bool:
+    """Ruling 18: every hard mark met on the chains at temperature 0, and
+    none of them failed. No chain at 0, no candidate."""
+    return bool(at_zero["chains"]) and not at_zero["missed"] and not at_zero["failed"]
+
+
 def summary(results: dict) -> dict:
     rows = marks(results)
     hard_met = all(m["met"] for m in rows if m["kind"] == "hard")
+    at_zero = at_temperature(results, 0.0)
     return {"marks": rows,
-            "hard_met": hard_met, "candidate": hard_met, **empty_and_kept(results),
+            "hard_met": hard_met, "candidate": is_candidate(at_zero),
+            "at_temperature_0": at_zero, "stress_test": at_temperature(results, 0.5),
+            **empty_and_kept(results),
             "soft_met": sum(m["met"] for m in rows if m["kind"] == "soft"),
             "time_met": all(m["met"] for m in rows if m["kind"] == "time"),
             "chains": len(results), "failed_chains": [f"{c}/{ch}" for (c, ch), r in sorted(results.items()) if r["failed"]],
@@ -297,9 +342,26 @@ def as_markdown(scored: dict) -> str:
     counts = Counter(s["alarm"] for s in scored["per_chain"].values())
     lines.append(f"Distinct alarm strings: {len(counts)}. Empty replies: {scored['empty_replies']}. "
                  f"Kept lists: {scored['kept_lists']}.")
-    missed = ", ".join(m["n"] for m in scored["marks"] if m["kind"] == "hard" and not m["met"])
-    lines.append("Candidate: yes" if scored["candidate"] else f"Candidate: NO, missed {missed}")
+    lines.append(candidate_line(scored["at_temperature_0"]))
+    stress = scored["stress_test"]
+    lines.append(f"The stress test at 0.5, apart: {stress['chains']} chains; hard marks missed: "
+                 f"{', '.join(stress['missed']) or 'none'}; failed: {', '.join(stress['failed']) or 'none'}.")
     return "\n".join(lines) + "\n"
+
+
+def candidate_line(at_zero: dict) -> str:
+    """What the tool says about ruling 18, wherever it writes it."""
+    head = "Candidate (every hard mark met on the chains at temperature 0, none failed): "
+    if is_candidate(at_zero):
+        return head + "yes"
+    why = []
+    if not at_zero["chains"]:
+        why.append("no chain at temperature 0")
+    if at_zero["missed"]:
+        why.append("missed " + ", ".join(at_zero["missed"]))
+    if at_zero["failed"]:
+        why.append(("chain " if len(at_zero["failed"]) == 1 else "chains ") + ", ".join(at_zero["failed"]) + " failed")
+    return head + "no: " + "; ".join(why)
 
 
 def call_times(rows: list[dict]) -> dict:

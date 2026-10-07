@@ -14,8 +14,13 @@ def a_pass(point, diffs=(), questions=(), raw_actions=(), actions=None, judged=T
                            "questions": list(questions)}}
 
 
-def a_result(case, group, passes, chain="A1", failed=None):
-    return {"case": case, "group": group, "chain": chain, "failed": failed, "passes": passes}
+def a_result(case, group, passes, chain="A1", failed=None, temperature=None):
+    """A made-up chain result. Its temperature is data of its own, as in a
+    real result; by default the one its chain name would have in CHAINS."""
+    if temperature is None:
+        temperature = next((c.temperature for c in CHAINS if c.name == chain), 0.0)
+    return {"case": case, "group": group, "chain": chain, "temperature": temperature, "failed": failed,
+            "passes": passes}
 
 
 def test_9_2_the_495_rules_score_made_up_passes_as_written():
@@ -123,3 +128,56 @@ def test_9_2_a_failed_chain_is_scored_as_failed_on_every_mark_it_enters():
     # A missing chain counts as failed too: fewer than 13 on H6.
     del results[("06", "B10")]
     assert not {m["n"]: m for m in score.marks(results)}["H6"]["met"]
+
+
+def test_ruling_18_a_failed_chain_at_0_bars_an_arm_and_one_at_0_5_does_not():
+    at_zero = full_results()
+    at_zero[("15", "A2")]["failed"] = "a call failed at point 8: too_long"
+    scored = score.summary(at_zero)
+    assert scored["candidate"] is False and scored["at_temperature_0"]["failed"] == ["15/A2"]
+    assert not scored["hard_met"]                       # over all 13 chains H6 counts a failed chain as not fired
+    # Script 15 is a male case too: at 0 the failed chain counts as not fired (H6) and as a match (H7).
+    assert "no: missed H6, H7; chain 15/A2 failed" in score.as_markdown(scored)
+    stress = full_results()
+    stress[("15", "B4")]["failed"] = "a call failed at point 8: too_long"
+    scored = score.summary(stress)
+    assert scored["candidate"] is True and not scored["hard_met"]       # the stress test bars nothing
+    assert scored["stress_test"]["failed"] == ["15/B4"] and scored["stress_test"]["hard"]["H6"]["value"]["15"] == 9
+    assert "Candidate (every hard mark met on the chains at temperature 0, none failed): yes" in score.as_markdown(scored)
+    assert "failed: 15/B4" in score.as_markdown(scored)
+
+
+def test_ruling_18_the_hard_marks_at_temperature_0_count_n_of_n_and_none():
+    results = full_results()
+    for p in results[("495", "A3")]["passes"]:
+        p["assessment"]["differentials"] = [{"condition": "Something else", "likelihood": "low"}]
+    scored = score.summary(results)
+    at_zero, stress = scored["at_temperature_0"], scored["stress_test"]
+    assert (at_zero["chains"], stress["chains"]) == (3, 10)
+    assert at_zero["hard"]["H1"] == {"rule": "495: ectopic pregnancy on the list at some pass", "value": 2, "of": 3, "met": False}
+    assert at_zero["missed"] == ["H1"] and scored["candidate"] is False
+    assert at_zero["hard"]["H6"]["value"] == {c: 3 for c in score.EMERGENCY} and at_zero["hard"]["H6"]["met"]
+    assert at_zero["hard"]["H7"]["value"] == {c: 0 for c in score.MALE} and at_zero["hard"]["H7"]["met"]
+    assert stress["hard"]["H1"] == {"rule": at_zero["hard"]["H1"]["rule"], "value": 10, "of": 10, "met": True}
+    assert at_zero["soft"]["S8"] == 2 and stress["soft"]["S8"] == 10
+    assert "no: missed H1" in score.as_markdown(scored)
+    # A male case naming a female term at 0 misses H7 there, 'none' meaning none.
+    results = full_results()
+    results[("10", "A1")]["passes"][0]["assessment"]["differentials"] = [{"condition": "Ovarian torsion", "likelihood": "low"}]
+    assert score.summary(results)["at_temperature_0"]["hard"]["H7"]["met"] is False
+
+
+def test_ruling_26_the_temperature_is_read_from_the_data_and_not_from_the_name():
+    results = full_results()
+    for (case, chain), r in results.items():
+        r["temperature"] = 0.0 if chain == "B1" else 0.5     # the names lie; the data says B1 is the chain at 0
+    results[("15", "A1")]["failed"] = "a call failed at point 8: too_long"
+    scored = score.summary(results)
+    assert scored["at_temperature_0"]["chains"] == 1 and scored["candidate"] is True
+    assert scored["stress_test"]["chains"] == 12 and scored["stress_test"]["failed"] == ["15/A1"]
+    assert score.chains_at(results, 0.0) == {key: r for key, r in results.items() if key[1] == "B1"}
+    # A result with no temperature at all is at no temperature: no chain at 0, so no candidate.
+    for r in results.values():
+        del r["temperature"]
+    assert score.summary(results)["candidate"] is False
+    assert "no: no chain at temperature 0" in score.as_markdown(score.summary(results))
