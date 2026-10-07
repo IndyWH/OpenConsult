@@ -4,6 +4,169 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-07. Stage 3b: the engine bench
+
+Built over 6 and 7 Oct 2026 and published on 7 Oct, after the owner ruled
+that the bench of 7 Oct is the one public bench (spec 15.8, ruling 24).
+The two local publish commits of the first bench came out of the history
+first, in one rebase, with a bundle of the repo kept outside it.
+
+What was done, 6 Oct:
+- Two small items first. An empty list keeps the earlier list: when an
+  assessment reply fits its form but its list of differentials is empty,
+  and an earlier list exists, the pass gives the earlier entries whole,
+  says that the list was kept, and hands the same names to the next pass.
+  The record still holds the model's own reply. At the first pass empty
+  stays empty. And the terminal's second line now says the browser will
+  open by itself; the old line stays for --no-browser.
+- The pass is three plain functions: the two messages, the sending, the
+  settling. run_pass calls them in the same order and behaves as before.
+- Two more engines, llama.cpp and vLLM, as modules of the bench behind
+  the joint of stage 3 (bench/chat_engine.py, llamacpp.py, vllm.py). The
+  bench command takes the kind of engine, its address and the name it
+  knows the model by. The app cannot reach them and has no switch for
+  one; a test in a fresh Python proves it. No setting was built.
+- In the bench: the two calls of a pass sent together; the repeat test;
+  the exporter, which writes an arm's public form and never writes over
+  a published file; and the marks worked out again from published
+  replies (score --replies).
+What was done, 7 Oct:
+- Candidate means ruling 18: every hard mark met on the chains at
+  temperature 0, read from the data and never from a chain's name, and
+  none of them failed. The chains at 0.5 are a stress test, counted the
+  same way and reported apart. The 18 marks over 13 chains do not change.
+- bench/figures.py and the command openconsult-bench figures: the rules
+  of 7 Oct in the repo's own tool. The typical pass of a round, Rule B at
+  half a second in every round, the steadiness of the day on Ollama's own
+  rounds, the tokens written and the time for each token, and the counts
+  from the replies: failed chains, replies cut mid-sentence, empty and
+  kept lists, time critical with no action, the first alarm, the same
+  answer in every chain at 0. It works from the public folder alone and
+  gives the same figures from the private result folders. The rounds and
+  the arms' roles are data (engine-bench/rounds.json). Every figure in
+  seconds is rounded half up from the milliseconds, once. The compare
+  command, its line of 1 second and the 13-chain candidate went.
+- The exporter takes the card's memory over an arm's own steps (--steps),
+  because the arms took turns through the day.
+- Published in engine-bench: the report, how the bench was run, the
+  cases, the six arms of 7 Oct, rounds.json, the tool's figures as data,
+  the machine's figures as small data files, and bench-of-6-oct with the
+  two kept parts of the first bench. 71 files, 4.2 MB.
+- No library added. NOTICE has nothing to add.
+
+The rulings of spec 15.8, each in one line:
+1. Every prompt a model reads is put to the owner word for word. No
+   prompt changed; the two hashes are as v1's.
+2. The engine bench is published. Done: engine-bench.
+3. The v1 service is off. Nothing to do here.
+4. What the plan review of stage 3 settled is in the spec. Nothing here.
+5. An empty list keeps the earlier list. Done, in the pass.
+6. Showing the app somewhere else: stage 6's brainstorm. Nothing built.
+7. The vLLM arm ran the repack by xbill9, at its fixed revision. Done.
+8. The calls of a pass are also sent together, as a measurement. Done.
+9. Does an engine give the same answer twice: the repeat test, 6 Oct. Done.
+10. What counts as faster, as first fixed. Replaced by 17 and 18.
+11. Every case the bench reads is published. Done.
+12. The words in the terminal at the start. Done.
+13. The together arm on Ollama ran on a second Ollama process. Done.
+14. Ollama runs llama.cpp inside it. Said in the report.
+15. The two travel cases are published unchanged, with a note. Done.
+16. The push was held and vLLM got a second arm, with the switch. Done.
+17. Faster means half a second, in every round. In the tool.
+18. Temperature 0 decides who is a candidate. In the tool.
+19. The full bench ran again on 7 Oct. Done.
+20. The together arms ran the three chains at temperature 0. Done.
+21. Three rounds, the order rotating; steadiness on Ollama. Done.
+22. vLLM ran with the switch only; two figures per engine. Done.
+23. The first bench waited for the second. Done.
+24. One public bench, the bench of 7 Oct. Done.
+25. What the public folder holds. Done, as written.
+26. Anyone can rerun the figures: openconsult-bench figures. Done.
+27. How the two commits came out: bundle, then one rebase. Done.
+28. The first lines of the report in the owner's words; the docs script
+    checks each figure in them against the tool. Done.
+
+Decided in the plan reviews (Cowork), as decisions of this stage:
+- 6 Oct: the kept list holds the earlier entries whole, marked kept; a
+  failed assessment call is not an empty list. vLLM 0.31.0 and llama.cpp
+  v0.6.0, the newest on the day. In the repeat test the earlier list came
+  from the reference arm's chain A1. Nothing public names a path, a user
+  or a host; the word check reads the unpacked text of each packed file.
+- 7 Oct: the card over an arm's own steps is the pooled median. A reply
+  that did not end ok or cannot be read as its form is counted apart,
+  never as cut. A difference below zero is written as longer. The kept
+  files of 6 Oct are as written then, and the note in bench-of-6-oct says
+  what candidate meant that day. No figure from an arm that is not in
+  the folder. Seconds are rounded half up from the milliseconds, once.
+
+For stage 6:
+- Whether the screen keeps the earlier list through a failed assessment
+  call is the owner's ruling then. Nothing is built for it.
+- Sending the two calls together shortens the pass on every engine, but
+  the alarm itself comes back later (1.46 s against 1.12 s on Ollama),
+  and on Ollama it needs OLLAMA_NUM_PARALLEL=2, which the service does
+  not set. The app still sends one after another.
+- The stray quote (ruling 16) goes to the session on the two carried
+  prompts. The engine choice has a brainstorm of its own: a compact form
+  for Ollama or llama.cpp, and the speech model beside the language model
+  on the card, were not tested.
+
+Measurements. The bench's figures are from engine-bench/README.md.
+- 199 tests, 4.5 s, none skipped (191 before). App code about 2,260 lines
+  without the bench; the bench 2,064; tests 3,190. Largest file
+  bench/figures.py, 407 lines. CLAUDE.md 99 lines.
+- The run of 7 Oct: 768 chains, 14,016 calls, every call ok, no chain
+  failed; 07:17 to 15:25, nobody at the desk, the screensaver never seen
+  in 487 minutes.
+- Every hard mark met on every engine at both temperatures. Over 13
+  chains llama.cpp missed two soft marks (S10 13, 9 and S14 6).
+- The typical pass of 495 by round, one after another: Ollama 5.13,
+  5.07, 5.12 s; llama.cpp 5.12, 5.12, 5.12; vLLM 3.56, 3.47, 3.43. Sent
+  together: 3.76, 3.76, 3.75; 3.83, 3.81, 3.85; 2.78, 2.78, 2.77. The day
+  was steady: Ollama's rounds 0.06 s apart.
+- Rule B: vLLM faster by the rule, 1.57, 1.61 and 1.69 s shorter than
+  Ollama one after another and 0.98, 0.99, 0.98 s shorter together.
+  llama.cpp not faster either way (0.01 shorter to 0.05 longer; 0.07 to
+  0.10 longer together). Every together arm is more than 1.25 s shorter
+  than Ollama one after another in every round.
+- At temperature 0 vLLM wrote 254,979 tokens against 319,170 on Ollama
+  and 325,947 on llama.cpp (20 % fewer), at 5.33 ms a token against 6.44
+  and 6.52 (17 % less). About half of its gain is the switch.
+- Replies cut mid-sentence at 0.5: Ollama 23, llama.cpp 35, vLLM 21 of
+  2,920; at 0: 0, 6, 0. The vLLM arm of 6 Oct without the switch: 14
+  chains failed, all at 0.5. Time critical with no action: 65, 29, 73.
+- The same answer in all three chains at 0: 16 of 16 cases on Ollama
+  and llama.cpp, 0 on vLLM. The repeat test of 6 Oct, sets of ten all the
+  same, of 12: Ollama 2; llama.cpp 3, and 12 with its prompt cache off;
+  vLLM 0, and 10 with batch invariance on.
+- The card, pooled over each arm's own steps: Ollama 17,139 MiB (70 %),
+  llama.cpp 15,591 (63 %), vLLM 23,137 (94 %, its fixed share). Starts:
+  llama.cpp 2.0 s, vLLM 25.8 s; Ollama's first call with the model not
+  loaded 3.4 to 3.5 s.
+- Empty lists: 3 on Ollama, each kept, all at 0.5; none elsewhere.
+- The private word check printed nothing before every commit but the
+  published folder's, where its 61 lines are all in case and reply files
+  and equal the list Cowork read at the gate.
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: the bench commands, now with figures and export
+  and the kinds of engine. README: the line that points to engine-bench.
+  Both fixed in this commit.
+- V2_SPEC.md 15.8, the details of 6 Oct: the reference arm is not
+  published (ruling 25 says so); compare.json and compare.md no longer
+  exist; the typical pass of ruling 10 is replaced by that of 17. Ruling 7
+  and 15.7 ruling 5 were corrected by the owner on 6 Oct. 15.8 ruling 24
+  gives the card as 23,137 and 17,139 MiB: that is the pooled median over
+  the arm's own steps, which the tool and the exporter now use.
+- V1_LESSONS 9.1 says temperature 0 with a fixed seed is not
+  reproducible. On 7 Oct it was, on Ollama and llama.cpp, on 16 of 16
+  cases over three chains hours apart; on vLLM it was not.
+
+Next: the owner reads the report and pushes; the GitHub check must be
+green on all three systems. Then, if he wishes, his answer to issue 1 in
+his own words. Owed before stage 6: the session in which the owner and
+Cowork read the two carried prompts word for word.
+
 ## 2026-10-04. Stage 3: the language model door
 
 What was done:
