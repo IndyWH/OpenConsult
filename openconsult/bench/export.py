@@ -110,21 +110,33 @@ def reply_lines(results: dict, rows: dict) -> list[dict]:
     return lines
 
 
-def card_memory(csv: Path, first: str, last: str) -> dict | None:
-    """The sampler's readings between an arm's first and last call: MiB in use."""
-    start, end = (dt.datetime.fromisoformat(at).replace(tzinfo=None) for at in (first, last))
+def card_memory(csv: Path, windows: list[tuple[str, str]]) -> dict | None:
+    """The sampler's readings inside the given windows, pooled: MiB in use.
+    The windows are an arm's own steps, because the arms took turns
+    through the day; or its first and last call, when no steps are given."""
+    spans = [tuple(dt.datetime.fromisoformat(at).replace(tzinfo=None) for at in window) for window in windows]
     used = []
     for row in Path(csv).read_text(encoding="utf-8").splitlines():
         parts = [part.strip() for part in row.split(",")]
         try:
             when = dt.datetime.strptime(parts[0], "%Y/%m/%d %H:%M:%S.%f")
-            if start <= when <= end:
+            if any(start <= when <= end for start, end in spans):
                 used.append(int(parts[1].split()[0]))
         except (ValueError, IndexError):
             continue
     if not used:
         return None
-    return {"samples": len(used), "lowest_mib": min(used), "median_mib": score.med(used), "highest_mib": max(used)}
+    return {"samples": len(used), "windows": len(spans), "lowest_mib": min(used), "median_mib": score.med(used),
+            "highest_mib": max(used)}
+
+
+def steps_of(steps_file: Path, arm: str) -> list[tuple[str, str]]:
+    """The windows of an arm's own steps, from the published steps file."""
+    steps = json.loads(Path(steps_file).read_text(encoding="utf-8"))["steps"]
+    found = [(step["start"], step["end"]) for step in steps if step["arm"] == arm]
+    if not found:
+        raise Refused(f"{steps_file} names no step of the arm {arm}")
+    return found
 
 
 def pass_times(results: dict) -> dict:
@@ -137,8 +149,11 @@ def pass_times(results: dict) -> dict:
             for group, ms in sorted(by_group.items())}
 
 
-def arm_files(name: str, out: Path, card: Path | None = None, facts: dict | None = None) -> dict[str, bytes]:
-    """An arm's public files, from its result files and its record of calls."""
+def arm_files(name: str, out: Path, card: Path | None = None, facts: dict | None = None,
+              steps: list[tuple[str, str]] | None = None) -> dict[str, bytes]:
+    """An arm's public files, from its result files and its record of
+    calls. The card's memory is taken over the arm's own steps when they
+    are given, else between its first and last call."""
     results = ResultWriter(out).read_all()
     if not results:
         raise Refused(f"{out} holds no result")
@@ -150,6 +165,7 @@ def arm_files(name: str, out: Path, card: Path | None = None, facts: dict | None
                        else [p[job]["call_id"] for p in r["passes"] for job in JOBS])]
     first, last = min(row["at"] for row in named), max(row["at"] for row in named)
     stamp = next(iter(results.values()))
+    memory = card_memory(card, steps or [(first, last)]) if card else None
     arm = {"arm": name, "kind": "repeat" if repeat else "chains",
            "together": any(r.get("together") for r in results.values()),
            **{key: stamp.get(key) for key in ("engine", "engine_version", "model_tag", "model_digest", "prompts")},
@@ -158,7 +174,8 @@ def arm_files(name: str, out: Path, card: Path | None = None, facts: dict | None
            "results": len(results), "calls": len(lines),
            "outcomes": dict(Counter(line["outcome"] for line in lines)),
            "first_call_at": first, "last_call_at": last,
-           "card": card_memory(card, first, last) if card else None, "facts": facts or {}}
+           "card": {"over": "the arm's own steps" if steps else "first call to last call", **memory} if memory else None,
+           "facts": facts or {}}
     packed = gzip.compress("".join(json.dumps(line, ensure_ascii=False) + "\n" for line in lines).encode("utf-8"),
                            mtime=0)   # no time stamp inside: the same run always gives the same file
     files = {f"arms/{name}/arm.json": as_json(arm), f"arms/{name}/replies.jsonl.gz": packed}

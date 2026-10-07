@@ -99,7 +99,8 @@ def test_15_8_the_public_form_holds_every_reply_and_no_request(arm, capsys):
     arm_said = json.loads(texts["arms/made-up-arm/arm.json"])
     assert (arm_said["engine"], arm_said["engine_version"], arm_said["model_digest"]) == ("ollama", "0.0-made-up", "made-up-digest")
     assert arm_said["calls"] == len(lines) and arm_said["facts"] == {"start_to_first_answer_s": "12.5"}
-    assert arm_said["card"] == {"samples": 2, "lowest_mib": 17000, "median_mib": 17200.0, "highest_mib": 17400}
+    assert arm_said["card"] == {"over": "first call to last call", "samples": 2, "windows": 1, "lowest_mib": 17000,
+                                "median_mib": 17200.0, "highest_mib": 17400}
     assert json.loads(texts["arms/made-up-arm/times.json"])["calls"]["alarm"]["calls"] == sum(1 for l in lines if l["job"] == "alarm")
     # No request: not the prompt, not the patient line, not a transcript, in any file of the arm.
     for name, text in texts.items():
@@ -177,4 +178,32 @@ def test_ruling_11_the_replies_of_the_repeat_test_are_published_with_their_count
     assert len(lines) == 2 * (10 + 19) and {line["role"] for line in lines} == {"test", "between"}
     assert json.loads(texts["arms/made-up-repeat/arm.json"])["kind"] == "repeat"
     assert "arms/made-up-repeat/marks.json" not in texts
+    capsys.readouterr()
+
+
+def test_15_8_the_card_is_taken_over_an_arms_own_steps(arm, capsys):
+    """The arms took turns through the day, so the card's memory of an arm
+    is pooled over its own steps, and a reading between two of its steps,
+    another engine's, is left out."""
+    cases, out, public, _ = arm
+    csv = public.parent / "steps-card.csv"
+    csv.write_text("2026/10/07 08:00:00.000, 17000 MiB, 24564 MiB\n"      # step one
+                   "2026/10/07 08:05:00.000, 17200 MiB, 24564 MiB\n"      # step one
+                   "2026/10/07 09:00:00.000, 23000 MiB, 24564 MiB\n"      # between: another engine's turn
+                   "2026/10/07 10:00:00.000, 17100 MiB, 24564 MiB\n"      # step two
+                   "2026/10/07 10:30:00.001, 600 MiB, 24564 MiB\n", encoding="utf-8")  # after step two
+    steps = {"how": "made up", "steps": [
+        {"name": "r1-made-up-A1", "arm": "made-up-arm", "start": "2026-10-07T08:00:00+01:00", "end": "2026-10-07T08:10:00+01:00"},
+        {"name": "r1-other", "arm": "another-arm", "start": "2026-10-07T08:50:00+01:00", "end": "2026-10-07T09:10:00+01:00"},
+        {"name": "r2-made-up-A2", "arm": "made-up-arm", "start": "2026-10-07T09:50:00+01:00", "end": "2026-10-07T10:30:00+01:00"}]}
+    (public.parent / "steps.json").write_text(json.dumps(steps), encoding="utf-8")
+    assert export.card_memory(csv, export.steps_of(public.parent / "steps.json", "made-up-arm")) == {
+        "samples": 3, "windows": 2, "lowest_mib": 17000, "median_mib": 17100, "highest_mib": 17200}
+    assert main(["export", "--public", str(public), "--arm", "made-up-arm", "--out", str(out), "--card", str(csv),
+                 "--steps", str(public.parent / "steps.json")]) == 0
+    said = json.loads(every_text(public)["arms/made-up-arm/arm.json"])["card"]
+    assert said == {"over": "the arm's own steps", "samples": 3, "windows": 2, "lowest_mib": 17000, "median_mib": 17100,
+                    "highest_mib": 17200}
+    with pytest.raises(Refused, match="names no step of the arm nobody"):
+        export.steps_of(public.parent / "steps.json", "nobody")
     capsys.readouterr()

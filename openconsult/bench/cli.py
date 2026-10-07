@@ -134,7 +134,8 @@ def cmd_export(args) -> int:
         ResultWriter(public, forbidden=(REPO, paths.default_data_folder()))   # never straight into the repo
         if args.arm:
             facts = dict(item.split("=", 1) for item in args.fact or [])
-            files = export.arm_files(args.arm, Path(args.out), Path(args.card) if args.card else None, facts)
+            steps = export.steps_of(Path(args.steps), args.arm) if args.steps else None
+            files = export.arm_files(args.arm, Path(args.out), Path(args.card) if args.card else None, facts, steps)
             what = f"{args.arm}: {json.loads(files[f'arms/{args.arm}/arm.json'])['calls']} replies"
         else:
             files = export.case_files(Path(args.cases))
@@ -226,6 +227,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--cases", help="the private folder of cases, to publish the cases")
     p.add_argument("--arm", help="the public name of the arm in --out, to publish an arm")
     p.add_argument("--card", help="the sampler's file")
+    p.add_argument("--steps", help="the steps file: the card is taken over the arm's own steps")
     p.add_argument("--fact", action="append", help="KEY=VALUE, a measured fact to keep with the arm")
     args = parser.parse_args(argv)
     if args.command == "score" and not (args.out or args.replies):
