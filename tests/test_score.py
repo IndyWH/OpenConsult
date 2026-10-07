@@ -130,6 +130,26 @@ def test_9_2_a_failed_chain_is_scored_as_failed_on_every_mark_it_enters():
     assert not {m["n"]: m for m in score.marks(results)}["H6"]["met"]
 
 
+def test_ruling_5_the_score_counts_empty_replies_and_kept_lists():
+    listed = [("Made-up thing", "low")]
+    kept = a_pass(2, diffs=listed)
+    kept["assessment"]["kept"] = True                  # the reply's own list was empty; the earlier one stands
+    first_empty = a_pass(1)
+    first_empty["assessment"]["kept"] = False          # empty at the first pass: nothing to keep
+    failed = a_pass(3)
+    failed["assessment"]["ok"] = False                 # a failed call is not an empty reply
+    before_ruling_5 = a_pass(2)                        # written by stage 3: no such mark, an empty list
+    results = {("495", "A1"): a_result("495", "495", [first_empty, kept, failed]),
+               ("495", "A2"): a_result("495", "495", [a_pass(1, diffs=listed), before_ruling_5], chain="A2")}
+    found = score.empty_and_kept(results)
+    assert (found["empty_replies"], found["kept_lists"]) == (3, 1)
+    assert found["kept_at"] == ["495/A1 point 2"]
+    assert found["empty_at"] == ["495/A1 point 1", "495/A1 point 2", "495/A2 point 2"]
+    assert score.summary(results)["kept_lists"] == 1
+    # A kept list is the list the rules read.
+    assert score.score_495(results[("495", "A1")])["first_diff"][2] == "Made-up thing"
+
+
 def test_ruling_18_a_failed_chain_at_0_bars_an_arm_and_one_at_0_5_does_not():
     at_zero = full_results()
     at_zero[("15", "A2")]["failed"] = "a call failed at point 8: too_long"

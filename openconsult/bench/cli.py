@@ -1,5 +1,5 @@
 """The bench command, openconsult-bench (spec 15.7, 15.8): run, repeat,
-score, compare, export and wordcheck. It goes through the same door as the app and can be pointed
+score, figures, export and wordcheck. It goes through the same door as the app and can be pointed
 at any engine by its kind, its address and the name it knows the model
 by. It never writes to the app's data: its results and its own record
 of calls go to the folder it is given."""
@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import openconsult
-from openconsult.bench import compare, export, score, wordcheck
+from openconsult.bench import export, figures, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
@@ -147,17 +147,25 @@ def cmd_export(args) -> int:
     return 0
 
 
-def cmd_compare(args) -> int:
-    """One table that sets the arms side by side (spec 15.8)."""
-    folders = dict(item.split("=", 1) for item in args.arm)
-    arms = {name: ResultWriter(Path(folder)).read_all() for name, folder in folders.items()}
-    found = compare.table(arms, args.baseline, dict(item.split("=", 1) for item in args.pair or []))
-    out = Path(args.out)
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "compare.json").write_text(json.dumps(found, indent=1, ensure_ascii=False), encoding="utf-8", newline="\n")
-    text = compare.as_markdown(found)
-    (out / "compare.md").write_text(text, encoding="utf-8", newline="\n")
-    print(text)
+def cmd_figures(args) -> int:
+    """The figures of the public report, by the rules of 7 Oct (spec 15.8,
+    ruling 26): from the public folder alone, or from the private result
+    folders with the same rounds file. Prints them; writes only with --out,
+    and never over a file that exists."""
+    try:
+        if args.public:
+            rounds = figures.read_rounds(Path(args.public) / "rounds.json")
+            arms = figures.public_arms(Path(args.public), rounds)
+        else:
+            rounds = figures.read_rounds(Path(args.rounds))
+            arms = {name: figures.private_arm(Path(folder)) for name, folder in (item.split("=", 1) for item in args.arm)}
+        found = figures.figures(rounds, arms)
+        if args.out:
+            figures.write(Path(args.out), found)
+    except (figures.FiguresRefused, Refused) as refused:
+        say(f"STOP: {refused}")
+        return 7
+    print(figures.as_markdown(found), end="")
     return 0
 
 
@@ -209,10 +217,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--workload", nargs="*", help="only these v1 workloads")
     p = command("score", cmd_score, out=False)
     p.add_argument("--replies", help="score a published replies file")
-    p = command("compare", cmd_compare)
-    p.add_argument("--arm", action="append", required=True, help="NAME=FOLDER, once for each arm")
-    p.add_argument("--baseline", required=True, help="the arm the seconds are held against")
-    p.add_argument("--pair", action="append", help="TOGETHER=FULL: an arm sent together and the full arm of its engine")
+    p = command("figures", cmd_figures, out=False)
+    p.add_argument("--public", help="the public folder: its rounds.json and the replies of its arms")
+    p.add_argument("--rounds", help="the rounds file, when the arms are private result folders")
+    p.add_argument("--arm", action="append", help="NAME=FOLDER, a private result folder for each arm the rounds file names")
     p = command("export", cmd_export, out=False)
     p.add_argument("--public", required=True, help="the public folder to write")
     p.add_argument("--cases", help="the private folder of cases, to publish the cases")
@@ -222,6 +230,8 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     if args.command == "score" and not (args.out or args.replies):
         parser.error("score needs --out or --replies")
+    if args.command == "figures" and bool(args.public) == bool(args.rounds and args.arm):
+        parser.error("figures needs --public, or --rounds with --arm")
     if args.command == "export" and bool(args.arm) == bool(args.cases):
         parser.error("export needs --cases, or --arm with --out")
     if args.command == "export" and args.arm and not args.out:
