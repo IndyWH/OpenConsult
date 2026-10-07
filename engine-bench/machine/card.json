@@ -1,0 +1,250 @@
+{
+ "how": "nvidia-smi --query-gpu=timestamp,memory.used,memory.total every 5 seconds through the whole run, MiB in use on the one card of 24,564 MiB, the desktop's own use included. An arm's figure pools every sample inside that arm's own steps (steps.json), because the arms took turns through the day; the median is the typical figure, and the share is that median over 24,564. vLLM takes a fixed share of the card whatever the model needs (0.92 by default), so its figure is that share and not the model's need.",
+ "card_mib": 24564,
+ "samples_in_all": 5836,
+ "lowest_sample_mib": 563,
+ "first_sample": "2026-10-07T07:17:07",
+ "last_sample": "2026-10-07T15:25:12",
+ "note_on_the_sampler": "The sampler was restarted a minute into the first step, so about 10 seconds of samples are missing there.",
+ "arms": {
+  "ollama-google-file": {
+   "samples": 1779,
+   "windows": 6,
+   "lowest_mib": 14713,
+   "median_mib": 17139,
+   "highest_mib": 17289,
+   "share_of_card": 0.6977
+  },
+  "ollama-together": {
+   "samples": 322,
+   "windows": 3,
+   "lowest_mib": 563,
+   "median_mib": 17859.0,
+   "highest_mib": 17859,
+   "share_of_card": 0.727
+  },
+  "llamacpp-google-file": {
+   "samples": 1866,
+   "windows": 6,
+   "lowest_mib": 15539,
+   "median_mib": 15591.0,
+   "highest_mib": 15591,
+   "share_of_card": 0.6347
+  },
+  "llamacpp-together": {
+   "samples": 331,
+   "windows": 3,
+   "lowest_mib": 16169,
+   "median_mib": 16201,
+   "highest_mib": 16201,
+   "share_of_card": 0.6595
+  },
+  "vllm-repack-compact": {
+   "samples": 1288,
+   "windows": 6,
+   "lowest_mib": 23027,
+   "median_mib": 23137.0,
+   "highest_mib": 23137,
+   "share_of_card": 0.9419
+  },
+  "vllm-together-compact": {
+   "samples": 223,
+   "windows": 3,
+   "lowest_mib": 23137,
+   "median_mib": 23137,
+   "highest_mib": 23137,
+   "share_of_card": 0.9419
+  }
+ },
+ "steps": {
+  "r1-ollama-A1": {
+   "samples": 138,
+   "windows": 1,
+   "lowest_mib": 17139,
+   "median_mib": 17143.0,
+   "highest_mib": 17289
+  },
+  "r1-ollama-B1-B3": {
+   "samples": 407,
+   "windows": 1,
+   "lowest_mib": 17139,
+   "median_mib": 17139,
+   "highest_mib": 17139
+  },
+  "r1-ollama-together-A1": {
+   "samples": 107,
+   "windows": 1,
+   "lowest_mib": 17859,
+   "median_mib": 17859,
+   "highest_mib": 17859
+  },
+  "r1-llamacpp-A1": {
+   "samples": 143,
+   "windows": 1,
+   "lowest_mib": 15549,
+   "median_mib": 15591,
+   "highest_mib": 15591
+  },
+  "r1-llamacpp-B1-B3": {
+   "samples": 432,
+   "windows": 1,
+   "lowest_mib": 15591,
+   "median_mib": 15591.0,
+   "highest_mib": 15591
+  },
+  "r1-llamacpp-together-A1": {
+   "samples": 110,
+   "windows": 1,
+   "lowest_mib": 16201,
+   "median_mib": 16201.0,
+   "highest_mib": 16201
+  },
+  "r1-vllm-A1": {
+   "samples": 91,
+   "windows": 1,
+   "lowest_mib": 23071,
+   "median_mib": 23135,
+   "highest_mib": 23135
+  },
+  "r1-vllm-B1-B3": {
+   "samples": 305,
+   "windows": 1,
+   "lowest_mib": 23137,
+   "median_mib": 23137,
+   "highest_mib": 23137
+  },
+  "r1-vllm-together-A1": {
+   "samples": 74,
+   "windows": 1,
+   "lowest_mib": 23137,
+   "median_mib": 23137.0,
+   "highest_mib": 23137
+  },
+  "r2-llamacpp-A2": {
+   "samples": 144,
+   "windows": 1,
+   "lowest_mib": 15549,
+   "median_mib": 15591.0,
+   "highest_mib": 15591
+  },
+  "r2-llamacpp-B4-B6": {
+   "samples": 431,
+   "windows": 1,
+   "lowest_mib": 15591,
+   "median_mib": 15591,
+   "highest_mib": 15591
+  },
+  "r2-llamacpp-together-A2": {
+   "samples": 110,
+   "windows": 1,
+   "lowest_mib": 16201,
+   "median_mib": 16201.0,
+   "highest_mib": 16201
+  },
+  "r2-vllm-A2": {
+   "samples": 92,
+   "windows": 1,
+   "lowest_mib": 23027,
+   "median_mib": 23135.0,
+   "highest_mib": 23135
+  },
+  "r2-vllm-B4-B6": {
+   "samples": 304,
+   "windows": 1,
+   "lowest_mib": 23137,
+   "median_mib": 23137.0,
+   "highest_mib": 23137
+  },
+  "r2-vllm-together-A2": {
+   "samples": 74,
+   "windows": 1,
+   "lowest_mib": 23137,
+   "median_mib": 23137.0,
+   "highest_mib": 23137
+  },
+  "r2-ollama-A2": {
+   "samples": 138,
+   "windows": 1,
+   "lowest_mib": 17129,
+   "median_mib": 17139.0,
+   "highest_mib": 17139
+  },
+  "r2-ollama-B4-B6": {
+   "samples": 411,
+   "windows": 1,
+   "lowest_mib": 17139,
+   "median_mib": 17139,
+   "highest_mib": 17139
+  },
+  "r2-ollama-together-A2": {
+   "samples": 108,
+   "windows": 1,
+   "lowest_mib": 563,
+   "median_mib": 17859.0,
+   "highest_mib": 17859
+  },
+  "r3-vllm-A3": {
+   "samples": 92,
+   "windows": 1,
+   "lowest_mib": 23071,
+   "median_mib": 23135.0,
+   "highest_mib": 23135
+  },
+  "r3-vllm-B7-B10": {
+   "samples": 404,
+   "windows": 1,
+   "lowest_mib": 23137,
+   "median_mib": 23137.0,
+   "highest_mib": 23137
+  },
+  "r3-vllm-together-A3": {
+   "samples": 75,
+   "windows": 1,
+   "lowest_mib": 23137,
+   "median_mib": 23137,
+   "highest_mib": 23137
+  },
+  "r3-ollama-A3": {
+   "samples": 138,
+   "windows": 1,
+   "lowest_mib": 14713,
+   "median_mib": 17139.0,
+   "highest_mib": 17139
+  },
+  "r3-ollama-B7-B10": {
+   "samples": 547,
+   "windows": 1,
+   "lowest_mib": 17139,
+   "median_mib": 17139,
+   "highest_mib": 17139
+  },
+  "r3-ollama-together-A3": {
+   "samples": 107,
+   "windows": 1,
+   "lowest_mib": 14713,
+   "median_mib": 17859,
+   "highest_mib": 17859
+  },
+  "r3-llamacpp-A3": {
+   "samples": 143,
+   "windows": 1,
+   "lowest_mib": 15539,
+   "median_mib": 15591,
+   "highest_mib": 15591
+  },
+  "r3-llamacpp-B7-B10": {
+   "samples": 573,
+   "windows": 1,
+   "lowest_mib": 15591,
+   "median_mib": 15591,
+   "highest_mib": 15591
+  },
+  "r3-llamacpp-together-A3": {
+   "samples": 111,
+   "windows": 1,
+   "lowest_mib": 16169,
+   "median_mib": 16201,
+   "highest_mib": 16201
+  }
+ }
+}

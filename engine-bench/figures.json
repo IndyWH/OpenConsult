@@ -1,0 +1,2951 @@
+{
+ "rules": {
+  "faster_by_ms": 500,
+  "steady_within_ms": 250,
+  "typical_of": "495",
+  "sentence_ends": [
+   ".",
+   "?",
+   "!",
+   ")",
+   "]",
+   "\"",
+   "'",
+   "%"
+  ]
+ },
+ "rounds": {
+  "1": {
+   "chain": "A1",
+   "stress": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "order": [
+    "Ollama",
+    "llama.cpp",
+    "vLLM"
+   ]
+  },
+  "2": {
+   "chain": "A2",
+   "stress": [
+    "B4",
+    "B5",
+    "B6"
+   ],
+   "order": [
+    "llama.cpp",
+    "vLLM",
+    "Ollama"
+   ]
+  },
+  "3": {
+   "chain": "A3",
+   "stress": [
+    "B7",
+    "B8",
+    "B9",
+    "B10"
+   ],
+   "order": [
+    "vLLM",
+    "Ollama",
+    "llama.cpp"
+   ]
+  }
+ },
+ "roles": {
+  "ollama-google-file": {
+   "engine": "Ollama",
+   "way": "one after another"
+  },
+  "llamacpp-google-file": {
+   "engine": "llama.cpp",
+   "way": "one after another"
+  },
+  "vllm-repack-compact": {
+   "engine": "vLLM",
+   "way": "one after another"
+  },
+  "ollama-together": {
+   "engine": "Ollama",
+   "way": "together"
+  },
+  "llamacpp-together": {
+   "engine": "llama.cpp",
+   "way": "together"
+  },
+  "vllm-together-compact": {
+   "engine": "vLLM",
+   "way": "together"
+  }
+ },
+ "baseline": "ollama-google-file",
+ "baseline_together": "ollama-together",
+ "steadiness": {
+  "typical_ms_by_round": [
+   5127,
+   5072,
+   5115
+  ],
+  "spread_ms": 55,
+  "steady": true,
+  "line_ms": 250
+ },
+ "judgements": [
+  {
+   "arm": "llamacpp-google-file",
+   "against": "ollama-google-file",
+   "typical_ms": [
+    5120,
+    5120,
+    5122
+   ],
+   "against_typical_ms": [
+    5127,
+    5072,
+    5115
+   ],
+   "shorter_by_ms": [
+    7,
+    -48,
+    -7
+   ],
+   "in_every_round": false,
+   "candidate": true,
+   "verdict": "a figure, not a win",
+   "faster": false
+  },
+  {
+   "arm": "vllm-repack-compact",
+   "against": "ollama-google-file",
+   "typical_ms": [
+    3555,
+    3467,
+    3427
+   ],
+   "against_typical_ms": [
+    5127,
+    5072,
+    5115
+   ],
+   "shorter_by_ms": [
+    1572,
+    1605,
+    1688
+   ],
+   "in_every_round": true,
+   "candidate": true,
+   "verdict": "faster by the rule",
+   "faster": true
+  },
+  {
+   "arm": "llamacpp-together",
+   "against": "ollama-together",
+   "typical_ms": [
+    3828,
+    3814,
+    3851
+   ],
+   "against_typical_ms": [
+    3756,
+    3763,
+    3750
+   ],
+   "shorter_by_ms": [
+    -72,
+    -51,
+    -101
+   ],
+   "in_every_round": false,
+   "candidate": true,
+   "verdict": "a figure, not a win",
+   "faster": false
+  },
+  {
+   "arm": "vllm-together-compact",
+   "against": "ollama-together",
+   "typical_ms": [
+    2777,
+    2777,
+    2768
+   ],
+   "against_typical_ms": [
+    3756,
+    3763,
+    3750
+   ],
+   "shorter_by_ms": [
+    979,
+    986,
+    982
+   ],
+   "in_every_round": true,
+   "candidate": true,
+   "verdict": "faster by the rule",
+   "faster": true
+  },
+  {
+   "arm": "ollama-together",
+   "against": "ollama-google-file",
+   "typical_ms": [
+    3756,
+    3763,
+    3750
+   ],
+   "against_typical_ms": [
+    5127,
+    5072,
+    5115
+   ],
+   "shorter_by_ms": [
+    1371,
+    1309,
+    1365
+   ],
+   "in_every_round": true,
+   "candidate": true,
+   "verdict": "faster by the rule",
+   "faster": true
+  },
+  {
+   "arm": "llamacpp-together",
+   "against": "ollama-google-file",
+   "typical_ms": [
+    3828,
+    3814,
+    3851
+   ],
+   "against_typical_ms": [
+    5127,
+    5072,
+    5115
+   ],
+   "shorter_by_ms": [
+    1299,
+    1258,
+    1264
+   ],
+   "in_every_round": true,
+   "candidate": true,
+   "verdict": "faster by the rule",
+   "faster": true
+  },
+  {
+   "arm": "vllm-together-compact",
+   "against": "ollama-google-file",
+   "typical_ms": [
+    2777,
+    2777,
+    2768
+   ],
+   "against_typical_ms": [
+    5127,
+    5072,
+    5115
+   ],
+   "shorter_by_ms": [
+    2350,
+    2295,
+    2347
+   ],
+   "in_every_round": true,
+   "candidate": true,
+   "verdict": "faster by the rule",
+   "faster": true
+  }
+ ],
+ "arms": {
+  "ollama-google-file": {
+   "candidate": true,
+   "at_temperature_0": {
+    "temperature": 0.0,
+    "chains": 3,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 3,
+       "06": 3,
+       "07": 3,
+       "08": 3,
+       "10": 3,
+       "14": 3,
+       "15": 3
+      },
+      "of": 3,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 3,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 5,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     }
+    }
+   },
+   "stress_test": {
+    "temperature": 0.5,
+    "chains": 10,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 10,
+       "06": 10,
+       "07": 10,
+       "08": 10,
+       "10": 10,
+       "14": 10,
+       "15": 10
+      },
+      "of": 10,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 10,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 10,
+     "S9": 10,
+     "S10": [
+      10,
+      9
+     ],
+     "S11": 10,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 1,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 10,
+     "S14": 4.0,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 10,
+      "14": 10,
+      "15": 10
+     },
+     "S16": {
+      "01": 10,
+      "06": 10,
+      "07": 10,
+      "08": 10,
+      "10": 10,
+      "14": 10,
+      "15": 10
+     }
+    }
+   },
+   "all_chains": {
+    "chains": 208,
+    "hard_met": true,
+    "soft_met": 9,
+    "time_met": true,
+    "failed": [],
+    "marks": {
+     "H1": 13,
+     "H2": 13,
+     "H3": 13,
+     "H4": 13,
+     "H5": 13,
+     "H6": {
+      "01": 13,
+      "06": 13,
+      "07": 13,
+      "08": 13,
+      "10": 13,
+      "14": 13,
+      "15": 13
+     },
+     "H7": {
+      "T2": 0,
+      "01": 0,
+      "05": 0,
+      "06": 0,
+      "07": 0,
+      "10": 0,
+      "12": 0,
+      "15": 0
+     },
+     "S8": 13,
+     "S9": 13,
+     "S10": [
+      13,
+      12
+     ],
+     "S11": 13,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 1,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 13,
+     "S14": 4,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 13,
+      "14": 13,
+      "15": 13
+     },
+     "S16": {
+      "01": 13,
+      "06": 13,
+      "07": 13,
+      "08": 13,
+      "10": 13,
+      "14": 13,
+      "15": 13
+     },
+     "T17": 4.972,
+     "T18": 5.476
+    }
+   },
+   "rounds": {
+    "1": {
+     "chain": "A1",
+     "typical_ms": 5127,
+     "passes": 11,
+     "slowest_ms": 5402,
+     "all_cases_median_ms": 4736.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 5845,
+     "alarm_median_ms": 1124.5,
+     "assessment_median_ms": 3497.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 106390,
+      "ms_per_token_all_in": 6.45,
+      "ms_per_token_writing": 5.93,
+      "tokens_written_median": 329.0
+     },
+     "per_token_round": {
+      "calls": 1168,
+      "tokens_written": 420760,
+      "ms_per_token_all_in": 6.45,
+      "ms_per_token_writing": 5.93,
+      "tokens_written_median": 268.5
+     }
+    },
+    "2": {
+     "chain": "A2",
+     "typical_ms": 5072,
+     "passes": 11,
+     "slowest_ms": 5342,
+     "all_cases_median_ms": 4720.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 5825,
+     "alarm_median_ms": 1124.0,
+     "assessment_median_ms": 3495.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 106390,
+      "ms_per_token_all_in": 6.43,
+      "ms_per_token_writing": 5.92,
+      "tokens_written_median": 329.0
+     },
+     "per_token_round": {
+      "calls": 1168,
+      "tokens_written": 424734,
+      "ms_per_token_all_in": 6.44,
+      "ms_per_token_writing": 5.92,
+      "tokens_written_median": 272.0
+     }
+    },
+    "3": {
+     "chain": "A3",
+     "typical_ms": 5115,
+     "passes": 11,
+     "slowest_ms": 5360,
+     "all_cases_median_ms": 4721.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 5823,
+     "alarm_median_ms": 1124.5,
+     "assessment_median_ms": 3497.5,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 106390,
+      "ms_per_token_all_in": 6.44,
+      "ms_per_token_writing": 5.92,
+      "tokens_written_median": 329.0
+     },
+     "per_token_round": {
+      "calls": 1460,
+      "tokens_written": 529780,
+      "ms_per_token_all_in": 6.44,
+      "ms_per_token_writing": 5.92,
+      "tokens_written_median": 333.5
+     }
+    }
+   },
+   "typical_ms_by_round": [
+    5127,
+    5072,
+    5115
+   ],
+   "typical_of_495_all_chains_ms": 4972,
+   "per_token": {
+    "at 0.0": {
+     "calls": 876,
+     "tokens_written": 319170,
+     "ms_per_token_all_in": 6.44,
+     "ms_per_token_writing": 5.92,
+     "tokens_written_median": 329.0
+    },
+    "at 0.5": {
+     "calls": 2920,
+     "tokens_written": 1056104,
+     "ms_per_token_all_in": 6.44,
+     "ms_per_token_writing": 5.92,
+     "tokens_written_median": 273.5
+    }
+   },
+   "per_token_all": {
+    "calls": 3796,
+    "tokens_written": 1375274,
+    "ms_per_token_all_in": 6.44,
+    "ms_per_token_writing": 5.92,
+    "tokens_written_median": 273.5
+   },
+   "replies": {
+    "failed_chains": {},
+    "cut_mid_sentence": {
+     "alarm at 0.5": 16,
+     "assessment at 0.5": 7
+    },
+    "counted_apart": {},
+    "empty_lists": {
+     "at 0.5": 3
+    },
+    "kept_lists": {
+     "at 0.5": 3
+    },
+    "time_critical_no_action": {
+     "at 0.0, whole": 12,
+     "at 0.5, cut": 14,
+     "at 0.5, whole": 39
+    },
+    "first_alarm": {
+     "01": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "03": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "04": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "05": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 9,
+      "at 0.5: pass 8": 1
+     },
+     "06": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "07": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 1,
+      "at 0.5: pass 8": 9
+     },
+     "08": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "10": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "11": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "12": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 12": 1,
+      "at 0.5: pass 8": 9
+     },
+     "13": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "14": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "15": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 4": 6,
+      "at 0.5: pass 8": 4
+     },
+     "495": {
+      "at 0.0: pass 3": 3,
+      "at 0.5: pass 2": 5,
+      "at 0.5: pass 3": 4,
+      "at 0.5: pass 4": 1
+     },
+     "T1": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 12": 1,
+      "at 0.5: pass 4": 4,
+      "at 0.5: pass 8": 5
+     },
+     "T2": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 4": 9,
+      "at 0.5: pass 8": 1
+     }
+    },
+    "same_answer_at_0": [
+     "01",
+     "03",
+     "04",
+     "05",
+     "06",
+     "07",
+     "08",
+     "10",
+     "11",
+     "12",
+     "13",
+     "14",
+     "15",
+     "495",
+     "T1",
+     "T2"
+    ]
+   }
+  },
+  "llamacpp-google-file": {
+   "candidate": true,
+   "at_temperature_0": {
+    "temperature": 0.0,
+    "chains": 3,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 3,
+       "06": 3,
+       "07": 3,
+       "08": 3,
+       "10": 3,
+       "14": 3,
+       "15": 3
+      },
+      "of": 3,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 3,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 7,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     }
+    }
+   },
+   "stress_test": {
+    "temperature": 0.5,
+    "chains": 10,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 10,
+       "06": 10,
+       "07": 10,
+       "08": 10,
+       "10": 10,
+       "14": 10,
+       "15": 10
+      },
+      "of": 10,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 10,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 10,
+     "S9": 10,
+     "S10": [
+      10,
+      6
+     ],
+     "S11": 10,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 4,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 10,
+     "S14": 6.0,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 10,
+      "14": 10,
+      "15": 10
+     },
+     "S16": {
+      "01": 10,
+      "06": 10,
+      "07": 10,
+      "08": 10,
+      "10": 10,
+      "14": 10,
+      "15": 10
+     }
+    }
+   },
+   "all_chains": {
+    "chains": 208,
+    "hard_met": true,
+    "soft_met": 7,
+    "time_met": true,
+    "failed": [],
+    "marks": {
+     "H1": 13,
+     "H2": 13,
+     "H3": 13,
+     "H4": 13,
+     "H5": 13,
+     "H6": {
+      "01": 13,
+      "06": 13,
+      "07": 13,
+      "08": 13,
+      "10": 13,
+      "14": 13,
+      "15": 13
+     },
+     "H7": {
+      "T2": 0,
+      "01": 0,
+      "05": 0,
+      "06": 0,
+      "07": 0,
+      "10": 0,
+      "12": 0,
+      "15": 0
+     },
+     "S8": 13,
+     "S9": 13,
+     "S10": [
+      13,
+      9
+     ],
+     "S11": 13,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 4,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 13,
+     "S14": 6,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 13,
+      "14": 13,
+      "15": 13
+     },
+     "S16": {
+      "01": 13,
+      "06": 13,
+      "07": 13,
+      "08": 13,
+      "10": 13,
+      "14": 13,
+      "15": 13
+     },
+     "T17": 5.173,
+     "T18": 5.626
+    }
+   },
+   "rounds": {
+    "1": {
+     "chain": "A1",
+     "typical_ms": 5120,
+     "passes": 11,
+     "slowest_ms": 5472,
+     "all_cases_median_ms": 4896.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 5944,
+     "alarm_median_ms": 1272.0,
+     "assessment_median_ms": 3588.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 108649,
+      "ms_per_token_all_in": 6.52,
+      "ms_per_token_writing": 5.95,
+      "tokens_written_median": 348.5
+     },
+     "per_token_round": {
+      "calls": 1168,
+      "tokens_written": 437130,
+      "ms_per_token_all_in": 6.53,
+      "ms_per_token_writing": 5.96,
+      "tokens_written_median": 338.5
+     }
+    },
+    "2": {
+     "chain": "A2",
+     "typical_ms": 5120,
+     "passes": 11,
+     "slowest_ms": 5465,
+     "all_cases_median_ms": 4898.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 5943,
+     "alarm_median_ms": 1272.5,
+     "assessment_median_ms": 3590.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 108649,
+      "ms_per_token_all_in": 6.52,
+      "ms_per_token_writing": 5.95,
+      "tokens_written_median": 348.5
+     },
+     "per_token_round": {
+      "calls": 1168,
+      "tokens_written": 436670,
+      "ms_per_token_all_in": 6.53,
+      "ms_per_token_writing": 5.96,
+      "tokens_written_median": 340.0
+     }
+    },
+    "3": {
+     "chain": "A3",
+     "typical_ms": 5122,
+     "passes": 11,
+     "slowest_ms": 5470,
+     "all_cases_median_ms": 4898.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 5941,
+     "alarm_median_ms": 1272.0,
+     "assessment_median_ms": 3588.5,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 108649,
+      "ms_per_token_all_in": 6.52,
+      "ms_per_token_writing": 5.95,
+      "tokens_written_median": 348.5
+     },
+     "per_token_round": {
+      "calls": 1460,
+      "tokens_written": 544106,
+      "ms_per_token_all_in": 6.53,
+      "ms_per_token_writing": 5.96,
+      "tokens_written_median": 339.0
+     }
+    }
+   },
+   "typical_ms_by_round": [
+    5120,
+    5120,
+    5122
+   ],
+   "typical_of_495_all_chains_ms": 5173,
+   "per_token": {
+    "at 0.0": {
+     "calls": 876,
+     "tokens_written": 325947,
+     "ms_per_token_all_in": 6.52,
+     "ms_per_token_writing": 5.95,
+     "tokens_written_median": 348.5
+    },
+    "at 0.5": {
+     "calls": 2920,
+     "tokens_written": 1091959,
+     "ms_per_token_all_in": 6.53,
+     "ms_per_token_writing": 5.96,
+     "tokens_written_median": 339.0
+    }
+   },
+   "per_token_all": {
+    "calls": 3796,
+    "tokens_written": 1417906,
+    "ms_per_token_all_in": 6.53,
+    "ms_per_token_writing": 5.96,
+    "tokens_written_median": 339.0
+   },
+   "replies": {
+    "failed_chains": {},
+    "cut_mid_sentence": {
+     "alarm at 0.0": 6,
+     "alarm at 0.5": 34,
+     "assessment at 0.5": 1
+    },
+    "counted_apart": {},
+    "empty_lists": {},
+    "kept_lists": {},
+    "time_critical_no_action": {
+     "at 0.0, cut": 6,
+     "at 0.5, cut": 23
+    },
+    "first_alarm": {
+     "01": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "03": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "04": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "05": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 6,
+      "at 0.5: pass 4": 2,
+      "at 0.5: pass 8": 2
+     },
+     "06": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "07": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 4": 6,
+      "at 0.5: pass 8": 4
+     },
+     "08": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "10": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "11": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "12": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 9,
+      "at 0.5: pass 8": 1
+     },
+     "13": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "14": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "15": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "495": {
+      "at 0.0: pass 2": 3,
+      "at 0.5: pass 2": 9,
+      "at 0.5: pass 3": 1
+     },
+     "T1": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 4": 10
+     },
+     "T2": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     }
+    },
+    "same_answer_at_0": [
+     "01",
+     "03",
+     "04",
+     "05",
+     "06",
+     "07",
+     "08",
+     "10",
+     "11",
+     "12",
+     "13",
+     "14",
+     "15",
+     "495",
+     "T1",
+     "T2"
+    ]
+   }
+  },
+  "vllm-repack-compact": {
+   "candidate": true,
+   "at_temperature_0": {
+    "temperature": 0.0,
+    "chains": 3,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 3,
+       "06": 3,
+       "07": 3,
+       "08": 3,
+       "10": 3,
+       "14": 3,
+       "15": 3
+      },
+      "of": 3,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 3,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 3,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     }
+    }
+   },
+   "stress_test": {
+    "temperature": 0.5,
+    "chains": 10,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 10,
+      "of": 10,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 10,
+       "06": 10,
+       "07": 10,
+       "08": 10,
+       "10": 10,
+       "14": 10,
+       "15": 10
+      },
+      "of": 10,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 10,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 10,
+     "S9": 10,
+     "S10": [
+      10,
+      10
+     ],
+     "S11": 10,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 10,
+     "S14": 3.0,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 10,
+      "14": 10,
+      "15": 10
+     },
+     "S16": {
+      "01": 10,
+      "06": 10,
+      "07": 10,
+      "08": 10,
+      "10": 10,
+      "14": 10,
+      "15": 10
+     }
+    }
+   },
+   "all_chains": {
+    "chains": 208,
+    "hard_met": true,
+    "soft_met": 9,
+    "time_met": true,
+    "failed": [],
+    "marks": {
+     "H1": 13,
+     "H2": 13,
+     "H3": 13,
+     "H4": 13,
+     "H5": 13,
+     "H6": {
+      "01": 13,
+      "06": 13,
+      "07": 13,
+      "08": 13,
+      "10": 13,
+      "14": 13,
+      "15": 13
+     },
+     "H7": {
+      "T2": 0,
+      "01": 0,
+      "05": 0,
+      "06": 0,
+      "07": 0,
+      "10": 0,
+      "12": 0,
+      "15": 0
+     },
+     "S8": 13,
+     "S9": 13,
+     "S10": [
+      13,
+      13
+     ],
+     "S11": 13,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 13,
+     "S14": 3,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 13,
+      "14": 13,
+      "15": 13
+     },
+     "S16": {
+      "01": 13,
+      "06": 13,
+      "07": 13,
+      "08": 13,
+      "10": 13,
+      "14": 13,
+      "15": 13
+     },
+     "T17": 3.775,
+     "T18": 4.24
+    }
+   },
+   "rounds": {
+    "1": {
+     "chain": "A1",
+     "typical_ms": 3555,
+     "passes": 11,
+     "slowest_ms": 3673,
+     "all_cases_median_ms": 3131.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 3969,
+     "alarm_median_ms": 745.5,
+     "assessment_median_ms": 2316.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 84796,
+      "ms_per_token_all_in": 5.33,
+      "ms_per_token_writing": 5.22,
+      "tokens_written_median": 272.5
+     },
+     "per_token_round": {
+      "calls": 1168,
+      "tokens_written": 340585,
+      "ms_per_token_all_in": 5.78,
+      "ms_per_token_writing": 5.68,
+      "tokens_written_median": 280.5
+     }
+    },
+    "2": {
+     "chain": "A2",
+     "typical_ms": 3467,
+     "passes": 11,
+     "slowest_ms": 3679,
+     "all_cases_median_ms": 3132.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 3712,
+     "alarm_median_ms": 733.0,
+     "assessment_median_ms": 2343.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 85071,
+      "ms_per_token_all_in": 5.33,
+      "ms_per_token_writing": 5.22,
+      "tokens_written_median": 273.5
+     },
+     "per_token_round": {
+      "calls": 1168,
+      "tokens_written": 339520,
+      "ms_per_token_all_in": 5.78,
+      "ms_per_token_writing": 5.68,
+      "tokens_written_median": 282.5
+     }
+    },
+    "3": {
+     "chain": "A3",
+     "typical_ms": 3427,
+     "passes": 11,
+     "slowest_ms": 3500,
+     "all_cases_median_ms": 3131.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 3847,
+     "alarm_median_ms": 741.0,
+     "assessment_median_ms": 2329.5,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 85112,
+      "ms_per_token_all_in": 5.33,
+      "ms_per_token_writing": 5.22,
+      "tokens_written_median": 268.0
+     },
+     "per_token_round": {
+      "calls": 1460,
+      "tokens_written": 423789,
+      "ms_per_token_all_in": 5.81,
+      "ms_per_token_writing": 5.71,
+      "tokens_written_median": 225.0
+     }
+    }
+   },
+   "typical_ms_by_round": [
+    3555,
+    3467,
+    3427
+   ],
+   "typical_of_495_all_chains_ms": 3775,
+   "per_token": {
+    "at 0.0": {
+     "calls": 876,
+     "tokens_written": 254979,
+     "ms_per_token_all_in": 5.33,
+     "ms_per_token_writing": 5.22,
+     "tokens_written_median": 270.0
+    },
+    "at 0.5": {
+     "calls": 2920,
+     "tokens_written": 848915,
+     "ms_per_token_all_in": 5.93,
+     "ms_per_token_writing": 5.83,
+     "tokens_written_median": 228.5
+    }
+   },
+   "per_token_all": {
+    "calls": 3796,
+    "tokens_written": 1103894,
+    "ms_per_token_all_in": 5.79,
+    "ms_per_token_writing": 5.69,
+    "tokens_written_median": 228.5
+   },
+   "replies": {
+    "failed_chains": {},
+    "cut_mid_sentence": {
+     "alarm at 0.5": 20,
+     "assessment at 0.5": 1
+    },
+    "counted_apart": {},
+    "empty_lists": {},
+    "kept_lists": {},
+    "time_critical_no_action": {
+     "at 0.0, whole": 10,
+     "at 0.5, cut": 3,
+     "at 0.5, whole": 60
+    },
+    "first_alarm": {
+     "01": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "03": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "04": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "05": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "06": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "07": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 8": 10
+     },
+     "08": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "10": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 10
+     },
+     "11": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "12": {
+      "at 0.0: pass 12": 2,
+      "at 0.0: pass 8": 1,
+      "at 0.5: pass 12": 2,
+      "at 0.5: pass 16": 1,
+      "at 0.5: pass 20": 1,
+      "at 0.5: pass 4": 1,
+      "at 0.5: pass 8": 5
+     },
+     "13": {
+      "at 0.0: never": 3,
+      "at 0.5: never": 10
+     },
+     "14": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 4": 9,
+      "at 0.5: pass 8": 1
+     },
+     "15": {
+      "at 0.0: pass 4": 1,
+      "at 0.0: pass 8": 2,
+      "at 0.5: pass 4": 5,
+      "at 0.5: pass 8": 5
+     },
+     "495": {
+      "at 0.0: pass 2": 3,
+      "at 0.5: pass 2": 7,
+      "at 0.5: pass 3": 3
+     },
+     "T1": {
+      "at 0.0: pass 8": 3,
+      "at 0.5: pass 12": 1,
+      "at 0.5: pass 4": 2,
+      "at 0.5: pass 8": 7
+     },
+     "T2": {
+      "at 0.0: pass 4": 3,
+      "at 0.5: pass 12": 3,
+      "at 0.5: pass 4": 4,
+      "at 0.5: pass 8": 3
+     }
+    },
+    "same_answer_at_0": []
+   }
+  },
+  "ollama-together": {
+   "candidate": true,
+   "at_temperature_0": {
+    "temperature": 0.0,
+    "chains": 3,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 3,
+       "06": 3,
+       "07": 3,
+       "08": 3,
+       "10": 3,
+       "14": 3,
+       "15": 3
+      },
+      "of": 3,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 3,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 4,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     }
+    }
+   },
+   "stress_test": {
+    "temperature": 0.5,
+    "chains": 0,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 0,
+       "06": 0,
+       "07": 0,
+       "08": 0,
+       "10": 0,
+       "14": 0,
+       "15": 0
+      },
+      "of": 0,
+      "met": false
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 0,
+      "met": false
+     }
+    },
+    "missed": [
+     "H1",
+     "H2",
+     "H3",
+     "H4",
+     "H5",
+     "H6",
+     "H7"
+    ],
+    "failed": [],
+    "soft": {}
+   },
+   "all_chains": {
+    "chains": 48,
+    "hard_met": false,
+    "soft_met": 3,
+    "time_met": true,
+    "failed": [],
+    "marks": {
+     "H1": 3,
+     "H2": 3,
+     "H3": 3,
+     "H4": 3,
+     "H5": 3,
+     "H6": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     },
+     "H7": {
+      "T2": 0,
+      "01": 0,
+      "05": 0,
+      "06": 0,
+      "07": 0,
+      "10": 0,
+      "12": 0,
+      "15": 0
+     },
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 4,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     },
+     "T17": 3.756,
+     "T18": 4.156
+    }
+   },
+   "rounds": {
+    "1": {
+     "chain": "A1",
+     "typical_ms": 3756,
+     "passes": 11,
+     "slowest_ms": 4155,
+     "all_cases_median_ms": 3669.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 4371,
+     "alarm_median_ms": 1457.0,
+     "assessment_median_ms": 3651.5,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 106160,
+      "ms_per_token_all_in": 7.04,
+      "ms_per_token_writing": 6.17,
+      "tokens_written_median": 347.0
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 106160,
+      "ms_per_token_all_in": 7.04,
+      "ms_per_token_writing": 6.17,
+      "tokens_written_median": 347.0
+     }
+    },
+    "2": {
+     "chain": "A2",
+     "typical_ms": 3763,
+     "passes": 11,
+     "slowest_ms": 4155,
+     "all_cases_median_ms": 3684.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 4375,
+     "alarm_median_ms": 1458.0,
+     "assessment_median_ms": 3668.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 106160,
+      "ms_per_token_all_in": 7.05,
+      "ms_per_token_writing": 6.17,
+      "tokens_written_median": 347.0
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 106160,
+      "ms_per_token_all_in": 7.05,
+      "ms_per_token_writing": 6.17,
+      "tokens_written_median": 347.0
+     }
+    },
+    "3": {
+     "chain": "A3",
+     "typical_ms": 3750,
+     "passes": 11,
+     "slowest_ms": 4156,
+     "all_cases_median_ms": 3684.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 4367,
+     "alarm_median_ms": 1455.5,
+     "assessment_median_ms": 3667.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 106160,
+      "ms_per_token_all_in": 7.04,
+      "ms_per_token_writing": 6.17,
+      "tokens_written_median": 347.0
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 106160,
+      "ms_per_token_all_in": 7.04,
+      "ms_per_token_writing": 6.17,
+      "tokens_written_median": 347.0
+     }
+    }
+   },
+   "typical_ms_by_round": [
+    3756,
+    3763,
+    3750
+   ],
+   "typical_of_495_all_chains_ms": 3756,
+   "per_token": {
+    "at 0.0": {
+     "calls": 876,
+     "tokens_written": 318480,
+     "ms_per_token_all_in": 7.04,
+     "ms_per_token_writing": 6.17,
+     "tokens_written_median": 347.0
+    }
+   },
+   "per_token_all": {
+    "calls": 876,
+    "tokens_written": 318480,
+    "ms_per_token_all_in": 7.04,
+    "ms_per_token_writing": 6.17,
+    "tokens_written_median": 347.0
+   },
+   "replies": {
+    "failed_chains": {},
+    "cut_mid_sentence": {},
+    "counted_apart": {},
+    "empty_lists": {},
+    "kept_lists": {},
+    "time_critical_no_action": {
+     "at 0.0, whole": 9
+    },
+    "first_alarm": {
+     "01": {
+      "at 0.0: pass 4": 3
+     },
+     "03": {
+      "at 0.0: never": 3
+     },
+     "04": {
+      "at 0.0: never": 3
+     },
+     "05": {
+      "at 0.0: never": 3
+     },
+     "06": {
+      "at 0.0: pass 4": 3
+     },
+     "07": {
+      "at 0.0: pass 8": 3
+     },
+     "08": {
+      "at 0.0: pass 4": 3
+     },
+     "10": {
+      "at 0.0: pass 4": 3
+     },
+     "11": {
+      "at 0.0: never": 3
+     },
+     "12": {
+      "at 0.0: pass 8": 3
+     },
+     "13": {
+      "at 0.0: never": 3
+     },
+     "14": {
+      "at 0.0: pass 4": 3
+     },
+     "15": {
+      "at 0.0: pass 4": 3
+     },
+     "495": {
+      "at 0.0: pass 3": 3
+     },
+     "T1": {
+      "at 0.0: pass 8": 3
+     },
+     "T2": {
+      "at 0.0: pass 8": 3
+     }
+    },
+    "same_answer_at_0": [
+     "01",
+     "03",
+     "04",
+     "05",
+     "06",
+     "07",
+     "08",
+     "10",
+     "11",
+     "12",
+     "13",
+     "14",
+     "15",
+     "495",
+     "T1",
+     "T2"
+    ]
+   }
+  },
+  "llamacpp-together": {
+   "candidate": true,
+   "at_temperature_0": {
+    "temperature": 0.0,
+    "chains": 3,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 3,
+       "06": 3,
+       "07": 3,
+       "08": 3,
+       "10": 3,
+       "14": 3,
+       "15": 3
+      },
+      "of": 3,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 3,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      2
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 7,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     }
+    }
+   },
+   "stress_test": {
+    "temperature": 0.5,
+    "chains": 0,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 0,
+       "06": 0,
+       "07": 0,
+       "08": 0,
+       "10": 0,
+       "14": 0,
+       "15": 0
+      },
+      "of": 0,
+      "met": false
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 0,
+      "met": false
+     }
+    },
+    "missed": [
+     "H1",
+     "H2",
+     "H3",
+     "H4",
+     "H5",
+     "H6",
+     "H7"
+    ],
+    "failed": [],
+    "soft": {}
+   },
+   "all_chains": {
+    "chains": 48,
+    "hard_met": false,
+    "soft_met": 2,
+    "time_met": true,
+    "failed": [],
+    "marks": {
+     "H1": 3,
+     "H2": 3,
+     "H3": 3,
+     "H4": 3,
+     "H5": 3,
+     "H6": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     },
+     "H7": {
+      "T2": 0,
+      "01": 0,
+      "05": 0,
+      "06": 0,
+      "07": 0,
+      "10": 0,
+      "12": 0,
+      "15": 0
+     },
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      2
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 7,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     },
+     "T17": 3.819,
+     "T18": 4.073
+    }
+   },
+   "rounds": {
+    "1": {
+     "chain": "A1",
+     "typical_ms": 3828,
+     "passes": 11,
+     "slowest_ms": 4073,
+     "all_cases_median_ms": 3750.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 4581,
+     "alarm_median_ms": 1653.0,
+     "assessment_median_ms": 3733.5,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 108402,
+      "ms_per_token_all_in": 7.15,
+      "ms_per_token_writing": 6.2,
+      "tokens_written_median": 339.5
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 108402,
+      "ms_per_token_all_in": 7.15,
+      "ms_per_token_writing": 6.2,
+      "tokens_written_median": 339.5
+     }
+    },
+    "2": {
+     "chain": "A2",
+     "typical_ms": 3814,
+     "passes": 11,
+     "slowest_ms": 3962,
+     "all_cases_median_ms": 3711.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 4366,
+     "alarm_median_ms": 1669.0,
+     "assessment_median_ms": 3695.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 108407,
+      "ms_per_token_all_in": 7.14,
+      "ms_per_token_writing": 6.2,
+      "tokens_written_median": 328.0
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 108407,
+      "ms_per_token_all_in": 7.14,
+      "ms_per_token_writing": 6.2,
+      "tokens_written_median": 328.0
+     }
+    },
+    "3": {
+     "chain": "A3",
+     "typical_ms": 3851,
+     "passes": 11,
+     "slowest_ms": 4072,
+     "all_cases_median_ms": 3729.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 4582,
+     "alarm_median_ms": 1653.5,
+     "assessment_median_ms": 3713.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 108402,
+      "ms_per_token_all_in": 7.16,
+      "ms_per_token_writing": 6.21,
+      "tokens_written_median": 339.5
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 108402,
+      "ms_per_token_all_in": 7.16,
+      "ms_per_token_writing": 6.21,
+      "tokens_written_median": 339.5
+     }
+    }
+   },
+   "typical_ms_by_round": [
+    3828,
+    3814,
+    3851
+   ],
+   "typical_of_495_all_chains_ms": 3819,
+   "per_token": {
+    "at 0.0": {
+     "calls": 876,
+     "tokens_written": 325211,
+     "ms_per_token_all_in": 7.15,
+     "ms_per_token_writing": 6.2,
+     "tokens_written_median": 329.0
+    }
+   },
+   "per_token_all": {
+    "calls": 876,
+    "tokens_written": 325211,
+    "ms_per_token_all_in": 7.15,
+    "ms_per_token_writing": 6.2,
+    "tokens_written_median": 329.0
+   },
+   "replies": {
+    "failed_chains": {},
+    "cut_mid_sentence": {
+     "alarm at 0.0": 5
+    },
+    "counted_apart": {},
+    "empty_lists": {},
+    "kept_lists": {},
+    "time_critical_no_action": {
+     "at 0.0, cut": 5
+    },
+    "first_alarm": {
+     "01": {
+      "at 0.0: pass 4": 3
+     },
+     "03": {
+      "at 0.0: never": 3
+     },
+     "04": {
+      "at 0.0: never": 3
+     },
+     "05": {
+      "at 0.0: never": 3
+     },
+     "06": {
+      "at 0.0: pass 4": 3
+     },
+     "07": {
+      "at 0.0: pass 4": 3
+     },
+     "08": {
+      "at 0.0: pass 4": 3
+     },
+     "10": {
+      "at 0.0: pass 4": 3
+     },
+     "11": {
+      "at 0.0: never": 3
+     },
+     "12": {
+      "at 0.0: pass 4": 3
+     },
+     "13": {
+      "at 0.0: never": 3
+     },
+     "14": {
+      "at 0.0: pass 4": 3
+     },
+     "15": {
+      "at 0.0: pass 4": 3
+     },
+     "495": {
+      "at 0.0: pass 2": 3
+     },
+     "T1": {
+      "at 0.0: pass 4": 1,
+      "at 0.0: pass 8": 2
+     },
+     "T2": {
+      "at 0.0: pass 4": 3
+     }
+    },
+    "same_answer_at_0": [
+     "13"
+    ]
+   }
+  },
+  "vllm-together-compact": {
+   "candidate": true,
+   "at_temperature_0": {
+    "temperature": 0.0,
+    "chains": 3,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 3,
+      "of": 3,
+      "met": true
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 3,
+       "06": 3,
+       "07": 3,
+       "08": 3,
+       "10": 3,
+       "14": 3,
+       "15": 3
+      },
+      "of": 3,
+      "met": true
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 3,
+      "met": true
+     }
+    },
+    "missed": [],
+    "failed": [],
+    "soft": {
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 3,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     }
+    }
+   },
+   "stress_test": {
+    "temperature": 0.5,
+    "chains": 0,
+    "hard": {
+     "H1": {
+      "rule": "495: ectopic pregnancy on the list at some pass",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H2": {
+      "rule": "495: the alarm names a pregnancy test or hCG",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H3": {
+      "rule": "T1: dengue on the list by the update at turn 20",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H4": {
+      "rule": "T2: malaria on the list by the update at turn 16",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H5": {
+      "rule": "T2: the alarm fires by the update at turn 16",
+      "value": 0,
+      "of": 0,
+      "met": false
+     },
+     "H6": {
+      "rule": "each emergency script fires",
+      "value": {
+       "01": 0,
+       "06": 0,
+       "07": 0,
+       "08": 0,
+       "10": 0,
+       "14": 0,
+       "15": 0
+      },
+      "of": 0,
+      "met": false
+     },
+     "H7": {
+      "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+      "value": {
+       "T2": 0,
+       "01": 0,
+       "05": 0,
+       "06": 0,
+       "07": 0,
+       "10": 0,
+       "12": 0,
+       "15": 0
+      },
+      "of": 0,
+      "met": false
+     }
+    },
+    "missed": [
+     "H1",
+     "H2",
+     "H3",
+     "H4",
+     "H5",
+     "H6",
+     "H7"
+    ],
+    "failed": [],
+    "soft": {}
+   },
+   "all_chains": {
+    "chains": 48,
+    "hard_met": false,
+    "soft_met": 3,
+    "time_met": true,
+    "failed": [],
+    "marks": {
+     "H1": 3,
+     "H2": 3,
+     "H3": 3,
+     "H4": 3,
+     "H5": 3,
+     "H6": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     },
+     "H7": {
+      "T2": 0,
+      "01": 0,
+      "05": 0,
+      "06": 0,
+      "07": 0,
+      "10": 0,
+      "12": 0,
+      "15": 0
+     },
+     "S8": 3,
+     "S9": 3,
+     "S10": [
+      3,
+      3
+     ],
+     "S11": 3,
+     "S12": {
+      "03": 0,
+      "04": 0,
+      "05": 0,
+      "11": 0,
+      "13": 0
+     },
+     "S13": 3,
+     "S14": 3,
+     "S15": {
+      "11": 0,
+      "12": 0,
+      "13": 3,
+      "14": 3,
+      "15": 3
+     },
+     "S16": {
+      "01": 3,
+      "06": 3,
+      "07": 3,
+      "08": 3,
+      "10": 3,
+      "14": 3,
+      "15": 3
+     },
+     "T17": 2.777,
+     "T18": 2.898
+    }
+   },
+   "rounds": {
+    "1": {
+     "chain": "A1",
+     "typical_ms": 2777,
+     "passes": 11,
+     "slowest_ms": 2888,
+     "all_cases_median_ms": 2544.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 3229,
+     "alarm_median_ms": 933.5,
+     "assessment_median_ms": 2527.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 84462,
+      "ms_per_token_all_in": 6.02,
+      "ms_per_token_writing": 5.86,
+      "tokens_written_median": 270.5
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 84462,
+      "ms_per_token_all_in": 6.02,
+      "ms_per_token_writing": 5.86,
+      "tokens_written_median": 270.5
+     }
+    },
+    "2": {
+     "chain": "A2",
+     "typical_ms": 2777,
+     "passes": 11,
+     "slowest_ms": 2898,
+     "all_cases_median_ms": 2559.5,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 3161,
+     "alarm_median_ms": 937.0,
+     "assessment_median_ms": 2542.5,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 84782,
+      "ms_per_token_all_in": 6.01,
+      "ms_per_token_writing": 5.86,
+      "tokens_written_median": 268.5
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 84782,
+      "ms_per_token_all_in": 6.01,
+      "ms_per_token_writing": 5.86,
+      "tokens_written_median": 268.5
+     }
+    },
+    "3": {
+     "chain": "A3",
+     "typical_ms": 2768,
+     "passes": 11,
+     "slowest_ms": 2897,
+     "all_cases_median_ms": 2567.0,
+     "all_cases_passes": 146,
+     "all_cases_slowest_ms": 3283,
+     "alarm_median_ms": 934.5,
+     "assessment_median_ms": 2551.0,
+     "per_token": {
+      "calls": 292,
+      "tokens_written": 85263,
+      "ms_per_token_all_in": 6.0,
+      "ms_per_token_writing": 5.85,
+      "tokens_written_median": 271.5
+     },
+     "per_token_round": {
+      "calls": 292,
+      "tokens_written": 85263,
+      "ms_per_token_all_in": 6.0,
+      "ms_per_token_writing": 5.85,
+      "tokens_written_median": 271.5
+     }
+    }
+   },
+   "typical_ms_by_round": [
+    2777,
+    2777,
+    2768
+   ],
+   "typical_of_495_all_chains_ms": 2777,
+   "per_token": {
+    "at 0.0": {
+     "calls": 876,
+     "tokens_written": 254507,
+     "ms_per_token_all_in": 6.01,
+     "ms_per_token_writing": 5.86,
+     "tokens_written_median": 268.5
+    }
+   },
+   "per_token_all": {
+    "calls": 876,
+    "tokens_written": 254507,
+    "ms_per_token_all_in": 6.01,
+    "ms_per_token_writing": 5.86,
+    "tokens_written_median": 268.5
+   },
+   "replies": {
+    "failed_chains": {},
+    "cut_mid_sentence": {},
+    "counted_apart": {},
+    "empty_lists": {},
+    "kept_lists": {},
+    "time_critical_no_action": {
+     "at 0.0, whole": 8
+    },
+    "first_alarm": {
+     "01": {
+      "at 0.0: pass 4": 3
+     },
+     "03": {
+      "at 0.0: never": 3
+     },
+     "04": {
+      "at 0.0: never": 3
+     },
+     "05": {
+      "at 0.0: never": 3
+     },
+     "06": {
+      "at 0.0: pass 4": 3
+     },
+     "07": {
+      "at 0.0: pass 8": 3
+     },
+     "08": {
+      "at 0.0: pass 4": 3
+     },
+     "10": {
+      "at 0.0: pass 4": 3
+     },
+     "11": {
+      "at 0.0: never": 3
+     },
+     "12": {
+      "at 0.0: pass 12": 2,
+      "at 0.0: pass 8": 1
+     },
+     "13": {
+      "at 0.0: never": 3
+     },
+     "14": {
+      "at 0.0: pass 4": 3
+     },
+     "15": {
+      "at 0.0: pass 4": 3
+     },
+     "495": {
+      "at 0.0: pass 2": 3
+     },
+     "T1": {
+      "at 0.0: pass 8": 3
+     },
+     "T2": {
+      "at 0.0: pass 4": 3
+     }
+    },
+    "same_answer_at_0": []
+   }
+  }
+ }
+}

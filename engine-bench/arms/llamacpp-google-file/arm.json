@@ -1,0 +1,69 @@
+{
+ "arm": "llamacpp-google-file",
+ "kind": "chains",
+ "together": false,
+ "engine": "llama.cpp",
+ "engine_version": "b11429-d81235049",
+ "model_tag": "google/gemma-4-26B-A4B-it-qat-q4_0-gguf",
+ "model_digest": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+ "prompts": {
+  "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
+  "assessment": "6cc315afcf2c8570a7486bb8adb84885a8c043612e54bd2da158fa7814ad9308"
+ },
+ "cases": [
+  "01",
+  "03",
+  "04",
+  "05",
+  "06",
+  "07",
+  "08",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "495",
+  "T1",
+  "T2"
+ ],
+ "chains": [
+  "A1",
+  "A2",
+  "A3",
+  "B1",
+  "B10",
+  "B2",
+  "B3",
+  "B4",
+  "B5",
+  "B6",
+  "B7",
+  "B8",
+  "B9"
+ ],
+ "results": 208,
+ "calls": 3796,
+ "outcomes": {
+  "ok": 3796
+ },
+ "first_call_at": "2026-10-07T08:12:04.091+01:00",
+ "last_call_at": "2026-10-07T15:15:52.064+01:00",
+ "card": {
+  "over": "the arm's own steps",
+  "samples": 1866,
+  "windows": 6,
+  "lowest_mib": 15539,
+  "median_mib": 15591.0,
+  "highest_mib": 15591
+ },
+ "facts": {
+  "run_on": "2026-10-07",
+  "rounds": "3: round 1 chains A1 and B1 to B3, round 2 A2 and B4 to B6, round 3 A3 and B7 to B10; the together arms the chain at 0 of each round",
+  "engine_start": "llama-server started for each round",
+  "slots": "1",
+  "context_of_a_slot": "16384",
+  "model_file_sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d"
+ }
+}

@@ -1,0 +1,52 @@
+{
+ "calls": {
+  "alarm": {
+   "calls": 1898,
+   "outcomes": {
+    "ok": 1898
+   },
+   "wall_ms": 796.0,
+   "wall_ms_max": 1345,
+   "read_ms": 16.0,
+   "write_ms": 774.0,
+   "prompt_tokens": 1050.0,
+   "output_tokens": 136.0,
+   "output_tokens_max": 230
+  },
+  "assessment": {
+   "calls": 1898,
+   "outcomes": {
+    "ok": 1898
+   },
+   "wall_ms": 2543.5,
+   "wall_ms_max": 3259,
+   "read_ms": 28.0,
+   "write_ms": 2508.0,
+   "prompt_tokens": 779.0,
+   "output_tokens": 441.0,
+   "output_tokens_max": 554
+  }
+ },
+ "passes": {
+  "495": {
+   "passes": 143,
+   "median_ms": 3775,
+   "slowest_ms": 4240
+  },
+  "all": {
+   "passes": 1898,
+   "median_ms": 3397.5,
+   "slowest_ms": 4482
+  },
+  "script": {
+   "passes": 1573,
+   "median_ms": 3350,
+   "slowest_ms": 4357
+  },
+  "travel": {
+   "passes": 182,
+   "median_ms": 3594.0,
+   "slowest_ms": 4482
+  }
+ }
+}

@@ -1,0 +1,43 @@
+{
+ "arm": "vllm-repeat-batch-invariant",
+ "kind": "repeat",
+ "together": false,
+ "engine": "vllm",
+ "engine_version": "0.31.0",
+ "model_tag": "xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct",
+ "model_digest": "2096d38dad51a19b8e982b44241c47102a8bbb00",
+ "prompts": {
+  "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
+  "assessment": "6cc315afcf2c8570a7486bb8adb84885a8c043612e54bd2da158fa7814ad9308"
+ },
+ "cases": [
+  "15",
+  "495",
+  "T2"
+ ],
+ "chains": [
+  "alarm-bare",
+  "alarm-between",
+  "assessment-bare",
+  "assessment-between"
+ ],
+ "results": 12,
+ "calls": 174,
+ "outcomes": {
+  "ok": 174
+ },
+ "first_call_at": "2026-10-06T19:43:29.752+01:00",
+ "last_call_at": "2026-10-06T19:56:51.354+01:00",
+ "card": {
+  "samples": 160,
+  "lowest_mib": 22435,
+  "median_mib": 22523.0,
+  "highest_mib": 22678
+ },
+ "facts": {
+  "card_share": "0.92, the default",
+  "started_with": "VLLM_BATCH_INVARIANT=1",
+  "ready_after_s": "42.0",
+  "first_call_ms": "1983"
+ }
+}

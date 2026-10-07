@@ -1,0 +1,66 @@
+{
+ "arm": "vllm-repack",
+ "kind": "chains",
+ "together": false,
+ "engine": "vllm",
+ "engine_version": "0.31.0",
+ "model_tag": "xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct",
+ "model_digest": "2096d38dad51a19b8e982b44241c47102a8bbb00",
+ "prompts": {
+  "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
+  "assessment": "6cc315afcf2c8570a7486bb8adb84885a8c043612e54bd2da158fa7814ad9308"
+ },
+ "cases": [
+  "01",
+  "03",
+  "04",
+  "05",
+  "06",
+  "07",
+  "08",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "495",
+  "T1",
+  "T2"
+ ],
+ "chains": [
+  "A1",
+  "A2",
+  "A3",
+  "B1",
+  "B10",
+  "B2",
+  "B3",
+  "B4",
+  "B5",
+  "B6",
+  "B7",
+  "B8",
+  "B9"
+ ],
+ "results": 208,
+ "calls": 3602,
+ "outcomes": {
+  "ok": 3588,
+  "too_long": 14
+ },
+ "first_call_at": "2026-10-06T17:08:52.275+01:00",
+ "last_call_at": "2026-10-06T19:14:06.831+01:00",
+ "card": {
+  "samples": 1498,
+  "lowest_mib": 23347,
+  "median_mib": 23483.0,
+  "highest_mib": 23714
+ },
+ "facts": {
+  "card_share": "0.92, the default",
+  "ready_after_s": "30.3",
+  "ready_after_s_at_its_first_start_on_this_machine": "110.7",
+  "first_call_ms": "1083"
+ }
+}

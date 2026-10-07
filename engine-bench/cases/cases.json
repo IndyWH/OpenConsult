@@ -1,0 +1,214 @@
+{
+ "note": "The cases of the engine bench. Each is acted or scripted. None is a real patient.",
+ "cases": [
+  {
+   "name": "495",
+   "group": "495",
+   "kind": "passes",
+   "file": "495.jsonl",
+   "consultation": 495,
+   "sha256": "147c8ec518313e72de95d4cf6b3a81f01fa5a14973dec7525535d3a208e6d8de",
+   "age": 31,
+   "sex": "F",
+   "expected": {
+    "text": "ectopic pregnancy on the list at some pass; the alarm names a pregnancy test or hCG; leads at pass 11; asks about the period, pregnancy or contraception"
+   },
+   "cut": "the 11 recorded live transcripts, one pass each"
+  },
+  {
+   "name": "T1",
+   "group": "travel",
+   "kind": "script",
+   "file": "T1_returned_traveller_bali_uk.md",
+   "sha256": "c4e0cc86b3acf51dfe31aa5c84a2a4ac6e01ea0a76b52c0e7c7846cfe6b72ba9",
+   "age": 29,
+   "sex": "F",
+   "expected": {
+    "text": "dengue on the list by the update at turn 20; asks about travel at turn 4, 8 or 12"
+   },
+   "cut": "every 4 turns: 4, 8, 12, 16, 20, 24, 28"
+  },
+  {
+   "name": "T2",
+   "group": "travel",
+   "kind": "script",
+   "file": "T2_returned_traveller_ghana_uk.md",
+   "sha256": "fcb0a0aabdcf5a004901cbcadec8dd7cf0143388c2de89d9968529f18485bced",
+   "age": 46,
+   "sex": "M",
+   "expected": {
+    "text": "malaria on the list by the update at turn 16; the alarm fires by 16; no action at 28; male: no female term"
+   },
+   "cut": "every 4 turns: 4, 8, 12, 16, 20, 24, 28"
+  },
+  {
+   "name": "01",
+   "group": "script",
+   "kind": "script",
+   "file": "01_chest_pain_en.md",
+   "sha256": "1ea7dc2dc91663e5504359b02bb6c42cb101f145295a531fea78b819517c41d2",
+   "age": 52,
+   "sex": "M",
+   "expected": {
+    "text": "fires; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "03",
+   "group": "script",
+   "kind": "script",
+   "file": "03_diabetes_review_en.md",
+   "sha256": "ae9bb0de1dacb53421e3ff5b974fa1637d810e42b034963093e827f3ba19ec89",
+   "age": 58,
+   "sex": "F",
+   "expected": {
+    "text": "silent"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "04",
+   "group": "script",
+   "kind": "script",
+   "file": "04_asthma_en.md",
+   "sha256": "e2dbb738f149402f29995718dc4098e50e0e9d9a7224a78b5d5bffd7bec2a6a4",
+   "age": 24,
+   "sex": "F",
+   "expected": {
+    "text": "silent"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "05",
+   "group": "script",
+   "kind": "script",
+   "file": "05_epigastric_pain_en.md",
+   "sha256": "df75ea0b00cc6ac414a39682ba373e04f8185a1ba840308ca7cc343b15788263",
+   "age": 35,
+   "sex": "M",
+   "expected": {
+    "text": "silent; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "06",
+   "group": "script",
+   "kind": "script",
+   "file": "06_tia_funny_turn_en.md",
+   "sha256": "e54971cc84804625a1e178b584f5332190a10e13102bb263e7090a696a68072d",
+   "age": 72,
+   "sex": "M",
+   "expected": {
+    "text": "fires; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "07",
+   "group": "script",
+   "kind": "script",
+   "file": "07_gi_bleed_en.md",
+   "sha256": "9ab26aaf45bcad64b14ef2556c82b9fd6f1affd4687084bf2ee9327934d608b2",
+   "age": 35,
+   "sex": "M",
+   "expected": {
+    "text": "fires; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "08",
+   "group": "script",
+   "kind": "script",
+   "file": "08_pulmonary_embolism_en.md",
+   "sha256": "11dcd68c4cec25fc14f37519507ceff44e11e9ba9be5d39438a594c45e8d744d",
+   "age": 41,
+   "sex": "F",
+   "expected": {
+    "text": "fires"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "10",
+   "group": "script",
+   "kind": "script",
+   "file": "10_testicular_torsion_en.md",
+   "sha256": "5b3494f9ce0a81197abd43f78e2dcbd009087591ea57d04e51defd6858728206",
+   "age": 15,
+   "sex": "M",
+   "expected": {
+    "text": "fires; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "11",
+   "group": "script",
+   "kind": "script",
+   "file": "11_tired_all_the_time_uk.md",
+   "sha256": "40ea18e640d82ec89e0ab52d14e330377672944449224395d2db1c165500dec9",
+   "age": 34,
+   "sex": "F",
+   "expected": {
+    "text": "silent; restraint: broad, none high"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "12",
+   "group": "script",
+   "kind": "script",
+   "file": "12_dizziness_uk.md",
+   "sha256": "9571354eb5ca794a2783c7f03440b9bb112bdf9d5b17f5efc73dbc311081638a",
+   "age": 45,
+   "sex": "M",
+   "expected": {
+    "text": "silent; restraint: broad; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "13",
+   "group": "script",
+   "kind": "script",
+   "file": "13_migraine_uk.md",
+   "sha256": "7f461543bd820fc29f7c755ea7efc6aef779ba2dd61cc91ad697de0bd621ef92",
+   "age": 29,
+   "sex": "F",
+   "expected": {
+    "text": "silent; restraint: migraine leads, high"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "14",
+   "group": "script",
+   "kind": "script",
+   "file": "14_giant_cell_arteritis_uk.md",
+   "sha256": "fedbc06e63ba139a073eddfb720e42a491ce1d184fad0a8c4045d317bc935c5d",
+   "age": 71,
+   "sex": "F",
+   "expected": {
+    "text": "fires; restraint: giant cell arteritis leads"
+   },
+   "cut": "every 4 turns, and the end"
+  },
+  {
+   "name": "15",
+   "group": "script",
+   "kind": "script",
+   "file": "15_cauda_equina_uk.md",
+   "sha256": "b422b784b079d9c913f07e20022c9c447dcfa803ba2edd516f7913b6ea3733ce",
+   "age": 40,
+   "sex": "M",
+   "expected": {
+    "text": "fires; restraint: cauda equina leads; male: no female term"
+   },
+   "cut": "every 4 turns, and the end"
+  }
+ ]
+}

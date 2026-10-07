@@ -1,0 +1,87 @@
+{
+ "how": "From starting an engine's process to the first answer of its health page, polled by the driver, in seconds. The Ollama service was already running and was never restarted; its model was loaded by the first call of each turn, which steps.json gives as that step's unmeasured first call. The model files were in the file cache at every start. The first four starts were for the proofs, before the first round.",
+ "for_the_proofs": [
+  {
+   "at": "2026-10-07T07:10:50+01:00",
+   "start_name": "ollama-private",
+   "ready_after_s": 1.2
+  },
+  {
+   "at": "2026-10-07T07:12:12+01:00",
+   "start_name": "llamacpp-1",
+   "ready_after_s": 3.0
+  },
+  {
+   "at": "2026-10-07T07:13:35+01:00",
+   "start_name": "llamacpp-2",
+   "ready_after_s": 2.0
+  },
+  {
+   "at": "2026-10-07T07:15:40+01:00",
+   "start_name": "vllm-compact",
+   "ready_after_s": 26.3
+  }
+ ],
+ "in_the_run": [
+  {
+   "at": "2026-10-07T08:02:54+01:00",
+   "start_name": "ollama-private",
+   "ready_after_s": 1.1
+  },
+  {
+   "at": "2026-10-07T08:11:56+01:00",
+   "start_name": "llamacpp-1",
+   "ready_after_s": 2.0
+  },
+  {
+   "at": "2026-10-07T09:00:06+01:00",
+   "start_name": "llamacpp-2",
+   "ready_after_s": 2.0
+  },
+  {
+   "at": "2026-10-07T09:09:49+01:00",
+   "start_name": "vllm-compact",
+   "ready_after_s": 25.8
+  },
+  {
+   "at": "2026-10-07T09:49:15+01:00",
+   "start_name": "llamacpp-1",
+   "ready_after_s": 2.0
+  },
+  {
+   "at": "2026-10-07T10:37:22+01:00",
+   "start_name": "llamacpp-2",
+   "ready_after_s": 2.0
+  },
+  {
+   "at": "2026-10-07T10:47:04+01:00",
+   "start_name": "vllm-compact",
+   "ready_after_s": 25.8
+  },
+  {
+   "at": "2026-10-07T12:12:23+01:00",
+   "start_name": "ollama-private",
+   "ready_after_s": 1.1
+  },
+  {
+   "at": "2026-10-07T12:21:49+01:00",
+   "start_name": "vllm-compact",
+   "ready_after_s": 25.8
+  },
+  {
+   "at": "2026-10-07T14:06:58+01:00",
+   "start_name": "ollama-private",
+   "ready_after_s": 1.1
+  },
+  {
+   "at": "2026-10-07T14:15:59+01:00",
+   "start_name": "llamacpp-1",
+   "ready_after_s": 2.0
+  },
+  {
+   "at": "2026-10-07T15:15:55+01:00",
+   "start_name": "llamacpp-2",
+   "ready_after_s": 2.0
+  }
+ ]
+}

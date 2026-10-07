@@ -1,0 +1,119 @@
+{
+ "how": "Made again on each of the five starts before the first round, one engine on the card at a time, with the bench's own door: the first pass of all 16 cases (32 calls) for thinking text and the form; one call asked for 5 tokens; made-up text of about 15,000 tokens by the engine's own count; made-up text of about 17,500 and 78,000 tokens; the tokens read on the same 32 calls set beside the reference run of 4 Oct; and on the starts for two calls at once, two short calls and two calls of about 15,000 tokens sent at the same moment.",
+ "starts": {
+  "ollama-service": {
+   "no_thinking_text": "32 of 32",
+   "fits_its_form": "32 of 32",
+   "asked_for_5_tokens": "cut",
+   "full_context_input_tokens": 15001,
+   "full_context_outcome": "ok",
+   "oversize_outcomes": [
+    "did_not_fit",
+    "did_not_fit"
+   ],
+   "tokens_read_less_the_reference_arm": [
+    0
+   ]
+  },
+  "ollama-private": {
+   "no_thinking_text": "32 of 32",
+   "fits_its_form": "32 of 32",
+   "asked_for_5_tokens": "cut",
+   "full_context_input_tokens": 15001,
+   "full_context_outcome": "ok",
+   "oversize_outcomes": [
+    "did_not_fit",
+    "did_not_fit"
+   ],
+   "tokens_read_less_the_reference_arm": [
+    0
+   ],
+   "two_calls_s": {
+    "one_alone": 0.55,
+    "two_together": [
+     0.73,
+     0.8
+    ]
+   },
+   "two_calls_of_15000_tokens_s": {
+    "one_alone": 0.5,
+    "two_together": [
+     1.84,
+     2.05
+    ]
+   }
+  },
+  "llamacpp-1": {
+   "no_thinking_text": "32 of 32",
+   "fits_its_form": "32 of 32",
+   "asked_for_5_tokens": "cut",
+   "full_context_input_tokens": 15001,
+   "full_context_outcome": "ok",
+   "oversize_outcomes": [
+    "did_not_fit",
+    "did_not_fit"
+   ],
+   "tokens_read_less_the_reference_arm": [
+    0
+   ]
+  },
+  "llamacpp-2": {
+   "no_thinking_text": "32 of 32",
+   "fits_its_form": "32 of 32",
+   "asked_for_5_tokens": "cut",
+   "full_context_input_tokens": 15001,
+   "full_context_outcome": "ok",
+   "oversize_outcomes": [
+    "did_not_fit",
+    "did_not_fit"
+   ],
+   "tokens_read_less_the_reference_arm": [
+    0
+   ],
+   "two_calls_s": {
+    "one_alone": 0.62,
+    "two_together": [
+     0.88,
+     0.9
+    ]
+   },
+   "two_calls_of_15000_tokens_s": {
+    "one_alone": 0.67,
+    "two_together": [
+     1.94,
+     2.08
+    ]
+   }
+  },
+  "vllm-compact": {
+   "no_thinking_text": "32 of 32",
+   "fits_its_form": "32 of 32",
+   "asked_for_5_tokens": "cut",
+   "full_context_input_tokens": 15002,
+   "full_context_outcome": "ok",
+   "oversize_outcomes": [
+    "did_not_fit",
+    "did_not_fit"
+   ],
+   "tokens_read_less_the_reference_arm": [
+    1
+   ],
+   "two_calls_s": {
+    "one_alone": 0.48,
+    "two_together": [
+     0.54,
+     0.55
+    ]
+   },
+   "two_calls_of_15000_tokens_s": {
+    "one_alone": 0.58,
+    "two_together": [
+     0.7,
+     0.71
+    ]
+   },
+   "compact_form": "in 32 of 32 replies the only blank space outside a string is one single space after a colon or a comma",
+   "structured_outputs_config": "StructuredOutputsConfig(backend='xgrammar', disable_any_whitespace=True)"
+  }
+ }
+}

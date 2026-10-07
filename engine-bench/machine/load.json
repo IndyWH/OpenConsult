@@ -1,0 +1,20 @@
+{
+ "how": "Once a minute through the run: the machine's load averages from /proc/loadavg, its three busiest processes by processor share (ps), whether the desktop's screensaver was running, and the processes on the card (nvidia-smi --query-compute-apps, sampled once a minute). Process names only; no command line is published.",
+ "minutes_logged": 487,
+ "minutes_with_the_screensaver": 0,
+ "highest_one_minute_load": 5.86,
+ "minutes_with_load_8_or_more": 0,
+ "processes_at_50_percent_of_a_core_or_more_by_minutes": {
+  "llama-server": 358,
+  "localsearch-ext": 4,
+  "VLLM::EngineCor": 3,
+  "vllm": 1,
+  "openconsult-ben": 1
+ },
+ "processes_on_the_card_by_samples": {
+  "llama-server": 359,
+  "VLLM::EngineCore": 127
+ },
+ "stay_awake": "on throughout: the desktop could not blank, lock or start its screensaver",
+ "at_the_desk": "nobody"
+}

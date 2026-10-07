@@ -1,0 +1,1768 @@
+{
+ "marks": [
+  {
+   "n": "H1",
+   "kind": "hard",
+   "rule": "495: ectopic pregnancy on the list at some pass",
+   "mark": 13,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "H2",
+   "kind": "hard",
+   "rule": "495: the alarm names a pregnancy test or hCG",
+   "mark": 13,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "H3",
+   "kind": "hard",
+   "rule": "T1: dengue on the list by the update at turn 20",
+   "mark": 13,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "H4",
+   "kind": "hard",
+   "rule": "T2: malaria on the list by the update at turn 16",
+   "mark": 13,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "H5",
+   "kind": "hard",
+   "rule": "T2: the alarm fires by the update at turn 16",
+   "mark": 13,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "H6",
+   "kind": "hard",
+   "rule": "each emergency script fires",
+   "mark": "13 of 13 on every one of the seven",
+   "value": {
+    "01": 3,
+    "06": 3,
+    "07": 3,
+    "08": 3,
+    "10": 3,
+    "14": 3,
+    "15": 3
+   },
+   "met": false
+  },
+  {
+   "n": "H7",
+   "kind": "hard",
+   "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+   "mark": "none",
+   "value": {
+    "T2": 0,
+    "01": 0,
+    "05": 0,
+    "06": 0,
+    "07": 0,
+    "10": 0,
+    "12": 0,
+    "15": 0
+   },
+   "met": true
+  },
+  {
+   "n": "S8",
+   "kind": "soft",
+   "rule": "495: ectopic pregnancy first on the list at the last pass",
+   "mark": 12,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "S9",
+   "kind": "soft",
+   "rule": "495: asks about the last period, pregnancy or contraception",
+   "mark": 12,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "S10",
+   "kind": "soft",
+   "rule": "T1 and T2: asks about travel at the update at turn 4, 8 or 12",
+   "mark": "10 each",
+   "value": [
+    3,
+    3
+   ],
+   "met": false
+  },
+  {
+   "n": "S11",
+   "kind": "soft",
+   "rule": "T2: no urgent action at the update at turn 28",
+   "mark": 10,
+   "value": 3,
+   "met": false
+  },
+  {
+   "n": "S12",
+   "kind": "soft",
+   "rule": "each routine script: chains where the alarm fires",
+   "mark": {
+    "03": 1,
+    "04": 1,
+    "05": 4,
+    "11": 1,
+    "13": 1
+   },
+   "value": {
+    "03": 0,
+    "04": 0,
+    "05": 0,
+    "11": 0,
+    "13": 0
+   },
+   "met": true
+  },
+  {
+   "n": "S13",
+   "kind": "soft",
+   "rule": "script 12: chains where the alarm fires",
+   "mark": 13,
+   "value": 3,
+   "met": true
+  },
+  {
+   "n": "S14",
+   "kind": "soft",
+   "rule": "script 12: median updates with an alarm over the chains that fired",
+   "mark": 5,
+   "value": 3,
+   "met": true
+  },
+  {
+   "n": "S15",
+   "kind": "soft",
+   "rule": "each restraint script: chains passing the restraint verdict",
+   "mark": {
+    "11": 0,
+    "12": 0,
+    "13": 12,
+    "14": 12,
+    "15": 12
+   },
+   "value": {
+    "11": 0,
+    "12": 0,
+    "13": 3,
+    "14": 3,
+    "15": 3
+   },
+   "met": false
+  },
+  {
+   "n": "S16",
+   "kind": "soft",
+   "rule": "each emergency script: chains cleared at the last update",
+   "mark": 12,
+   "value": {
+    "01": 3,
+    "06": 3,
+    "07": 3,
+    "08": 3,
+    "10": 3,
+    "14": 3,
+    "15": 3
+   },
+   "met": false
+  },
+  {
+   "n": "T17",
+   "kind": "time",
+   "rule": "495: median pass, seconds",
+   "mark": 6.0,
+   "value": 2.777,
+   "met": true
+  },
+  {
+   "n": "T18",
+   "kind": "time",
+   "rule": "495: slowest pass, seconds",
+   "mark": 8.0,
+   "value": 2.898,
+   "met": true
+  }
+ ],
+ "hard_met": false,
+ "candidate": true,
+ "at_temperature_0": {
+  "temperature": 0.0,
+  "chains": 3,
+  "hard": {
+   "H1": {
+    "rule": "495: ectopic pregnancy on the list at some pass",
+    "value": 3,
+    "of": 3,
+    "met": true
+   },
+   "H2": {
+    "rule": "495: the alarm names a pregnancy test or hCG",
+    "value": 3,
+    "of": 3,
+    "met": true
+   },
+   "H3": {
+    "rule": "T1: dengue on the list by the update at turn 20",
+    "value": 3,
+    "of": 3,
+    "met": true
+   },
+   "H4": {
+    "rule": "T2: malaria on the list by the update at turn 16",
+    "value": 3,
+    "of": 3,
+    "met": true
+   },
+   "H5": {
+    "rule": "T2: the alarm fires by the update at turn 16",
+    "value": 3,
+    "of": 3,
+    "met": true
+   },
+   "H6": {
+    "rule": "each emergency script fires",
+    "value": {
+     "01": 3,
+     "06": 3,
+     "07": 3,
+     "08": 3,
+     "10": 3,
+     "14": 3,
+     "15": 3
+    },
+    "of": 3,
+    "met": true
+   },
+   "H7": {
+    "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+    "value": {
+     "T2": 0,
+     "01": 0,
+     "05": 0,
+     "06": 0,
+     "07": 0,
+     "10": 0,
+     "12": 0,
+     "15": 0
+    },
+    "of": 3,
+    "met": true
+   }
+  },
+  "missed": [],
+  "failed": [],
+  "soft": {
+   "S8": 3,
+   "S9": 3,
+   "S10": [
+    3,
+    3
+   ],
+   "S11": 3,
+   "S12": {
+    "03": 0,
+    "04": 0,
+    "05": 0,
+    "11": 0,
+    "13": 0
+   },
+   "S13": 3,
+   "S14": 3,
+   "S15": {
+    "11": 0,
+    "12": 0,
+    "13": 3,
+    "14": 3,
+    "15": 3
+   },
+   "S16": {
+    "01": 3,
+    "06": 3,
+    "07": 3,
+    "08": 3,
+    "10": 3,
+    "14": 3,
+    "15": 3
+   }
+  }
+ },
+ "stress_test": {
+  "temperature": 0.5,
+  "chains": 0,
+  "hard": {
+   "H1": {
+    "rule": "495: ectopic pregnancy on the list at some pass",
+    "value": 0,
+    "of": 0,
+    "met": false
+   },
+   "H2": {
+    "rule": "495: the alarm names a pregnancy test or hCG",
+    "value": 0,
+    "of": 0,
+    "met": false
+   },
+   "H3": {
+    "rule": "T1: dengue on the list by the update at turn 20",
+    "value": 0,
+    "of": 0,
+    "met": false
+   },
+   "H4": {
+    "rule": "T2: malaria on the list by the update at turn 16",
+    "value": 0,
+    "of": 0,
+    "met": false
+   },
+   "H5": {
+    "rule": "T2: the alarm fires by the update at turn 16",
+    "value": 0,
+    "of": 0,
+    "met": false
+   },
+   "H6": {
+    "rule": "each emergency script fires",
+    "value": {
+     "01": 0,
+     "06": 0,
+     "07": 0,
+     "08": 0,
+     "10": 0,
+     "14": 0,
+     "15": 0
+    },
+    "of": 0,
+    "met": false
+   },
+   "H7": {
+    "rule": "male cases: chains naming pregnan, ectopic, ovarian or hcg",
+    "value": {
+     "T2": 0,
+     "01": 0,
+     "05": 0,
+     "06": 0,
+     "07": 0,
+     "10": 0,
+     "12": 0,
+     "15": 0
+    },
+    "of": 0,
+    "met": false
+   }
+  },
+  "missed": [
+   "H1",
+   "H2",
+   "H3",
+   "H4",
+   "H5",
+   "H6",
+   "H7"
+  ],
+  "failed": [],
+  "soft": {}
+ },
+ "empty_replies": 0,
+ "kept_lists": 0,
+ "empty_at": [],
+ "kept_at": [],
+ "soft_met": 3,
+ "time_met": true,
+ "chains": 48,
+ "failed_chains": [],
+ "per_chain": {
+  "01/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 32,
+   "updates_with_alarm": 8,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Bedside ECG"
+   ],
+   "leading_last": "Stable Angina",
+   "male_hits": [],
+   "alarm": "XXXXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.403,
+    2.324,
+    2.6,
+    2.78,
+    2.638,
+    2.729,
+    2.735,
+    2.6,
+    2.441,
+    2.241
+   ]
+  },
+  "01/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 32,
+   "updates_with_alarm": 8,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Bedside ECG"
+   ],
+   "leading_last": "Stable angina",
+   "male_hits": [],
+   "alarm": "XXXXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.36,
+    2.454,
+    2.701,
+    2.649,
+    2.606,
+    2.748,
+    2.654,
+    2.683,
+    2.7,
+    2.699
+   ]
+  },
+  "01/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 32,
+   "updates_with_alarm": 8,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Bedside ECG"
+   ],
+   "leading_last": "Stable angina",
+   "male_hits": [],
+   "alarm": "XXXXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.348,
+    2.442,
+    2.579,
+    2.76,
+    2.811,
+    2.722,
+    2.654,
+    2.779,
+    2.862,
+    2.4
+   ]
+  },
+  "03/A1": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Diabetic peripheral neuropathy",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.11,
+    2.413,
+    2.44,
+    2.561,
+    2.725,
+    2.749,
+    2.335,
+    2.541,
+    2.835,
+    2.662
+   ]
+  },
+  "03/A2": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Diabetic peripheral neuropathy",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.138,
+    2.352,
+    2.433,
+    2.578,
+    2.786,
+    2.804,
+    2.439,
+    2.211,
+    2.248,
+    2.847
+   ]
+  },
+  "03/A3": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Diabetic peripheral neuropathy",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.144,
+    2.416,
+    2.475,
+    2.524,
+    2.776,
+    2.892,
+    2.434,
+    2.536,
+    2.779,
+    2.326
+   ]
+  },
+  "04/A1": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Uncontrolled asthma",
+   "male_hits": [],
+   "alarm": "........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.306,
+    2.56,
+    2.285,
+    2.523,
+    2.731,
+    2.363,
+    2.269,
+    2.131
+   ]
+  },
+  "04/A2": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Uncontrolled asthma",
+   "male_hits": [],
+   "alarm": "........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.332,
+    2.459,
+    2.306,
+    2.415,
+    2.773,
+    2.383,
+    2.428,
+    2.433
+   ]
+  },
+  "04/A3": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Uncontrolled asthma",
+   "male_hits": [],
+   "alarm": "........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.129,
+    2.465,
+    2.36,
+    2.372,
+    2.61,
+    2.26,
+    2.492,
+    2.425
+   ]
+  },
+  "05/A1": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "NSAID-induced gastritis/ulcer",
+   "male_hits": [],
+   "alarm": "...........",
+   "n_high_last": 2,
+   "tc_no_action": [
+    4
+   ],
+   "pass_s": [
+    2.186,
+    2.459,
+    2.365,
+    2.371,
+    2.328,
+    2.456,
+    2.461,
+    2.922,
+    2.205,
+    2.234,
+    2.385
+   ]
+  },
+  "05/A2": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "NSAID-induced gastritis or peptic ulcer",
+   "male_hits": [],
+   "alarm": "...........",
+   "n_high_last": 2,
+   "tc_no_action": [
+    4
+   ],
+   "pass_s": [
+    2.187,
+    2.425,
+    2.469,
+    2.408,
+    2.384,
+    2.57,
+    2.553,
+    2.755,
+    2.163,
+    2.24,
+    2.478
+   ]
+  },
+  "05/A3": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "NSAID-induced gastropathy/ulcer",
+   "male_hits": [],
+   "alarm": "...........",
+   "n_high_last": 2,
+   "tc_no_action": [
+    4
+   ],
+   "pass_s": [
+    2.225,
+    2.418,
+    2.409,
+    2.459,
+    2.416,
+    2.502,
+    2.486,
+    2.461,
+    2.469,
+    2.363,
+    2.409
+   ]
+  },
+  "06/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 32,
+   "updates_with_alarm": 8,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Urgent hospital assessment/admission"
+   ],
+   "leading_last": "Transient Ischemic Attack (TIA)",
+   "male_hits": [],
+   "alarm": "XXXXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.182,
+    2.801,
+    2.51,
+    2.73,
+    2.556,
+    2.748,
+    2.723,
+    2.888,
+    2.569,
+    2.38
+   ]
+  },
+  "06/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 32,
+   "updates_with_alarm": 8,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Urgent neurological assessment and neuroimaging (e.g., CT/MRI brain)",
+    "Urgent carotid artery imaging"
+   ],
+   "leading_last": "Transient Ischemic Attack (TIA)",
+   "male_hits": [],
+   "alarm": "XXXXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.257,
+    2.717,
+    2.569,
+    2.747,
+    2.589,
+    2.7,
+    2.84,
+    2.733,
+    2.55,
+    2.361
+   ]
+  },
+  "06/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 32,
+   "updates_with_alarm": 8,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Urgent hospital assessment/admission"
+   ],
+   "leading_last": "Transient Ischemic Attack (TIA)",
+   "male_hits": [],
+   "alarm": "XXXXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.259,
+    2.71,
+    2.569,
+    2.772,
+    2.674,
+    2.775,
+    2.834,
+    2.859,
+    2.636,
+    3.004
+   ]
+  },
+  "07/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 8,
+   "last_fire": 20,
+   "updates_with_alarm": 4,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Hospital admission/Emergency department referral"
+   ],
+   "leading_last": "Peptic Ulcer Disease (Gastric or Duodenal)",
+   "male_hits": [],
+   "alarm": ".XXXX...",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.45,
+    2.827,
+    2.732,
+    2.774,
+    2.738,
+    2.625,
+    2.719,
+    2.713
+   ]
+  },
+  "07/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 8,
+   "last_fire": 20,
+   "updates_with_alarm": 4,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Urgent hospital assessment/admission"
+   ],
+   "leading_last": "Peptic Ulcer Disease (likely Duodenal or Gastric)",
+   "male_hits": [],
+   "alarm": ".XXXX...",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.546,
+    2.687,
+    2.662,
+    2.707,
+    2.762,
+    2.835,
+    2.544,
+    2.718
+   ]
+  },
+  "07/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 8,
+   "last_fire": 20,
+   "updates_with_alarm": 4,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Urgent hospital assessment/admission"
+   ],
+   "leading_last": "Peptic Ulcer Disease (Gastric or Duodenal)",
+   "male_hits": [],
+   "alarm": ".XXXX...",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.37,
+    2.668,
+    2.676,
+    2.81,
+    2.744,
+    2.822,
+    2.632,
+    2.794
+   ]
+  },
+  "08/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 24,
+   "updates_with_alarm": 6,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Immediate clinical assessment and vital signs",
+    "Urgent ECG and chest X-ray",
+    "Consider hospital admission/emergency transfer"
+   ],
+   "leading_last": "Pulmonary embolism",
+   "male_hits": [],
+   "alarm": "XXXXXX..",
+   "n_high_last": 2,
+   "tc_no_action": [],
+   "pass_s": [
+    2.512,
+    2.617,
+    2.679,
+    2.493,
+    2.568,
+    2.862,
+    2.361,
+    2.305
+   ]
+  },
+  "08/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 24,
+   "updates_with_alarm": 6,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Immediate clinical assessment and vital signs",
+    "Urgent ECG and chest X-ray",
+    "Consider hospital admission/emergency transfer"
+   ],
+   "leading_last": "Pulmonary embolism",
+   "male_hits": [],
+   "alarm": "XXXXXX..",
+   "n_high_last": 2,
+   "tc_no_action": [],
+   "pass_s": [
+    2.558,
+    2.607,
+    2.643,
+    2.551,
+    2.504,
+    2.561,
+    2.383,
+    2.268
+   ]
+  },
+  "08/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 24,
+   "updates_with_alarm": 6,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Immediate clinical assessment and vital signs",
+    "Urgent ECG and chest X-ray",
+    "Consider hospital admission/emergency transfer"
+   ],
+   "leading_last": "Pulmonary embolism",
+   "male_hits": [],
+   "alarm": "XXXXXX..",
+   "n_high_last": 2,
+   "tc_no_action": [],
+   "pass_s": [
+    2.547,
+    2.38,
+    2.605,
+    2.764,
+    2.735,
+    3.283,
+    2.306,
+    2.225
+   ]
+  },
+  "10/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 28,
+   "updates_with_alarm": 7,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Immediate physical examination and surgical assessment"
+   ],
+   "leading_last": "Testicular torsion",
+   "male_hits": [],
+   "alarm": "XXXXXXX...",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.066,
+    2.279,
+    2.528,
+    2.22,
+    2.51,
+    2.752,
+    2.292,
+    2.142,
+    2.157,
+    2.056
+   ]
+  },
+  "10/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 28,
+   "updates_with_alarm": 7,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Immediate clinical examination and surgical assessment"
+   ],
+   "leading_last": "Testicular torsion",
+   "male_hits": [],
+   "alarm": "XXXXXXX...",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.082,
+    2.258,
+    2.487,
+    2.284,
+    2.483,
+    2.741,
+    2.181,
+    2.164,
+    2.028,
+    2.066
+   ]
+  },
+  "10/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 28,
+   "updates_with_alarm": 7,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Immediate clinical examination and surgical assessment"
+   ],
+   "leading_last": "Testicular torsion",
+   "male_hits": [],
+   "alarm": "XXXXXXX...",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.054,
+    2.265,
+    2.566,
+    2.215,
+    2.485,
+    2.766,
+    2.285,
+    2.098,
+    2.145,
+    2.102
+   ]
+  },
+  "11/A1": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Iron deficiency anaemia",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.018,
+    2.242,
+    2.389,
+    2.538,
+    2.575,
+    2.535,
+    2.685,
+    2.12,
+    2.283,
+    2.173
+   ],
+   "restraint": "FAIL (over-committed: 1 high-confidence)"
+  },
+  "11/A2": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Iron deficiency anaemia",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.042,
+    2.301,
+    2.481,
+    2.458,
+    2.526,
+    2.644,
+    2.701,
+    2.633,
+    2.082,
+    2.165
+   ],
+   "restraint": "FAIL (over-committed: 1 high-confidence)"
+  },
+  "11/A3": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Iron deficiency anaemia",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.232,
+    2.285,
+    2.491,
+    2.421,
+    2.512,
+    2.464,
+    2.634,
+    2.697,
+    2.196,
+    2.12
+   ],
+   "restraint": "FAIL (over-committed: 1 high-confidence)"
+  },
+  "12/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 8,
+   "last_fire": 20,
+   "updates_with_alarm": 4,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Neurological examination and ECG"
+   ],
+   "leading_last": "Lifestyle-related (Dehydration/Hypoglycemia/Caffeine)",
+   "male_hits": [],
+   "alarm": ".XXXX......",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.373,
+    2.348,
+    2.485,
+    2.526,
+    2.662,
+    2.547,
+    2.643,
+    2.709,
+    2.652,
+    2.369,
+    2.628
+   ],
+   "restraint": "FAIL (over-committed: 1 high-confidence)"
+  },
+  "12/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 12,
+   "last_fire": 20,
+   "updates_with_alarm": 3,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Neurological examination",
+    "ECG"
+   ],
+   "leading_last": "Lifestyle/Dehydration/Hypoglycaemia",
+   "male_hits": [],
+   "alarm": "..XXX......",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.473,
+    2.466,
+    2.513,
+    2.623,
+    2.651,
+    2.835,
+    2.821,
+    2.803,
+    2.662,
+    2.657,
+    2.346
+   ],
+   "restraint": "FAIL (over-committed: 1 high-confidence)"
+  },
+  "12/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 12,
+   "last_fire": 20,
+   "updates_with_alarm": 3,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Neurological examination",
+    "ECG"
+   ],
+   "leading_last": "Lifestyle-related (Dehydration/Hypoglycemia/Caffeine)",
+   "male_hits": [],
+   "alarm": "..XXX......",
+   "n_high_last": 1,
+   "tc_no_action": [
+    8
+   ],
+   "pass_s": [
+    2.527,
+    2.288,
+    2.481,
+    2.543,
+    2.656,
+    2.56,
+    2.817,
+    2.821,
+    2.89,
+    2.655,
+    2.786
+   ],
+   "restraint": "FAIL (over-committed: 1 high-confidence)"
+  },
+  "13/A1": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Migraine with aura",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.309,
+    2.489,
+    2.64,
+    2.587,
+    2.757,
+    2.692,
+    2.993,
+    2.313,
+    2.334,
+    2.308
+   ],
+   "restraint": "PASS (confident, correct leader)"
+  },
+  "13/A2": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Migraine with aura",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.311,
+    2.489,
+    2.58,
+    2.597,
+    2.595,
+    2.625,
+    2.986,
+    2.311,
+    2.425,
+    2.235
+   ],
+   "restraint": "PASS (confident, correct leader)"
+  },
+  "13/A3": {
+   "failed": null,
+   "fired": false,
+   "first_fire": null,
+   "last_fire": null,
+   "updates_with_alarm": null,
+   "cleared": false,
+   "dropout_return": false,
+   "first_actions": [],
+   "leading_last": "Migraine with aura",
+   "male_hits": [],
+   "alarm": "..........",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.349,
+    2.489,
+    2.623,
+    2.62,
+    2.747,
+    2.642,
+    2.99,
+    2.232,
+    2.341,
+    2.316
+   ],
+   "restraint": "PASS (confident, correct leader)"
+  },
+  "14/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 24,
+   "updates_with_alarm": 6,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Blood tests (ESR/CRP)",
+    "Urgent specialist referral/ophthalmology review"
+   ],
+   "leading_last": "Giant cell arteritis",
+   "male_hits": [],
+   "alarm": "XXXXXX..",
+   "n_high_last": 2,
+   "tc_no_action": [],
+   "pass_s": [
+    2.211,
+    2.423,
+    2.556,
+    3.076,
+    2.934,
+    2.63,
+    2.638,
+    2.389
+   ],
+   "restraint": "PASS (emergency leads)"
+  },
+  "14/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 24,
+   "updates_with_alarm": 6,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Blood tests (ESR/CRP)",
+    "Urgent specialist referral/ophthalmology review"
+   ],
+   "leading_last": "Giant Cell Arteritis (GCA)",
+   "male_hits": [],
+   "alarm": "XXXXXX..",
+   "n_high_last": 2,
+   "tc_no_action": [],
+   "pass_s": [
+    2.438,
+    2.513,
+    2.827,
+    2.934,
+    2.845,
+    2.443,
+    2.398,
+    2.396
+   ],
+   "restraint": "PASS (emergency leads)"
+  },
+  "14/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 24,
+   "updates_with_alarm": 6,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Blood tests (ESR/CRP)",
+    "Urgent specialist referral (Rheumatology/Ophthalmology)"
+   ],
+   "leading_last": "Giant cell arteritis",
+   "male_hits": [],
+   "alarm": "XXXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.23,
+    2.448,
+    2.769,
+    2.946,
+    2.832,
+    2.596,
+    2.621,
+    2.608
+   ],
+   "restraint": "PASS (emergency leads)"
+  },
+  "15/A1": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 20,
+   "updates_with_alarm": 5,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Neurological examination for Cauda Equina Syndrome"
+   ],
+   "leading_last": "Cauda equina syndrome",
+   "male_hits": [],
+   "alarm": "XXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.306,
+    2.481,
+    2.821,
+    2.624,
+    2.675,
+    2.433,
+    2.196
+   ],
+   "restraint": "PASS (emergency leads)"
+  },
+  "15/A2": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 20,
+   "updates_with_alarm": 5,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Neurological examination for Cauda Equina Syndrome"
+   ],
+   "leading_last": "Cauda equina syndrome",
+   "male_hits": [],
+   "alarm": "XXXXX..",
+   "n_high_last": 1,
+   "tc_no_action": [],
+   "pass_s": [
+    2.36,
+    2.706,
+    2.506,
+    2.618,
+    2.603,
+    2.583,
+    2.288
+   ],
+   "restraint": "PASS (emergency leads)"
+  },
+  "15/A3": {
+   "failed": null,
+   "fired": true,
+   "first_fire": 4,
+   "last_fire": 20,
+   "updates_with_alarm": 5,
+   "cleared": true,
+   "dropout_return": false,
+   "first_actions": [
+    "Neurological examination for Cauda Equina Syndrome"
+   ],
+   "leading_last": "Cauda equina syndrome",
+   "male_hits": [],
+   "alarm": "XXXXX..",
+   "n_high_last": 2,
+   "tc_no_action": [],
+   "pass_s": [
+    2.344,
+    2.648,
+    2.568,
+    2.316,
+    2.619,
+    2.421,
+    2.349
+   ],
+   "restraint": "PASS (emergency leads)"
+  },
+  "495/A1": {
+   "considered": 2,
+   "led": 3,
+   "leads_at_11": true,
+   "named": true,
+   "asked": 2,
+   "asked_np": 2,
+   "tested": 2,
+   "first_diff": {
+    "1": "Depressive episode",
+    "2": "Gastroenteritis/Post-infectious IBS",
+    "3": "Ectopic Pregnancy",
+    "4": "Ectopic Pregnancy",
+    "5": "Ectopic Pregnancy",
+    "6": "Ectopic Pregnancy",
+    "7": "Ectopic Pregnancy",
+    "8": "Ectopic Pregnancy",
+    "9": "Ectopic Pregnancy",
+    "10": "Ectopic Pregnancy",
+    "11": "Ectopic Pregnancy"
+   },
+   "alarm": ".XXXXXXXXXX",
+   "not_judged": [],
+   "tc_no_action": [],
+   "pass_s": [
+    2.261,
+    2.355,
+    2.596,
+    2.821,
+    2.888,
+    2.777,
+    2.848,
+    2.838,
+    2.71,
+    2.76,
+    2.793
+   ]
+  },
+  "495/A2": {
+   "considered": 2,
+   "led": 3,
+   "leads_at_11": true,
+   "named": true,
+   "asked": 2,
+   "asked_np": 2,
+   "tested": 2,
+   "first_diff": {
+    "1": "Depressive episode",
+    "2": "Gastroenteritis/Post-infectious IBS",
+    "3": "Ectopic Pregnancy",
+    "4": "Ectopic Pregnancy",
+    "5": "Ectopic Pregnancy",
+    "6": "Ectopic Pregnancy",
+    "7": "Ectopic Pregnancy",
+    "8": "Ectopic Pregnancy",
+    "9": "Ectopic Pregnancy",
+    "10": "Ectopic Pregnancy",
+    "11": "Ectopic Pregnancy"
+   },
+   "alarm": ".XXXXXXXXXX",
+   "not_judged": [],
+   "tc_no_action": [],
+   "pass_s": [
+    2.124,
+    2.337,
+    2.585,
+    2.77,
+    2.777,
+    2.833,
+    2.799,
+    2.898,
+    2.836,
+    2.815,
+    2.769
+   ]
+  },
+  "495/A3": {
+   "considered": 2,
+   "led": 3,
+   "leads_at_11": true,
+   "named": true,
+   "asked": 2,
+   "asked_np": 2,
+   "tested": 2,
+   "first_diff": {
+    "1": "Depressive episode",
+    "2": "Gastroenteritis/Post-infectious IBS",
+    "3": "Ectopic Pregnancy",
+    "4": "Ectopic Pregnancy",
+    "5": "Ectopic Pregnancy",
+    "6": "Ectopic Pregnancy",
+    "7": "Ectopic Pregnancy",
+    "8": "Ectopic Pregnancy",
+    "9": "Ectopic Pregnancy",
+    "10": "Ectopic Pregnancy",
+    "11": "Ectopic Pregnancy"
+   },
+   "alarm": ".XXXXXXXXXX",
+   "not_judged": [],
+   "tc_no_action": [],
+   "pass_s": [
+    2.22,
+    2.301,
+    2.602,
+    2.88,
+    2.768,
+    2.725,
+    2.817,
+    2.846,
+    2.897,
+    2.823,
+    2.742
+   ]
+  },
+  "T1/A1": {
+   "asks": true,
+   "first_target": 8,
+   "fired_at": [
+    8,
+    12,
+    16,
+    20,
+    24
+   ],
+   "clears": true,
+   "male_hits": [],
+   "alarm": ".XXXXX.",
+   "not_judged": [],
+   "tc_no_action": [
+    4
+   ],
+   "pass_s": [
+    2.144,
+    2.525,
+    2.607,
+    2.972,
+    2.754,
+    3.229,
+    2.585
+   ]
+  },
+  "T1/A2": {
+   "asks": true,
+   "first_target": 8,
+   "fired_at": [
+    8,
+    12,
+    16,
+    20
+   ],
+   "clears": true,
+   "male_hits": [],
+   "alarm": ".XXXX..",
+   "not_judged": [],
+   "tc_no_action": [
+    4,
+    24
+   ],
+   "pass_s": [
+    2.265,
+    2.489,
+    2.611,
+    2.783,
+    2.661,
+    3.161,
+    2.895
+   ]
+  },
+  "T1/A3": {
+   "asks": true,
+   "first_target": 4,
+   "fired_at": [
+    8,
+    12,
+    16,
+    20,
+    24
+   ],
+   "clears": true,
+   "male_hits": [],
+   "alarm": ".XXXXX.",
+   "not_judged": [],
+   "tc_no_action": [
+    4
+   ],
+   "pass_s": [
+    2.466,
+    2.46,
+    2.644,
+    2.769,
+    2.733,
+    2.984,
+    2.569
+   ]
+  },
+  "T2/A1": {
+   "asks": true,
+   "first_target": 4,
+   "fired_at": [
+    4,
+    8,
+    12,
+    16,
+    20
+   ],
+   "clears": true,
+   "male_hits": [],
+   "alarm": "XXXXX..",
+   "not_judged": [],
+   "tc_no_action": [],
+   "pass_s": [
+    2.271,
+    2.457,
+    2.663,
+    2.713,
+    2.834,
+    2.755,
+    2.802
+   ]
+  },
+  "T2/A2": {
+   "asks": true,
+   "first_target": 4,
+   "fired_at": [
+    4,
+    8,
+    12,
+    16,
+    20
+   ],
+   "clears": true,
+   "male_hits": [],
+   "alarm": "XXXXX..",
+   "not_judged": [],
+   "tc_no_action": [],
+   "pass_s": [
+    2.188,
+    2.53,
+    2.617,
+    2.707,
+    2.784,
+    3.01,
+    2.701
+   ]
+  },
+  "T2/A3": {
+   "asks": true,
+   "first_target": 4,
+   "fired_at": [
+    4,
+    8,
+    12,
+    16,
+    20
+   ],
+   "clears": true,
+   "male_hits": [],
+   "alarm": "XXXXX..",
+   "not_judged": [],
+   "tc_no_action": [],
+   "pass_s": [
+    2.251,
+    2.432,
+    2.662,
+    2.67,
+    2.773,
+    3.055,
+    2.896
+   ]
+  }
+ }
+}

@@ -1,0 +1,98 @@
+[
+ {
+  "case": "15",
+  "point": 27,
+  "job": "alarm",
+  "way": "bare",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "15",
+  "point": 27,
+  "job": "alarm",
+  "way": "between",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "15",
+  "point": 27,
+  "job": "assessment",
+  "way": "bare",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "15",
+  "point": 27,
+  "job": "assessment",
+  "way": "between",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "495",
+  "point": 11,
+  "job": "alarm",
+  "way": "bare",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "495",
+  "point": 11,
+  "job": "alarm",
+  "way": "between",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "495",
+  "point": 11,
+  "job": "assessment",
+  "way": "bare",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "495",
+  "point": 11,
+  "job": "assessment",
+  "way": "between",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "T2",
+  "point": 16,
+  "job": "alarm",
+  "way": "bare",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "T2",
+  "point": 16,
+  "job": "alarm",
+  "way": "between",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "T2",
+  "point": 16,
+  "job": "assessment",
+  "way": "bare",
+  "times": 10,
+  "same_as_first": 10
+ },
+ {
+  "case": "T2",
+  "point": 16,
+  "job": "assessment",
+  "way": "between",
+  "times": 10,
+  "same_as_first": 10
+ }
+]

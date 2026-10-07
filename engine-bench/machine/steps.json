@@ -1,0 +1,459 @@
+{
+ "how": "Each step is one bench command of the driver: one engine, one round, the chains named. Its start and end are the driver's own clock, local time, written to the log when the command ended. The first call of each step loads or warms the model and is recorded but never measured; its milliseconds are given here.",
+ "date": "2026-10-07",
+ "steps": [
+  {
+   "name": "r1-ollama-A1",
+   "round": 1,
+   "engine": "Ollama",
+   "arm": "ollama-google-file",
+   "start_name": "the Ollama service as installed",
+   "together": false,
+   "chains": [
+    "A1"
+   ],
+   "start": "2026-10-07T07:17:13+01:00",
+   "end": "2026-10-07T07:28:47+01:00",
+   "minutes": 11.6,
+   "exit": 0,
+   "first_call_not_measured_ms": 3522
+  },
+  {
+   "name": "r1-ollama-B1-B3",
+   "round": 1,
+   "engine": "Ollama",
+   "arm": "ollama-google-file",
+   "start_name": "the Ollama service as installed",
+   "together": false,
+   "chains": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "start": "2026-10-07T07:28:48+01:00",
+   "end": "2026-10-07T08:02:50+01:00",
+   "minutes": 34.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 854
+  },
+  {
+   "name": "r1-ollama-together-A1",
+   "round": 1,
+   "engine": "Ollama",
+   "arm": "ollama-together",
+   "start_name": "ollama-private",
+   "together": true,
+   "chains": [
+    "A1"
+   ],
+   "start": "2026-10-07T08:02:54+01:00",
+   "end": "2026-10-07T08:11:52+01:00",
+   "minutes": 9.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 654
+  },
+  {
+   "name": "r1-llamacpp-A1",
+   "round": 1,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-google-file",
+   "start_name": "llamacpp-1",
+   "together": false,
+   "chains": [
+    "A1"
+   ],
+   "start": "2026-10-07T08:11:56+01:00",
+   "end": "2026-10-07T08:23:56+01:00",
+   "minutes": 12.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 869
+  },
+  {
+   "name": "r1-llamacpp-B1-B3",
+   "round": 1,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-google-file",
+   "start_name": "llamacpp-1",
+   "together": false,
+   "chains": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "start": "2026-10-07T08:23:56+01:00",
+   "end": "2026-10-07T09:00:03+01:00",
+   "minutes": 36.1,
+   "exit": 0,
+   "first_call_not_measured_ms": 852
+  },
+  {
+   "name": "r1-llamacpp-together-A1",
+   "round": 1,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-together",
+   "start_name": "llamacpp-2",
+   "together": true,
+   "chains": [
+    "A1"
+   ],
+   "start": "2026-10-07T09:00:06+01:00",
+   "end": "2026-10-07T09:09:22+01:00",
+   "minutes": 9.3,
+   "exit": 0,
+   "first_call_not_measured_ms": 816
+  },
+  {
+   "name": "r1-vllm-A1",
+   "round": 1,
+   "engine": "vLLM",
+   "arm": "vllm-repack-compact",
+   "start_name": "vllm-compact",
+   "together": false,
+   "chains": [
+    "A1"
+   ],
+   "start": "2026-10-07T09:09:49+01:00",
+   "end": "2026-10-07T09:17:27+01:00",
+   "minutes": 7.6,
+   "exit": 0,
+   "first_call_not_measured_ms": 1077
+  },
+  {
+   "name": "r1-vllm-B1-B3",
+   "round": 1,
+   "engine": "vLLM",
+   "arm": "vllm-repack-compact",
+   "start_name": "vllm-compact",
+   "together": false,
+   "chains": [
+    "B1",
+    "B2",
+    "B3"
+   ],
+   "start": "2026-10-07T09:17:27+01:00",
+   "end": "2026-10-07T09:42:59+01:00",
+   "minutes": 25.5,
+   "exit": 0,
+   "first_call_not_measured_ms": 624
+  },
+  {
+   "name": "r1-vllm-together-A1",
+   "round": 1,
+   "engine": "vLLM",
+   "arm": "vllm-together-compact",
+   "start_name": "vllm-compact",
+   "together": true,
+   "chains": [
+    "A1"
+   ],
+   "start": "2026-10-07T09:42:59+01:00",
+   "end": "2026-10-07T09:49:11+01:00",
+   "minutes": 6.2,
+   "exit": 0,
+   "first_call_not_measured_ms": 624
+  },
+  {
+   "name": "r2-llamacpp-A2",
+   "round": 2,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-google-file",
+   "start_name": "llamacpp-1",
+   "together": false,
+   "chains": [
+    "A2"
+   ],
+   "start": "2026-10-07T09:49:15+01:00",
+   "end": "2026-10-07T10:01:15+01:00",
+   "minutes": 12.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 870
+  },
+  {
+   "name": "r2-llamacpp-B4-B6",
+   "round": 2,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-google-file",
+   "start_name": "llamacpp-1",
+   "together": false,
+   "chains": [
+    "B4",
+    "B5",
+    "B6"
+   ],
+   "start": "2026-10-07T10:01:15+01:00",
+   "end": "2026-10-07T10:37:19+01:00",
+   "minutes": 36.1,
+   "exit": 0,
+   "first_call_not_measured_ms": 854
+  },
+  {
+   "name": "r2-llamacpp-together-A2",
+   "round": 2,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-together",
+   "start_name": "llamacpp-2",
+   "together": true,
+   "chains": [
+    "A2"
+   ],
+   "start": "2026-10-07T10:37:22+01:00",
+   "end": "2026-10-07T10:46:37+01:00",
+   "minutes": 9.2,
+   "exit": 0,
+   "first_call_not_measured_ms": 821
+  },
+  {
+   "name": "r2-vllm-A2",
+   "round": 2,
+   "engine": "vLLM",
+   "arm": "vllm-repack-compact",
+   "start_name": "vllm-compact",
+   "together": false,
+   "chains": [
+    "A2"
+   ],
+   "start": "2026-10-07T10:47:04+01:00",
+   "end": "2026-10-07T10:54:43+01:00",
+   "minutes": 7.7,
+   "exit": 0,
+   "first_call_not_measured_ms": 1075
+  },
+  {
+   "name": "r2-vllm-B4-B6",
+   "round": 2,
+   "engine": "vLLM",
+   "arm": "vllm-repack-compact",
+   "start_name": "vllm-compact",
+   "together": false,
+   "chains": [
+    "B4",
+    "B5",
+    "B6"
+   ],
+   "start": "2026-10-07T10:54:43+01:00",
+   "end": "2026-10-07T11:20:08+01:00",
+   "minutes": 25.4,
+   "exit": 0,
+   "first_call_not_measured_ms": 626
+  },
+  {
+   "name": "r2-vllm-together-A2",
+   "round": 2,
+   "engine": "vLLM",
+   "arm": "vllm-together-compact",
+   "start_name": "vllm-compact",
+   "together": true,
+   "chains": [
+    "A2"
+   ],
+   "start": "2026-10-07T11:20:08+01:00",
+   "end": "2026-10-07T11:26:21+01:00",
+   "minutes": 6.2,
+   "exit": 0,
+   "first_call_not_measured_ms": 621
+  },
+  {
+   "name": "r2-ollama-A2",
+   "round": 2,
+   "engine": "Ollama",
+   "arm": "ollama-google-file",
+   "start_name": "the Ollama service as installed",
+   "together": false,
+   "chains": [
+    "A2"
+   ],
+   "start": "2026-10-07T11:26:23+01:00",
+   "end": "2026-10-07T11:37:56+01:00",
+   "minutes": 11.6,
+   "exit": 0,
+   "first_call_not_measured_ms": 3454
+  },
+  {
+   "name": "r2-ollama-B4-B6",
+   "round": 2,
+   "engine": "Ollama",
+   "arm": "ollama-google-file",
+   "start_name": "the Ollama service as installed",
+   "together": false,
+   "chains": [
+    "B4",
+    "B5",
+    "B6"
+   ],
+   "start": "2026-10-07T11:37:56+01:00",
+   "end": "2026-10-07T12:12:20+01:00",
+   "minutes": 34.4,
+   "exit": 0,
+   "first_call_not_measured_ms": 854
+  },
+  {
+   "name": "r2-ollama-together-A2",
+   "round": 2,
+   "engine": "Ollama",
+   "arm": "ollama-together",
+   "start_name": "ollama-private",
+   "together": true,
+   "chains": [
+    "A2"
+   ],
+   "start": "2026-10-07T12:12:23+01:00",
+   "end": "2026-10-07T12:21:22+01:00",
+   "minutes": 9.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 649
+  },
+  {
+   "name": "r3-vllm-A3",
+   "round": 3,
+   "engine": "vLLM",
+   "arm": "vllm-repack-compact",
+   "start_name": "vllm-compact",
+   "together": false,
+   "chains": [
+    "A3"
+   ],
+   "start": "2026-10-07T12:21:49+01:00",
+   "end": "2026-10-07T12:29:29+01:00",
+   "minutes": 7.7,
+   "exit": 0,
+   "first_call_not_measured_ms": 1077
+  },
+  {
+   "name": "r3-vllm-B7-B10",
+   "round": 3,
+   "engine": "vLLM",
+   "arm": "vllm-repack-compact",
+   "start_name": "vllm-compact",
+   "together": false,
+   "chains": [
+    "B7",
+    "B8",
+    "B9",
+    "B10"
+   ],
+   "start": "2026-10-07T12:29:29+01:00",
+   "end": "2026-10-07T13:03:17+01:00",
+   "minutes": 33.8,
+   "exit": 0,
+   "first_call_not_measured_ms": 626
+  },
+  {
+   "name": "r3-vllm-together-A3",
+   "round": 3,
+   "engine": "vLLM",
+   "arm": "vllm-together-compact",
+   "start_name": "vllm-compact",
+   "together": true,
+   "chains": [
+    "A3"
+   ],
+   "start": "2026-10-07T13:03:18+01:00",
+   "end": "2026-10-07T13:09:33+01:00",
+   "minutes": 6.2,
+   "exit": 0,
+   "first_call_not_measured_ms": 620
+  },
+  {
+   "name": "r3-ollama-A3",
+   "round": 3,
+   "engine": "Ollama",
+   "arm": "ollama-google-file",
+   "start_name": "the Ollama service as installed",
+   "together": false,
+   "chains": [
+    "A3"
+   ],
+   "start": "2026-10-07T13:09:35+01:00",
+   "end": "2026-10-07T13:21:08+01:00",
+   "minutes": 11.6,
+   "exit": 0,
+   "first_call_not_measured_ms": 3399
+  },
+  {
+   "name": "r3-ollama-B7-B10",
+   "round": 3,
+   "engine": "Ollama",
+   "arm": "ollama-google-file",
+   "start_name": "the Ollama service as installed",
+   "together": false,
+   "chains": [
+    "B7",
+    "B8",
+    "B9",
+    "B10"
+   ],
+   "start": "2026-10-07T13:21:08+01:00",
+   "end": "2026-10-07T14:06:54+01:00",
+   "minutes": 45.8,
+   "exit": 0,
+   "first_call_not_measured_ms": 852
+  },
+  {
+   "name": "r3-ollama-together-A3",
+   "round": 3,
+   "engine": "Ollama",
+   "arm": "ollama-together",
+   "start_name": "ollama-private",
+   "together": true,
+   "chains": [
+    "A3"
+   ],
+   "start": "2026-10-07T14:06:58+01:00",
+   "end": "2026-10-07T14:15:56+01:00",
+   "minutes": 9.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 642
+  },
+  {
+   "name": "r3-llamacpp-A3",
+   "round": 3,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-google-file",
+   "start_name": "llamacpp-1",
+   "together": false,
+   "chains": [
+    "A3"
+   ],
+   "start": "2026-10-07T14:15:59+01:00",
+   "end": "2026-10-07T14:28:00+01:00",
+   "minutes": 12.0,
+   "exit": 0,
+   "first_call_not_measured_ms": 871
+  },
+  {
+   "name": "r3-llamacpp-B7-B10",
+   "round": 3,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-google-file",
+   "start_name": "llamacpp-1",
+   "together": false,
+   "chains": [
+    "B7",
+    "B8",
+    "B9",
+    "B10"
+   ],
+   "start": "2026-10-07T14:28:00+01:00",
+   "end": "2026-10-07T15:15:52+01:00",
+   "minutes": 47.9,
+   "exit": 0,
+   "first_call_not_measured_ms": 852
+  },
+  {
+   "name": "r3-llamacpp-together-A3",
+   "round": 3,
+   "engine": "llama.cpp",
+   "arm": "llamacpp-together",
+   "start_name": "llamacpp-2",
+   "together": true,
+   "chains": [
+    "A3"
+   ],
+   "start": "2026-10-07T15:15:55+01:00",
+   "end": "2026-10-07T15:25:12+01:00",
+   "minutes": 9.3,
+   "exit": 0,
+   "first_call_not_measured_ms": 820
+  }
+ ]
+}

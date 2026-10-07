@@ -1,0 +1,42 @@
+{
+ "arm": "ollama-repeat",
+ "kind": "repeat",
+ "together": false,
+ "engine": "ollama",
+ "engine_version": "0.33.3",
+ "model_tag": "openconsult-bench-gemma4:26b-google-q4_0",
+ "model_digest": "9813ae3a5cf9ef2c1f20472d76c3b012b7b0a7bab2285c2f825244331d1db89c",
+ "prompts": {
+  "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
+  "assessment": "6cc315afcf2c8570a7486bb8adb84885a8c043612e54bd2da158fa7814ad9308"
+ },
+ "cases": [
+  "15",
+  "495",
+  "T2"
+ ],
+ "chains": [
+  "alarm-bare",
+  "alarm-between",
+  "assessment-bare",
+  "assessment-between"
+ ],
+ "results": 12,
+ "calls": 174,
+ "outcomes": {
+  "ok": 174
+ },
+ "first_call_at": "2026-10-06T13:41:23.978+01:00",
+ "last_call_at": "2026-10-06T13:48:04.125+01:00",
+ "card": {
+  "samples": 80,
+  "lowest_mib": 17433,
+  "median_mib": 17456.0,
+  "highest_mib": 17599
+ },
+ "facts": {
+  "engine_start": "the installed Ollama service, not restarted",
+  "model_file_sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+  "first_call_with_the_model_not_loaded_ms": "3463"
+ }
+}

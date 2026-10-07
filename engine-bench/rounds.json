@@ -1,0 +1,19 @@
+{
+ "note": "The rounds of 7 Oct 2026 as data for openconsult-bench figures. Each round holds one chain at temperature 0, run both ways, and a share of the ten chains at 0.5 (the stress test). The temperature of a chain is read from the results, never from its name.",
+ "card_mib": 24564,
+ "baseline": "ollama-google-file",
+ "baseline_together": "ollama-together",
+ "arms": {
+  "ollama-google-file": {"engine": "Ollama", "way": "one after another"},
+  "llamacpp-google-file": {"engine": "llama.cpp", "way": "one after another"},
+  "vllm-repack-compact": {"engine": "vLLM", "way": "one after another"},
+  "ollama-together": {"engine": "Ollama", "way": "together"},
+  "llamacpp-together": {"engine": "llama.cpp", "way": "together"},
+  "vllm-together-compact": {"engine": "vLLM", "way": "together"}
+ },
+ "rounds": {
+  "1": {"chain": "A1", "stress": ["B1", "B2", "B3"], "order": ["Ollama", "llama.cpp", "vLLM"]},
+  "2": {"chain": "A2", "stress": ["B4", "B5", "B6"], "order": ["llama.cpp", "vLLM", "Ollama"]},
+  "3": {"chain": "A3", "stress": ["B7", "B8", "B9", "B10"], "order": ["vLLM", "Ollama", "llama.cpp"]}
+ }
+}

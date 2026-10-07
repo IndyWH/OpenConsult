@@ -1,0 +1,59 @@
+{
+ "arm": "ollama-together",
+ "kind": "chains",
+ "together": true,
+ "engine": "ollama",
+ "engine_version": "0.33.3",
+ "model_tag": "openconsult-bench-gemma4:26b-google-q4_0",
+ "model_digest": "b7b2309642163e7ca6042374fd653f3725c1e81cfe447c501bcdbbd43242d9a8",
+ "prompts": {
+  "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
+  "assessment": "6cc315afcf2c8570a7486bb8adb84885a8c043612e54bd2da158fa7814ad9308"
+ },
+ "cases": [
+  "01",
+  "03",
+  "04",
+  "05",
+  "06",
+  "07",
+  "08",
+  "10",
+  "11",
+  "12",
+  "13",
+  "14",
+  "15",
+  "495",
+  "T1",
+  "T2"
+ ],
+ "chains": [
+  "A1",
+  "A2",
+  "A3"
+ ],
+ "results": 48,
+ "calls": 876,
+ "outcomes": {
+  "ok": 876
+ },
+ "first_call_at": "2026-10-07T08:03:00.598+01:00",
+ "last_call_at": "2026-10-07T14:15:56.664+01:00",
+ "card": {
+  "over": "the arm's own steps",
+  "samples": 322,
+  "windows": 3,
+  "lowest_mib": 563,
+  "median_mib": 17859.0,
+  "highest_mib": 17859
+ },
+ "facts": {
+  "run_on": "2026-10-07",
+  "rounds": "3: round 1 chains A1 and B1 to B3, round 2 A2 and B4 to B6, round 3 A3 and B7 to B10; the together arms the chain at 0 of each round",
+  "engine_start": "a second Ollama process, OLLAMA_NUM_PARALLEL=2, its own model folder, started for each round",
+  "slots": "2",
+  "model_file_sha256": "3eca3b8f6d7baf218a7dd6bba5fb59a56ee25fe2d567b6f5f589b4f697eca51d",
+  "digest_note": "Ollama's digest covers its own manifest, so this process's copy of the same file has its own digest"
+ }
+}
