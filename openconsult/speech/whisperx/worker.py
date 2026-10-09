@@ -65,6 +65,8 @@ def serve(inp, out, open_stream, stop_pass) -> int:
                 write_frame(out, {"type": "error", "fatal": False, "message": f"unknown session {sid!r}"})
             elif kind == "audio":
                 write_frame(out, {"type": "lines", "session": sid, **sessions[sid].accept(payload)})
+            elif kind == "stop" and int(header.get("speakers") or 0) < 1:
+                write_frame(out, {"type": "error", "fatal": False, "message": "the number of speakers must be 1 or more"})
             elif kind == "stop":
                 stream = sessions.pop(sid)
                 started = time.perf_counter()

@@ -118,6 +118,10 @@ class Door:
         (change 3). Raw segments are kept as they came (V1_LESSONS 1.7)."""
         if self._session is None:
             return failed_final("no_session", words.DOOR_NO_SESSION, self.stamp)
+        if int(speakers) < 1:
+            # Refused here, with the session kept: pyannote would fail on it
+            # and take the worker down for a wrong number.
+            return failed_final("bad_speakers", words.DOOR_BAD_SPEAKERS.format(speakers=speakers), self.stamp)
         session, self._session = self._session, None
         try:
             reply = self._worker.request({"type": "stop", "session": session, "speakers": int(speakers)},

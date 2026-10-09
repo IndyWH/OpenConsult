@@ -169,6 +169,12 @@ def test_2_1_the_number_of_speakers_is_given_never_worked_out():
     assert worker.requested("stop")[0][0]["speakers"] == 2
     with pytest.raises(TypeError):
         door.stop()                                 # no default
+    # A number below one is refused by the door, and the session stays up.
+    door.open(RATE)
+    for bad in (0, -1):
+        refused = door.stop(speakers=bad)
+        assert (refused.failure, refused.detail) == ("bad_speakers", words.DOOR_BAD_SPEAKERS.format(speakers=bad))
+    assert len(worker.requested("stop")) == 1 and door.feed(LOUD).ok and door.stop(speakers=1).ok
 
 
 def test_1_7_raw_segments_are_kept_as_they_came():

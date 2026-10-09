@@ -168,6 +168,7 @@ CHOICE_TITLE = "WhisperX with pyannote"
 SPEECH_NEEDS_INSTALL = "The speech choice is not installed. Run openconsult install-speech first."
 DOOR_NO_SESSION = "No session is open."
 DOOR_SESSION_OPEN = "A session is already open."
+DOOR_BAD_SPEAKERS = "The number of speakers must be 1 or more, not {speakers}."
 DOOR_BAD_REPLY = "The speech worker's answer could not be read: {reason}"
 SPEECH_BUILDING = (
     "Building the speech environment for WhisperX with pyannote in {folder}. "
