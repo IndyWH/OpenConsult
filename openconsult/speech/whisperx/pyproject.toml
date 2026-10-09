@@ -1,0 +1,45 @@
+# The speech environment of the WhisperX with pyannote choice (spec 6.2;
+# 15.9). Not a package: only its locked libraries are installed, into the
+# user's data folder, by openconsult install-speech. The versions are
+# v1's as Task 19 left them, so the bench can be set beside Tasks 17 to 19.
+[project]
+name = "openconsult-speech-whisperx"
+version = "2.0.0.dev0"
+description = "The libraries of OpenConsult's WhisperX with pyannote speech worker. A research and education prototype, never for real patients."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "faster-whisper==1.2.1",
+    "whisperx==3.8.6",
+    "ctranslate2==4.8.1",
+    "pyannote-audio==3.4.0",
+    "torch==2.8.0",
+    "torchaudio==2.8.0",
+    "torchvision==0.23.0",
+    "numpy==2.5.1",
+    "transformers==4.57.6",
+    "onnxruntime==1.27.0",
+    "huggingface-hub==0.36.2",
+    "tokenizers==0.22.2",
+    "av==18.0.0",
+    "pandas==3.0.3",
+    "omegaconf==2.3.1",
+    "nltk==3.10.3",
+    "lightning==2.6.6",
+    "speechbrain==1.1.0",
+    "scipy==1.18.0",
+    "triton==3.4.0; sys_platform == 'linux' and platform_machine == 'x86_64'",
+]
+
+[tool.uv]
+package = false
+# Two of v1's three overrides are still needed. whisperx 3.8.6 declares
+# pyannote-audio>=4, whose loader of the 3.1 pipeline pulls a separately
+# gated model; 3.4.0 loads speaker-diarization-3.1 with the terms already
+# accepted, and the worker calls pyannote itself. whisperx declares
+# torchcodec and never imports it; 0.7 fails against this system's FFmpeg
+# 8 and its presence breaks transformers at import. v1's third override,
+# ctranslate2>=4.6, is a plain dependency now: whisperx 3.8.6 allows it.
+override-dependencies = [
+    "pyannote-audio==3.4.0",
+    "torchcodec; sys_platform == 'never'",
+]

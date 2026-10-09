@@ -48,6 +48,45 @@ Stage 2. Carried from v1 (this project's own code, AGPL-3.0-or-later):
 the password hashing method of app/auth.py, and the style sheet
 app/static/theme.css, cut to what v2 uses.
 
+Stage 5a, 9 Oct 2026. The speech environment of the WhisperX with pyannote
+choice. These run as a separate process, in their own environment in the
+user's data folder, built by openconsult install-speech from the lock file
+openconsult/speech/whisperx/uv.lock. The app never imports any of them. The
+versions are v1's as Task 19 left them. The lock holds 123 packages; the
+direct ones are:
+
+  faster-whisper 1.2.1       MIT              https://pypi.org/project/faster-whisper/
+  whisperx 3.8.6             BSD-2-Clause     https://pypi.org/project/whisperx/
+  ctranslate2 4.8.1          MIT              https://pypi.org/project/ctranslate2/
+  pyannote-audio 3.4.0       MIT              https://pypi.org/project/pyannote.audio/
+  torch 2.8.0                BSD-3-Clause     https://pypi.org/project/torch/
+  torchaudio 2.8.0           BSD-2-Clause     https://pypi.org/project/torchaudio/
+  torchvision 0.23.0         BSD-3-Clause     https://pypi.org/project/torchvision/
+  numpy 2.5.1                BSD-3-Clause     https://pypi.org/project/numpy/
+  transformers 4.57.6        Apache-2.0       https://pypi.org/project/transformers/
+  onnxruntime 1.27.0         MIT              https://pypi.org/project/onnxruntime/
+  huggingface-hub 0.36.2     Apache-2.0       https://pypi.org/project/huggingface-hub/
+  tokenizers 0.22.2          Apache-2.0       https://pypi.org/project/tokenizers/
+  av 18.0.0                  BSD-3-Clause     https://pypi.org/project/av/
+  pandas 3.0.3               BSD-3-Clause     https://pypi.org/project/pandas/
+  omegaconf 2.3.1            BSD-3-Clause     https://pypi.org/project/omegaconf/
+  nltk 3.10.3                Apache-2.0       https://pypi.org/project/nltk/
+  lightning 2.6.6            Apache-2.0       https://pypi.org/project/lightning/
+  speechbrain 1.1.0          Apache-2.0       https://pypi.org/project/speechbrain/
+  scipy 1.18.0               BSD-3-Clause     https://pypi.org/project/scipy/
+  triton 3.4.0               MIT              https://pypi.org/project/triton/ (Linux only)
+  nvidia-cudnn-cu12, nvidia-cublas-cu12 and the other nvidia-* wheels torch
+    requires              NVIDIA proprietary (the CUDA Toolkit end user licence)
+                                             https://pypi.org/project/nvidia-cudnn-cu12/
+
+The models this choice loads are not bundled. openconsult install-speech
+fetches them from their makers at the revisions pinned in
+openconsult/speech/whisperx/models.json, into the model caches on the user's
+computer: Whisper large-v3 and distil-large-v3 as converted by Systran (MIT),
+the wav2vec2 alignment model of torchaudio (MIT), Silero VAD (MIT), and
+pyannote's speaker-diarization-3.1, segmentation-3.0 (MIT, behind their
+makers' terms on Hugging Face) and wespeaker-voxceleb-resnet34-LM (CC-BY-4.0).
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 
