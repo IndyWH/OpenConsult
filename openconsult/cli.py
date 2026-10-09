@@ -1,11 +1,14 @@
-"""The one command (spec 15.6): openconsult starts the app, and
-openconsult reset-password resets the password (D26)."""
+"""The one command (spec 15.6): openconsult starts the app, openconsult
+reset-password resets the password (D26), and openconsult install-speech
+builds the speech environment and fetches its models (15.9)."""
 
 from __future__ import annotations
 
 import argparse
 import getpass
+import shutil
 import socket
+import subprocess
 from pathlib import Path
 from typing import Callable
 
@@ -19,22 +22,28 @@ from openconsult.patients.users import MIN_PASSWORD, Users, password_problem
 from openconsult.settings import store
 from openconsult.settings.machine import Machine
 from openconsult.settings.store import LISTEN_ON
+from openconsult.speech import environment
+from openconsult.speech.choices import WHISPERX_PYANNOTE
 
 
 def main(argv: list[str] | None = None, say: Callable = print,
          ask: Callable = getpass.getpass, serve: Callable | None = None,
-         machine: Machine | None = None, open_browser: Callable | None = None) -> int:
-    """say, ask, serve, machine and open_browser are passed in so tests run
-    the command with no terminal, no browser and the same result on every
-    machine."""
+         machine: Machine | None = None, open_browser: Callable | None = None,
+         run_process: Callable = subprocess.run, which: Callable = shutil.which) -> int:
+    """say, ask, serve, machine, open_browser, run_process and which are passed in so
+    tests run the command with no terminal, no browser, no uv and the same
+    result on every machine."""
     parser = argparse.ArgumentParser(prog="openconsult")
-    parser.add_argument("command", nargs="?", choices=["run", "reset-password"], default="run")
+    parser.add_argument("command", nargs="?", choices=["run", "reset-password", "install-speech"],
+                        default="run")
     parser.add_argument("--data-folder", type=Path, help="where the data lives, for a development run")
     parser.add_argument("--port", type=int, help="the port to listen on; 8001 if not given")
     parser.add_argument("--no-browser", action="store_true", help="start without opening the browser")
     args = parser.parse_args(argv)
     if args.command == "reset-password":
         return reset_password(args.data_folder, say=say, ask=ask)
+    if args.command == "install-speech":
+        return install_speech(args.data_folder, say=say, run=run_process, which=which)
     return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine,
                open_browser=None if args.no_browser else (open_browser or browser.start))
 
@@ -104,3 +113,13 @@ def reset_password(data_folder: Path | None, say: Callable, ask: Callable) -> in
     users.reset_password(new)
     say(words.RESET_DONE)
     return 0
+
+
+def install_speech(data_folder: Path | None, say: Callable, run: Callable, which: Callable) -> int:
+    """Builds the one speech choice's environment in the data folder from
+    the committed lock file, then finds or fetches its models (15.9; plan
+    review, change 1). Nothing else downloads a model."""
+    settings = store.build(data_folder)
+    say(words.SPEECH_BUILDING.format(folder=environment.folder(settings.data_folder, WHISPERX_PYANNOTE)))
+    report = environment.build(settings.data_folder, WHISPERX_PYANNOTE, say=say, run=run, which=which)
+    return 0 if report.ok else 1

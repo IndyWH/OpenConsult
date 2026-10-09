@@ -156,3 +156,65 @@ def answer_by_job(body):
     """A chat reply that fits the form of whichever job asked."""
     job = body["response_format"]["json_schema"]["name"]
     return chat_reply(json.dumps(ALARM_QUIET if job == "alarm" else ASSESSMENT))
+
+
+# ------------------------------------- a made-up speech worker behind the door
+
+class MadeUpWorker:
+    """Stands where the real worker process stands, in this process. It
+    keeps every request it was given, answers from what the test set, and
+    can die on the Nth request. Nothing here hears any sound."""
+
+    def __init__(self, live=None, final=None, pending=None, die_after=None, ready=True,
+                 rate_only=None, info=None):
+        self.live = list(live or [])          # segment lists, one per audio request
+        self.pending = list(pending or [])
+        self.final = final or {"last_live": [], "segments": [], "seconds": {"load": 1.0, "stop": 2.0}}
+        self.die_after = die_after
+        self.ready_ok = ready
+        self.rate_only = rate_only
+        self.info = {}
+        self._info = info or {"type": "ready", "models": {"made-up": {"revision": "r0"}},
+                              "versions": {"made-up": "0.0"}}
+        self.requests: list[tuple[dict, bytes]] = []
+        self.starts = 0
+        self.state, self.kind, self.reason = "stopped", None, None
+
+    def start(self):
+        self.starts += 1
+        self.state = "starting"
+
+    def wait_ready(self, timeout_s=None):
+        if not self.ready_ok:
+            self.state, self.kind, self.reason = "failed", "died", "made-up: could not load"
+            return False
+        self.state, self.info = "ready", self._info
+        return True
+
+    def stop(self):
+        self.state = "stopped"
+
+    def request(self, header, payload=b"", timeout_s=None):
+        from openconsult.speech.worker import WorkerGone
+        self.requests.append((header, payload))
+        if self.state != "ready":
+            raise WorkerGone(self.kind or "died", self.reason or "made-up: not ready")
+        if self.die_after is not None and len(self.requests) >= self.die_after:
+            self.state, self.kind, self.reason = "failed", "died", "made-up: died with exit code 3"
+            raise WorkerGone(self.kind, self.reason)
+        kind = header["type"]
+        if kind == "open":
+            if self.rate_only and header["rate"] != self.rate_only:
+                return {"type": "error", "fatal": False, "reason": "rate_not_supported",
+                        "message": f"made-up: takes {self.rate_only} only"}
+            return {"type": "opened", "session": header["session"]}
+        if kind == "audio":
+            return {"type": "lines", "session": header["session"],
+                    "segments": self.live.pop(0) if self.live else [],
+                    "pending": self.pending.pop(0) if self.pending else []}
+        if kind == "stop":
+            return {"type": "stopped", "session": header["session"], **self.final}
+        return {"type": "error", "fatal": False, "message": f"made-up: unknown {kind!r}"}
+
+    def requested(self, kind):
+        return [(h, p) for h, p in self.requests if h["type"] == kind]

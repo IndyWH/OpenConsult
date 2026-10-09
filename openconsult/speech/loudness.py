@@ -63,8 +63,9 @@ class Loudness:
         """The loudest window that overlaps the span. A span that reaches
         past the full windows also sees the piece still in hand; a span
         with no sound at all is -inf, as silence is."""
-        first = max(0, int(start_s / WINDOW_S))
-        last = max(first + 1, int(math.ceil(end_s / WINDOW_S)))
+        # In whole samples, so 0.3 s is window 3 and not 2.999 of one.
+        first = max(0, int(round(start_s * self.rate)) // self.window)
+        last = max(first + 1, -(-int(round(end_s * self.rate)) // self.window))
         found = self.windows[first:last]
         if last > len(self.windows) and len(self._carry):
             found = [*found, dbfs(rms_of(self._carry))]
