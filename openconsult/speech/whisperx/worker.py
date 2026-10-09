@@ -78,6 +78,8 @@ def serve(inp, out, open_stream, stop_pass) -> int:
             else:
                 write_frame(out, {"type": "error", "fatal": False, "message": f"unknown request {kind!r}"})
         except Exception as exc:  # noqa: BLE001 - reported, then the process ends
+            # The traceback shows code, never data; the message is the
+            # exception's own words, which name no segment.
             traceback.print_exc(file=sys.stderr)
             write_frame(out, {"type": "error", "session": sid, "fatal": True,
                               "message": f"{type(exc).__name__}: {exc}"[:500]})
@@ -88,11 +90,29 @@ class RateRefused(Exception):
     pass
 
 
+QUIET_LOGGERS = ("faster_whisper", "whisperx", "pyannote", "transformers", "huggingface_hub",
+                 "torch", "torchaudio", "speechbrain", "lightning", "pytorch_lightning")
+
+
+def quiet_logs() -> None:
+    """The log in the data folder is not part of any consultation, so it
+    must never hold spoken words (D44). Nothing here writes a segment or
+    a transcript to it, and the libraries are held to warnings and above:
+    their lower levels are where a text could be echoed."""
+    import logging
+    logging.basicConfig(level=logging.WARNING, stream=sys.stderr, force=True)
+    for name in QUIET_LOGGERS:
+        logging.getLogger(name).setLevel(logging.WARNING)
+    os.environ.setdefault("TRANSFORMERS_VERBOSITY", "warning")
+    os.environ.setdefault("HF_HUB_DISABLE_PROGRESS_BARS", "1")
+
+
 def main() -> int:
     out = os.fdopen(os.dup(1), "wb")
     os.dup2(2, 1)
     sys.stdout = sys.stderr
     inp = sys.stdin.buffer
+    quiet_logs()
     started = time.perf_counter()
     try:
         import torch  # noqa: F401 - first, so ctranslate2 finds the CUDA libraries torch loads
