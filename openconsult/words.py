@@ -195,3 +195,12 @@ SELF_TEST_CLIP_CHANGED = (
     "The test clip is not the one that came with OpenConsult (its checksum differs), "
     "so the self-test did not run."
 )
+# This machine: the two speech rows, on a suitable card only (15.9). Drafts.
+ROW_SPEECH = "Speech"
+ROW_SELF_TEST = "Self-test"
+SPEECH_INSTALLED = "WhisperX with pyannote is installed."
+SPEECH_NOT_INSTALLED = "WhisperX with pyannote is not installed."
+SELF_TEST_NOT_RUN = "Not yet run."
+SELF_TEST_NOT_POSSIBLE = "Not run, because the speech choice is not installed."
+SELF_TEST_PASSED = "Passed on {date} at {time}."
+SELF_TEST_FAILED = "Failed on {date} at {time}: {reason}"

@@ -21,6 +21,7 @@ from openconsult.patients.users import Users
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.store import Settings
 from openconsult.speech.door import Door as SpeechDoor, make_door
+from openconsult.speech.selftest import SelfTests
 from openconsult.web import guards, routes
 from openconsult.web.first_run import FirstRun
 
@@ -39,6 +40,7 @@ class Parts:
     engine: Engine
     door: Door
     speech: SpeechDoor
+    self_tests: SelfTests
 
 
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
@@ -60,6 +62,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         engine=engine,
         door=Door(engine, ModelCalls(db, clock)),
         speech=speech or make_door(settings.data_folder),
+        self_tests=SelfTests(db, clock),
     )
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.state.parts = parts

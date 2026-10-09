@@ -6,7 +6,7 @@
 <form method="post" action="/first-run/machine" class="pane">
   <div class="pane-body">
     <p>{{ words.FIRST_RUN_MACHINE_INTRO }}</p>
-    {{ machine_rows(machine, models) }}
+    {{ machine_rows(machine, models, speech) }}
     <button class="primary" id="continue" aria-describedby="continue-refusal">{{ words.CONTINUE }}</button>
     {{ refusal("continue") }}
   </div>

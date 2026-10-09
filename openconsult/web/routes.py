@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from dataclasses import dataclass
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
@@ -38,6 +39,33 @@ async def local_model_lines(request: Request) -> ModelLines | None:
                       words.MODEL_PRESENT if status.model_present else words.MODEL_ABSENT)
 
 
+@dataclass(frozen=True)
+class SpeechLines:
+    installed: str
+    self_test: str
+
+
+def speech_lines(request: Request) -> SpeechLines | None:
+    """The two lines about the speech choice, on a suitable card only
+    (spec 15.9): whether it is installed, from the data folder, and the
+    last self-test, from the stored result. No worker is started and no
+    model is loaded, so the page never hangs."""
+    p = parts(request)
+    if p.machine.case != "suitable":
+        return None
+    if not p.speech.installed:
+        return SpeechLines(words.SPEECH_NOT_INSTALLED, words.SELF_TEST_NOT_POSSIBLE)
+    last = p.self_tests.last(p.speech.choice.name)
+    if last is None:
+        return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_NOT_RUN)
+    when = datetime.fromisoformat(last["at"])
+    date, time = f"{when.day} {when:%b %Y}", f"{when:%H:%M}"
+    if last["passed"]:
+        return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_PASSED.format(date=date, time=time))
+    reason = last["detail"].get("reason") or ""
+    return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_FAILED.format(date=date, time=time, reason=reason))
+
+
 @router.get("/")
 async def home(request: Request, user=Depends(guards.logged_in)):
     return render(request, "home.html", user=user, active="home")
@@ -58,7 +86,8 @@ async def first_run(request: Request):
     if step is None:
         raise Redirect("/login")
     models = await local_model_lines(request) if step == "machine" else None
-    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models)
+    speech = speech_lines(request) if step == "machine" else None
+    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, speech=speech)
 
 
 def _at_step(request: Request, step: str) -> None:
@@ -162,6 +191,7 @@ NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
 
 def _settings_page(request: Request, user, refused=None, models=None):
     context = dict(user=user, active="settings", machine=parts(request).machine, models=models,
+                   speech=speech_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    page_path="/settings")
     if refused:
