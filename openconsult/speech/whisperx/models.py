@@ -158,10 +158,29 @@ def check_present() -> None:
             raise ModelMissing(report["model"])
 
 
+def loaded_revision(entry: dict) -> str | None:
+    """The revision a pyannote inner model is loaded at. The pipeline names
+    its two inner models with no revision, so the hub serves whatever the
+    cache's main ref points at: that ref is read from disk and stamped,
+    beside the pinned value, so the stamp says only what is known (R20)."""
+    ref = pyannote_cache() / f"models--{entry['repo'].replace('/', '--')}" / "refs" / "main"
+    return ref.read_text(encoding="utf-8").strip() if ref.exists() else None
+
+
 def stamp() -> dict:
-    """Every model with its revision or checksum (R20)."""
-    return {name: {k: v for k, v in entry.items() if k in ("repo", "name", "revision", "sha256", "ref")}
-            for name, entry in MODELS.items()}
+    """Every model with the revision or checksum it is loaded at (R20)."""
+    stamped = {}
+    for name, entry in MODELS.items():
+        known = {k: v for k, v in entry.items() if k in ("repo", "name", "sha256", "ref")}
+        if entry["kind"] in ("hub",) or name == "diarise":
+            known["revision"] = entry["revision"]          # loaded at this revision by name@revision
+        elif entry["kind"] == "pyannote":
+            known["pinned"] = entry["revision"]
+            known["revision"] = loaded_revision(entry)     # what the pipeline's main ref loads
+        elif entry["kind"] == "torchhub":
+            known["folder"] = vad_folder().name
+        stamped[name] = known
+    return stamped
 
 
 def versions() -> dict:
