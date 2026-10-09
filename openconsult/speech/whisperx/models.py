@@ -80,9 +80,21 @@ def _snapshot(entry: dict, offline: bool) -> Path:
 
 
 def _file_of(entry: dict) -> Path:
+    """The model's file on disk. The voice activity model may sit in the
+    folder of its pinned tag or in an older cached copy; the first folder
+    that holds the file is taken, and the checksum decides."""
     if entry["kind"] == "torchaudio":
         return hub_dir() / "checkpoints" / entry["file"]
-    return hub_dir() / entry["folder"] / entry["file"]
+    for folder in entry["folders"]:
+        if (hub_dir() / folder / entry["file"]).exists():
+            return hub_dir() / folder / entry["file"]
+    return hub_dir() / entry["folders"][0] / entry["file"]
+
+
+def vad_folder() -> Path:
+    """The folder the voice activity model is loaded from, by path."""
+    entry = MODELS["vad"]
+    return _file_of(entry).parents[len(Path(entry["file"]).parts) - 1]
 
 
 def _found(name: str, entry: dict) -> dict:
@@ -133,8 +145,9 @@ def _fetch(entry: dict) -> None:
         getattr(torchaudio.pipelines, entry["name"]).get_model()
     else:
         import torch
-        torch.hub.load(f"{entry['repo']}:{entry['ref']}", "silero_vad", force_reload=False,
-                       onnx=False, trust_repo=True, skip_validation=True)
+        # At the pinned tag, which does not move; the checksum then decides.
+        torch.hub.load(f"{entry['repo']}:{entry['ref']}", "silero_vad", source="github",
+                       force_reload=False, onnx=False, trust_repo=True, skip_validation=True)
 
 
 def check_present() -> None:
@@ -278,6 +291,28 @@ def _safe_globals() -> list:
             typing.Any, collections.defaultdict, dict, list, int, float, str]
 
 
+def _local_silero():
+    """whisperx's own Silero class, but loaded from the folder on disk that
+    install-speech checked, by path: no name is looked up and no connection
+    is opened. whisperx itself would ask the hub by name at every Stop, and
+    the hub would ask github.com which branch is the default."""
+    import torch
+    from whisperx.vads.silero import Silero
+    from whisperx.vads.vad import Vad
+
+    class LocalSilero(Silero):
+        def __init__(self, folder: Path, **options):
+            Vad.__init__(self, options["vad_onset"])
+            self.vad_onset = options["vad_onset"]
+            self.chunk_size = options["chunk_size"]
+            self.vad_pipeline, utils = torch.hub.load(repo_or_dir=str(folder), model="silero_vad",
+                                                      source="local", onnx=False, trust_repo=True)
+            (self.get_speech_timestamps, _, self.read_audio, _, _) = utils
+
+    # whisperx's own default values for its silero VAD.
+    return LocalSilero(vad_folder(), chunk_size=30, vad_onset=0.500, vad_offset=0.363)
+
+
 def stop_pass(pcm: bytes, speakers: int, device: str) -> tuple[list[dict], dict]:
     """WhisperX large-v3 with word times, then pyannote with the speaker
     count given, on exactly the sound that was fed. Returns every raw
@@ -294,7 +329,7 @@ def stop_pass(pcm: bytes, speakers: int, device: str) -> tuple[list[dict], dict]
     compute = "float16" if device == "cuda" else "int8"
     started = time.perf_counter()
     model = whisperx.load_model(str(_snapshot(MODELS["stop"], offline=True)), device,
-                                compute_type=compute, vad_method="silero", language="en")
+                                compute_type=compute, vad_model=_local_silero(), language="en")
     seconds["load_stop"] = round(time.perf_counter() - started, 2)
     step = time.perf_counter()
     result = model.transcribe(audio, batch_size=BATCH_SIZE, language="en")
