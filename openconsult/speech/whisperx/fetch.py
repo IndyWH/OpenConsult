@@ -1,5 +1,5 @@
-"""Finds or fetches every model the worker loads, at install (plan
-review, change 1). Run by openconsult install-speech with the speech
+"""Finds or fetches every model the worker loads, at install, so that
+nothing downloads without a click (spec 6.4). Run by openconsult install-speech with the speech
 environment's own Python. One JSON line for each model: found or
 fetched, its size, its pinned revision or checksum, and ok or the error.
 The model hub uses its own stored sign-in by itself; nothing here reads,

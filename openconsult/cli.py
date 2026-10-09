@@ -124,8 +124,8 @@ def reset_password(data_folder: Path | None, say: Callable, ask: Callable) -> in
 
 def install_speech(data_folder: Path | None, say: Callable, run: Callable, which: Callable) -> int:
     """Builds the one speech choice's environment in the data folder from
-    the committed lock file, then finds or fetches its models (15.9; plan
-    review, change 1). Nothing else downloads a model."""
+    the committed lock file, then finds or fetches its models (15.9; 6.4).
+    Nothing else downloads a model."""
     settings = store.build(data_folder)
     say(words.SPEECH_BUILDING.format(folder=environment.folder(settings.data_folder, WHISPERX_PYANNOTE)))
     report = environment.build(settings.data_folder, WHISPERX_PYANNOTE, say=say, run=run, which=which)

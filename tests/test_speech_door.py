@@ -189,7 +189,7 @@ def test_1_7_raw_segments_are_kept_as_they_came():
     assert [r["refused"] for r in final.raw] == [False, False] and final.seconds == {"stop": 1.5}
 
 
-def test_change_2_the_rate_travels_with_the_session():
+def test_13_2_ruling_7_the_rate_travels_with_the_session():
     worker = MadeUpWorker()
     door = door_with(worker)
     assert door.open(48000).ok and worker.requested("open")[0][0]["rate"] == 48000
@@ -201,7 +201,7 @@ def test_change_2_the_rate_travels_with_the_session():
     assert strict.feed(LOUD).failure == "no_session"
 
 
-def test_change_3_the_last_live_lines_are_made_final_at_stop():
+def test_11_5_rule_2_D45_the_last_live_lines_are_made_final_at_stop():
     tail = [{"start": 0.0, "end": 0.2, "text": "ask not"}, {"start": 0.3, "end": 0.5, "text": "what"}]
     worker = MadeUpWorker(final={"last_live": tail, "segments": [], "seconds": {}})
     door = door_with(worker)

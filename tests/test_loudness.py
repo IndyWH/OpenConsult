@@ -61,7 +61,7 @@ def test_1_6_windows_sit_on_the_session_clock_across_pieces():
     assert Loudness(RATE).loudest(0.0, 1.0) == -math.inf
 
 
-def test_change_2_the_measure_takes_the_sessions_rate():
+def test_13_2_the_measure_takes_the_sessions_rate():
     at_48k = Loudness(48000)
     at_48k.add(sine(0.5, -20.0, rate=48000))
     assert len(at_48k.windows) == 5 and at_48k.seconds == 0.5

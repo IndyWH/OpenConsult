@@ -2,8 +2,9 @@
 6.2, 6.4; 15.9): in the user's data folder, from the lock file committed
 in the worker's folder, by uv. Then every model the worker loads is
 found or fetched by the worker folder's own fetch script, run with the
-environment's Python, so the worker never fetches (plan review, change
-1). The worker is run with the model hub's network switched off."""
+environment's Python, so the worker never fetches: nothing downloads
+without a click, and a consultation never waits on the internet (spec
+6.4). The worker is run with the model hub's network switched off."""
 
 from __future__ import annotations
 

@@ -25,8 +25,8 @@ def merge_into_turns(raw_segments: list[dict]) -> list[Line]:
     merge once made one 300-second turn of 22 (v1, recording 66).
 
     A turn's confidence is the mean score of its scored words, or none
-    when no word was scored. v1 gave 0.5 there; v2 does not make one up
-    (plan review, change 4)."""
+    when no word was scored. v1 gave 0.5 there; v2 does not make one up,
+    because a confidence is a score or none (spec 11.4; 11.5 rule 5)."""
     clusters = {speaker_of(s) for s in raw_segments if speaker_of(s)}
     single_cluster = len(clusters) <= 1
     turns: list[dict] = []

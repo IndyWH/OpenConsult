@@ -48,7 +48,7 @@ CASES = [
     # A single cluster keeps the segment boundaries (v1, recording 66).
     ([seg(0, 1, "a", "S0", [0.9]), seg(1, 2, "b", "S0", [0.7])],
      [Line("S0", 0.0, 1.0, "a", 0.9), Line("S0", 1.0, 2.0, "b", 0.7)]),
-    # Empty text is skipped; no scored word gives no confidence (change 4), never 0.5.
+    # Empty text is skipped; no scored word gives no confidence (spec 11.4: a score or none), never 0.5.
     ([seg(0, 1, "   ", "S0"), seg(1, 2, "a", "S0"), seg(2, 3, "b", "S1")],
      [Line("S0", 1.0, 2.0, "a", None), Line("S1", 2.0, 3.0, "b", None)]),
     # A turn with scores joined by one without keeps the mean of the scored words.

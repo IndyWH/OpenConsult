@@ -64,7 +64,9 @@ class Door:
     # ---------------------------------------------------------------- open
 
     def open(self, rate: int) -> Live:
-        """Start a session at the sound's rate (plan review, change 2)."""
+        """Start a session at the sound's rate: the app records sound as the
+        microphone gives it, and the new recordings are 48 kHz (spec 13.2;
+        15.9 ruling 7)."""
         if self._session is not None:
             # The open session goes on untouched: its sound is never thrown away.
             return failed_live("session_open", words.DOOR_SESSION_OPEN, self.fed_s, self.stamp)
@@ -114,8 +116,9 @@ class Door:
 
     def stop(self, speakers: int) -> Final:
         """The pass at Stop. The number of speakers is given, never worked
-        out (V1_LESSONS 2.1). The last live lines are made final first
-        (change 3). Raw segments are kept as they came (V1_LESSONS 1.7)."""
+        out (V1_LESSONS 2.1). The last live lines are made final first, so
+        the check at Stop can see the end (11.5 rule 2; D45). Raw segments
+        are kept as they came (V1_LESSONS 1.7)."""
         if self._session is None:
             return failed_final("no_session", words.DOOR_NO_SESSION, self.stamp)
         if int(speakers) < 1:

@@ -1,5 +1,5 @@
 """Where a speech environment lives and how it is built (spec 6.2, 6.4;
-15.9; V1_LESSONS 7.2, 7.5; plan review, change 1). A made-up uv and a
+15.9; 6.4: nothing downloads without a click; V1_LESSONS 7.2, 7.5). A made-up uv and a
 made-up fetch: nothing is downloaded and no environment is built."""
 
 import json

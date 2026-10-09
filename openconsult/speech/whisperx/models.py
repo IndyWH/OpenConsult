@@ -120,8 +120,8 @@ def find_all() -> list[dict]:
 
 
 def fetch_all() -> list[dict]:
-    """At install (plan review, change 1): find each model, fetch what is
-    missing, and say so. The worker never fetches."""
+    """At install: find each model, fetch what is missing, and say so. The
+    worker never fetches, so nothing downloads without a click (spec 6.4)."""
     reports = []
     for name, entry in MODELS.items():
         report = _found(name, entry)
@@ -272,7 +272,8 @@ class LiveStream:
 
     def finish(self) -> list[dict]:
         """At Stop: what is left in the buffer, transcribed once more, every
-        segment final (plan review, change 3)."""
+        segment final, so the live transcript has its end for the check at
+        Stop (spec 11.5 rule 2; D45)."""
         if len(self._buffer) / SAMPLE_RATE < FLUSH_LEAST_S:
             return []
         tail = [self._absolute(s) for s in self._model.transcribe(self._buffer)]

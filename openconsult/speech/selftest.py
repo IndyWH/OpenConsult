@@ -3,7 +3,7 @@ with the app is fed through the door in the pieces the live page will
 send, at real time, then the transcript at Stop is asked for, and the
 words of both are checked. A broken install is found at once. The
 result is stored; This machine reads it. The pass rule is a draft for
-the owner (plan review, point 7)."""
+the owner."""
 
 from __future__ import annotations
 
