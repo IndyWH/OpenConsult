@@ -87,6 +87,12 @@ the wav2vec2 alignment model of torchaudio (MIT), Silero VAD (MIT), and
 pyannote's speaker-diarization-3.1, segmentation-3.0 (MIT, behind their
 makers' terms on Hugging Face) and wespeaker-voxceleb-resnet34-LM (CC-BY-4.0).
 
+Stage 5a. The self-test's clip, bundled (openconsult/speech/clip/jfk.wav):
+11 seconds of the opening of John F. Kennedy's inaugural address of
+20 January 1961, a recording in the public domain, as distributed with
+whisper.cpp (samples/jfk.wav, github.com/ggml-org/whisper.cpp), 16 kHz mono.
+sha256 59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e.
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 

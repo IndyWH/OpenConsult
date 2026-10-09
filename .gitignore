@@ -22,6 +22,8 @@
 # A stage that needs a small test clip adds a narrow exception for that one
 # folder, in the same commit as the clip.
 *.wav
+# The one exception: the self-test's clip, 11 s of a public speech of 1961 (spec 15.9).
+!/openconsult/speech/clip/jfk.wav
 *.flac
 *.mp3
 *.ogg
