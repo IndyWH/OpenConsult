@@ -153,3 +153,13 @@ RESET_DONE = "The password is changed. Any open login has ended."
 RESET_SHORT = "The password needs at least {least} characters. Nothing was changed."
 RESET_DIFFER = "The two passwords do not match. Nothing was changed."
 RESET_NO_USER = "No user is set up yet. Start OpenConsult and set one up first."
+
+# The speech worker (spec 15.9). The reasons a call to the speech door
+# gives back. Drafts for the owner.
+WORKER_NOT_STARTED = "The speech worker could not be started: {reason}"
+WORKER_REFUSED = "The speech worker could not load its models: {message}"
+WORKER_SAID_NOTHING = "it gave no reason"
+WORKER_DIED = "The speech worker stopped with exit code {code}."
+WORKER_DIED_SAYING = "The speech worker stopped with exit code {code}. Its last words: {last}"
+WORKER_NO_ANSWER = "The speech worker did not answer within {seconds} seconds."
+WORKER_NOT_READY = "The speech worker is not ready."
