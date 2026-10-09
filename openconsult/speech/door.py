@@ -49,6 +49,15 @@ class Door:
         return Stamp(self.choice.name, dict(info.get("models") or {}), dict(info.get("versions") or {}))
 
     @property
+    def installed(self) -> bool:
+        return bool(self._installed())
+
+    @property
+    def ready_info(self) -> dict:
+        """What the worker said when ready: its load time and device too."""
+        return dict(self._worker.info) if self._worker else {}
+
+    @property
     def fed_s(self) -> float:
         return self._loudness.seconds if self._loudness else 0.0
 

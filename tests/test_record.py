@@ -32,7 +32,7 @@ def test_6_5_a_version_1_database_with_its_user_comes_forward_with_nothing_lost(
     path = tmp_path / "openconsult.db"
     version_1_database(path)
     db = open_database(path)
-    assert db.version() == 2 and "model_call" in db.tables()
+    assert db.version() == schema.VERSION and "model_call" in db.tables()
     user = db.query_one("SELECT title, name FROM app_user")
     assert (user["title"], user["name"]) == ("Dr", "Made-up")
     assert db.query_one("SELECT event FROM audit_log")["event"] == "user.set_up"

@@ -1,6 +1,7 @@
 """The one command (spec 15.6): openconsult starts the app, openconsult
-reset-password resets the password (D26), and openconsult install-speech
-builds the speech environment and fetches its models (15.9)."""
+reset-password resets the password (D26), openconsult install-speech
+builds the speech environment and fetches its models, and openconsult
+self-test runs the speech self-test (15.9)."""
 
 from __future__ import annotations
 
@@ -9,6 +10,7 @@ import getpass
 import shutil
 import socket
 import subprocess
+import time
 from pathlib import Path
 from typing import Callable
 
@@ -22,20 +24,23 @@ from openconsult.patients.users import MIN_PASSWORD, Users, password_problem
 from openconsult.settings import store
 from openconsult.settings.machine import Machine
 from openconsult.settings.store import LISTEN_ON
-from openconsult.speech import environment
+from openconsult.speech import environment, selftest
 from openconsult.speech.choices import WHISPERX_PYANNOTE
+from openconsult.speech.door import make_door
 
 
 def main(argv: list[str] | None = None, say: Callable = print,
          ask: Callable = getpass.getpass, serve: Callable | None = None,
          machine: Machine | None = None, open_browser: Callable | None = None,
-         run_process: Callable = subprocess.run, which: Callable = shutil.which) -> int:
-    """say, ask, serve, machine, open_browser, run_process and which are passed in so
-    tests run the command with no terminal, no browser, no uv and the same
-    result on every machine."""
+         run_process: Callable = subprocess.run, which: Callable = shutil.which,
+         make_speech: Callable = make_door, sleep: Callable = time.sleep) -> int:
+    """say, ask, serve, machine, open_browser, run_process, which, make_speech
+    and sleep are passed in so tests run the command with no terminal, no
+    browser, no uv, no speech worker and no waiting, the same on every
+    machine."""
     parser = argparse.ArgumentParser(prog="openconsult")
-    parser.add_argument("command", nargs="?", choices=["run", "reset-password", "install-speech"],
-                        default="run")
+    parser.add_argument("command", nargs="?",
+                        choices=["run", "reset-password", "install-speech", "self-test"], default="run")
     parser.add_argument("--data-folder", type=Path, help="where the data lives, for a development run")
     parser.add_argument("--port", type=int, help="the port to listen on; 8001 if not given")
     parser.add_argument("--no-browser", action="store_true", help="start without opening the browser")
@@ -44,6 +49,8 @@ def main(argv: list[str] | None = None, say: Callable = print,
         return reset_password(args.data_folder, say=say, ask=ask)
     if args.command == "install-speech":
         return install_speech(args.data_folder, say=say, run=run_process, which=which)
+    if args.command == "self-test":
+        return self_test(args.data_folder, say=say, make_speech=make_speech, sleep=sleep)
     return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine,
                open_browser=None if args.no_browser else (open_browser or browser.start))
 
@@ -123,3 +130,29 @@ def install_speech(data_folder: Path | None, say: Callable, run: Callable, which
     say(words.SPEECH_BUILDING.format(folder=environment.folder(settings.data_folder, WHISPERX_PYANNOTE)))
     report = environment.build(settings.data_folder, WHISPERX_PYANNOTE, say=say, run=run, which=which)
     return 0 if report.ok else 1
+
+
+def self_test(data_folder: Path | None, say: Callable, make_speech: Callable, sleep: Callable) -> int:
+    """The clip through the door, then Stop; the result stored and said
+    (D46; 15.9). Nothing starts when the choice is not installed."""
+    settings = store.build(data_folder)
+    door = make_speech(settings.data_folder)
+    if not door.installed:
+        say(words.SPEECH_NEEDS_INSTALL)
+        return 1
+    say(words.SELF_TEST_RUNNING)
+    try:
+        outcome = selftest.run(door, sleep=sleep)
+    except selftest.ClipChanged:
+        say(words.SELF_TEST_CLIP_CHANGED)
+        return 1
+    finally:
+        door.close()
+    db = open_database(settings.database_path)
+    selftest.SelfTests(db).add(door.choice.name, outcome)
+    live, stop = " ".join(outcome.live_words), " ".join(outcome.stop_words)
+    if outcome.passed:
+        say(words.SELF_TEST_RESULT_PASSED.format(live=live, stop=stop))
+        return 0
+    say(words.SELF_TEST_RESULT_FAILED.format(reason=outcome.reason, live=live, stop=stop))
+    return 1

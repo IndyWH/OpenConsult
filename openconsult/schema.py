@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 2
+VERSION = 3
 
 MIGRATIONS = {
     1: """
@@ -75,6 +75,19 @@ CREATE TABLE model_call (
     write_ms INTEGER,
     outcome TEXT NOT NULL,
     detail TEXT
+);
+""",
+    # The stored results of the speech self-test (spec 15.9; D46), one row
+    # per run; This machine reads the last. detail is JSON: the words heard
+    # live and at Stop, the delays, the seconds, what the rule refused, the
+    # raw segments and the stamp.
+    3: """
+CREATE TABLE speech_self_test (
+    id INTEGER PRIMARY KEY,
+    at TEXT NOT NULL,
+    choice TEXT NOT NULL,
+    passed INTEGER NOT NULL,
+    detail TEXT NOT NULL
 );
 """,
 }

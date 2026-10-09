@@ -48,3 +48,22 @@ def test_15_6_an_audit_line_can_never_be_changed_or_removed(tmp_path):
         db.execute("DELETE FROM audit_log")
     assert db.query_one("SELECT event FROM audit_log")["event"] == "login"
     db.close()
+
+
+def test_6_5_a_version_2_database_with_its_user_comes_forward_to_3(tmp_path, monkeypatch):
+    # The owner's real database is at version 2 with his user in it (stage 5a).
+    from openconsult.patients.audit import Audit
+    from openconsult.patients.users import Users
+
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 2)
+    old = open_database(path)
+    assert old.version() == 2 and "speech_self_test" not in old.tables()
+    Users(old, Audit(old)).set_up("Dr", "Example", "example-password")
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 3 and "speech_self_test" in new.tables()
+    users = Users(new, Audit(new))
+    assert users.exists() and users.verify("example-password") and users.get().name == "Example"
+    new.close()
