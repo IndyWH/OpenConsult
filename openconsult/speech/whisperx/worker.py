@@ -46,8 +46,10 @@ def serve(inp, out, open_stream, stop_pass) -> int:
         try:
             if kind == "ping":
                 write_frame(out, {"type": "pong", "sessions": sorted(sessions)})
+            elif kind == "open" and sessions:
+                # One session at a time, and the open one is never thrown away.
+                write_frame(out, {"type": "error", "fatal": False, "message": "a session is already open"})
             elif kind == "open":
-                sessions.clear()                     # one session at a time
                 try:
                     sessions[sid] = open_stream(int(header.get("rate") or 0))
                 except RateRefused as refused:

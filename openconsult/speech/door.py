@@ -65,6 +65,9 @@ class Door:
 
     def open(self, rate: int) -> Live:
         """Start a session at the sound's rate (plan review, change 2)."""
+        if self._session is not None:
+            # The open session goes on untouched: its sound is never thrown away.
+            return failed_live("session_open", words.DOOR_SESSION_OPEN, self.fed_s, self.stamp)
         if not self._installed():
             return failed_live("not_installed", words.SPEECH_NEEDS_INSTALL, 0.0, None)
         if self._worker is None or self._worker.state in ("stopped", "failed"):

@@ -89,6 +89,20 @@ def test_10_4_a_dead_worker_is_a_failure_with_its_reason_and_nothing_else_is_tri
     assert (refused.failure, refused.detail) == ("died", "made-up: could not load")
 
 
+def test_a_second_open_never_throws_sound_away():
+    worker = MadeUpWorker(live=[[], [], [], [{"start": 0.0, "end": 0.5, "text": "made up"}]])
+    door = door_with(worker)
+    assert door.open(RATE).ok
+    door.feed(LOUD)
+    again = door.open(RATE)
+    assert (again.ok, again.failure, again.detail) == (False, "session_open", words.DOOR_SESSION_OPEN)
+    assert len(worker.requested("open")) == 1                        # the worker was not asked
+    for _ in range(3):
+        heard = door.feed(LOUD)
+    assert [line.text for line in heard.lines] == ["made up"] and heard.fed_s == 1.0   # the first session goes on
+    assert door.stop(speakers=1).ok and door.open(RATE).ok            # then a new one may open
+
+
 def test_the_door_never_raises_a_bad_reply_is_a_failure():
     worker = MadeUpWorker(live=[[{"start": "soon", "end": 1.0, "text": "x"}], "not a list"])
     door = door_with(worker)

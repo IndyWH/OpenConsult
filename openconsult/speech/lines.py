@@ -11,7 +11,7 @@ from dataclasses import dataclass, field
 WHEN = ("live", "at_stop", "none")
 
 FAILURES = ("not_installed", "died", "no_answer", "worker_error", "bad_reply",
-            "no_session", "rate_not_supported")
+            "no_session", "session_open", "rate_not_supported")
 
 
 @dataclass(frozen=True)
