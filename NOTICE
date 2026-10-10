@@ -93,6 +93,12 @@ Stage 5a. The self-test's clip, bundled (openconsult/speech/clip/jfk.wav):
 whisper.cpp (samples/jfk.wav, github.com/ggml-org/whisper.cpp), 16 kHz mono.
 sha256 59dfb9a4acb36fe2a2affc14bacbee2920ff435cb13cc314a08c13f66ba7860e.
 
+Stage 5b, 10 Oct 2026. One library added to the base app, for the two cloud
+speech workers (spec 15.9, the details of 5b). They run on the app's own
+Python as separate processes; the app itself never imports it:
+
+  websockets 17.2            BSD-3-Clause     https://pypi.org/project/websockets/
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 

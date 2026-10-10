@@ -231,7 +231,7 @@ def test_7_1_the_app_imports_no_speech_library_and_never_the_worker(tmp_path):
         f"door = Door(WHISPERX_PYANNOTE, lambda: Worker([sys.executable, '-u', {str(script)!r}, 'ready']), lambda: True)\n"
         "assert door.open(16000).ok and door.feed(bytes(8000)).ok and door.stop(speakers=1).ok\n"
         "door.close()\n"
-        "heavy = ('torch', 'numpy', 'whisperx', 'faster_whisper', 'ctranslate2', 'pyannote', 'transformers')\n"
+        "heavy = ('torch', 'numpy', 'whisperx', 'faster_whisper', 'ctranslate2', 'pyannote', 'transformers', 'websockets')\n"
         "print(sorted(m for m in sys.modules if m.split('.')[0] in heavy or m.startswith('openconsult.speech.whisperx')))\n"
     )
     done = subprocess.run([sys.executable, "-c", code, str(tmp_path)], capture_output=True, text=True, timeout=60)
