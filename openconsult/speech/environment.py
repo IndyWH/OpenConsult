@@ -128,7 +128,7 @@ def plain_size(n: int) -> str:
         return f"{n / 10 ** 9:.1f} GB"
     if n >= 10 ** 6:
         return f"{n / 10 ** 6:.0f} MB"
-    return f"{n / 1000:.0f} kB"
+    return f"{max(1, round(n / 1000))} kB"
 
 
 def _last_line(text: str | None) -> str:

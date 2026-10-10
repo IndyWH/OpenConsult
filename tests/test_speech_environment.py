@@ -71,6 +71,12 @@ def test_15_9_the_environment_is_built_from_the_lock_file_into_the_data_folder(t
     assert report.ok and not report.built and again.commands[0] == uv and said[0] == words.SPEECH_ALREADY_BUILT
 
 
+def test_a_size_is_never_said_as_nothing():
+    # The pipeline's own files are a few hundred bytes; the first run on the card said "0 kB".
+    assert environment.plain_size(512) == "1 kB" and environment.plain_size(27_000_000) == "27 MB"
+    assert environment.plain_size(3_100_000_000) == "3.1 GB"
+
+
 def test_15_9_a_build_that_cannot_happen_says_so(tmp_path):
     said = []
     report = environment.build(tmp_path, CHOICE, say=said.append, run=MadeUpRun(), which=lambda name: None)
