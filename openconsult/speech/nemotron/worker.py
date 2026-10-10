@@ -102,6 +102,8 @@ def main() -> int:
     started = time.perf_counter()
     try:
         models.check_present()
+        from nemo.utils import logging as nemo_logging    # NeMo's own logger ignores the standard levels
+        nemo_logging.setLevel(nemo_logging.WARNING)
         device = models.device_name()
         loaded = models.Models(device)
         load_s = round(time.perf_counter() - started, 2)

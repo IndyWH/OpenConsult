@@ -30,7 +30,7 @@ LOG_TAIL_BYTES = 4096
 # worker's log, and a harmless warning is never taken for the reason.
 TERMINAL_CODES = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 TRACEBACK_LINE = re.compile(r'^(Traceback \(most recent call last\):|File ".*", line \d+)')
-WARNING_LINE = re.compile(r"^(WARNING\b|warnings\.warn\(|.*:\d+: \w*Warning: )")
+WARNING_LINE = re.compile(r"^(WARNING\b|warnings\.warn\(|.*:\d+: \w*Warning: |\[NeMo [IWD] )")
 
 _END = object()
 
@@ -193,9 +193,13 @@ class Worker:
     def _log_tail(self) -> str:
         if not self.log_path or not self.log_path.exists():
             return ""
+        size = self.log_path.stat().st_size
         with open(self.log_path, "rb") as fh:
-            fh.seek(max(0, self.log_path.stat().st_size - LOG_TAIL_BYTES))
-            return plain_last_line(fh.read().decode(errors="replace"))
+            fh.seek(max(0, size - LOG_TAIL_BYTES))
+            text = fh.read().decode(errors="replace")
+        if size > LOG_TAIL_BYTES:
+            text = text.partition("\n")[2]           # the first line of the window may be cut
+        return plain_last_line(text)
 
 
 def plain_last_line(text: str) -> str:
