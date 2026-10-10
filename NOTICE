@@ -99,6 +99,58 @@ Python as separate processes; the app itself never imports it:
 
   websockets 17.2            BSD-3-Clause     https://pypi.org/project/websockets/
 
+Stage 5b, 10 Oct 2026. The speech environment of the Nemotron choice.
+These run as a separate process, in their own environment in the user's
+data folder, built by openconsult install-speech --choice nemotron from the
+lock file openconsult/speech/nemotron/uv.lock. The app never imports any of
+them. NeMo is pinned to one commit, v1's. The lock holds 159 packages; the
+direct ones and NeMo's own asr dependencies are:
+
+  nemo-toolkit 3.1.0+1688cc3d6  Apache-2.0    https://github.com/NVIDIA-NeMo/Speech (commit 1688cc3d6a9ade854f544987810c53f605dc86fc)
+  torch 2.12.0               BSD-3-Clause     https://pypi.org/project/torch/
+  numpy 2.5.3                BSD-3-Clause     https://pypi.org/project/numpy/
+  huggingface-hub 2.2.0      Apache-2.0       https://pypi.org/project/huggingface-hub/
+  omegaconf 2.3.0            BSD-3-Clause     https://pypi.org/project/omegaconf/
+    lhotse 2.0.0a6           Apache-2.0       https://pypi.org/project/lhotse/
+    librosa 1.0.0            ISC              https://pypi.org/project/librosa/
+    soundfile 0.14.0         BSD-3-Clause     https://pypi.org/project/soundfile/
+    hydra-core 1.3.2         MIT              https://pypi.org/project/hydra-core/
+    lightning 2.4.0          Apache-2.0       https://pypi.org/project/lightning/
+    transformers 5.19.0      Apache-2.0       https://pypi.org/project/transformers/
+    torchmetrics 1.9.0       Apache-2.0       https://pypi.org/project/torchmetrics/
+    sentencepiece 0.2.2      Apache-2.0       https://pypi.org/project/sentencepiece/
+    einops 0.8.2             MIT              https://pypi.org/project/einops/
+    kaldialign 0.12.0        Apache-2.0       https://pypi.org/project/kaldialign/
+    scipy 1.18.1             BSD-3-Clause     https://pypi.org/project/scipy/
+    numba 0.68.0             BSD-2-Clause     https://pypi.org/project/numba/
+    triton 3.7.0             MIT              https://pypi.org/project/triton/ (Linux only)
+    cuda-bindings 13.4.3     NVIDIA proprietary (the CUDA Toolkit end user licence)
+                                             https://pypi.org/project/cuda-bindings/
+  nvidia-cublas, nvidia-cudnn-cu13 and the other nvidia-* CUDA 13 wheels torch
+    requires              NVIDIA proprietary (the CUDA Toolkit end user licence)
+                                             https://pypi.org/project/nvidia-cudnn-cu13/
+
+The models this choice loads are not bundled. openconsult install-speech
+--choice nemotron fetches them from their maker at the revisions pinned in
+openconsult/speech/nemotron/models.json, into the model cache on the user's
+computer:
+
+  nvidia/nemotron-speech-streaming-en-0.6b (the words)
+    revision ebe59e5a817142986528bbbee5dba8db7b38ed50, 2.47 GB
+    NVIDIA Open Model License
+    https://huggingface.co/nvidia/nemotron-speech-streaming-en-0.6b
+  nvidia/Nemotron-3-Diarization (who spoke)
+    revision f667ed73aee57d40cc39428eb768b4fd87a0a29e, 199 MB
+    OpenMDW-1.1
+    https://huggingface.co/nvidia/Nemotron-3-Diarization
+
+Stage 5b. Two cloud speech services, reached by the app's own workers
+through their EU addresses with the user's own key, under each service's
+own terms (spec 15.9, rulings 5, 9 and 10). Nothing of theirs is bundled:
+
+  Speechmatics               https://www.speechmatics.com/
+  AssemblyAI                 https://www.assemblyai.com/
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 

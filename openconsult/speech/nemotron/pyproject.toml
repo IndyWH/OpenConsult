@@ -1,0 +1,23 @@
+# The speech environment of the Nemotron choice (spec 6.2; 15.9, ruling
+# 8). Not a package: only its locked libraries are installed, into the
+# user's data folder, by openconsult install-speech --choice nemotron.
+# NeMo is pinned to one commit, v1's, so the bench can be set beside
+# Task 17; torch comes from PyPI (CUDA 13 wheels on Linux, CPU wheels on
+# Windows and macOS), as the WhisperX environment's does. The lock was
+# made with uv lock --no-sources, because NeMo's own pyproject carries
+# torch index rules that conflict across platforms.
+[project]
+name = "openconsult-speech-nemotron"
+version = "2.0.0.dev0"
+description = "The libraries of OpenConsult's Nemotron speech worker. A research and education prototype, never for real patients."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "nemo-toolkit[asr] @ git+https://github.com/NVIDIA-NeMo/Speech.git@1688cc3d6a9ade854f544987810c53f605dc86fc",
+    "torch==2.12.0",
+    "numpy==2.5.3",
+    "huggingface-hub==2.2.0",
+    "omegaconf==2.3.0",
+]
+
+[tool.uv]
+package = false
