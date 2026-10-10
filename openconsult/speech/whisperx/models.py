@@ -226,9 +226,12 @@ class LiveStream:
     for the pass at Stop."""
 
     def __init__(self, model: LiveModel, rate: int):
-        if rate != SAMPLE_RATE:
-            raise RateNotSupported(rate)
         import numpy as np
+        import resample      # the conversion every local worker shares, beside the frames
+        try:
+            self._resampler = resample.Resampler(rate, SAMPLE_RATE)
+        except resample.RateNotSupported:
+            raise RateNotSupported(rate) from None
         self._np = np
         self._model = model
         self._buffer = np.zeros(0, dtype=np.float32)
@@ -242,9 +245,13 @@ class LiveStream:
         return len(self.pcm) / 2 / SAMPLE_RATE
 
     def accept(self, pcm: bytes) -> dict:
+        """The piece, converted to 16,000 if the session is at 48,000; the
+        converted sound is what the live model hears and what the pass at
+        Stop runs on."""
         np = self._np
-        self.pcm += pcm
-        chunk = np.frombuffer(pcm[: len(pcm) - len(pcm) % 2], dtype="<i2").astype(np.float32) / 32768.0
+        samples = self._resampler.convert(pcm)
+        self.pcm += samples.tobytes()
+        chunk = samples.astype(np.float32) / 32768.0
         self._buffer = np.concatenate([self._buffer, chunk])
         self._new += len(chunk)
         if self._new / SAMPLE_RATE < PROCESS_INTERVAL_S:

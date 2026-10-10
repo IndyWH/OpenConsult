@@ -208,6 +208,9 @@ class MadeUpWorker:
             if self.rate_only and header["rate"] != self.rate_only:
                 return {"type": "error", "fatal": False, "reason": "rate_not_supported",
                         "message": f"made-up: takes {self.rate_only} only"}
+            if header["rate"] not in (16000, 48000):      # as the local workers: the two rates, no other
+                return {"type": "error", "fatal": False, "reason": "rate_not_supported",
+                        "message": f"made-up: takes 16000 or 48000, not {header['rate']}"}
             return {"type": "opened", "session": header["session"]}
         if kind == "audio":
             return {"type": "lines", "session": header["session"],

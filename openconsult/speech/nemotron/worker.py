@@ -12,8 +12,8 @@ Requests and replies, one reply to each:
 Before any request one unsolicited frame: ready {models, versions,
 load_s, device}, or error {fatal: true, message} before exit.
 
-PCM is mono 16-bit little-endian at 16,000 samples a second; any other
-rate is refused plainly. There is one transcript: the lines are final as
+PCM is mono 16-bit little-endian at 16,000 or 48,000 samples a second (the
+worker converts 48,000 to 16,000 itself); any other rate is refused plainly. There is one transcript: the lines are final as
 they are given, and Stop gives the last ones. Only stderr is free for
 logging: before any library is imported, file descriptor 1 is pointed at
 stderr and the protocol keeps the real stdout. The log never holds a
@@ -29,7 +29,7 @@ import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))   # the frames every worker shares
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))   # the frames and the conversion every worker shares
 
 import models  # noqa: E402 - light at import: the table only; the libraries load in main
 from frames import read_frame, write_frame  # noqa: E402
@@ -57,7 +57,7 @@ def serve(inp, out, open_session) -> int:
                     sessions[sid] = open_session(int(header.get("rate") or 0), int(header.get("speakers") or 0))
                 except models.RateNotSupported as refused:
                     write_frame(out, {"type": "error", "fatal": False, "reason": "rate_not_supported",
-                                      "message": f"this choice takes sound at 16,000 samples a second, not {refused}"})
+                                      "message": f"this choice takes sound at 16,000 or 48,000 samples a second, not {refused}"})
                     continue
                 write_frame(out, {"type": "opened", "session": sid})
             elif kind == "close":

@@ -194,7 +194,7 @@ MODEL_FETCHED = "Downloaded {model} ({size})."
 MODEL_FAILED = "The model {model} could not be fetched: {reason}"
 MODEL_MISSING = "The model {model} is not on this computer. Run openconsult install-speech."
 MODELS_READY = "Every model is on this computer."
-RATE_NOT_SUPPORTED = "This speech choice takes sound at 16,000 samples a second, not {rate}."
+RATE_NOT_SUPPORTED = "This speech choice takes sound at 16,000 or 48,000 samples a second, not {rate}."
 # The self-test (D46). Drafts.
 SELF_TEST_RUNNING = (
     "Running the self-test: 11 seconds of a public speech of 1961, fed as the live page "

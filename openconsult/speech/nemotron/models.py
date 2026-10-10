@@ -416,11 +416,14 @@ class Session:
     """One session: the same sound to both streams, then the join."""
 
     def __init__(self, models: Models, rate: int, speakers: int):
-        if int(rate) != SAMPLE_RATE:
-            raise RateNotSupported(rate)
         import sys
         sys.path.insert(0, str(HERE))
         import join as join_module
+        import resample      # the conversion every local worker shares, beside the frames
+        try:
+            self._resampler = resample.Resampler(rate, SAMPLE_RATE)
+        except resample.RateNotSupported:
+            raise RateNotSupported(rate) from None
         self._join = join_module
         self.m = models
         self.speakers = max(1, int(speakers))
@@ -437,7 +440,7 @@ class Session:
     def accept(self, pcm: bytes) -> dict:
         import numpy as np
         started = time.perf_counter()
-        samples = np.frombuffer(pcm[: len(pcm) - len(pcm) % 2], dtype="<i2").astype(np.float32) / 32768.0
+        samples = self._resampler.convert(pcm).astype(np.float32) / 32768.0   # at 16,000, whatever the session's rate
         self.fed_samples += samples.size
         self.words.add(samples)
         self.voices.add(samples)

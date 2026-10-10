@@ -12,7 +12,8 @@ Requests and replies, one reply to each:
 Before any request one unsolicited frame: ready {models, versions,
 load_s, device}, or error {fatal: true, message} before exit.
 
-PCM is mono 16-bit little-endian at the session's rate; 5a takes 16,000.
+PCM is mono 16-bit little-endian at the session's rate: 16,000, or 48,000,
+which the worker converts to 16,000 itself; any other rate is refused.
 Only stderr is free for logging: before any library is imported, file
 descriptor 1 is pointed at stderr and the protocol keeps the real stdout.
 A request about an unknown session is a non-fatal error. Any other
@@ -29,7 +30,7 @@ import traceback
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))   # the frames every worker shares
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))   # the frames and the conversion every worker shares
 
 import models  # noqa: E402 - light at import: the table only; the libraries load in main
 from frames import read_frame, write_frame  # noqa: E402
@@ -56,7 +57,7 @@ def serve(inp, out, open_stream, stop_pass) -> int:
                     sessions[sid] = open_stream(int(header.get("rate") or 0))
                 except RateRefused as refused:
                     write_frame(out, {"type": "error", "fatal": False, "reason": "rate_not_supported",
-                                      "message": f"this choice takes sound at 16,000 samples a second, "
+                                      "message": f"this choice takes sound at 16,000 or 48,000 samples a second, "
                                                  f"not {refused}"})
                     continue
                 write_frame(out, {"type": "opened", "session": sid})

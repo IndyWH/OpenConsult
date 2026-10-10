@@ -199,6 +199,8 @@ def test_13_2_ruling_7_the_rate_travels_with_the_session():
     refused = strict.open(48000)
     assert (refused.failure, refused.detail) == ("rate_not_supported", "made-up: takes 16000 only")
     assert strict.feed(LOUD).failure == "no_session"
+    # The local workers take 16,000 and 48,000 (the conversion of 5c) and refuse any other rate plainly.
+    assert door_with(MadeUpWorker()).open(44100).failure == "rate_not_supported"
 
 
 def test_11_5_rule_2_D45_the_last_live_lines_are_made_final_at_stop():
