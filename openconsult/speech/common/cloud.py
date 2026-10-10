@@ -312,14 +312,18 @@ def serve(inp, out, open_session) -> int:
             return 1
 
 
-def run(service: str, key_name: str, address: str, stamp: dict, open_session, dial_with) -> int:
+def run(service: str, key_name: str, address: str, stamp: dict, open_session, dial_with,
+        inp=None, out=None, environ=None) -> int:
     """A cloud worker's main: the protocol on the real stdout, logs on
-    stderr, the key from this process's environment, ready, then serve."""
-    out = os.fdopen(os.dup(1), "wb")
-    os.dup2(2, 1)
-    sys.stdout = sys.stderr
-    inp = sys.stdin.buffer
-    key = os.environ.get(key_name) or ""
+    stderr, the key from this process's environment, ready, then serve.
+    The suite gives its own streams and environment instead."""
+    if out is None:
+        out = os.fdopen(os.dup(1), "wb")
+        os.dup2(2, 1)
+        sys.stdout = sys.stderr
+    if inp is None:
+        inp = sys.stdin.buffer
+    key = (os.environ if environ is None else environ).get(key_name) or ""
     if not key:
         write_frame(out, {"type": "error", "fatal": True, "reason": "no_key", "message": f"no {key_name} in the environment"})
         return 1
