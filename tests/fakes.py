@@ -166,9 +166,10 @@ class MadeUpWorker:
     can die on the Nth request. Nothing here hears any sound."""
 
     def __init__(self, live=None, final=None, pending=None, die_after=None, ready=True,
-                 rate_only=None, info=None):
+                 rate_only=None, info=None, revisions=None):
         self.live = list(live or [])          # segment lists, one per audio request
         self.pending = list(pending or [])
+        self.revisions = list(revisions or [])   # revision lists, one per audio request
         self.final = final or {"last_live": [], "segments": [], "seconds": {"load": 1.0, "stop": 2.0}}
         self.die_after = die_after
         self.ready_ok = ready
@@ -211,7 +212,8 @@ class MadeUpWorker:
         if kind == "audio":
             return {"type": "lines", "session": header["session"],
                     "segments": self.live.pop(0) if self.live else [],
-                    "pending": self.pending.pop(0) if self.pending else []}
+                    "pending": self.pending.pop(0) if self.pending else [],
+                    "revisions": self.revisions.pop(0) if self.revisions else []}
         if kind == "stop":
             return {"type": "stopped", "session": header["session"], **self.final}
         return {"type": "error", "fatal": False, "message": f"made-up: unknown {kind!r}"}

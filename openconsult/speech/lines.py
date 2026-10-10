@@ -11,7 +11,10 @@ from dataclasses import dataclass, field
 WHEN = ("live", "at_stop", "none")
 
 FAILURES = ("not_installed", "died", "no_answer", "worker_error", "bad_reply",
-            "no_session", "session_open", "rate_not_supported", "bad_speakers")
+            "no_session", "session_open", "rate_not_supported", "bad_speakers",
+            # The cloud choices (spec 7.2; 15.9, the details of 5b).
+            "no_key", "key_refused", "no_credit", "no_internet", "service_down",
+            "limit_reached", "address_refused", "connection_lost")
 
 
 @dataclass(frozen=True)
@@ -21,6 +24,7 @@ class Line:
     end: float
     text: str
     confidence: float | None
+    id: int | None = None      # given by a choice whose labels are live, so a label can be revised
 
 
 @dataclass(frozen=True)
@@ -30,6 +34,18 @@ class Refused:
     line: Line
     loudest_dbfs: float
     threshold_dbfs: float
+
+
+@dataclass(frozen=True)
+class Revision:
+    """A service revised the label of a line already given (ruling 4). It
+    changes the label and nothing else. applied says the door changed a
+    line it had given; otherwise line is the refused line it named, or
+    none when the door never saw that id. A revision never costs a line."""
+    id: int
+    speaker: str | None
+    applied: bool
+    line: Line | None
 
 
 @dataclass(frozen=True)
@@ -52,8 +68,8 @@ class Stamp:
 
 @dataclass(frozen=True)
 class Live:
-    """One live call: the lines made final, what was refused, and the
-    text not yet final."""
+    """One live call: the lines made final, what was refused, the text not
+    yet final, and any labels revised."""
     ok: bool
     fed_s: float
     stamp: Stamp | None
@@ -62,12 +78,16 @@ class Live:
     partial: str = ""
     failure: str | None = None
     detail: str | None = None
+    revisions: tuple[Revision, ...] = ()
 
 
 @dataclass(frozen=True)
 class Final:
     """The pass at Stop: the turns, the last live lines (made final at
-    Stop), what was refused, and every raw segment as it came."""
+    Stop), what was refused, and every raw segment as it came. For a
+    choice with one transcript, lines is every line already given plus the
+    last ones, raw is empty, and speakers records the number given at open
+    and at Stop."""
     ok: bool
     stamp: Stamp | None
     lines: tuple[Line, ...] = ()
@@ -77,6 +97,8 @@ class Final:
     seconds: dict = field(default_factory=dict)
     failure: str | None = None
     detail: str | None = None
+    revisions: tuple[Revision, ...] = ()
+    speakers: dict = field(default_factory=dict)
 
 
 def failed_live(failure: str, detail: str, fed_s: float, stamp: Stamp | None) -> Live:

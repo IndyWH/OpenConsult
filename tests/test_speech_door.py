@@ -237,3 +237,135 @@ def test_7_1_the_app_imports_no_speech_library_and_never_the_worker(tmp_path):
     done = subprocess.run([sys.executable, "-c", code, str(tmp_path)], capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[]"
+
+
+# ------------------------------------------------ the choices of 5b (15.9)
+
+from openconsult.speech.choices import ASSEMBLYAI, NEMOTRON, SPEECHMATICS  # noqa: E402
+from openconsult.speech.lines import Revision  # noqa: E402
+
+
+def live_door(worker, choice=NEMOTRON, key_present=True):
+    return Door(choice, make_worker=lambda: worker, installed=lambda: True, key_present=lambda: key_present)
+
+
+def live_seg(number, start, end, text, speaker="S1", confidence=0.9):
+    return {"id": number, "start": start, "end": end, "text": text, "speaker": speaker, "confidence": confidence}
+
+
+def test_15_9_a_live_label_choice_is_told_the_number_of_speakers_at_open():
+    # Ruling 8 and the details of 5b; the number is given, never worked out (V1_LESSONS 2.1).
+    worker = MadeUpWorker()
+    door = live_door(worker)
+    assert door.open(RATE, speakers=2).ok
+    assert worker.requested("open")[0][0] == {"type": "open", "session": "s1", "rate": RATE, "speakers": 2}
+    door.stop(speakers=2)
+    missing = door.open(RATE)
+    assert (missing.failure, missing.detail) == ("bad_speakers", words.DOOR_SPEAKERS_NEEDED)
+    assert door.open(RATE, speakers=0).failure == "bad_speakers" and len(worker.requested("open")) == 1
+    # The WhisperX choice is not told: its open frame is as in 5a (rule 20).
+    old = MadeUpWorker()
+    door_with(old).open(RATE)
+    assert old.requested("open")[0][0] == {"type": "open", "session": "s1", "rate": RATE}
+
+
+def test_11_1_a_one_transcript_choice_gives_at_stop_the_lines_already_given():
+    # Spec 11.1; the details of 5b: the same lines, nothing twice, nothing lost; raw is empty.
+    worker = MadeUpWorker(live=[[live_seg(1, 0.0, 0.2, "one")], [], [live_seg(2, 0.3, 0.5, "two", "S2")], []],
+                          final={"last_live": [live_seg(3, 0.6, 0.9, "three", None, None)], "seconds": {"tail": 0.1}})
+    door = live_door(worker)
+    door.open(RATE, speakers=2)
+    given = []
+    for _ in range(4):
+        given += door.feed(LOUD).lines
+    final = door.stop(speakers=2)
+    assert final.ok and final.raw == () and final.seconds == {"tail": 0.1}
+    assert final.lines == tuple(given) + final.last_live
+    assert [line.id for line in final.lines] == [1, 2, 3] and final.last_live[0].text == "three"
+    assert final.speakers == {"open": 2, "stop": 2}
+    assert len(worker.requested("stop")) == 1 and "segments" not in worker.requested("stop")[0][0]
+
+
+def test_11_4_a_live_line_carries_its_speaker_and_confidence_or_none():
+    worker = MadeUpWorker(live=[[live_seg(1, 0.0, 0.2, "a"), live_seg(2, 0.2, 0.4, "b", None, None),
+                                 {"id": 3, "start": 0.4, "end": 0.5, "text": "c"}]])
+    door = live_door(worker, SPEECHMATICS)
+    door.open(RATE, speakers=1)
+    lines = door.feed(LOUD).lines
+    assert lines == (Line("S1", 0.0, 0.2, "a", 0.9, 1), Line(None, 0.2, 0.4, "b", None, 2), Line(None, 0.4, 0.5, "c", None, 3))
+
+
+def test_ruling_4_a_revision_changes_the_label_only_and_never_costs_a_line():
+    thanks = {"id": 9, "start": 1.0, "end": 1.5, "text": "Thank you.", "speaker": "A", "confidence": 0.5}
+    worker = MadeUpWorker(live=[[live_seg(1, 0.0, 0.2, "one", "A")], [], [], [], [thanks], []],
+                          revisions=[[], [{"id": 1, "speaker": "B"}], [], [], [], [{"id": 9, "speaker": "B"}, {"id": 7, "speaker": "A"}]],
+                          final={"last_live": [], "revisions": [{"id": 1, "speaker": None}], "seconds": {}})
+    door = live_door(worker, ASSEMBLYAI)
+    door.open(RATE, speakers=2)
+    first = door.feed(LOUD)
+    revised = door.feed(LOUD)
+    assert revised.revisions == (Revision(1, "B", True, Line("B", 0.0, 0.2, "one", 0.9, 1)),)
+    for _ in range(2):
+        door.feed(QUIET)
+    quiet = door.feed(QUIET)                                   # "Thank you." over silence is refused
+    assert [r.line.id for r in quiet.refused] == [9]
+    odd = door.feed(QUIET)                                     # a revision of a refused line, and of an unknown id
+    assert odd.ok and odd.revisions == (Revision(9, "B", False, quiet.refused[0].line), Revision(7, "A", False, None))
+    final = door.stop(speakers=2)
+    assert final.ok and final.lines == (Line(None, 0.0, 0.2, "one", 0.9, 1),)     # the label, nothing else
+    assert final.revisions == (Revision(1, None, True, final.lines[0]),)
+    assert first.lines[0].text == final.lines[0].text and first.lines[0].start == final.lines[0].start
+
+
+def test_7_2_the_new_failures_pass_through_by_name_with_their_sentence():
+    named = {
+        "key_refused": words.KEY_REFUSED.format(service="Speechmatics", detail=""),
+        "no_credit": words.NO_CREDIT.format(service="Speechmatics", detail=""),
+        "no_internet": words.NO_INTERNET.format(service="Speechmatics", detail=""),
+        "service_down": words.SERVICE_DOWN.format(service="Speechmatics", detail=""),
+        "limit_reached": words.LIMIT_REACHED.format(service="Speechmatics", detail=""),
+        "address_refused": words.ADDRESS_REFUSED.format(service="Speechmatics", detail="wss://made-up"),
+        "connection_lost": words.CONNECTION_LOST.format(service="Speechmatics", detail=""),
+    }
+    for reason, sentence in named.items():
+        worker = MadeUpWorker()
+        worker.request = lambda header, payload=b"", timeout_s=None, r=reason: {
+            "type": "error", "fatal": False, "reason": r, "message": "made-up: raw", "detail": "wss://made-up"}
+        failed = live_door(worker, SPEECHMATICS).open(RATE, speakers=1)
+        assert (failed.failure, failed.detail) == (reason, sentence)
+    unknown = MadeUpWorker()
+    unknown.request = lambda header, payload=b"", timeout_s=None: {"type": "error", "fatal": False, "reason": "odd", "message": "made-up: odd"}
+    assert live_door(unknown, SPEECHMATICS).open(RATE, speakers=1).failure == "worker_error"
+
+
+def test_ruling_1_no_words_from_silence_holds_for_a_one_transcript_choice():
+    thanks = [live_seg(1, 0.0, 0.5, "Thank you.")]
+    worker = MadeUpWorker(live=[[], [], [], thanks], final={"last_live": [live_seg(2, 0.6, 0.9, "Thank you.")], "seconds": {}})
+    door = live_door(worker)
+    door.open(RATE, speakers=1)
+    for _ in range(3):
+        door.feed(QUIET)
+    assert [r.line.text for r in door.feed(QUIET).refused] == ["Thank you."]
+    final = door.stop(speakers=1)
+    assert final.lines == () and final.last_live == () and [r.line.id for r in final.refused] == [2]
+
+
+def test_10_4_a_live_label_choice_with_no_key_starts_nothing():
+    worker = MadeUpWorker()
+    failed = live_door(worker, SPEECHMATICS, key_present=False).open(RATE, speakers=1)
+    assert (failed.failure, failed.detail) == ("no_key", words.NO_KEY.format(service="Speechmatics", name="SPEECHMATICS_API_KEY"))
+    assert worker.starts == 0
+    assert live_door(MadeUpWorker(), NEMOTRON, key_present=False).open(RATE, speakers=1).ok     # needs no key
+
+
+def test_a_count_at_stop_that_differs_from_the_count_at_open_is_recorded_not_refused():
+    # The last words of a consultation arrive at Stop, where safety nets are
+    # said; a difference in a count never holds them back.
+    worker = MadeUpWorker(final={"last_live": [live_seg(1, 0.0, 0.3, "go straight to hospital")], "seconds": {}})
+    door = live_door(worker)
+    door.open(RATE, speakers=2)
+    door.feed(LOUD)
+    final = door.stop(speakers=1)
+    assert final.ok and [line.text for line in final.lines] == ["go straight to hospital"]
+    assert final.speakers == {"open": 2, "stop": 1}
+    assert door.open(RATE, speakers=0).failure == "bad_speakers"

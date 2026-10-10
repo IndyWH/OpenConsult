@@ -200,7 +200,24 @@ SELF_TEST_CLIP_CHANGED = (
     "The test clip is not the one that came with OpenConsult (its checksum differs), "
     "so the self-test did not run."
 )
-# This machine: the two speech rows, on a suitable card only (15.9). Drafts.
+# The cloud choices (spec 7.2; 15.9, the details of 5b). Drafts.
+NO_KEY = (
+    "No key for {service} was found. Put {name} in the .env file in the data folder, "
+    "or in the environment, and try again."
+)
+KEY_REFUSED = "{service} refused the key. Check the key and try again."
+NO_CREDIT = "{service} refused to start: the account has no credit left."
+NO_INTERNET = "{service} could not be reached. Check the internet connection and try again."
+SERVICE_DOWN = "{service} is not answering. Try again later."
+LIMIT_REACHED = "{service} refused to start: a limit on the account was reached."
+ADDRESS_REFUSED = "{detail} is not the EU address of {service}, so nothing was sent to it."
+CONNECTION_LOST = "The connection to {service} was lost. Nothing more was sent, and the session has ended."
+DOOR_SPEAKERS_NEEDED = "This speech choice must be told the number of speakers when the session opens."
+# This machine: one line for each choice (15.9). Drafts.
+ROW_NEMOTRON = "Nemotron"
+ROW_SPEECHMATICS = "Speechmatics"
+ROW_ASSEMBLYAI = "AssemblyAI"
+# The two WhisperX rows, on a suitable card only (15.9). Drafts.
 ROW_SPEECH = "Speech"
 ROW_SELF_TEST = "Self-test"
 SPEECH_INSTALLED = "WhisperX with pyannote is installed."
