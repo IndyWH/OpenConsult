@@ -1,0 +1,12 @@
+{
+ "words": {
+  "repo": "nvidia/nemotron-speech-streaming-en-0.6b",
+  "revision": "ebe59e5a817142986528bbbee5dba8db7b38ed50",
+  "file": "nemotron-speech-streaming-en-0.6b.nemo"
+ },
+ "speakers": {
+  "repo": "nvidia/Nemotron-3-Diarization",
+  "revision": "f667ed73aee57d40cc39428eb768b4fd87a0a29e",
+  "file": "Nemotron-3-Diarization.nemo"
+ }
+}
