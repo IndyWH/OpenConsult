@@ -118,8 +118,9 @@ class MadeUpService:
             self._send_all(ws, [self.first or {"message": "Error", "type": "not_authorised", "reason": "made-up: not allowed"}])
             ws.close(4001, "not_authorised")
             return
-        self._send_all(ws, [self.first or {"message": "RecognitionStarted", "id": "made-up-id",
-                                           "language_pack_info": {"language_description": "made-up"}}])
+        firsts = self.first or {"message": "RecognitionStarted", "id": "made-up-id",
+                                "language_pack_info": {"language_description": "made-up"}}
+        self._send_all(ws, firsts if isinstance(firsts, list) else [firsts])
         pieces = 0
         for message in ws:
             if isinstance(message, bytes):

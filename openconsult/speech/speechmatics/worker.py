@@ -22,6 +22,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))
@@ -79,17 +80,25 @@ class Session(cloud.Session):
     def start(self) -> None:
         sent = opening(self.rate, self.speakers)
         self.send(json.dumps(sent))
-        first = json.loads(self.first_reply())
-        # The opening message and the first reply hold no key and no spoken
-        # word, so the worker's log keeps them: they are the proof of what
-        # was asked and what the service applied.
+        # The opening message and the replies before the session starts
+        # hold no key and no spoken word, so the worker's log keeps them:
+        # they are the proof of what was asked and what the service applied.
         print(f"opening sent: {json.dumps(sent)}", file=sys.stderr, flush=True)
-        print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
-        if first.get("message") == "Error":
-            raise Refused_from_error(first)
-        if first.get("message") != "RecognitionStarted":
-            raise cloud.Refused("service_down", f"first reply {first.get('message')!r}")
-        self.started = first
+        deadline = time.perf_counter() + cloud.FIRST_REPLY_S
+        while True:
+            # The service may send Info (its usage, its region) or Warning
+            # before RecognitionStarted; those are read and kept, not taken
+            # for the answer.
+            first = json.loads(self.first_reply(max(0.1, deadline - time.perf_counter())))
+            print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
+            kind = first.get("message")
+            if kind == "Error":
+                raise Refused_from_error(first)
+            if kind == "RecognitionStarted":
+                self.started = first
+                return
+            if kind not in ("Info", "Warning"):
+                raise cloud.Refused("service_down", f"first reply {kind!r}")
 
     def take(self, message) -> None:
         if isinstance(message, bytes):

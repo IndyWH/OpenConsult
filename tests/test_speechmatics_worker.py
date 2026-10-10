@@ -87,6 +87,19 @@ def test_11_4_final_text_becomes_lines_and_partial_text_becomes_partial():
         service.stop()
 
 
+def test_an_info_before_recognition_started_is_read_and_not_taken_for_the_answer():
+    # The real service answered first with Info (its usage, its region) on 10 Oct 2026.
+    info = {"message": "Info", "type": "concurrent_session_usage", "reason": "made-up", "region": "eu"}
+    started = {"message": "RecognitionStarted", "id": "made-up-id"}
+    service = MadeUpService(SPEECHMATICS, first=[info, {"message": "Warning", "type": "made-up"}, started])
+    try:
+        session = session_on(service)
+        assert session.started == started
+        session.close()
+    finally:
+        service.stop()
+
+
 def test_11_1_stop_ends_the_session_so_the_last_words_arrive():
     service = MadeUpService(SPEECHMATICS, script={"stop": [transcript([word("hospital", 9.0, 9.5)], "hospital")]})
     try:

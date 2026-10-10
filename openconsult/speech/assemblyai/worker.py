@@ -87,12 +87,20 @@ class Session(cloud.Session):
         print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
         if first.get("type") != "Begin":
             raise cloud.Refused("service_down", f"first reply {first.get('type')!r}")
-        applied = first.get("configuration") or {}
+        applied = dict(first.get("configuration") or {})
+        if "model" in applied:
+            applied.setdefault("speech_model", applied["model"])
         asked = {"speech_model": MODEL, "domain": DOMAIN, "speaker_labels": True, "max_speakers": self.speakers}
-        got = {"speech_model": applied.get("model", applied.get("speech_model")), "domain": applied.get("domain"),
-               "speaker_labels": applied.get("speaker_labels"), "max_speakers": applied.get("max_speakers")}
-        if got != asked:
-            raise cloud.Refused("worker_error", f"the service applied {got}, not {asked}")
+        # A field the echo carries must match what was asked. A field the
+        # echo does not carry (on 10 Oct 2026 the service echoed no
+        # max_speakers) cannot be checked here; it is recorded as not
+        # echoed, in the log and in the session, and reported.
+        differ = {k: applied[k] for k, v in asked.items() if k in applied and applied[k] != v}
+        self.not_echoed = sorted(k for k in asked if k not in applied)
+        if differ:
+            raise cloud.Refused("worker_error", f"the service applied {differ}, not {asked}")
+        if self.not_echoed:
+            print(f"not echoed by the service: {self.not_echoed}", file=sys.stderr, flush=True)
         self.begin = first
 
     def take(self, message) -> None:

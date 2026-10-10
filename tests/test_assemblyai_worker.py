@@ -58,6 +58,16 @@ def test_ruling_9_an_echo_that_differs_from_what_was_asked_is_refused():
         assert service.connections == 1
     finally:
         service.stop()
+    # A field the echo does not carry is recorded as not echoed, never taken for a difference.
+    silent = {"type": "Begin", "id": "made-up", "expires_at": 0,
+              "configuration": {"model": "universal-3-6-pro", "domain": "medical-v1", "speaker_labels": True}}
+    service = MadeUpService(ASSEMBLYAI, first=silent)
+    try:
+        session = session_on(service)
+        assert session.not_echoed == ["max_speakers"]
+        session.close()
+    finally:
+        service.stop()
 
 
 def test_11_4_final_turns_become_lines_and_an_open_turn_is_partial():
