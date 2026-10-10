@@ -4,7 +4,11 @@ in the worker's folder, by uv. Then every model the worker loads is
 found or fetched by the worker folder's own fetch script, run with the
 environment's Python, so the worker never fetches: nothing downloads
 without a click, and a consultation never waits on the internet (spec
-6.4). The worker is run with the model hub's network switched off."""
+6.4). The worker is run with the model hub's network switched off.
+
+A cloud choice has no environment: its worker runs on the app's own
+Python, so the base app alone is the whole install (spec 6.4). Its key
+goes into that worker's environment, and no worker holds any other key."""
 
 from __future__ import annotations
 
@@ -13,16 +17,18 @@ import os
 import platform
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping
 
 from openconsult import words
-from openconsult.speech.choices import Choice
+from openconsult.speech.choices import CHOICES, Choice
 
 SPEECH = "speech"
 PYTHON = "3.12"
 UV = "uv"
+KEY_NAMES = tuple(choice.key for choice in CHOICES.values() if choice.key)
 
 
 @dataclass(frozen=True)
@@ -53,23 +59,36 @@ def python(data_folder: Path, choice: Choice, system: str | None = None) -> Path
 
 
 def installed(data_folder: Path, choice: Choice, system: str | None = None) -> bool:
-    """A path check only: nothing is started and nothing is loaded."""
+    """A path check only: nothing is started and nothing is loaded. A
+    choice with no environment is installed with the base app."""
+    if not choice.environment:
+        return True
     return python(data_folder, choice, system).exists()
 
 
 def log_path(data_folder: Path, choice: Choice) -> Path:
-    return folder(data_folder, choice) / "worker.log"
+    where = folder(data_folder, choice)
+    where.mkdir(parents=True, exist_ok=True)      # a cloud choice has no install to make it
+    return where / "worker.log"
 
 
 def worker_command(data_folder: Path, choice: Choice, system: str | None = None) -> list[str]:
-    return [str(python(data_folder, choice, system)), str(choice.worker_folder / "worker.py")]
+    interpreter = python(data_folder, choice, system) if choice.environment else Path(sys.executable)
+    return [str(interpreter), str(choice.worker_folder / "worker.py")]
 
 
-def worker_env(environ: Mapping[str, str] = os.environ) -> dict:
+def worker_env(environ: Mapping[str, str] = os.environ, key_name: str | None = None,
+               key: str | None = None) -> dict:
     """The app's environment, so the hub's own settings and sign-in are
     found by the hub itself, with its network switched off: the worker
-    loads from disk only."""
-    return {**environ, "HF_HUB_OFFLINE": "1", "PYTHONUNBUFFERED": "1"}
+    loads from disk only. Every key's name is taken out, then the one key
+    this worker needs is put in: a worker holds its own key and no other,
+    and never on its command line."""
+    env = {name: value for name, value in environ.items() if name not in KEY_NAMES}
+    env.update(HF_HUB_OFFLINE="1", PYTHONUNBUFFERED="1")
+    if key_name and key:
+        env[key_name] = key
+    return env
 
 
 def build(data_folder: Path, choice: Choice, say: Callable = lambda line: None,

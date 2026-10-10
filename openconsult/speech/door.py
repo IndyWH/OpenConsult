@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Callable
 
 from openconsult import words
+from openconsult.settings import keys
 from openconsult.speech import environment
 from openconsult.speech.choices import WHISPERX_PYANNOTE, Choice
 from openconsult.speech.lines import FAILURES, Final, Line, Live, Revision, Stamp, failed_final, failed_live
@@ -252,11 +253,17 @@ class Door:
 
 def make_door(data_folder: Path, choice: Choice = WHISPERX_PYANNOTE,
               environ=os.environ) -> Door:
-    """The app's door: the real worker from the data folder's environment."""
+    """The app's door: the real worker from the data folder's environment,
+    or on the app's own Python for a cloud choice, with its one key in
+    the worker's environment and nowhere in the door."""
+    def key() -> str | None:
+        return keys.read_key(choice.key, data_folder, environ) if choice.key else None
+
     return Door(
         choice,
         make_worker=lambda: Worker(environment.worker_command(data_folder, choice),
                                    log_path=environment.log_path(data_folder, choice),
-                                   env=environment.worker_env(environ)),
+                                   env=environment.worker_env(environ, choice.key, key())),
         installed=lambda: environment.installed(data_folder, choice),
+        key_present=lambda: key() is not None,
     )
