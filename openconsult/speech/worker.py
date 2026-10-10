@@ -7,6 +7,7 @@ not offer: the same code runs on the three systems (spec 5.1)."""
 from __future__ import annotations
 
 import queue
+import re
 import subprocess
 import threading
 from pathlib import Path
@@ -23,6 +24,13 @@ READY_TIMEOUT_S = 300.0
 REQUEST_TIMEOUT_S = 10.0
 STOP_WAIT_S = 10.0
 LOG_TAIL_BYTES = 4096
+
+# The reason of a death is one plain sentence (spec 15.9, the details of
+# 5b): a library's terminal colour codes and its traceback stay in the
+# worker's log, and a harmless warning is never taken for the reason.
+TERMINAL_CODES = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+TRACEBACK_LINE = re.compile(r'^(Traceback \(most recent call last\):|File ".*", line \d+)')
+WARNING_LINE = re.compile(r"^(WARNING\b|warnings\.warn\(|.*:\d+: \w*Warning: )")
 
 _END = object()
 
@@ -187,8 +195,20 @@ class Worker:
             return ""
         with open(self.log_path, "rb") as fh:
             fh.seek(max(0, self.log_path.stat().st_size - LOG_TAIL_BYTES))
-            lines = fh.read().decode(errors="replace").strip().splitlines()
-        return next((ln.strip() for ln in reversed(lines) if ln.strip()), "")[:200]
+            return plain_last_line(fh.read().decode(errors="replace"))
+
+
+def plain_last_line(text: str) -> str:
+    """The last line of a log that is a reason: not a traceback's frame
+    or code line, not a warning, with no terminal codes."""
+    for raw in reversed(text.splitlines()):
+        line = TERMINAL_CODES.sub("", raw)
+        if not line.strip() or line[:1].isspace():      # a traceback's code line is indented
+            continue
+        if TRACEBACK_LINE.match(line) or WARNING_LINE.match(line):
+            continue
+        return line.strip()[:200]
+    return ""
 
 
 def _end(proc) -> int | None:

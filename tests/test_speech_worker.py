@@ -10,7 +10,7 @@ import pytest
 
 from openconsult import words
 from openconsult.speech import frames
-from openconsult.speech.worker import Worker, WorkerGone
+from openconsult.speech.worker import Worker, WorkerGone, plain_last_line
 from tests.made_up_worker import load_frames
 
 SCRIPT = Path(__file__).parent / "made_up_worker.py"
@@ -103,3 +103,21 @@ def test_frames_round_trip_and_a_too_long_header_is_refused():
         theirs.read_frame(io.BytesIO(theirs.HEADER.pack(theirs.MAX_HEADER + 1) + b"x"))
     with pytest.raises(frames.BadFrame):
         frames.read_frame(io.BytesIO(frames.HEADER.pack(3) + b"[1]"))
+
+
+def test_15_9_a_deaths_reason_is_one_plain_sentence_never_a_warning():
+    # Carried from 5a: a library's terminal codes and traceback stay in the
+    # log, and a harmless warning after the real reason is not the reason.
+    log = (
+        "\x1b[33mWARNING\x1b[0m something harmless\n"
+        "Traceback (most recent call last):\n"
+        '  File "/made-up/lib.py", line 12, in load\n'
+        "    raise RuntimeError(\"made-up: the card is full\")\n"
+        "\x1b[31mRuntimeError: made-up: the card is full\x1b[0m\n"
+        "/made-up/lib.py:9: UserWarning: made-up: a deprecation\n"
+        "  warnings.warn(\"made-up\")\n"
+        "WARNING: made-up: the last harmless line\n"
+    )
+    assert plain_last_line(log) == "RuntimeError: made-up: the card is full"
+    assert plain_last_line("WARNING only\n  warnings.warn(x)\n") == ""
+    assert plain_last_line("") == ""
