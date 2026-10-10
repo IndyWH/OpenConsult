@@ -204,14 +204,15 @@ class Door:
         flagged = tuple({**seg, "refused": id(line) in refused_ids} for seg, line in zip(raw, raw_lines))
         kept = [seg for seg, line in zip(raw, raw_lines) if id(line) not in refused_ids]
         return Final(True, self.stamp, tuple(merge_into_turns(kept)), tuple(tail_ok),
-                     tuple(tail_refused + raw_refused), flagged, dict(reply.get("seconds") or {}))
+                     tuple(tail_refused + raw_refused), flagged, dict(reply.get("seconds") or {}),
+                     notes=dict(reply.get("notes") or {}))
 
     def _one_transcript_final(self, reply: dict, tail_ok: list, tail_refused: list, speakers: int) -> Final:
         self._record(tail_ok, tail_refused)
         revisions = self._revise(reply.get("revisions") or [])
         return Final(True, self.stamp, tuple(self._given.values()), tuple(tail_ok), tuple(tail_refused), (),
                      dict(reply.get("seconds") or {}), revisions=revisions,
-                     speakers={"open": self._speakers_at_open, "stop": speakers})
+                     speakers={"open": self._speakers_at_open, "stop": speakers}, notes=dict(reply.get("notes") or {}))
 
     def close(self) -> None:
         self._session = None

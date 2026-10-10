@@ -105,6 +105,9 @@ class Final:
     detail: str | None = None
     revisions: tuple[Revision, ...] = ()
     speakers: dict = field(default_factory=dict)
+    # A worker's own record at Stop, carried unread, so a bench arm can
+    # keep what the door does not read (the tied pair's late changes).
+    notes: dict = field(default_factory=dict)
 
 
 def failed_live(failure: str, detail: str, fed_s: float, stamp: Stamp | None) -> Live:

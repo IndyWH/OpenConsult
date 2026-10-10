@@ -80,7 +80,7 @@ def run(door: Door, arm: Arm, recording: Recording, pcm: bytes, sleep: Callable 
     result["stop"] = {"t": t, "lines": _lines(final.lines), "last_live": _lines(final.last_live),
                       "refused": _lines(final.refused), "raw": list(final.raw), "seconds": dict(final.seconds),
                       "revisions": _lines(final.revisions), "speakers": dict(final.speakers),
-                      "notes": dict(getattr(final, "notes", {}) or {})}
+                      "notes": dict(final.notes)}
     result["loudness"] = {"window_s": WINDOW_S, "dbfs": _windows(door)}
     return result
 

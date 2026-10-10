@@ -267,3 +267,6 @@ BENCH_ARM_NEEDS_ENVIRONMENT = ("The arm {arm} runs in the environment of {choice
                                "data folder. Run openconsult install-speech --choice {choice} first.")
 BENCH_WRITE_EXISTS = "{path} exists and is never written over."
 BENCH_MODEL_FETCH = "Fetching the models of the arm {arm} with the environment of {choice}."
+# The two arms that belong to the bench (ruling 15), as their results name them.
+ARM_TIED_PAIR = "Nemotron, the tied pair (bench only)"
+ARM_V1_LINE = "WhisperX with v1's line (bench only)"

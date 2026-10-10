@@ -1,0 +1,12 @@
+{
+ "words": {
+  "repo": "nvidia/nemotron-3.5-asr-streaming-0.6b",
+  "revision": "ea30d66debe3740a08b573244286791d423d6b3e",
+  "file": "nemotron-3.5-asr-streaming-0.6b.nemo"
+ },
+ "speakers": {
+  "repo": "nvidia/Nemotron-3-Diarization",
+  "revision": "f667ed73aee57d40cc39428eb768b4fd87a0a29e",
+  "file": "Nemotron-3-Diarization.nemo"
+ }
+}

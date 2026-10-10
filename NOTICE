@@ -151,6 +151,27 @@ own terms (spec 15.9, rulings 5, 9 and 10). Nothing of theirs is bundled:
   Speechmatics               https://www.speechmatics.com/
   AssemblyAI                 https://www.assemblyai.com/
 
+Stage 5c, part one, 10 Oct 2026. The replay bench of speech (spec 15.9,
+the details of 5c) adds no library to the app. Two arms belong to the bench
+alone and are not part of the app:
+
+  The tied Nemotron pair (openconsult/bench/speech/tied), v1's pairing, run
+  in the Nemotron environment of 5b. Its words model is not bundled;
+  openconsult-bench speech-fetch fetches it at the pinned revision:
+    nvidia/nemotron-3.5-asr-streaming-0.6b
+      revision ea30d66debe3740a08b573244286791d423d6b3e, 2.37 GB
+      OpenMDW-1.1 (its card: Use of the model is governed by the OpenMDW-1.1 license)
+      https://huggingface.co/nvidia/nemotron-3.5-asr-streaming-0.6b
+    with nvidia/Nemotron-3-Diarization at the revision of stage 5b (above).
+  The configuration defaults the arm copies as a plain dictionary come from
+  NeMo Speech's example script speech_to_text_multitalker_streaming_infer.py
+  at commit 1688cc3d6a9ade854f544987810c53f605dc86fc, Apache-2.0,
+  https://github.com/NVIDIA-NeMo/Speech. Nothing of it is vendored.
+
+  WhisperX with v1's line (openconsult/bench/speech/v1line): the WhisperX
+  choice's own worker and models, loaded by path, with v1's line of drug
+  names given to the live model only. No new component.
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 

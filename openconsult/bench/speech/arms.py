@@ -13,10 +13,15 @@ import os
 from dataclasses import dataclass
 from pathlib import Path
 
+from openconsult import words
 from openconsult.speech import environment
-from openconsult.speech.choices import ASSEMBLYAI, NEMOTRON, SPEECHMATICS, WHISPERX_PYANNOTE, Choice
+from openconsult.speech.choices import (ASSEMBLYAI, NEMOTRON, NEMOTRON_TIME_SLACK_S, SPEECHMATICS, WHISPERX_PYANNOTE,
+                                        Choice)
 from openconsult.speech.door import Door, make_door
+from openconsult.speech.lines import Declares
 from openconsult.speech.worker import Worker
+
+BENCH = Path(__file__).resolve().parent
 
 
 @dataclass(frozen=True)
@@ -32,9 +37,22 @@ class Arm:
         return self.cloud_service is not None
 
 
+# The two arms of the bench (ruling 15). Not in the app's table of choices.
+# The tied pair (ruling 8): v1's pairing, no confidence, labels live, one
+# transcript, and its times made as Nemotron's are, so the same figure.
+TIED_PAIR = Choice(name="nemotron_tied_pair", title=words.ARM_TIED_PAIR,
+                   declares=Declares(confidence="none", speakers="live", second_transcript=False,
+                                     time_slack_s=NEMOTRON_TIME_SLACK_S),
+                   folder="", environment=True)
+# WhisperX with v1's line (ruling 3): the same live model, given the line.
+V1_LINE = Choice(name="whisperx_v1_line", title=words.ARM_V1_LINE, declares=WHISPERX_PYANNOTE.declares,
+                 folder="", environment=True)
+
 ARMS: dict[str, Arm] = {
     "whisperx_pyannote": Arm("whisperx_pyannote", WHISPERX_PYANNOTE, WHISPERX_PYANNOTE, None),
+    "whisperx_v1_line": Arm("whisperx_v1_line", V1_LINE, WHISPERX_PYANNOTE, BENCH / "v1line" / "worker.py"),
     "nemotron": Arm("nemotron", NEMOTRON, NEMOTRON, None),
+    "nemotron_tied_pair": Arm("nemotron_tied_pair", TIED_PAIR, NEMOTRON, BENCH / "tied" / "worker.py"),
     "speechmatics": Arm("speechmatics", SPEECHMATICS, SPEECHMATICS, None, "speechmatics"),
     "assemblyai": Arm("assemblyai", ASSEMBLYAI, ASSEMBLYAI, None, "assemblyai"),
 }
