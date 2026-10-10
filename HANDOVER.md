@@ -4,6 +4,137 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-10. Stage 5a: the transcription door
+
+Built on 9 and 10 Oct 2026. The plan was reviewed by Cowork on 9 Oct
+(seven changes) and the build again at the gate for the card (six
+changes); both are in. The checks on the card ran on 10 Oct with the v1
+service off.
+
+What was done:
+- One door to transcription (openconsult/speech): open at the sound's
+  rate, feed, stop with the number of speakers given. Every call gives
+  lines of text, each with a speaker or none, a start, an end and a
+  confidence or none (11.4), or a failure with its reason: not
+  installed, died, no answer, worker error, bad reply, no session,
+  session open, rate not supported, bad speakers. It never raises into
+  the app, and tries nothing else (10.4). Every result carries the stamp:
+  the choice, its models with their revisions or checksums, and its
+  library versions (R20).
+- The rule against words from silence, in the door, as a plain function:
+  the loudness of every piece fed, in 100 ms windows on the session
+  clock; a line is refused when even its loudest window is at or below
+  QUIET_DBFS = -40 dBFS. It runs on live lines, on the text not yet
+  final, on the last live lines made final at Stop, and on the raw
+  segments before the merge. What it refuses is kept and marked.
+- The worker frame: v1's frames kept word for word, a reader thread in
+  place of select, each start with its own queue and event; a made-up
+  worker runs as a real subprocess in the suite on the three systems.
+- The first choice, WhisperX with pyannote, as a worker run only by its
+  own environment's Python: the live stream on faster-whisper
+  distil-large-v3 (v1's buffer and commit margin), and at Stop the
+  live buffer transcribed once more so the last seconds are final, then
+  WhisperX large-v3 with word times and pyannote 3.1 with the count
+  given. No text is given to any model. The merge of raw segments into
+  turns is a plain function in the base app; raw segments are kept as
+  they came, flagged refused or not.
+- The environment lives in the data folder, built from the committed
+  lock file by openconsult install-speech, which then finds or fetches
+  every model at a pinned revision or checksum. The worker runs with the
+  hub's network off and loads from disk only; the voice activity model
+  is loaded by path, not by name. No model downloads without a click.
+- The self-test: the clip in 250 ms pieces at real time, Stop with one
+  speaker, at least 20 of the 22 expected words in order, live and at
+  Stop. openconsult self-test runs it; the result is stored in the new
+  table speech_self_test (version 3); This machine shows the two rows
+  on a suitable card.
+- The base app gains no library. NOTICE gains the environment's direct
+  libraries, the models it fetches, and the clip.
+
+The rulings of spec 15.9, each in one line:
+1. Two hard marks for a speech choice: the bench of 5c and 5e. Nothing
+   built; the rule against words from silence is the app's side of the
+   second mark.
+2. A misheard drug name is marked, never corrected silently: stage 6
+   and the bench. Nothing built.
+3. No speech model is given a line of drug names: v1's line is not
+   carried; the record of item 8 shows no prompt, prefix or hotwords.
+4. An unsure line is shown as unsure: stage 6. Nothing built.
+5. Two cloud services enter the bench: 5b. Nothing built.
+6. Stage 5 in five steps; this is 5a. Done when This machine says the
+   choice is installed and the self-test passed: it does.
+7. The sound as the microphone gives it: the door takes the rate with
+   the session (the new recordings are 48 kHz); the real worker takes
+   16,000 in 5a. Conversion is 5c's.
+
+Decided in the plan review of 9 Oct (Cowork), as decisions of this stage:
+the models are fetched at install, never by the worker; the sound's rate
+travels with the session; the last live lines are made final at Stop;
+no made-up confidence, so a turn with no scored word has none (v1 gave
+0.5: the gate of stage 6 must expect none); no test for a control a
+later stage builds; the archive is archive/HANDOVER_ARCHIVE.md; the
+clip's source is proven (whisper.cpp's sample, identical by checksum).
+Decided at the gate (Cowork): the pass at Stop asks the network nothing;
+a second open never throws sound away; a count below one is refused by
+the door; the stamp says only what is known (pyannote's inner models are
+stamped with the revision their main ref loads, read from disk); names
+and comments cite what they pin; the worker's log never holds what was
+said (its libraries held to warnings and above).
+
+Measurements, 10 Oct 2026, RTX 4090, v1 off:
+- 255 tests, 6.4 s, none skipped. App code 4,063 lines without the
+  bench (6,138 with it), tests 4,165. Largest file
+  speech/whisperx/models.py, 399 lines; no function over 80. CLAUDE.md
+  99 lines.
+- The environment: 123 packages locked, 119 installed on Linux, 7.2 GB,
+  built in 10 s from a warm uv cache; the second run audited and
+  changed nothing in 3.0 s. Every model found in the caches, none
+  downloaded. Every library permissive except the nvidia-* wheels
+  (NVIDIA's proprietary CUDA licence).
+- The self-test passed: 22 of 22 words live and at Stop. The worker
+  loaded in 2.9 s. The one live line that was final before Stop came
+  3.0 s after its sound ended; the last line was made final at Stop in
+  0.07 s. The pass at Stop took 2.1 s: load 1.0, transcribe 0.3, align
+  0.5, diarise 0.3. Nothing refused. The card's highest sample 7,600 MiB
+  (every 2 s). A second run with every connection and name lookup in the
+  worker recorded: the record was empty. The worker's log holds none of
+  the clip's words.
+- Silence: 60 s of zeros, of white noise at -50 dBFS and of white noise
+  at -30 dBFS, live and at Stop: neither model wrote a word, so the rule
+  had nothing to refuse, the -30 dBFS noise included. Measured levels
+  -inf, -50.0 and -30.0 dBFS. A measurement for 5e, not a pass mark.
+- v1's 445 figure, the source of the threshold, was an RMS over each
+  filler line's whole span; the rule uses the loudest 100 ms window of a
+  line, which is the stricter measure for refusing.
+- No text to a model: the live model's transcribe is called with
+  language en, beam 5, vad_filter, no condition on previous text and
+  nothing else; every prompt built is the bare start sequence (start of
+  transcript, English, transcribe; plus no timestamps for WhisperX), with
+  prefix None and hotwords None; WhisperX's options carry initial_prompt
+  None, prefix None, hotwords None.
+- The worker killed mid-clip: the next feed failed with died, the exit
+  code and the log's last line; feed and stop after it said no session;
+  no second worker was started; a new open loaded a new worker and the
+  whole clip went through.
+- The private word check printed nothing before every commit.
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: the two new commands; the archive's path. The
+  README's line. Both fixed in this commit.
+- V2_SPEC.md 11.1 and 15.9 say the pass at Stop runs on the recording:
+  in 5a the worker keeps the sound it was fed and runs the pass on that;
+  stage 6 may hand it the file. 15.9 says the library versions are v1's:
+  the speech libraries are, and 43 helper packages resolved newer. The
+  spec is silent on the self-test's pass rule (20 of 22) and on the
+  rate carried with the session. Cowork folds these in.
+- The plan's figure for the threshold on raw sound is still owed to 5e.
+
+Next: the owner's check (install-speech, self-test, the app on 8001:
+This machine shows the two rows), then push; the GitHub check must be
+green on all three systems. Then the 5b brainstorm. For stage 6: the
+gate must expect a confidence of none; the worker's log and the sound
+the worker keeps belong to no consultation yet.
+
 ## 2026-10-07. Stage 3b: the engine bench
 
 Built over 6 and 7 Oct 2026 and published on 7 Oct, after the owner ruled
@@ -289,127 +420,3 @@ Made untrue by this stage:
 Next: the owner's check on port 8001 (the browser opens by itself; This
 machine shows the two lines), then push; the GitHub check must be green
 on all three systems. Then the stage 3b brainstorm, the engine bench.
-
-## 2026-10-04. Stage 2: the skeleton
-
-What was done:
-- The app starts. One person accepts the statement, sees This machine,
-  sets up a title, a name and a password, and logs in. The settings page
-  has This machine and You. The log page shows the audit log. The reset
-  command resets the password. Nothing of a patient, a model or sound.
-- One package, openconsult, on Python 3.12 with the lock file committed.
-  Libraries: fastapi, uvicorn, jinja2; for tests pytest and httpx2. All
-  pure Python or prebuilt wheels; nothing needs a compiler or a card.
-- SQLite, from Python's own library. Four tables at version 1:
-  schema_version, app_user, audit_log, first_run. Triggers make the audit
-  log append-only.
-- A GitHub check on Linux, Windows and macOS at every push to v2:
-  install from the lock, run the suite, start the app, check it answers,
-  stop it. Outside steps pinned: actions/checkout v7.0.1 at
-  3d3c42e5aac5ba805825da76410c181273ba90b1; astral-sh/setup-uv v9.0.0 at
-  c771a70e6277c0a99b617c7a806ffedaca235ff9; uv 0.12.10.
-
-The rulings of spec 15.6, each in one line:
-1. CLAUDE.md now says only documents are limited at the root. Done.
-2. CITATION.cff is stage 16. Nothing to do here.
-3. Every commit from stage 2 ends with the co-author line. Done.
-4. The statement comes first and is audited; no user before it. Done.
-5. The 30 minute lock, a named value in logins.py; a consultation holds
-   it off through a flag stage 6 will set. Done.
-6. The app listens on 127.0.0.1 only, with no flag to change it. Done.
-7. The You section: title, name, password, current password first,
-   every change audited from what to what. Done.
-8. v1's look, the style sheet cut from 195 to about 90 lines. Done.
-9. Cloud services with a free trial: later stages. Nothing here.
-10. The engine choice: stage 3 brainstorm. Nothing here.
-
-Decided in the plan review of 4 Oct 2026 (Cowork), as decisions of this stage:
-- The settings store holds only the data folder and the port; no table,
-  no page and no change method until a page-changeable setting exists.
-- No page script in stage 2. The refusal helper is server-side Python:
-  the page is sent back with the message under the control pressed, and
-  the helper raises if the message would land nowhere.
-- The wrong-password wait: 1 second after the first wrong try, doubling,
-  capped at 5 minutes, cleared by a right password or a restart. A design
-  choice, not a measurement; named in logins.py with the review as source.
-- A card is suitable when its memory rounds to 24 GB or more.
-- After set-up the user goes to the login page.
-- The Mac sentence and the card-could-not-be-read sentence are drafts.
-- A reset in another process ends the app's logins through a generation
-  number on the user row; each login remembers the one it was made under.
-- The This machine step is done when its Continue is pressed.
-- No test holds its own copy of a sentence. Every sentence is in
-  openconsult/words.py; tests take it from there or check which case the
-  code chose. The owner corrects wording in that one file.
-- The lock clears a screen nobody is using: every page behind the login
-  carries a plain refresh instruction to itself with ?quiet after the
-  time left. A ?quiet request never counts as use. If another tab kept
-  the login alive the page waits again for the time left; otherwise the
-  lock line is written then and the page goes to login with the reason.
-
-For stage 6: when a page has text being typed, typing must count as use.
-That needs a page script and is that stage's work. The quiet refresh also
-re-renders a page, so a page with a form in progress needs the script to
-hold the refresh off while typing. The consultation_running flag on
-Logins is the hook for the live page.
-
-Three fixes after Cowork's check, same day (stage-prompts/STAGE_02_FIXES.md):
-- A page sent back by a form post now names its own GET address for the
-  timed move, so a refused Settings form left alone locks to the login
-  page and writes the lock line, instead of ending on a 405.
-- A wrong current password in Settings is written to the log and counts
-  on the same growing wait as the login page; while the wait runs both
-  forms refuse and change nothing. The refusal sentence now says the wait.
-- No test runs the real nvidia-smi: the command takes the machine like
-  its saying and serving functions, and its test gives a made-up one.
-
-Measurements (after the fixes):
-- 76 tests, 1.9 s, none skipped. The twins and the parametrised cases
-  are counted as pytest counts them.
-- App code about 1,350 lines in 20 Python files; largest routes.py, 209 lines.
-  Templates and the style sheet, 261 lines. Tests 959 lines.
-- Largest function: well under 80 lines. No file near 600.
-- The private word check printed nothing before every commit.
-
-Not in the plan: the plan's commits 10 and 11 became one commit, because
-the login tests need a set-up user and the only honest way to one is
-through the first-run screens. Two drafted sentences were not used:
-"Accept the statement first." and "OpenConsult is already set up.",
-because a form sent at the wrong step goes back to the right step
-instead.
-
-Made untrue by this stage:
-- CLAUDE.md, Running it: rewritten here. README: no longer says the app
-  does not run. Both are fixed in this commit.
-- V2_SPEC.md 15.6 "the settings store ... a change is written to the
-  audit log": true from the first page-changeable setting, not in stage 2.
-  And "plain pages, with their scripts in their own files": there are no
-  scripts yet. Cowork folds both into the spec at the next brainstorm.
-
-Next: the owner's check on port 8001, then push; the GitHub check must be
-green on all three systems. Then the stage 3 brainstorm.
-
-## 2026-10-04. Stage 1: the v2 branch is opened
-
-What was done:
-- A new branch, v2, in its own folder. It shares no history with main.
-- Three commits: the spec and the lessons; the licence, the notice and the
-  ignore list; CLAUDE.md, this file, a holding README and the stage prompt.
-- No code. Nothing runs yet.
-
-Decided by the owner on 4 Oct 2026 (spec 15.5):
-- The spec is approved. It changes only by a dated ruling of his.
-- A privacy pass before anything is public. Nothing committed names a
-  family member, a colleague, a home or a place.
-- One spec, and it lives in this folder.
-- The licence stays as v1: AGPL-3.0-or-later.
-
-Waiting for later stages:
-- The community files (CONTRIBUTING, SECURITY, the code of conduct,
-  CITATION.cff, the issue templates) cross from v1 in stage 16, before the
-  join of spec 14.3.
-- NOTICE gains an entry in the same commit as each third-party component.
-
-Made untrue by this stage: nothing.
-
-Next: stage 2, the skeleton, after its brainstorm.
