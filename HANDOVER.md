@@ -4,6 +4,159 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-10. Stage 5b: the Nemotron choice and the two cloud choices
+
+Built on 10 Oct 2026. The plan was reviewed by Cowork the same day (nine
+changes and one addition to Part 4); all are in. The checks on the card
+and against the two services ran on 10 Oct with the v1 service off.
+
+What was done:
+- Three more speech choices behind the door of 5a (openconsult/speech):
+  Nemotron on the card, Speechmatics and AssemblyAI through their EU
+  addresses. Each is proven by the self-test of 5a, each command names
+  its choice (--choice), and This machine has one line for each.
+- The door: a choice whose labels are live is told the number of
+  speakers at open and the number goes to the worker; a choice with one
+  transcript gets at Stop every line the door already gave, with the
+  last ones made final, from the door's own record by id (11.1). Stop
+  never refuses over a count that differs from the one at open: both
+  counts are recorded (the last words are said at Stop). A revision
+  from a service changes a label and nothing else, and never costs a
+  line. New failures by name: no_key, key_refused, no_credit,
+  no_internet, service_down, limit_reached, address_refused,
+  connection_lost. The WhisperX choice behaves as before.
+- The keys: one module (settings/keys.py) reads SPEECHMATICS_API_KEY
+  and ASSEMBLYAI_API_KEY from the process environment, then from .env
+  in the data folder; a key goes into its own worker's environment and
+  nowhere else, and every worker's environment has every other key's
+  name taken out. .env.example is committed with empty values.
+- The cloud frame (speech/common/cloud.py), on websockets 17.2, the one
+  library added to the base app: the EU address is a named constant,
+  dial refuses any other before a connection, main takes no argument
+  and reads no environment value for it; the certificate and the host
+  are checked by the library's default context with no argument that
+  could weaken it; a dead line is noticed within 50 s (ping 20, pong
+  20, close 10, the library's own defaults) and is connection_lost;
+  nothing reconnects. A made-up service on loopback stands in for both
+  services in the suite; the suite never reaches the internet.
+- Speechmatics: StartRecognition with the enhanced model, the medical
+  domain, speaker diarization, partials on, the session's rate,
+  max_speakers from 2 up, no additional_vocab. One line per run of
+  label from an AddTranscript; UU is no speaker. EndOfStream, then
+  EndOfTranscript. The service sends Info (its usage and its region)
+  before RecognitionStarted; the worker reads past it.
+- AssemblyAI: the parameters in the query, model universal-3-6-pro
+  named, speaker_labels, domain medical-v1, max_speakers as given, no
+  keyterms_prompt, no format_turns (the model always formats). The
+  Begin echo is checked field by field; a field the echo does not carry
+  is recorded as not echoed. A Turn that ends is one line; PENDING and
+  UNKNOWN are no speaker; a SpeakerRevision gives id and label only.
+  Terminate, then Termination. A wrong key is answered after the
+  handshake with an Error frame (1008) and a close.
+- Nemotron (ruling 8): one worker, one environment built from a
+  committed lock with NeMo at v1's commit 1688cc3d, torch 2.12.0 from
+  PyPI, Python 3.12. The English model alone writes the words at the
+  revision and the setting of Task 17's third arm ([70, 13]); the
+  speaker model beside it, at v1's revision, in the Low latency row of
+  its card (1.04 s). Each has its own features (v1's splice), chunker
+  and cache; nothing of v1's pairing. The join (nemotron/join.py) is a
+  plain function: a word that no stretch covers, or that two speakers
+  cover equally, has no speaker; a line closes at a sentence's end, a
+  change of speaker or a pause of 1.0 s, or by time at 3.0 s.
+- Carried from 5a: the home page's line; a death's reason is one plain
+  sentence (codes stripped, traceback and warning lines skipped, a cut
+  first line of the log window dropped, a library's own log lines and a
+  worker's [note] lines never taken); the worker-side frames shared by
+  every worker folder (speech/common/frames.py). Eighteen comments
+  that cited private plan reviews now give their reason (ruling 11).
+
+The rulings of spec 15.9 for 5b, each in one line:
+8. The English model alone writes the words; the speaker model only
+   says who spoke; item 6 proved the words identical with and without
+   it; the join can change no word. Done.
+9. The EU address only, medical on, labels live, no word list: pinned
+   word for word against the made-up service and proven on the real
+   connections (items 11 to 13). Done.
+10. AssemblyAI stays; what it keeps is for the bench report and stage
+    9. Nothing built; the self-test's sentence says the clip leaves.
+11. The tidy-up commit opened the stage. Done.
+
+Decided in the plan review (Cowork, 10 Oct), as decisions of this stage:
+the number given at open is sent to AssemblyAI as max_speakers as given
+and to Speechmatics from 2 up, with no headroom; a label beyond a number
+a service could not be given stands as the service gave it; Stop never
+refuses over a count; a revision never costs a line; a worker holds its
+own key and no other; the certificate is always checked; the dead-line
+figures are the library's own; AssemblyAI's text is formatted without
+format_turns (its migration page); the home page's line is the review's
+draft; the Nemotron environment is not Task 17's (Python 3.12 and torch
+from PyPI here; 3.13 and NVIDIA's index there), the model, revision and
+setting the same. Decided while building: a field the Begin echo does
+not carry is not a difference (it echoes no max_speakers); the workers
+log the opening sent and the first reply as [note] lines.
+
+Measurements, 10 Oct 2026, RTX 4090, v1 off:
+- 346 tests, 16.1 s, none skipped. App code 5,864 lines without the
+  bench, tests 5,492. Largest file speech/nemotron/models.py, 497
+  lines; no function over 80. CLAUDE.md 99 lines.
+- The Nemotron environment: 159 packages locked, 156 installed on
+  Linux, 5.5 GB, built in 22 s from a warm cache; the second run
+  audited and changed nothing in 0.3 s. Both models found in the shared
+  cache at their pinned revisions, none downloaded.
+- Nemotron self-test passed: 21 of 22 words live and at Stop (the same
+  lines). The first word, And, came at 0.08 to 0.16 s, in the clip's
+  opening silence, and the rule refused it at -43 dBFS: the model's
+  frame times can run ahead of the first word. Load 6.9 s, then the
+  warm-up. Lines 2.19 to 3.18 s after their last word; Stop 0.04 s; the
+  slowest step 0.18 s. Four lines of 4, 2, 7 and 8 words. The card's
+  highest sample 4,321 MiB. The English model alone gave the same 22
+  words, word for word. Silence and noise (zeros, -50, -30 dBFS, 60 s
+  each): no word, nothing to refuse. The connection record was empty.
+  Killed mid-clip: died with the exit code, no second start, a new open
+  worked.
+- Speechmatics self-test passed, 22 of 22; open 0.1 to 0.16 s; a line
+  4.7 to 4.9 s after its last word (the service's default max_delay);
+  Stop 0.18 s; 11 lines (ten of one word, one of twelve), every word
+  S1, every confidence 1.0; RecognitionStarted after an Info with
+  region eu. AssemblyAI self-test passed, 22 of 22; open 0.85 s; lines
+  1.2 and 2.1 s after their last word; Stop 1.1 to 1.4 s; 3 lines (5, 2
+  and 15 words) with confidences 0.994, 0.705 and 0.981; the middle
+  line PENDING live and revised to A at Stop. The connection records
+  hold only the EU host's lookup and connection, three lines each.
+  Silence and noise, 180 s to each: no word. A wrong key: Speechmatics
+  HTTP 401, AssemblyAI an Error frame 1008; both the plain sentence,
+  one attempt. Killed mid-clip: as Nemotron. Sound sent: about 234 s to
+  Speechmatics, 218 s to AssemblyAI, the clip and made sound only.
+- The keys' values appear in no file under the working data folder,
+  the log, the plan, the report or the repo (counts 0).
+- This machine on the working data folder: Nemotron installed and
+  passed, Speechmatics passed, AssemblyAI passed, each with its date.
+- The WhisperX self-test on 5a's folder passed with this code, 22 of 22.
+- The private word check printed nothing before every commit.
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: --choice on the two commands; the README's
+  line. Both fixed in this commit.
+- V2_SPEC.md 15.9, the details of 5b: "the number is given to the
+  worker" holds, but a service may not take it (Speechmatics below 2)
+  or may not echo it (AssemblyAI); the list of new failures lacks
+  connection_lost; a line now has an id; the Begin echo rule is as
+  decided above. Cowork folds these in.
+- The plan's figure for the Nemotron card memory (4,000 MiB) was met
+  (4,321 at the highest sample, with the clip; 5a's WhisperX took 7,600).
+
+For stage 6: a cloud worker's connection is opened at the door's open,
+so Start pays 0.1 to 0.9 s; a dead line is noticed within 50 s; the
+Nemotron English model's first word can be timed in silence before it,
+so the rule may refuse a real first word; AssemblyAI's labels come
+PENDING for a short turn and are revised at Stop; Speechmatics gives
+one line per word early in a session.
+
+Next: the owner's check (install-speech --choice nemotron, the four
+self-tests, the app on 8001: This machine shows the rows), then push;
+the GitHub check must be green on all three systems. Then the 5c
+brainstorm.
+
 ## 2026-10-10. Stage 5a: the transcription door
 
 Built on 9 and 10 Oct 2026. The plan was reviewed by Cowork on 9 Oct
@@ -297,126 +450,3 @@ Next: the owner reads the report and pushes; the GitHub check must be
 green on all three systems. Then, if he wishes, his answer to issue 1 in
 his own words. Owed before stage 6: the session in which the owner and
 Cowork read the two carried prompts word for word.
-
-## 2026-10-04. Stage 3: the language model door
-
-What was done:
-- Every call to the language model goes through one door (openconsult/llm):
-  a table of two jobs, the assessment and the alarm, each with its prompt
-  file, answer form, limit on length (1,500 and 1,000 tokens) and limit on
-  time (60 s each). One result: an answer, or a failure with its reason:
-  too slow, too long, unreachable, bad form, or did not fit. Nothing is
-  retried and nothing else is tried.
-- The door writes the record of every call itself, table model_call at
-  version 2: when, the job, the engine and its version, the model's tag
-  and digest, the hash of the prompt sent, exactly what was sent, the raw
-  reply, the tokens, the times and the outcome. It lives in the data
-  folder only. A version 1 folder comes forward with nothing lost.
-- The two prompts cross from v1 word for word as files in
-  openconsult/prompts, with their forms and the fixed words around the
-  transcript as frames; one loader; the app and the bench read the same
-  files. Their hashes equal v1's recorded values and a test pins them.
-- One pass (openconsult/consult): the alarm first, then the assessment,
-  both with the patient line, the assessment with the earlier names as a
-  stale list; the bookkeeping in code; a failed alarm is a third state,
-  not judged, never read as no alarm.
-- The joint between the door and an engine carries the parts of a call and
-  one plain reply. The Ollama engine behind it uses the standard library.
-- The app opens the browser by itself once it answers; --no-browser.
-- This machine says whether Ollama runs and whether Gemma 4 QAT is
-  present, on a machine with a suitable card only.
-- The bench kit (openconsult/bench): the case list with checksums, 13
-  chains, the replay through the same door, a writer that never writes
-  over a result, the scoring with the marks of Tasks 5 and 5b, the word
-  check, and the command openconsult-bench. Cases and results live in the
-  private log folder; the repo holds the code and the marks only.
-- No library added. NOTICE has nothing to add.
-
-The rulings of spec 15.7, each in one line:
-1. The stage 2 leftovers are in 15.6. Nothing to do here.
-2. The browser opens by itself once the app answers; --no-browser for the
-   tests and the GitHub check; no screen is not an error. Done.
-3. The same marks: the word check rebuilt 1,898 of 1,898 assessment and
-   1,898 of 1,898 alarm calls of arm D exactly, and the 13-chain run met
-   every hard mark (7 of 7), both time marks and 8 of 9 soft marks. Done.
-4. Gemma 4 QAT only; the joint is built so Claude and Qwen fit later with
-   no change to the jobs. Done.
-5. The engine bench is stage 3b. The bench takes any engine's address. Nothing else here.
-
-Decided in the plan review of 4 Oct 2026 (Cowork), as decisions of this stage:
-- The door sends "truncate": false. Measured that day: by default this
-  Ollama (0.33.3) cut a 77,585-token input to 8,195 tokens, half the
-  context, and answered as if nothing had happened; with the field it
-  refuses with HTTP 400 exceed_context_size_error, which the door records
-  as did_not_fit. The word check compares the message, model, think and
-  options one by one and then the whole body with that one key removed.
-  v1 runs with Ollama's default.
-- The record holds the sha256 of the system message as sent, equal to
-  v1's recorded value (the file's text less its final line break).
-- What crosses the joint is the parts of a call, not Ollama's shape;
-  keep_alive 30m lives in the Ollama engine.
-- The two This machine lines show only on a machine with a suitable card;
-  elsewhere nothing about Ollama is shown and Ollama is not asked.
-- The soft marks stand as the numbers fixed against arm N in Task 5b
-  (03, 04, 11, 13 at most 1 chain fired; 05 at most 4; script 12 at most
-  13 and a median of at most 5 updates; restraint 13, 14, 15 at least 12;
-  cleared at least 12 on each emergency script). Arm D's figure is shown
-  beside each as v1 today.
-- A failed alarm call is a third state in the pass result: not judged,
-  with the reason. A script chain with any failed call is a failed chain;
-  on 495 and the travel cases a failed pass meets no rule.
-- The two time marks were set for a three-call pass; v2's pass is two
-  calls (no affect call, which took part in no mark). Reported as written.
-- R21's check names no publisher: the prompts hold no guideline word and
-  every capitalised word in a prompt is on a known list in the test.
-- The sampling override on the door is reachable from the bench only. It
-  is not a setting. The engine's address is one fixed value in the store.
-- browser.py sits at the top of the package beside cli.py.
-- HOME_SO_FAR and the This machine lines are drafts for the owner.
-
-For stages 6 and 12: the door's call waits until the reply comes. The
-live consultation must not wait on it in the page's own loop, and a call
-already sent cannot be taken back, only its result dropped. Nothing is
-built for this now. Stage 6 also ties each model_call row to its
-consultation (version 3) and shows a failed call's reason on screen.
-
-Measurements:
-- 141 tests, 3.5 s, none skipped (98 test functions; the parametrised
-  cases counted as pytest counts them).
-- App code about 2,230 lines in openconsult without the bench; the bench
-  about 780; the start check 79. Templates and the style sheet 265.
-  Tests 2,070 lines. Largest file bench/score.py, 292 lines; largest
-  function, its marks table, 64 lines. CLAUDE.md 99 lines.
-- The word check, no model: 1,898 of 1,898 assessment and 1,898 of 1,898
-  alarm calls of arm D rebuilt exactly (495 and travel from Task 5, the
-  13 scripts from Task 5b); Task 5's single-run script calls 242 of 242.
-- The run: 16 cases, 13 chains each, 208 chains, 1,898 passes, 3,796
-  calls, none failed, no cap hit, no thinking text; 2 h 24 min; the
-  card's memory 17,379 to 17,846 MiB. Ollama 0.33.3; Gemma 4 QAT digest
-  2dd70431...c4e4, as Tasks 5 and 5b; the two prompt hashes as v1's.
-- Marks: hard 7 of 7; time 2 of 2 (495 median pass 4.63 s, slowest
-  7.01 s, two calls); soft 8 of 9. The miss is S15 on script 15: 11
-  chains of 13 passed the restraint verdict against a mark of 12 (arm N
-  and arm D 13). In chains A2 and A3 the assessment at the last update
-  gave an empty differential list, so no leader could be judged; the
-  alarm fired and cleared in all 13. Task 5b saw four such empty lists
-  in arm D, three of them on script 15. The owner and Cowork decide.
-- The private word check printed nothing before every commit.
-- A1, A2 and A3 gave the same answers throughout on 2 of 16 cases:
-  temperature 0 with seed 42 is not reproducible on this machine
-  (V1_LESSONS 9.1, seen again).
-
-Made untrue by this stage:
-- CLAUDE.md, Running it: the switch and the bench commands added here.
-  README: now says the door exists. Both fixed in this commit.
-- V2_SPEC.md 15.7, the details: "the model's profile holds ... keep_alive"
-  is no longer so (it lives in the Ollama engine); "a request in Ollama's
-  shape" nowhere, but the joint is now the plain parts; the two This
-  machine lines are on a suitable card only; the record's prompt hash is of
-  the text sent. Cowork folds these into the spec at the next brainstorm.
-- Spec 15.7 says the assessment's frames and the alarm's frame live in
-  the prompts folder as "the fixed words": they are the three .frame.txt files.
-
-Next: the owner's check on port 8001 (the browser opens by itself; This
-machine shows the two lines), then push; the GitHub check must be green
-on all three systems. Then the stage 3b brainstorm, the engine bench.
