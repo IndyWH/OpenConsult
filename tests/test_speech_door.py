@@ -297,15 +297,17 @@ def test_11_4_a_live_line_carries_its_speaker_and_confidence_or_none():
 
 def test_ruling_4_a_revision_changes_the_label_only_and_never_costs_a_line():
     thanks = {"id": 9, "start": 1.0, "end": 1.5, "text": "Thank you.", "speaker": "A", "confidence": 0.5}
-    worker = MadeUpWorker(live=[[live_seg(1, 0.0, 0.2, "one", "A")], [], [], [], [thanks], []],
-                          revisions=[[], [{"id": 1, "speaker": "B"}], [], [], [], [{"id": 9, "speaker": "B"}, {"id": 7, "speaker": "A"}]],
+    # The quiet line ends at 1.5 s, so 1.5 s of sound is fed before it comes:
+    # sound not yet fed would count as not quiet (ruling 12).
+    worker = MadeUpWorker(live=[[live_seg(1, 0.0, 0.2, "one", "A")], [], [], [], [], [thanks], []],
+                          revisions=[[], [{"id": 1, "speaker": "B"}], [], [], [], [], [{"id": 9, "speaker": "B"}, {"id": 7, "speaker": "A"}]],
                           final={"last_live": [], "revisions": [{"id": 1, "speaker": None}], "seconds": {}})
     door = live_door(worker, ASSEMBLYAI)
     door.open(RATE, speakers=2)
     first = door.feed(LOUD)
     revised = door.feed(LOUD)
     assert revised.revisions == (Revision(1, "B", True, Line("B", 0.0, 0.2, "one", 0.9, 1)),)
-    for _ in range(2):
+    for _ in range(3):
         door.feed(QUIET)
     quiet = door.feed(QUIET)                                   # "Thank you." over silence is refused
     assert [r.line.id for r in quiet.refused] == [9]
@@ -339,11 +341,13 @@ def test_7_2_the_new_failures_pass_through_by_name_with_their_sentence():
 
 
 def test_ruling_1_no_words_from_silence_holds_for_a_one_transcript_choice():
+    # Nemotron's rule looks 1.0 s to each side (ruling 12), so the quiet
+    # fed here is 3.0 s: the whole wider stretch of each line is quiet.
     thanks = [live_seg(1, 0.0, 0.5, "Thank you.")]
-    worker = MadeUpWorker(live=[[], [], [], thanks], final={"last_live": [live_seg(2, 0.6, 0.9, "Thank you.")], "seconds": {}})
+    worker = MadeUpWorker(live=[[]] * 11 + [thanks], final={"last_live": [live_seg(2, 0.6, 0.9, "Thank you.")], "seconds": {}})
     door = live_door(worker)
     door.open(RATE, speakers=1)
-    for _ in range(3):
+    for _ in range(11):
         door.feed(QUIET)
     assert [r.line.text for r in door.feed(QUIET).refused] == ["Thank you."]
     final = door.stop(speakers=1)

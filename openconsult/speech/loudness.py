@@ -59,25 +59,46 @@ class Loudness:
     def seconds(self) -> float:
         return (len(self.windows) * self.window + len(self._carry)) / self.rate
 
+    def _last_window(self, end_s: float) -> int:
+        # In whole samples, so 0.3 s is window 3 and not 2.999 of one.
+        return -(-int(round(end_s * self.rate)) // self.window)
+
+    def reaches_past(self, end_s: float) -> bool:
+        """Whether a span ending here reaches into sound not yet fed: past
+        the full windows and past the piece still in hand."""
+        return self._last_window(end_s) > len(self.windows) + (1 if len(self._carry) else 0)
+
     def loudest(self, start_s: float, end_s: float) -> float:
         """The loudest window that overlaps the span. A span that reaches
         past the full windows also sees the piece still in hand; a span
         with no sound at all is -inf, as silence is."""
-        # In whole samples, so 0.3 s is window 3 and not 2.999 of one.
         first = max(0, int(round(start_s * self.rate)) // self.window)
-        last = max(first + 1, -(-int(round(end_s * self.rate)) // self.window))
+        last = max(first + 1, self._last_window(end_s))
         found = self.windows[first:last]
         if last > len(self.windows) and len(self._carry):
             found = [*found, dbfs(rms_of(self._carry))]
         return max(found) if found else -math.inf
 
 
-def refuse_quiet(lines: list[Line], loudness: Loudness,
-                 threshold: float = QUIET_DBFS) -> tuple[list[Line], list[Refused]]:
-    """The rule. What it refuses is kept and marked (V1_LESSONS 1.2)."""
+def refuse_quiet(lines: list[Line], loudness: Loudness, threshold: float = QUIET_DBFS,
+                 slack_s: float = 0.0, more_to_come: bool = True) -> tuple[list[Line], list[Refused]]:
+    """The rule. What it refuses is kept and marked (V1_LESSONS 1.2).
+
+    It looks slack_s to each side of the line, as wide as the choice's
+    times allow (ruling 12), and refuses only if all of that stretch is
+    quiet. While more sound is still to come, a stretch that reaches past
+    the sound fed counts as not quiet, so in doubt the word stays and no
+    line waits for more sound. At Stop nothing is still to come: the
+    stretch is cut at the end of the sound, and a quiet last line is
+    refused, because v1 wrote words into the silence at the end of a
+    consultation, where safety nets are said."""
     accepted, refused = [], []
     for line in lines:
-        loudest = loudness.loudest(line.start, line.end)
+        start, end = max(0.0, line.start - slack_s), line.end + slack_s
+        if more_to_come and loudness.reaches_past(end):
+            accepted.append(line)
+            continue
+        loudest = loudness.loudest(start, end)
         if loudest <= threshold:
             refused.append(Refused(line, loudest, threshold))
         else:

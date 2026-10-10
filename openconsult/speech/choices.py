@@ -15,6 +15,15 @@ from openconsult.speech.lines import Declares
 
 WORKERS = Path(__file__).parent
 
+# Ruling 12: how far a choice's line times may lie from the sound. The
+# rule against words from silence looks this far to each side of a line.
+# WhisperX and the two services: nothing measured in 5a or 5b speaks
+# against their times. Nemotron: 5b found the clip's first word timed about
+# half a second from the sound, and the ruling asks for a soft rule, so the
+# figure is twice what was found. Both are drafts, measured again in 5e.
+EXACT_TIMES_S = 0.0
+NEMOTRON_TIME_SLACK_S = 1.0
+
 
 @dataclass(frozen=True)
 class Choice:
@@ -33,7 +42,8 @@ class Choice:
 WHISPERX_PYANNOTE = Choice(
     name="whisperx_pyannote",
     title=words.CHOICE_TITLE,
-    declares=Declares(confidence="at_stop", speakers="at_stop", second_transcript=True),
+    declares=Declares(confidence="at_stop", speakers="at_stop", second_transcript=True,
+                      time_slack_s=EXACT_TIMES_S),
     folder="whisperx",
     environment=True,
 )
@@ -43,7 +53,8 @@ WHISPERX_PYANNOTE = Choice(
 NEMOTRON = Choice(
     name="nemotron",
     title=words.ROW_NEMOTRON,
-    declares=Declares(confidence="none", speakers="live", second_transcript=False),
+    declares=Declares(confidence="none", speakers="live", second_transcript=False,
+                      time_slack_s=NEMOTRON_TIME_SLACK_S),
     folder="nemotron",
     environment=True,
 )
@@ -53,7 +64,8 @@ NEMOTRON = Choice(
 SPEECHMATICS = Choice(
     name="speechmatics",
     title=words.ROW_SPEECHMATICS,
-    declares=Declares(confidence="live", speakers="live", second_transcript=False),
+    declares=Declares(confidence="live", speakers="live", second_transcript=False,
+                      time_slack_s=EXACT_TIMES_S),
     folder="speechmatics",
     environment=False,
     key="SPEECHMATICS_API_KEY",
@@ -62,7 +74,8 @@ SPEECHMATICS = Choice(
 ASSEMBLYAI = Choice(
     name="assemblyai",
     title=words.ROW_ASSEMBLYAI,
-    declares=Declares(confidence="live", speakers="live", second_transcript=False),
+    declares=Declares(confidence="live", speakers="live", second_transcript=False,
+                      time_slack_s=EXACT_TIMES_S),
     folder="assemblyai",
     environment=False,
     key="ASSEMBLYAI_API_KEY",

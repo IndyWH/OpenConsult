@@ -85,6 +85,17 @@ class Door:
         return self._loudness.seconds if self._loudness else 0.0
 
     @property
+    def loudness_windows(self) -> list[float]:
+        """The loudness of the sound fed so far, one dBFS figure for each
+        window of WINDOW_S, read only: the bench keeps it with a result so
+        the scoring can be made again from the stored results alone."""
+        return list(self._loudness.windows) if self._loudness else []
+
+    @property
+    def _slack(self) -> float:
+        return self.choice.declares.time_slack_s
+
+    @property
     def one_transcript(self) -> bool:
         return not self.choice.declares.second_transcript
 
@@ -144,12 +155,12 @@ class Door:
         try:
             final = [self._live_line(s) for s in reply.get("segments") or []]
             pending = [self._live_line(s) for s in reply.get("pending") or []]
-            accepted, refused = refuse_quiet(final, self._loudness)
+            accepted, refused = refuse_quiet(final, self._loudness, slack_s=self._slack)
             self._record(accepted, refused)
             revisions = self._revise(reply.get("revisions") or [])
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             return failed_live("bad_reply", words.DOOR_BAD_REPLY.format(reason=exc), self.fed_s, self.stamp)
-        heard, _ = refuse_quiet(pending, self._loudness)
+        heard, _ = refuse_quiet(pending, self._loudness, slack_s=self._slack)
         return Live(True, self.fed_s, self.stamp, tuple(accepted), tuple(refused),
                     " ".join(line.text for line in heard), revisions=revisions)
 
@@ -180,14 +191,15 @@ class Door:
             return failed_final(*self._error(reply), self.stamp)
         try:
             tail = [self._live_line(s) for s in reply.get("last_live") or []]
-            tail_ok, tail_refused = refuse_quiet(tail, self._loudness)
+            # At Stop nothing is still to come: a quiet last line is refused (ruling 12).
+            tail_ok, tail_refused = refuse_quiet(tail, self._loudness, slack_s=self._slack, more_to_come=False)
             if self.one_transcript:
                 return self._one_transcript_final(reply, tail_ok, tail_refused, int(speakers))
             raw = [dict(s) for s in reply.get("segments") or []]
             raw_lines = [as_line(s) for s in raw]
         except (KeyError, TypeError, ValueError, AttributeError) as exc:
             return failed_final("bad_reply", words.DOOR_BAD_REPLY.format(reason=exc), self.stamp)
-        _, raw_refused = refuse_quiet(raw_lines, self._loudness)
+        _, raw_refused = refuse_quiet(raw_lines, self._loudness, slack_s=self._slack, more_to_come=False)
         refused_ids = {id(r.line) for r in raw_refused}
         flagged = tuple({**seg, "refused": id(line) in refused_ids} for seg, line in zip(raw, raw_lines))
         kept = [seg for seg, line in zip(raw, raw_lines) if id(line) not in refused_ids]

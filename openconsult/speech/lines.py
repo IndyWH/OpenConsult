@@ -53,10 +53,16 @@ class Declares:
     confidence: str        # live, at_stop or none
     speakers: str          # live, at_stop or none
     second_transcript: bool
+    # How far the choice's line times may lie from the sound, in seconds
+    # (ruling 12). The rule against words from silence looks this far to
+    # each side of a line before it refuses it.
+    time_slack_s: float = 0.0
 
     def __post_init__(self):
         if self.confidence not in WHEN or self.speakers not in WHEN:
             raise ValueError("a declaration says live, at_stop or none")
+        if self.time_slack_s < 0:
+            raise ValueError("the slack of a choice's times is 0 or more seconds")
 
 
 @dataclass(frozen=True)
