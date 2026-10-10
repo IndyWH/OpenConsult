@@ -85,8 +85,8 @@ Think from the patient's side. In teaching mode, from the learner's side.
     uv sync                                            # once, from the lock file
     uv run openconsult [--data-folder DIR --port 8765] [--no-browser]   # start, on 8001; a development run; without a browser
     uv run openconsult reset-password [--data-folder DIR]
-    uv run openconsult install-speech [--data-folder DIR]   # the speech environment and its models, into the data folder
-    uv run openconsult self-test [--data-folder DIR]        # the clip through the speech door; the result is stored
+    uv run openconsult install-speech [--choice NAME] [--data-folder DIR]   # a choice's environment and models, into the data folder
+    uv run openconsult self-test [--choice NAME] [--data-folder DIR]        # the clip through the door; stored. NAME: whisperx_pyannote (the default), nemotron, speechmatics, assemblyai
     uv run pytest                                      # the suite
     uv run python .github/scripts/start_check.py       # start, answer, stop
     uv run openconsult-bench wordcheck --cases DIR --out DIR --v1-calls FILE...  # no model
@@ -94,6 +94,6 @@ Think from the patient's side. In teaching mode, from the learner's side.
     uv run openconsult-bench score --out DIR | --replies FILE     # the marks of one arm
     uv run openconsult-bench figures --public engine-bench        # the figures of the public report; no engine
 
-The bench writes only under --out, never to the app's data. Its published form is engine-bench; other cases and results stay in the log folder. install-speech and self-test write only in the data folder they are given.
+The bench writes only under --out, never to the app's data. Its published form is engine-bench; other cases and results stay in the log folder. install-speech and self-test write only in the data folder they are given. A cloud choice needs no install: its key goes in .env in the data folder (see .env.example), and its self-test sends the clip to the service's EU address.
 
 Data folder: Linux $XDG_DATA_HOME/openconsult or ~/.local/share/openconsult; macOS ~/Library/Application Support/OpenConsult; Windows %LOCALAPPDATA%\OpenConsult.

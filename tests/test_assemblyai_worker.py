@@ -144,12 +144,22 @@ def test_7_2_each_service_failure_has_its_plain_name_and_nothing_reconnects(mode
         service.stop()
 
 
-def test_7_2_the_services_error_frame_is_a_plain_name():
+def test_7_2_a_wrong_key_is_answered_with_an_error_frame_and_is_key_refused():
+    # The real service, 10 Oct 2026: the handshake succeeds, then one Error frame
+    # {"type": "Error", "error_code": 1008, "error": "Unauthorized Connection: Invalid API key"}, then the close.
     service = MadeUpService(ASSEMBLYAI, mode="error")
     try:
         with pytest.raises(cloud.Refused) as refused:
             session_on(service)
-        assert refused.value.kind in ("key_refused", "service_down") and service.connections == 1
+        assert refused.value.kind == "key_refused" and service.connections == 1
+    finally:
+        service.stop()
+    balance = {"type": "Error", "error_code": 1008, "error": "Unauthorized Connection: insufficient balance"}
+    service = MadeUpService(ASSEMBLYAI, first=balance)
+    try:
+        with pytest.raises(cloud.Refused) as refused:
+            session_on(service)
+        assert refused.value.kind == "no_credit"
     finally:
         service.stop()
 

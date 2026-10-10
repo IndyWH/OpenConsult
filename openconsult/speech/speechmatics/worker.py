@@ -83,14 +83,14 @@ class Session(cloud.Session):
         # The opening message and the replies before the session starts
         # hold no key and no spoken word, so the worker's log keeps them:
         # they are the proof of what was asked and what the service applied.
-        print(f"opening sent: {json.dumps(sent)}", file=sys.stderr, flush=True)
+        print(f"[note] opening sent: {json.dumps(sent)}", file=sys.stderr, flush=True)
         deadline = time.perf_counter() + cloud.FIRST_REPLY_S
         while True:
             # The service may send Info (its usage, its region) or Warning
             # before RecognitionStarted; those are read and kept, not taken
             # for the answer.
             first = json.loads(self.first_reply(max(0.1, deadline - time.perf_counter())))
-            print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
+            print(f"[note] first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
             kind = first.get("message")
             if kind == "Error":
                 raise Refused_from_error(first)

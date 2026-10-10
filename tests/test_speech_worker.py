@@ -121,4 +121,5 @@ def test_15_9_a_deaths_reason_is_one_plain_sentence_never_a_warning():
     assert plain_last_line(log) == "RuntimeError: made-up: the card is full"
     assert plain_last_line(log + "[NeMo I 2026-10-10 12:00:00 made_up:1] a library's own information line\n") == "RuntimeError: made-up: the card is full"
     assert plain_last_line("WARNING only\n  warnings.warn(x)\n") == ""
+    assert plain_last_line("ValueError: made-up\n[note] first reply: made-up record\n") == "ValueError: made-up"
     assert plain_last_line("") == ""

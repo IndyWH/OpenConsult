@@ -30,7 +30,8 @@ LOG_TAIL_BYTES = 4096
 # worker's log, and a harmless warning is never taken for the reason.
 TERMINAL_CODES = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
 TRACEBACK_LINE = re.compile(r'^(Traceback \(most recent call last\):|File ".*", line \d+)')
-WARNING_LINE = re.compile(r"^(WARNING\b|warnings\.warn\(|.*:\d+: \w*Warning: |\[NeMo [IWD] )")
+# A worker's own record lines are marked [note]; they are not a reason either.
+WARNING_LINE = re.compile(r"^(WARNING\b|warnings\.warn\(|.*:\d+: \w*Warning: |\[NeMo [IWD] |\[note\] )")
 
 _END = object()
 

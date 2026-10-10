@@ -148,8 +148,8 @@ class MadeUpService:
                 "max_speakers": int(asked["max_speakers"]) if "max_speakers" in asked else None,
                 "sample_rate": int(asked.get("sample_rate", 16000)), "encoding": asked.get("encoding")}
         if self.mode[0] == "error":
-            ws.send(json.dumps({"error": "made-up: unauthorized", "error_code": 1008}))
-            ws.close(1008, "Unauthorized Connection: Missing Authorization header")
+            ws.send(json.dumps({"type": "Error", "error_code": 1008, "error": "Unauthorized Connection: Invalid API key"}))
+            ws.close(1008, "Unauthorized Connection: Invalid API key")
             return
         begin = self.first or {"type": "Begin", "id": "made-up-id", "expires_at": 0, "configuration": echo}
         ws.send(json.dumps(begin))

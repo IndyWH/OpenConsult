@@ -83,8 +83,12 @@ class Session(cloud.Session):
         # The parameters and the first reply hold no key and no spoken word,
         # so the worker's log keeps them: the proof of what was asked and
         # what the service applied.
-        print(f"opening sent: {json.dumps(parameters(self.rate, self.speakers))}", file=sys.stderr, flush=True)
-        print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
+        print(f"[note] opening sent: {json.dumps(parameters(self.rate, self.speakers))}", file=sys.stderr, flush=True)
+        print(f"[note] first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
+        if first.get("type") == "Error" or first.get("error") is not None:
+            # A wrong key is answered this way: an Error frame (1008, Invalid
+            # API key) after the handshake, then the close (measured 10 Oct 2026).
+            raise cloud.Refused(*_error_kind(first.get("error_code"), str(first.get("error"))))
         if first.get("type") != "Begin":
             raise cloud.Refused("service_down", f"first reply {first.get('type')!r}")
         applied = dict(first.get("configuration") or {})
@@ -100,7 +104,7 @@ class Session(cloud.Session):
         if differ:
             raise cloud.Refused("worker_error", f"the service applied {differ}, not {asked}")
         if self.not_echoed:
-            print(f"not echoed by the service: {self.not_echoed}", file=sys.stderr, flush=True)
+            print(f"[note] not echoed by the service: {self.not_echoed}", file=sys.stderr, flush=True)
         self.begin = first
 
     def take(self, message) -> None:
