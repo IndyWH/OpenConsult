@@ -80,6 +80,11 @@ class Session(cloud.Session):
 
     def start(self) -> None:
         first = json.loads(self.first_reply())
+        # The parameters and the first reply hold no key and no spoken word,
+        # so the worker's log keeps them: the proof of what was asked and
+        # what the service applied.
+        print(f"opening sent: {json.dumps(parameters(self.rate, self.speakers))}", file=sys.stderr, flush=True)
+        print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
         if first.get("type") != "Begin":
             raise cloud.Refused("service_down", f"first reply {first.get('type')!r}")
         applied = first.get("configuration") or {}

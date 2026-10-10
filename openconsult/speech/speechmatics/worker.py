@@ -77,8 +77,14 @@ class Session(cloud.Session):
         self.started: dict | None = None
 
     def start(self) -> None:
-        self.send(json.dumps(opening(self.rate, self.speakers)))
+        sent = opening(self.rate, self.speakers)
+        self.send(json.dumps(sent))
         first = json.loads(self.first_reply())
+        # The opening message and the first reply hold no key and no spoken
+        # word, so the worker's log keeps them: they are the proof of what
+        # was asked and what the service applied.
+        print(f"opening sent: {json.dumps(sent)}", file=sys.stderr, flush=True)
+        print(f"first reply: {json.dumps(first)}", file=sys.stderr, flush=True)
         if first.get("message") == "Error":
             raise Refused_from_error(first)
         if first.get("message") != "RecognitionStarted":
