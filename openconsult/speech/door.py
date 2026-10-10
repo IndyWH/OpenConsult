@@ -70,6 +70,12 @@ class Door:
         return bool(self._installed())
 
     @property
+    def has_key(self) -> bool:
+        """Whether the key this choice needs is present (a file read, never
+        the value); true for a choice that needs none."""
+        return not self.choice.key or bool(self._key_present())
+
+    @property
     def ready_info(self) -> dict:
         """What the worker said when ready: its load time and device too."""
         return dict(self._worker.info) if self._worker else {}

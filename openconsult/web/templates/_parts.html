@@ -4,7 +4,7 @@
 <p class="refusal" id="{{ control }}-refusal" role="alert">{% if refused and refused.control == control %}{{ refused.message }}{% endif %}</p>
 {%- endmacro %}
 
-{% macro machine_rows(machine, models=None, speech=None) -%}
+{% macro machine_rows(machine, models=None, speech=None, choices=None) -%}
 <table class="plain facts">
   <tr><th>{{ words.ROW_SYSTEM }}</th><td>{{ machine.system }}</td></tr>
   <tr><th>{{ words.ROW_CARD }}</th><td>{{ machine.card_line }}</td></tr>
@@ -16,6 +16,9 @@
   <tr><th>{{ words.ROW_SPEECH }}</th><td>{{ speech.installed }}</td></tr>
   <tr><th>{{ words.ROW_SELF_TEST }}</th><td>{{ speech.self_test }}</td></tr>
   {% endif %}
+  {% for title, line in choices or [] %}
+  <tr><th>{{ title }}</th><td>{{ line }}</td></tr>
+  {% endfor %}
 </table>
 <p class="sentence">{{ machine.sentence }}</p>
 {%- endmacro %}

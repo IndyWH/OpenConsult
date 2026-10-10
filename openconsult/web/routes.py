@@ -58,12 +58,49 @@ def speech_lines(request: Request) -> SpeechLines | None:
     last = p.self_tests.last(p.speech.choice.name)
     if last is None:
         return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_NOT_RUN)
-    when = datetime.fromisoformat(last["at"])
-    date, time = f"{when.day} {when:%b %Y}", f"{when:%H:%M}"
+    date, time = _when(last)
     if last["passed"]:
         return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_PASSED.format(date=date, time=time))
     reason = last["detail"].get("reason") or ""
     return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_FAILED.format(date=date, time=time, reason=reason))
+
+
+def _when(last: dict) -> tuple[str, str]:
+    when = datetime.fromisoformat(last["at"])
+    return f"{when.day} {when:%b %Y}", f"{when:%H:%M}"
+
+
+def choice_lines(request: Request) -> list[tuple[str, str]]:
+    """One line for each choice of 5b (spec 15.9): Nemotron on a suitable
+    card only, installed or not and the last self-test; each cloud service
+    on every machine, no key yet or the last self-test. The page reads a
+    path, the key's presence and the stored result: no connection is
+    opened, no worker started, no model loaded."""
+    p = parts(request)
+    lines = []
+    for name, door in p.doors.items():
+        choice = door.choice
+        if choice.name == "whisperx_pyannote" or (choice.environment and p.machine.case != "suitable"):
+            continue
+        local = choice.environment
+        if local and not door.installed:
+            lines.append((choice.title, words.NEMOTRON_NOT_INSTALLED))
+            continue
+        if not local and not door.has_key:
+            lines.append((choice.title, words.CLOUD_NO_KEY))
+            continue
+        last = p.self_tests.last(name)
+        if last is None:
+            lines.append((choice.title, words.NEMOTRON_NOT_RUN if local else words.CLOUD_NOT_RUN))
+            continue
+        date, time = _when(last)
+        if last["passed"]:
+            lines.append((choice.title, (words.NEMOTRON_PASSED if local else words.CLOUD_PASSED).format(date=date, time=time)))
+        else:
+            reason = last["detail"].get("reason") or ""
+            lines.append((choice.title, (words.NEMOTRON_FAILED if local else words.CLOUD_FAILED).format(
+                date=date, time=time, reason=reason)))
+    return lines
 
 
 @router.get("/")
@@ -87,7 +124,8 @@ async def first_run(request: Request):
         raise Redirect("/login")
     models = await local_model_lines(request) if step == "machine" else None
     speech = speech_lines(request) if step == "machine" else None
-    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, speech=speech)
+    choices = choice_lines(request) if step == "machine" else None
+    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, speech=speech, choices=choices)
 
 
 def _at_step(request: Request, step: str) -> None:
@@ -191,7 +229,7 @@ NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
 
 def _settings_page(request: Request, user, refused=None, models=None):
     context = dict(user=user, active="settings", machine=parts(request).machine, models=models,
-                   speech=speech_lines(request),
+                   speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    page_path="/settings")
     if refused:
