@@ -1,8 +1,8 @@
-"""The bench command, openconsult-bench (spec 15.7, 15.8): run, repeat,
-score, figures, export and wordcheck. It goes through the same door as the app and can be pointed
-at any engine by its kind, its address and the name it knows the model
-by. It never writes to the app's data: its results and its own record
-of calls go to the folder it is given."""
+"""The bench command, openconsult-bench (spec 15.7, 15.8, 15.9): run,
+repeat, score, figures, export and wordcheck for the language model
+bench, and speech-fetch, speech-run and speech-score for the speech
+bench. It goes through the same doors as the app. It never writes to the
+app's data: its results go to the folder it is given."""
 
 from __future__ import annotations
 
@@ -19,6 +19,8 @@ from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
+from openconsult.bench.speech import commands as speech_commands
+from openconsult.bench.speech.arms import ARMS
 from openconsult.bench.vllm import VllmEngine
 from openconsult.bench.writer import Refused, ResultWriter
 from openconsult.db import open_database
@@ -187,9 +189,45 @@ def cmd_wordcheck(args) -> int:
     return 0 if found["matched"] == found["total"] else 1
 
 
+def cmd_speech_fetch(args) -> int:
+    return speech_commands.speech_fetch(Path(args.data_folder), say=say)
+
+
+def cmd_speech_run(args) -> int:
+    return speech_commands.speech_run(Path(args.recordings), args.arm, Path(args.data_folder), Path(args.out),
+                                      args.recording, say=say)
+
+
+def cmd_speech_score(args) -> int:
+    return speech_commands.speech_score(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts],
+                                        Path(args.marks), Path(args.write), say=say)
+
+
+def add_speech_commands(sub) -> None:
+    """The speech bench (spec 15.9, the details of 5c)."""
+    p = sub.add_parser("speech-fetch")
+    p.set_defaults(fn=cmd_speech_fetch)
+    p.add_argument("--data-folder", required=True, help="the data folder whose Nemotron environment fetches the tied pair's model")
+    p = sub.add_parser("speech-run")
+    p.set_defaults(fn=cmd_speech_run)
+    p.add_argument("--recordings", required=True, help="the folder holding recordings.json and the recordings")
+    p.add_argument("--arm", required=True, choices=list(ARMS), help="the arm to feed")
+    p.add_argument("--data-folder", required=True, help="the data folder whose environments run the workers")
+    p.add_argument("--out", required=True, help="the results folder: not the repo, not a data folder, not where recordings are kept")
+    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
+    p = sub.add_parser("speech-score")
+    p.set_defaults(fn=cmd_speech_score)
+    p.add_argument("--out", required=True, help="the results folder of speech-run")
+    p.add_argument("--recordings", required=True, help="the folder holding recordings.json")
+    p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
+    p.add_argument("--marks", required=True, help="the file of drug names, test names and safety nets")
+    p.add_argument("--write", required=True, help="where scores.json and report.md go; never written over")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="openconsult-bench")
     sub = parser.add_subparsers(dest="command", required=True)
+    add_speech_commands(sub)
 
     def command(name: str, fn, out: bool = True):
         p = sub.add_parser(name)

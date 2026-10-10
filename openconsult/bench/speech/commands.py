@@ -1,0 +1,104 @@
+"""The three commands of the speech bench (spec 15.9, the details of 5c),
+run by openconsult-bench: speech-fetch, speech-run and speech-score. Each
+refuses before anything is fed or written: a result folder in the repo,
+in the owner's data folder, in the data folder given for the workers or
+where recordings are kept; a file not listed or whose checksum differs; a
+cloud arm without consent."""
+
+from __future__ import annotations
+
+import json
+import subprocess
+from pathlib import Path
+from typing import Callable
+
+import openconsult
+from openconsult import words
+from openconsult.bench.speech import banked, replay, sound, tables
+from openconsult.bench.speech.arms import ARMS, Arm, door_for
+from openconsult.bench.writer import Refused, ResultWriter
+from openconsult.settings import paths
+from openconsult.speech import environment
+
+REPO = Path(openconsult.__file__).resolve().parents[1]
+# Exit codes: 3 the list or a file, 4 consent, 5 a failed result, 6 a folder, 7 an environment, 8 a script.
+
+
+def forbidden_for(data_folder: Path, recordings: list[banked.Recording]) -> tuple[Path, ...]:
+    return (REPO, paths.default_data_folder(), Path(data_folder), *banked.folders_of(recordings))
+
+
+def speech_fetch(data_folder: Path, say: Callable = print, run: Callable = subprocess.run) -> int:
+    """The models of the tied pair, found or fetched with the Nemotron
+    environment's Python, as install-speech finds a choice's."""
+    arm = ARMS["nemotron_tied_pair"]
+    if not environment.installed(data_folder, arm.environment_of):
+        say(words.BENCH_ARM_NEEDS_ENVIRONMENT.format(arm=arm.name, choice=arm.environment_of.name))
+        return 7
+    say(words.BENCH_MODEL_FETCH.format(arm=arm.name, choice=arm.environment_of.name))
+    fetched = run([str(environment.python(data_folder, arm.environment_of)), str(arm.worker_script.with_name("fetch.py"))],
+                  capture_output=True, text=True)
+    models = [json.loads(line) for line in (fetched.stdout or "").splitlines() if line.startswith("{")]
+    for model in models:
+        say(environment._model_sentence(model))
+    ok = fetched.returncode == 0 and bool(models) and all(m.get("ok") for m in models)
+    if not ok and not models:
+        say(words.SPEECH_BUILD_FAILED.format(reason=environment._last_line(fetched.stderr)))
+    return 0 if ok else 1
+
+
+def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: Path, names: list[str] | None,
+               say: Callable = print, make_door: Callable[[Arm, Path], object] = door_for,
+               sleep=None, clock=None) -> int:
+    arm = ARMS[arm_name]
+    try:
+        listed = banked.load_list(recordings_folder)
+        chosen = [banked.named(listed, n) for n in names] if names else listed
+    except banked.BadList as bad:
+        say(words.BENCH_BAD_LIST.format(reason=bad))
+        return 3
+    except banked.NotListed as missing:
+        say(words.BENCH_NOT_LISTED.format(name=missing))
+        return 3
+    try:
+        writer = ResultWriter(out, forbidden=forbidden_for(data_folder, listed))
+    except Refused as refused:
+        say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
+        return 6
+    if not environment.installed(data_folder, arm.environment_of):
+        say(words.BENCH_ARM_NEEDS_ENVIRONMENT.format(arm=arm.name, choice=arm.environment_of.name))
+        return 7
+    extra = {k: v for k, v in (("sleep", sleep), ("clock", clock)) if v is not None}
+    try:
+        summary = replay.run_many(arm, chosen, lambda: make_door(arm, data_folder), writer, say=say, **extra)
+    except banked.RecordingChanged as changed:
+        say(words.BENCH_RECORDING_CHANGED.format(name=str(changed).split(":")[0], reason=changed))
+        return 3
+    except sound.BadSound as bad:
+        say(words.BENCH_BAD_WAV.format(name=str(bad).split(":")[0], reason=bad))
+        return 3
+    return 5 if summary["failed"] else 0
+
+
+def speech_score(out: Path, recordings_folder: Path, script_folders: list[Path], marks_path: Path, write: Path,
+                 say: Callable = print) -> int:
+    """The one command: the stored results scored and the tables written,
+    never over an existing file."""
+    try:
+        listed = banked.load_list(recordings_folder)
+    except banked.BadList as bad:
+        say(words.BENCH_BAD_LIST.format(reason=bad))
+        return 3
+    results = ResultWriter(out).read_all()
+    marks_file = json.loads(Path(marks_path).read_text(encoding="utf-8"))
+    try:
+        scored = tables.score_all(results, listed, [Path(f) for f in script_folders], marks_file)
+        written = tables.write(write, scored, tables.as_markdown(scored))
+    except tables.ScriptNotFound as missing:
+        say(words.BENCH_BAD_LIST.format(reason=missing))
+        return 8
+    except Refused as refused:
+        say(words.BENCH_WRITE_EXISTS.format(path=str(refused).split(" exists")[0]))
+        return 6
+    say(words.BENCH_SCORED.format(results=len(results), arms=len(scored["arms"]), folder=written[0].parent))
+    return 0
