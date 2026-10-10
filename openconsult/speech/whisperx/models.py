@@ -292,23 +292,26 @@ class LiveStream:
 
 # -------------------------------------------------------------- the pass at Stop
 
-# pyannote 3.4's checkpoints hold omegaconf objects, which torch 2.8
-# refuses by default. v1 replaced torch.load for the whole process. v2
-# allows exactly these classes, for the load only, with torch's own scoped
-# allow-list (V1_LESSONS 1.11). The list is settled against the real
-# checkpoint: a class missing here is named by torch's own error.
+# pyannote 3.4's checkpoints hold omegaconf objects and a few of pyannote's
+# and torch's own classes, which torch 2.8 refuses by default. v1 replaced
+# torch.load for the whole process. v2 allows exactly these classes, for
+# the load only, with torch's own scoped allow-list (V1_LESSONS 1.11).
+# The list was settled against the real checkpoint on 10 Oct 2026: torch
+# names each class it refuses, and these are all it named.
 def _safe_globals() -> list:
     import collections
     import typing
 
-    import omegaconf
     import omegaconf.base
     import omegaconf.dictconfig
     import omegaconf.listconfig
     import omegaconf.nodes
+    import torch.torch_version
+    from pyannote.audio.core import task
     return [omegaconf.listconfig.ListConfig, omegaconf.dictconfig.DictConfig,
             omegaconf.base.ContainerMetadata, omegaconf.base.Metadata, omegaconf.nodes.AnyNode,
-            typing.Any, collections.defaultdict, dict, list, int, float, str]
+            typing.Any, collections.defaultdict, dict, list, int, float, str,
+            torch.torch_version.TorchVersion, task.Specifications, task.Problem, task.Resolution]
 
 
 def _local_silero():
