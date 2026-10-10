@@ -134,3 +134,59 @@ def test_10_4_a_line_that_dies_without_closing_is_noticed_and_nothing_reconnects
         assert service.connections == 1                               # no second connection was made
     finally:
         service.stop()
+
+
+# -------------------------------------------- never silent, both ways (10.4)
+
+from openconsult import words  # noqa: E402
+from openconsult.speech import door as door_module  # noqa: E402
+from openconsult.speech import choices  # noqa: E402  (the service kinds above are strings)
+from openconsult.speech.door import Door, make_door  # noqa: E402
+from tests.fakes import MadeUpWorker  # noqa: E402
+
+
+def test_10_4_a_cloud_service_that_fails_is_a_failure_and_nothing_else_is_tried():
+    worker = MadeUpWorker()
+    asked = []
+
+    def refusing(header, payload=b"", timeout_s=None):
+        asked.append(header)
+        return {"type": "error", "fatal": False, "reason": "no_credit", "message": "made-up", "detail": ""}
+
+    worker.request = refusing
+    door = Door(choices.SPEECHMATICS, make_worker=lambda: worker, installed=lambda: True)
+    failed = door.open(16000, speakers=1)
+    assert (failed.failure, failed.detail) == ("no_credit", words.NO_CREDIT.format(service="Speechmatics"))
+    assert door.feed(bytes(8000)).failure == "no_session"
+    assert worker.starts == 1 and [h["type"] for h in asked] == ["open"]     # one try, then the plain failure
+
+
+class RecordingWorker(MadeUpWorker):
+    """Stands where the real worker class stands in make_door: keeps the
+    command it was given, and dies at start."""
+
+    started: list = []
+
+    def __init__(self, command, log_path=None, env=None):
+        super().__init__(ready=False)
+        self.command = command
+        RecordingWorker.started.append(command)
+
+
+def test_10_4_a_local_choice_that_fails_never_falls_to_a_cloud_service(tmp_path, monkeypatch):
+    monkeypatch.setattr(door_module, "Worker", RecordingWorker)
+    RecordingWorker.started.clear()
+    python = tmp_path / "speech" / "nemotron" / ".venv" / "bin" / "python"
+    python.parent.mkdir(parents=True)
+    python.write_text("")
+    door = make_door(tmp_path, choices.NEMOTRON, environ={"SPEECHMATICS_API_KEY": "made-up", "ASSEMBLYAI_API_KEY": "made-up"})
+    if not door.installed:                                                  # Windows looks for Scripts/python.exe
+        (python.parents[1] / "Scripts").mkdir()
+        (python.parents[1] / "Scripts" / "python.exe").write_text("")
+    first = door.open(16000, speakers=2)
+    second = door.open(16000, speakers=2)
+    assert first.failure == "died" and second.failure == "died"
+    assert len(RecordingWorker.started) == 2
+    for command in RecordingWorker.started:
+        assert command[1].endswith(str(choices.NEMOTRON.worker_folder / "worker.py"))
+        assert not any(str(choice.worker_folder) in part for choice in (choices.SPEECHMATICS, choices.ASSEMBLYAI) for part in command)
