@@ -174,6 +174,46 @@ class _RefusalFinder(HTMLParser):
             self.text += data
 
 
+# ---------------------------------------- where recordings are kept (R18)
+
+def snapshot(folder: Path) -> dict:
+    """Every file under the folder with its size and its time of change."""
+    return {p.relative_to(folder).as_posix(): (p.stat().st_size, p.stat().st_mtime_ns)
+            for p in sorted(folder.rglob("*")) if p.is_file()}
+
+
+def changes(before: dict, after: dict) -> list[str]:
+    return sorted({name for name in set(before) | set(after) if before.get(name) != after.get(name)})
+
+
+class KeptFolder:
+    """A folder where recordings are kept: whatever a test puts in it at
+    first is all it may ever hold. settle() takes the snapshot once the
+    files are in place; check() fails the test by name for a file created,
+    changed or removed since (R18; V1_LESSONS 12, 15.5)."""
+
+    def __init__(self, folder: Path):
+        self.folder = folder
+        self._taken: dict = {}
+
+    def settle(self) -> Path:
+        self._taken = snapshot(self.folder)
+        return self.folder
+
+    def check(self) -> None:
+        changed = changes(self._taken, snapshot(self.folder))
+        if changed:
+            pytest.fail(f"R18: a test wrote where recordings are kept: {', '.join(changed)}")
+
+
+@pytest.fixture
+def recordings_kept(tmp_path):
+    kept = KeptFolder(tmp_path / "recordings")
+    kept.folder.mkdir()
+    yield kept
+    kept.check()
+
+
 # ------------------------------------------------- the bench's made-up server
 
 @pytest.fixture

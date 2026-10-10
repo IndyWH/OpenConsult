@@ -247,3 +247,23 @@ SELF_TEST_NOT_RUN = "Not yet run."
 SELF_TEST_NOT_POSSIBLE = "Not run, because the speech choice is not installed."
 SELF_TEST_PASSED = "Passed on {date} at {time}."
 SELF_TEST_FAILED = "Failed on {date} at {time}: {reason}"
+
+# The speech bench (spec 15.9, the details of 5c). Said in the terminal
+# by openconsult-bench. Drafts for the owner.
+BENCH_RECORDING_CHANGED = ("The recording {name} is not the file the list describes: {reason}. "
+                           "Nothing was fed.")
+BENCH_NOT_LISTED = "{name} is not in the banked list, so the bench will not touch it."
+BENCH_BAD_LIST = "The banked list cannot be used: {reason}"
+BENCH_BAD_WAV = "The recording {name} could not be read as WAV, 16-bit, one channel at the listed rate: {reason}"
+BENCH_NO_CLOUD_CONSENT = ("The consent for {name} does not cover {service}, so its sound was not sent. "
+                          "No connection was opened.")
+BENCH_RESULT_EXISTS = "A result for {arm} on {name} exists and is never written over. Skipped."
+BENCH_FOLDER_REFUSED = "Results may not go under {place}."
+BENCH_FEEDING = "Feeding {name} ({seconds} s at {rate} samples a second) to {arm}, as if live."
+BENCH_RESULT_WRITTEN = "Written: {path}"
+BENCH_FAILED = "{arm} on {name} failed at {at}: {detail} The failure is kept."
+BENCH_SCORED = "Scored {results} results of {arms} arms. Tables written to {folder}."
+BENCH_ARM_NEEDS_ENVIRONMENT = ("The arm {arm} runs in the environment of {choice}, which is not installed in the "
+                               "data folder. Run openconsult install-speech --choice {choice} first.")
+BENCH_WRITE_EXISTS = "{path} exists and is never written over."
+BENCH_MODEL_FETCH = "Fetching the models of the arm {arm} with the environment of {choice}."
