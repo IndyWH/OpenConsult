@@ -161,7 +161,8 @@ def main(dial=None, inp=None, out=None, environ=None) -> int:
     made-up service and its own streams."""
     if dial is None:
         dial = lambda key: cloud.dial(ADDRESS, EU_HOST, headers(key))  # noqa: E731
-    return cloud.run(SERVICE, KEY_NAME, ADDRESS, stamp(), open_session, dial, inp, out, environ)
+    return cloud.run(SERVICE, KEY_NAME, ADDRESS, stamp(),
+                     lambda key, rate, speakers: open_session(dial(key), rate, speakers), inp, out, environ)
 
 
 if __name__ == "__main__":

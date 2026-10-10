@@ -312,7 +312,7 @@ def serve(inp, out, open_session) -> int:
             return 1
 
 
-def run(service: str, key_name: str, address: str, stamp: dict, open_session, dial_with,
+def run(service: str, key_name: str, address: str, stamp: dict, open_with_key,
         inp=None, out=None, environ=None) -> int:
     """A cloud worker's main: the protocol on the real stdout, logs on
     stderr, the key from this process's environment, ready, then serve.
@@ -330,4 +330,4 @@ def run(service: str, key_name: str, address: str, stamp: dict, open_session, di
     started = time.perf_counter()
     write_frame(out, {"type": "ready", "models": {service: {"address": address, **stamp}},
                       "versions": versions(), "load_s": round(time.perf_counter() - started, 2)})
-    return serve(inp, out, lambda rate, speakers: open_session(dial_with(key), rate, speakers))
+    return serve(inp, out, lambda rate, speakers: open_with_key(key, rate, speakers))

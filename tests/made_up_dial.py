@@ -27,8 +27,11 @@ def main(argv: list[str]) -> int:
     worker = load_worker(argv[0])
     address = argv[1]
     cloud = worker.cloud
-    return worker.main(dial=lambda key: cloud.open_connection(address + worker.ADDRESS[len("wss://" + worker.EU_HOST):],
-                                                              worker.headers(key)))
+    path = worker.ADDRESS[len("wss://" + worker.EU_HOST):]
+    if argv[0] == "assemblyai":
+        return worker.main(dial_with=lambda key, rate, speakers: cloud.open_connection(
+            worker.address_for(rate, speakers, address + path), worker.headers(key)))
+    return worker.main(dial=lambda key: cloud.open_connection(address + path, worker.headers(key)))
 
 
 if __name__ == "__main__":
