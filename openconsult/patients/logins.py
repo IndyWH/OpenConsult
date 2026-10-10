@@ -22,8 +22,8 @@ LOCK_AFTER = timedelta(minutes=30)
 # Each wrong password makes the next try wait longer: this long after the
 # first, doubling each time, never more than the cap. A right password or
 # a restart clears it. The user is never locked out for good; the reset
-# command is the way back. Source: the stage 2 plan review of 4 Oct 2026
-# (answer c). A design choice, not a measurement.
+# command is the way back. Source: a design choice of stage 2 (HANDOVER,
+# 4 Oct 2026), not a measurement.
 FIRST_WAIT = timedelta(seconds=1)
 LONGEST_WAIT = timedelta(minutes=5)
 
@@ -60,8 +60,8 @@ class Logins:
 
     def find(self, token: str | None, generation: int, touch: bool = True) -> Found:
         """The login for a cookie, if it is still live. A request that is
-        use touches it; the page's own timed check does not (plan review,
-        change 2), so two open tabs cannot keep each other alive."""
+        use touches it; the page's own timed check does not (spec 15.6: a
+        timed check is not use), so two open tabs cannot keep each other alive."""
         login = self._logins.get(token or "")
         if login is None:
             return Found(None, "unknown")

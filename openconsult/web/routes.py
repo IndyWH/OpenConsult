@@ -27,7 +27,7 @@ class ModelLines:
 async def local_model_lines(request: Request) -> ModelLines | None:
     """The two lines of This machine about the local model, only on a
     machine with a suitable card; elsewhere Ollama is not even asked
-    (spec 15.7; plan review, change 2). Read at each view, off the
+    (spec 15.7; HANDOVER, stage 3). Read at each view, off the
     page's thread, with the engine's short limit, so the page never hangs."""
     p = parts(request)
     if p.machine.case != "suitable":

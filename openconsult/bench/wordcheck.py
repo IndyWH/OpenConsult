@@ -5,7 +5,7 @@ earlier answer, and compares: the message, the form, the model, the
 thinking switch and the options one by one, and then the whole body
 with v1's key order, which carries the prompt. The Ollama engine's own
 builder makes the body; truncate, the one key v1 did not send, is
-removed before the whole-body hash (plan review, answer 1).
+removed before the whole-body hash (HANDOVER, stage 3: the door sends truncate false).
 """
 
 from __future__ import annotations

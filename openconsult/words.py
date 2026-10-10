@@ -1,6 +1,7 @@
 """Every sentence the app shows to the user, in one place, so the owner
 can correct the wording here and nowhere else. Tests take a sentence
-from this file; none holds its own copy (plan review, change 1).
+from this file; none holds its own copy, so a wording change is one
+change (spec 5.2).
 
 The statement, the tick and the three This machine sentences are the
 owner's side's words, used exactly. The rest are drafts for him to
@@ -27,7 +28,7 @@ MACHINE = {
 }
 CARD_LINE = "{name}, {gb} GB"
 # The two local-model lines, shown only on a machine with a suitable card
-# (plan review of stage 3, change 2). Drafts for the owner.
+# (spec 15.7; elsewhere Ollama is not even asked). Drafts for the owner.
 ROW_OLLAMA = "Ollama"
 ROW_MODEL = "Local model"
 OLLAMA_RUNNING = "Running, version {version}"

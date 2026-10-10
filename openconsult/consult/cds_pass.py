@@ -4,7 +4,7 @@ R12) and open with the patient line (R11). Code does the bookkeeping:
 once the urgent step is arranged it stays arranged, and an empty list of
 differentials keeps the earlier list (spec 15.8, ruling 5). If one call
 fails the other still gives its result, and a failed alarm is said to be
-not judged, never read as no alarm (plan review, change 4).
+not judged, never read as no alarm (HANDOVER, stage 3).
 """
 
 from __future__ import annotations

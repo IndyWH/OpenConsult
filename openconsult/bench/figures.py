@@ -312,7 +312,7 @@ def two_places(value) -> str:
 
 def shorter_in_words(shorter_by_ms: list) -> str:
     """A difference below zero is written as longer, never as shorter by a
-    negative number (plan review, change 3)."""
+    negative number (HANDOVER, stage 3b)."""
     parts = []
     for d in shorter_by_ms:
         if d is None:

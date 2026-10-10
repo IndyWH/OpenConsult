@@ -44,7 +44,7 @@ def test_15_6_logout_ends_the_login_and_is_audited(logged_in, app):
 
 
 def test_ruling_5_a_page_locks_itself_and_the_lock_is_audited(logged_in, app, clock):
-    # Pins ruling 5 as the plan review's change 2 reads it: a page left
+    # Pins ruling 5 as HANDOVER (stage 2) records it: a page left
     # open moves to the login page by itself once the 30 minutes pass,
     # the move is not use, and the lock is written when the screen locks.
     seconds = int(LOCK_AFTER.total_seconds())

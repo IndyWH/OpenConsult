@@ -1,5 +1,5 @@
-"""This machine's two lines about the local model (spec 15.7; plan
-review, change 2): only on a machine with a suitable card."""
+"""This machine's two lines about the local model (spec 15.7; HANDOVER,
+stage 3): only on a machine with a suitable card."""
 
 import pytest
 

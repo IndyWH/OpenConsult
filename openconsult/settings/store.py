@@ -3,7 +3,7 @@ directly. It is built fresh at each start and for each test.
 
 Stage 3 has only the three values its behaviour uses, all fixed when the
 app starts. A setting a page can change, with its audited from-and-to,
-arrives with the first stage that has one (plan review, a).
+arrives with the first stage that has one (spec 7.3, rule 4).
 """
 
 from __future__ import annotations

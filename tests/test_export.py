@@ -1,5 +1,5 @@
 """The public form of the engine bench (spec 15.8, rulings 2 and 11;
-stage 3b rule 9; plan review change 1; V1_LESSONS 9.4). Every case, every
+stage 3b rule 9; HANDOVER, stage 3b; V1_LESSONS 9.4). Every case, every
 reply and every figure here is made up."""
 
 import getpass

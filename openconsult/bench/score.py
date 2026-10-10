@@ -1,6 +1,6 @@
 """The scoring rules and the marks, fixed before the run (spec 15.7,
 ruling 3; V1_LESSONS 9.2). The rules are Tasks 5 and 5b's, unchanged;
-the pass marks are the numbers fixed then (plan review, change 3).
+the pass marks are the numbers fixed then (HANDOVER, stage 3).
 
 Substring matches are case-insensitive. Differentials and questions are
 read from the assessment's own reply; "tested" and the male terms from

@@ -1,5 +1,5 @@
-"""The joint between the door and an engine (spec 15.7; plan review,
-change 1). What crosses it is the parts of a call and one plain reply,
+"""The joint between the door and an engine (spec 15.7; HANDOVER,
+stage 3). What crosses it is the parts of a call and one plain reply,
 nothing in any one engine's shape. A second engine is one new module
 that gives these four methods."""
 

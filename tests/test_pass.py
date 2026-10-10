@@ -1,6 +1,6 @@
 """One pass: the alarm, then the assessment, with the bookkeeping in code
-(spec 15.7; R9, R11, R12, R30; V1_LESSONS 3.1, 3.2, 3.14; plan review,
-change 4; spec 15.8, ruling 5). Every transcript here is made up."""
+(spec 15.7; R9, R11, R12, R30; V1_LESSONS 3.1, 3.2, 3.14; HANDOVER,
+stage 3; spec 15.8, ruling 5). Every transcript here is made up."""
 
 import json
 

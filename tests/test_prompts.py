@@ -13,7 +13,7 @@ V1_HASHES = {
     "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
 }
 
-# R21 check, as the plan review settled it: no publisher's name is listed
+# R21 check, as HANDOVER (stage 3) records it: no publisher's name is listed
 # here. Instead a prompt may hold no guideline words, and every capitalised
 # word in a prompt must be on this list, so a new one fails and is looked at.
 KNOWN_CAPITALS = {

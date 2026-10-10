@@ -74,7 +74,7 @@ def this_computer(request: Request) -> None:
 
 def logged_in(request: Request):
     """The user, for a page behind the login. A request with ?quiet is
-    the page's own timed check and is not use (plan review, change 2)."""
+    the page's own timed check and is not use (spec 15.6)."""
     first_run_done(request)
     p = parts(request)
     token = request.cookies.get(COOKIE)

@@ -33,7 +33,7 @@ class Card:
     @property
     def gb(self) -> int:
         # A card sold as 24 GB reports a little under 24 binary GB
-        # (24564 MiB), so the figure is rounded (plan review, d).
+        # (24564 MiB), so the figure is rounded (spec 6.4 counts 24 GB).
         return round(self.memory_mib / 1024)
 
 
