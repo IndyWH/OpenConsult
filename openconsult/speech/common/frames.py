@@ -1,7 +1,8 @@
-"""The worker's own copy of the frame protocol: a 4-byte big-endian
-length, a JSON header, then the payload bytes the header counts. The
-app's copy is openconsult/speech/frames.py; a test proves they agree.
-This file imports nothing but Python itself."""
+"""The workers' own copy of the frame protocol, shared by every worker
+folder: a 4-byte big-endian length, a JSON header, then the payload
+bytes the header counts. The app's copy is openconsult/speech/frames.py;
+a test proves they agree. This file imports nothing but Python itself,
+so any worker's Python can run it."""
 
 from __future__ import annotations
 

@@ -27,7 +27,9 @@ import sys
 import time
 import traceback
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))   # the frames every worker shares
 
 import models  # noqa: E402 - light at import: the table only; the libraries load in main
 from frames import read_frame, write_frame  # noqa: E402

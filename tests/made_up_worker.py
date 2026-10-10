@@ -17,7 +17,7 @@ import sys
 import time
 from pathlib import Path
 
-FRAMES = Path(__file__).resolve().parents[1] / "openconsult" / "speech" / "whisperx" / "frames.py"
+FRAMES = Path(__file__).resolve().parents[1] / "openconsult" / "speech" / "common" / "frames.py"
 
 
 def load_frames():
