@@ -177,6 +177,14 @@ SPEECH_BUILDING = (
     "Building the speech environment for WhisperX with pyannote in {folder}. "
     "This downloads about 7 GB the first time."
 )
+SPEECH_BUILDING_NEMOTRON = (
+    "Building the speech environment for Nemotron in {folder}. "
+    "This downloads about 6 GB the first time, and the two models about 2.7 GB."
+)
+CLOUD_NEEDS_NO_INSTALL = (
+    "{service} needs no install: it runs with the base app alone. "
+    "Put the key in the .env file in the data folder and run the self-test."
+)
 SPEECH_BUILT = "The speech environment is ready."
 SPEECH_ALREADY_BUILT = "The speech environment was already complete. Nothing was changed."
 SPEECH_BUILD_FAILED = "The speech environment could not be built: {reason}"
@@ -192,6 +200,11 @@ SELF_TEST_RUNNING = (
     "Running the self-test: 11 seconds of a public speech of 1961, fed as the live page "
     "will send it, then the transcript at Stop."
 )
+SELF_TEST_RUNNING_CLOUD = (
+    "Running the self-test on {service}: 11 seconds of a public speech of 1961 leave this computer "
+    "for the service's EU address, fed as the live page will send it, then Stop."
+)
+SELF_TEST_SAME_LINES = "Live and at Stop are the same lines for this choice."
 SELF_TEST_RESULT_PASSED = "The self-test passed. Heard live: {live}. At Stop: {stop}."
 SELF_TEST_RESULT_FAILED = "The self-test failed: {reason} Heard live: {live}. At Stop: {stop}."
 SELF_TEST_TOO_FEW_LIVE = "Only {heard} of the {total} expected words were heard live, in order; {needed} are needed."

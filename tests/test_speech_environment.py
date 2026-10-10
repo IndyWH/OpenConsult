@@ -100,3 +100,32 @@ def test_15_9_the_install_command(tmp_path):
     assert said[-1] == words.MODELS_READY and len(run.commands) == 2
     assert main(["install-speech", "--data-folder", str(tmp_path)], say=said.append, run_process=run,
                 which=lambda name: None) == 1
+
+
+# ------------------------------------------- the environments of 5b (15.9)
+
+from openconsult.speech.choices import NEMOTRON, SPEECHMATICS  # noqa: E402
+
+
+def test_15_9_the_nemotron_environment_is_built_from_its_lock_file(tmp_path):
+    said, run = [], MadeUpRun()
+    report = environment.build(tmp_path, NEMOTRON, say=said.append, run=run, which=lambda name: "/made-up/uv",
+                               environ={}, system="Linux")
+    assert report.ok
+    uv, fetch = run.commands
+    venv = tmp_path / "speech" / "nemotron" / ".venv"
+    assert uv == ["/made-up/uv", "sync", "--locked", "--project", str(NEMOTRON.worker_folder), "--python", "3.12"]
+    assert run.envs[0]["UV_PROJECT_ENVIRONMENT"] == str(venv)
+    assert fetch == [str(venv / "bin" / "python"), str(NEMOTRON.worker_folder / "fetch.py")]
+    assert (NEMOTRON.worker_folder / "uv.lock").exists() and (NEMOTRON.worker_folder / "pyproject.toml").exists()
+    code = main(["install-speech", "--choice", "nemotron", "--data-folder", str(tmp_path)], say=said.clear() or said.append,
+                run_process=run, which=lambda name: "/made-up/uv")
+    assert code == 0 and said[0] == words.SPEECH_BUILDING_NEMOTRON.format(folder=tmp_path / "speech" / "nemotron")
+
+
+def test_6_4_a_cloud_choice_needs_no_install(tmp_path):
+    said, run = [], MadeUpRun()
+    code = main(["install-speech", "--choice", "speechmatics", "--data-folder", str(tmp_path)], say=said.append,
+                run_process=run, which=lambda name: "/made-up/uv")
+    assert code == 0 and said == [words.CLOUD_NEEDS_NO_INSTALL.format(service="Speechmatics")]
+    assert run.commands == [] and environment.installed(tmp_path, SPEECHMATICS)

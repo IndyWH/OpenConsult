@@ -92,10 +92,11 @@ def run(door: Door, sleep: Callable = time.sleep, clip: Path = CLIP) -> Outcome:
     rate, pcm = read_clip(clip)
     detail = {"clip": clip.name, "sha256": CLIP_SHA256, "rate": rate, "piece_s": PIECE_S,
               "speakers": SPEAKERS, "expected": EXPECTED, "needed": NEEDED}
-    opened = door.open(rate)
+    # A choice whose labels are live is told the number at open (15.9, the details of 5b).
+    opened = door.open(rate, speakers=SPEAKERS) if door.declares.speakers == "live" else door.open(rate)
     if not opened.ok:
         return _failed(opened.failure, opened.detail, detail, door)
-    live, refused, delays = [], [], []
+    live, refused, delays, revisions = [], [], [], []
     started = time.monotonic()
     for number, piece in enumerate(pieces(pcm, rate), start=1):
         result = door.feed(piece)
@@ -104,12 +105,14 @@ def run(door: Door, sleep: Callable = time.sleep, clip: Path = CLIP) -> Outcome:
         delays += [round(result.fed_s - line.end, 2) for line in result.lines]
         live += result.lines
         refused += result.refused
+        revisions += result.revisions
         sleep(max(0.0, started + number * PIECE_S - time.monotonic()))
     final = door.stop(SPEAKERS)
     if not final.ok:
         return _failed(final.failure, final.detail, detail, door)
     live += final.last_live
     refused += final.refused
+    revisions += final.revisions
     live_words = words_of(" ".join(line.text for line in live))
     stop_words = words_of(" ".join(line.text for line in final.lines))
     passed, reason = judge(live_words, stop_words)
@@ -117,7 +120,8 @@ def run(door: Door, sleep: Callable = time.sleep, clip: Path = CLIP) -> Outcome:
         live_lines=[asdict(line) for line in live], last_live=[asdict(line) for line in final.last_live],
         stop_lines=[asdict(line) for line in final.lines], refused=[asdict(r) for r in refused],
         raw=list(final.raw), delays_s=delays, seconds=dict(final.seconds), stamp=_stamp(door),
-        worker=_worker(door), failure=None,
+        worker=_worker(door), failure=None, revisions=[asdict(r) for r in revisions],
+        same_lines=door.one_transcript, speakers_given=dict(final.speakers),
     )
     return Outcome(passed, reason, live_words, stop_words, detail)
 

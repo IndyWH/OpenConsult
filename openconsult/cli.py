@@ -1,7 +1,9 @@
 """The one command (spec 15.6): openconsult starts the app, openconsult
 reset-password resets the password (D26), openconsult install-speech
-builds the speech environment and fetches its models, and openconsult
-self-test runs the speech self-test (15.9)."""
+builds a speech choice's environment and fetches its models, and
+openconsult self-test runs a speech choice's self-test (15.9). Both name
+their choice with --choice; with none named they take WhisperX with
+pyannote, as before 5b."""
 
 from __future__ import annotations
 
@@ -25,7 +27,7 @@ from openconsult.settings import store
 from openconsult.settings.machine import Machine
 from openconsult.settings.store import LISTEN_ON
 from openconsult.speech import environment, selftest
-from openconsult.speech.choices import WHISPERX_PYANNOTE
+from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE, Choice
 from openconsult.speech.door import make_door
 
 
@@ -44,13 +46,15 @@ def main(argv: list[str] | None = None, say: Callable = print,
     parser.add_argument("--data-folder", type=Path, help="where the data lives, for a development run")
     parser.add_argument("--port", type=int, help="the port to listen on; 8001 if not given")
     parser.add_argument("--no-browser", action="store_true", help="start without opening the browser")
+    parser.add_argument("--choice", choices=sorted(CHOICES), default=WHISPERX_PYANNOTE.name,
+                        help="the speech choice for install-speech and self-test")
     args = parser.parse_args(argv)
     if args.command == "reset-password":
         return reset_password(args.data_folder, say=say, ask=ask)
     if args.command == "install-speech":
-        return install_speech(args.data_folder, say=say, run=run_process, which=which)
+        return install_speech(args.data_folder, CHOICES[args.choice], say=say, run=run_process, which=which)
     if args.command == "self-test":
-        return self_test(args.data_folder, say=say, make_speech=make_speech, sleep=sleep)
+        return self_test(args.data_folder, CHOICES[args.choice], say=say, make_speech=make_speech, sleep=sleep)
     return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine,
                open_browser=None if args.no_browser else (open_browser or browser.start))
 
@@ -122,25 +126,33 @@ def reset_password(data_folder: Path | None, say: Callable, ask: Callable) -> in
     return 0
 
 
-def install_speech(data_folder: Path | None, say: Callable, run: Callable, which: Callable) -> int:
-    """Builds the one speech choice's environment in the data folder from
-    the committed lock file, then finds or fetches its models (15.9; 6.4).
-    Nothing else downloads a model."""
+BUILDING = {"whisperx_pyannote": words.SPEECH_BUILDING, "nemotron": words.SPEECH_BUILDING_NEMOTRON}
+
+
+def install_speech(data_folder: Path | None, choice: Choice, say: Callable, run: Callable, which: Callable) -> int:
+    """Builds a speech choice's environment in the data folder from the
+    committed lock file, then finds or fetches its models (15.9; 6.4).
+    Nothing else downloads a model. A cloud choice has nothing to build."""
     settings = store.build(data_folder)
-    say(words.SPEECH_BUILDING.format(folder=environment.folder(settings.data_folder, WHISPERX_PYANNOTE)))
-    report = environment.build(settings.data_folder, WHISPERX_PYANNOTE, say=say, run=run, which=which)
+    if not choice.environment:
+        say(words.CLOUD_NEEDS_NO_INSTALL.format(service=choice.title))
+        return 0
+    say(BUILDING[choice.name].format(folder=environment.folder(settings.data_folder, choice)))
+    report = environment.build(settings.data_folder, choice, say=say, run=run, which=which)
     return 0 if report.ok else 1
 
 
-def self_test(data_folder: Path | None, say: Callable, make_speech: Callable, sleep: Callable) -> int:
+def self_test(data_folder: Path | None, choice: Choice, say: Callable, make_speech: Callable, sleep: Callable) -> int:
     """The clip through the door, then Stop; the result stored and said
-    (D46; 15.9). Nothing starts when the choice is not installed."""
+    (D46; 15.9). Nothing starts when the choice is not installed. For a
+    cloud choice this is also the test of the connection (7.2), and the
+    clip leaves the computer: the running sentence says so."""
     settings = store.build(data_folder)
-    door = make_speech(settings.data_folder)
+    door = make_speech(settings.data_folder, choice)
     if not door.installed:
         say(words.SPEECH_NEEDS_INSTALL)
         return 1
-    say(words.SELF_TEST_RUNNING)
+    say(words.SELF_TEST_RUNNING_CLOUD.format(service=choice.title) if choice.key else words.SELF_TEST_RUNNING)
     try:
         outcome = selftest.run(door, sleep=sleep)
     except selftest.ClipChanged:
@@ -153,6 +165,8 @@ def self_test(data_folder: Path | None, say: Callable, make_speech: Callable, sl
     live, stop = " ".join(outcome.live_words), " ".join(outcome.stop_words)
     if outcome.passed:
         say(words.SELF_TEST_RESULT_PASSED.format(live=live, stop=stop))
+        if door.one_transcript:
+            say(words.SELF_TEST_SAME_LINES)
         return 0
     say(words.SELF_TEST_RESULT_FAILED.format(reason=outcome.reason, live=live, stop=stop))
     return 1

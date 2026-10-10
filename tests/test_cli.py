@@ -104,3 +104,21 @@ def test_d26_the_reset_command_takes_no_password_on_the_command_line(tmp_path):
     with pytest.raises(SystemExit) as stopped:
         main(["reset-password", "a-password", "--data-folder", str(tmp_path)], say=Said(), ask=answers())
     assert stopped.value.code == 2
+
+
+def test_15_9_the_commands_name_their_choice_and_none_named_is_whisperx(tmp_path):
+    # --choice takes the four names; anything else is refused by the command itself.
+    with pytest.raises(SystemExit) as stopped:
+        main(["self-test", "--choice", "made-up", "--data-folder", str(tmp_path)], say=Said())
+    assert stopped.value.code == 2
+    seen = []
+
+    def make_speech(folder, choice):
+        seen.append(choice.name)
+        from openconsult.speech.door import Door
+        return Door(choice, make_worker=lambda: None, installed=lambda: False)
+
+    main(["self-test", "--data-folder", str(tmp_path)], say=Said(), make_speech=make_speech, sleep=lambda s: None)
+    main(["self-test", "--choice", "assemblyai", "--data-folder", str(tmp_path)], say=Said(), make_speech=make_speech,
+         sleep=lambda s: None)
+    assert seen == ["whisperx_pyannote", "assemblyai"]
