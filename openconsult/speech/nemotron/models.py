@@ -187,6 +187,13 @@ class FeatureStore:
         import torch
         self._np, self._torch = np, torch
         self.preprocessor = preprocessor
+        # As NeMo's own streaming buffer sets its preprocessor: no padding of
+        # the frame count to a multiple, and no dither, so a piece's frames
+        # are exactly those of its samples and the splice lines up.
+        featurizer = getattr(preprocessor, "featurizer", None)
+        if featurizer is not None:
+            featurizer.pad_to = 0
+            featurizer.dither = 0.0
         self.device = device
         self.tail = np.zeros(0, dtype=np.float32)
         self.tail_start = 0
@@ -218,6 +225,9 @@ class FeatureStore:
             features, _ = self.preprocessor(input_signal=signal, length=torch.tensor([piece.shape[0]], device=self.device))
         new = features[:, :, first - lead:]
         end = first + int(new.size(-1))
+        if end != self.frames_for(self.total_samples):
+            raise RuntimeError(f"the preprocessor gave {end} frames for {self.total_samples} samples, "
+                               f"not {self.frames_for(self.total_samples)}")
         if self.store is None or end > self.store.size(-1):
             capacity = max(end, 2 * (0 if self.store is None else self.store.size(-1)), 6000)
             grown = torch.zeros((1, new.size(1), capacity), dtype=new.dtype, device=new.device)
@@ -240,8 +250,10 @@ class FeatureStore:
 
 class WordsStream:
     """The English model's plain cache-aware stream: tokens become words
-    with times. The decoder's token timestamps are relative to each step,
-    so the step's encoder frames before it are added here."""
+    with times. The decoder carries its hypothesis across steps, and its
+    token frame indices count from the start of the session (measured on
+    the clip: the last word ends where the clip ends), so they are taken
+    as they are; the encoder frames are counted only for the record."""
 
     def __init__(self, models: Models):
         from nemo.collections.asr.parts.utils.streaming_utils import CacheAwareStreamingAudioBuffer
@@ -303,8 +315,7 @@ class WordsStream:
         hyp = self.hyps[0]
         ids = hyp.y_sequence.tolist() if hasattr(hyp.y_sequence, "tolist") else list(hyp.y_sequence)
         times = hyp.timestamp.tolist() if hasattr(hyp.timestamp, "tolist") else list(hyp.timestamp)
-        new_ids, new_times = ids[self.tokens_seen:], times[self.tokens_seen:]
-        self._take_tokens(new_ids, [t + self.frames_before for t in new_times])
+        self._take_tokens(ids[self.tokens_seen:], times[self.tokens_seen:])
         self.tokens_seen = len(ids)
         self.frames_before += int(encoded_len[0])
         self.step += 1
@@ -357,6 +368,7 @@ class SpeakersStream:
         self.right = RIGHT_CONTEXT * sub
         self.left = int(model.sortformer_modules.chunk_left_context) * sub
         self.done = 0
+        self._probabilities: list[list[float]] = []     # the scored frames so far, read once each
 
     def add(self, samples) -> None:
         self.features.add(samples)
@@ -387,7 +399,12 @@ class SpeakersStream:
                 total_preds=self.preds, left_offset=left, right_offset=right)
 
     def probabilities(self) -> list[list[float]]:
-        return self.preds[0].float().cpu().tolist()
+        """Every scored frame's probabilities per slot; only the frames
+        scored since the last call cross from the card."""
+        known = len(self._probabilities)
+        if self.preds.shape[1] > known:
+            self._probabilities += self.preds[0, known:].float().cpu().tolist()
+        return self._probabilities
 
     def scored_s(self) -> float:
         return self.preds.shape[1] * self.m.speaker_frame_s
