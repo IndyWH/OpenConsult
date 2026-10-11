@@ -15,12 +15,13 @@ from typing import Callable
 
 WORD_MARK = "▁"      # the piece that starts a word in the model's tokenizer
 # A word is complete once the decoded frames are this far past its last
-# token. It equals the join's pause (join.py, PAUSE_S): no word holds a
-# silence of a second inside it, and a token this long after the previous
-# token of its word would open a new line anyway, so nothing the join would
-# have put in one line is cut in two. It is under the line's own wait
-# (models.py, LINE_WAIT_S), so the word is complete before the line is.
-WORD_CLOSE_S = 1.0
+# token. Measured on the self-test clip (stage 5c part two, item 6): the
+# model gave one word its two tokens 16 frames (1.28 s) apart, across two
+# decoding steps, so a figure of one second could have cut that word in
+# two. Two seconds stands above that with margin, and under the line's own
+# wait (models.py, LINE_WAIT_S), so the word is complete before the line
+# is. A draft for the owner; the worker counts the largest gap it sees.
+WORD_CLOSE_S = 2.0
 
 
 class WordFlow:

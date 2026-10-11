@@ -50,15 +50,15 @@ def old_grouping(tokens):
              "end": round((w["last"] + 1) * FRAME_S, 3)} for w in words]
 
 
-def test_fix_one_a_word_with_no_next_word_is_complete_once_the_model_has_moved_a_second_past_it():
+def test_fix_one_a_word_with_no_next_word_is_complete_once_the_model_has_moved_two_seconds_past_it():
     flow = WordFlow(text_of, FRAME_S)
     for piece, frame in tokens_of("ask not"):
         flow.take(piece, piece, frame)
     assert flow.complete == [{"word": "ask", "start": 0.0, "end": 0.16}] and flow.open_text() == "not"
     last = 4                                   # the frame of the last token of "not" (▁no at 3, t at 4)
-    flow.moved_to(last + 12)                   # 12 frames: 0.96 s, not yet
+    flow.moved_to(last + 24)                   # 24 frames: 1.92 s, not yet
     assert flow.open_text() == "not" and len(flow.complete) == 1
-    flow.moved_to(last + 13)                   # 13 frames: 1.04 s past the word
+    flow.moved_to(last + 25)                   # 25 frames: 2.0 s past the word
     assert flow.open is None and flow.complete[-1] == {"word": "not", "start": 0.24, "end": 0.4}
     assert flow.tokens_after_close_by_time == 0
     # Silence after it: nothing more happens, and finish gives nothing new.
@@ -68,21 +68,23 @@ def test_fix_one_a_word_with_no_next_word_is_complete_once_the_model_has_moved_a
 
 
 def test_fix_one_never_splits_a_word_and_never_changes_adds_or_loses_one():
-    # A word whose tokens straddle a chunk of 13 frames is one word.
+    # A word whose tokens straddle a chunk of 13 frames is one word, even 16
+    # frames apart, as the clip's own tokens came (item 6 of part two).
     flow = WordFlow(text_of, FRAME_S)
-    flow.take(MARK + "co", MARK + "co", 12)
-    flow.moved_to(13)                          # the chunk ended between its two tokens
-    flow.take("da", "da", 13)
-    flow.take("mol", "mol", 14)
-    flow.moved_to(26)
+    flow.take(MARK + "co", MARK + "co", 88)
+    flow.moved_to(91)                          # the chunk ended between its two tokens
+    flow.take("da", "da", 104)
+    flow.moved_to(104)
+    flow.take("mol", "mol", 104)
+    flow.moved_to(117)
     flow.finish()
-    assert [w["word"] for w in flow.complete] == ["codamol"] and flow.largest_gap_frames == 1
+    assert [w["word"] for w in flow.complete] == ["codamol"] and flow.largest_gap_frames == 16
     # Random token sequences with gaps inside a word under the figure: the
     # same words, with the same times, as today's grouping; every token in one word.
     for seed in range(40):
         rnd = random.Random(seed)
         tokens = tokens_of(" ".join(rnd.choice(["a", "ab", "abcd", "abcdef", "x"]) for _ in range(rnd.randint(1, 12))),
-                           step=rnd.randint(1, 40), gap_inside=rnd.randint(1, 12))
+                           step=rnd.randint(1, 40), gap_inside=rnd.randint(1, 24))
         flow = WordFlow(text_of, FRAME_S)
         for i, (piece, frame) in enumerate(tokens):
             flow.take(piece, piece, frame)
