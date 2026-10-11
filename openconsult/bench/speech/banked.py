@@ -52,6 +52,11 @@ class Recording:
     machine_voices: bool
     consent: dict
     entry: dict = field(repr=False)        # every field of the list, as written
+    # Part two of 5c: the listed recording that holds the doctor's voice
+    # alone, or none; and whether this entry is such a voice, which the bench
+    # learns from and never replays as a consultation.
+    doctor_voice: str | None = None
+    voice_only: bool = False
 
     def cloud_allowed(self, service: str) -> bool:
         """Whether the list says this recording's sound may go to the service."""
@@ -80,6 +85,10 @@ def _check_entry(entry: dict) -> None:
         raise BadList(f"{entry['name']}: consent must say tests_on_this_computer true and list the cloud services")
     if int(entry["speakers"]) < 1:
         raise BadList(f"{entry['name']}: the number of speakers is 1 or more")
+    if entry.get("voice_only") and (int(entry["speakers"]) != 1 or consent.get("cloud")):
+        raise BadList(f"{entry['name']}: a recording of the doctor's voice alone has one speaker and goes to no cloud service")
+    if entry.get("doctor_voice") is not None and not isinstance(entry["doctor_voice"], str):
+        raise BadList(f"{entry['name']}: doctor_voice names a listed recording, or is null")
 
 
 def load_list(folder: Path, list_name: str = LIST_NAME) -> list[Recording]:
@@ -101,7 +110,8 @@ def load_list(folder: Path, list_name: str = LIST_NAME) -> list[Recording]:
             entry["name"], folder / entry["file"], entry["sha256"], entry["script"], entry["script_key"],
             entry["script_sha256"], int(entry["rate"]), int(entry["speakers"]), float(entry["length_s"]),
             bool(entry["whole"]), entry["last_speech"], tuple(entry["read_differently"]),
-            bool(entry["machine_voices"]), dict(entry["consent"]), dict(entry)))
+            bool(entry["machine_voices"]), dict(entry["consent"]), dict(entry),
+            entry.get("doctor_voice"), bool(entry.get("voice_only", False))))
     return recordings
 
 

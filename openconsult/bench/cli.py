@@ -20,6 +20,7 @@ from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.speech import commands as speech_commands
+from openconsult.bench.speech import commands2 as speech_commands2
 from openconsult.bench.speech.arms import ARMS
 from openconsult.bench.vllm import VllmEngine
 from openconsult.bench.writer import Refused, ResultWriter
@@ -203,8 +204,20 @@ def cmd_speech_score(args) -> int:
                                         Path(args.marks), Path(args.write), say=say)
 
 
+def cmd_speech_voice(args) -> int:
+    return speech_commands2.speech_voice(Path(args.out), Path(args.recordings), Path(args.data_folder), args.recording,
+                                         args.arm, say=say)
+
+
 def add_speech_commands(sub) -> None:
     """The speech bench (spec 15.9, the details of 5c)."""
+    p = sub.add_parser("speech-voice")
+    p.set_defaults(fn=cmd_speech_voice)
+    p.add_argument("--out", required=True, help="the results folder of speech-run; the voice results go under it")
+    p.add_argument("--recordings", required=True, help="the folder holding recordings.json and the recordings")
+    p.add_argument("--data-folder", required=True, help="the data folder whose WhisperX environment runs the voice worker")
+    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
+    p.add_argument("--arm", nargs="*", help="only these arms")
     p = sub.add_parser("speech-fetch")
     p.set_defaults(fn=cmd_speech_fetch)
     p.add_argument("--data-folder", required=True, help="the data folder whose Nemotron environment fetches the tied pair's model")

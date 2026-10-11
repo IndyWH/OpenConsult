@@ -53,13 +53,18 @@ def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: P
     arm = ARMS[arm_name]
     try:
         listed = banked.load_list(recordings_folder)
-        chosen = [banked.named(listed, n) for n in names] if names else listed
+        chosen = [banked.named(listed, n) for n in names] if names else [r for r in listed if not r.voice_only]
     except banked.BadList as bad:
         say(words.BENCH_BAD_LIST.format(reason=bad))
         return 3
     except banked.NotListed as missing:
         say(words.BENCH_NOT_LISTED.format(name=missing))
         return 3
+    for recording in chosen:
+        if recording.voice_only:
+            # The doctor's voice alone is learnt from, never fed as a consultation.
+            say(words.BENCH_VOICE_ONLY_REFUSED.format(name=recording.name))
+            return 3
     try:
         writer = ResultWriter(out, forbidden=forbidden_for(data_folder, listed))
     except Refused as refused:

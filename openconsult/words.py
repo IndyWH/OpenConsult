@@ -270,3 +270,12 @@ BENCH_MODEL_FETCH = "Fetching the models of the arm {arm} with the environment o
 # The two arms that belong to the bench (ruling 15), as their results name them.
 ARM_TIED_PAIR = "Nemotron, the tied pair (bench only)"
 ARM_V1_LINE = "WhisperX with v1's line (bench only)"
+
+# The voice method of the speech bench (spec 15.9, the details of part two of 5c). Drafts for the owner.
+BENCH_VOICE_LEARNING = "Learning the doctor's voice from {name}."
+BENCH_VOICE_SCORING = "Marking each line of {arm} on {name} as the doctor's voice or not, from the sound."
+BENCH_VOICE_NOT_RUN = "The voice method was not run for {name}: the list names no recording of the doctor's voice alone."
+BENCH_VOICE_NEEDS_VOICE_ONLY = ("{name} names {voice} as the doctor's voice, but that recording is not marked as the voice alone, "
+                                "so nothing was run.")
+BENCH_VOICE_ONLY_REFUSED = "{name} holds the doctor's voice alone and is never fed as a consultation."
+BENCH_VOICE_DONE = "The voice method ran on {run} pages, was not run on {not_run}, failed on {failed}; {kept} results were already there."
