@@ -9,15 +9,17 @@ from openconsult.speech.lines import Line
 
 
 def speaker_of(segment: dict) -> str | None:
-    """The cluster most of the segment's words belong to, or none. A tie
-    goes to the cluster of the earliest tied word, never to a set's order,
-    which changes with the hash seed: the same segment must give the same
-    speaker every time it is read."""
+    """The cluster most of the segment's words belong to. A segment split
+    evenly between two clusters is in doubt, and a line in doubt is shown as
+    unsure, never guessed (spec 15.9 ruling 4): on a tie, no speaker. The
+    answer never comes from a set's order, which changes with the hash seed."""
     speakers = [w.get("speaker") for w in segment.get("words", []) if w.get("speaker")]
     if not speakers:
         return None
-    in_order_of_appearance = list(dict.fromkeys(speakers))
-    return max(in_order_of_appearance, key=speakers.count)
+    counts = {s: speakers.count(s) for s in dict.fromkeys(speakers)}
+    most = max(counts.values())
+    leading = [s for s, n in counts.items() if n == most]
+    return leading[0] if len(leading) == 1 else None
 
 
 def scores_of(segment: dict) -> list[float]:

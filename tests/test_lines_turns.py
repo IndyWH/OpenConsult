@@ -1,6 +1,11 @@
 """The shape of a line (spec 11.4), what a choice declares (11.5 rule 5),
 and the merge into turns as a plain function (V1_LESSONS 1.3)."""
 
+import json
+import os
+import subprocess
+import sys
+
 import pytest
 
 from openconsult.speech.lines import Declares, Line, failed_final, failed_live
@@ -72,18 +77,26 @@ def test_1_3_the_merge_changes_no_raw_segment():
     assert raw == before
 
 
-def test_1_3_a_segment_split_evenly_takes_the_cluster_of_its_first_word_whatever_the_hash_seed():
-    # Two words of each cluster: the earliest tied cluster wins, and the answer
-    # cannot depend on a set's order (stage 5c: one recording scored two ways).
+def test_1_3_a_segment_split_evenly_between_two_speakers_has_no_speaker_whatever_the_hash_seed():
+    # Two words of each cluster: the segment is in doubt, so it is shown as unsure
+    # (spec 15.9 ruling 4), and the answer cannot depend on a set's order
+    # (stage 5c: one recording scored two ways). Run under more than one seed.
     first_s1 = {"start": 0.0, "end": 1.0, "text": "a b c d", "words": [
         {"word": "a", "speaker": "S1"}, {"word": "b", "speaker": "S0"},
         {"word": "c", "speaker": "S0"}, {"word": "d", "speaker": "S1"}]}
     first_s0 = {"start": 0.0, "end": 1.0, "text": "a b c d", "words": [
         {"word": "a", "speaker": "S0"}, {"word": "b", "speaker": "S1"},
         {"word": "c", "speaker": "S1"}, {"word": "d", "speaker": "S0"}]}
-    assert speaker_of(first_s1) == "S1" and speaker_of(first_s0) == "S0"
+    assert speaker_of(first_s1) is None and speaker_of(first_s0) is None
     majority = {"start": 0.0, "end": 1.0, "text": "a b c", "words": [
         {"word": "a", "speaker": "S1"}, {"word": "b", "speaker": "S0"}, {"word": "c", "speaker": "S0"}]}
     assert speaker_of(majority) == "S0"                                   # most words still win
     assert speaker_of({"start": 0.0, "end": 1.0, "text": "a", "words": [{"word": "a"}]}) is None
-    assert merge_into_turns([first_s1, dict(first_s0, start=1.0, end=2.0)])[0].speaker == "S1"
+    assert merge_into_turns([first_s1, dict(majority, start=1.0, end=2.0)])[0].speaker is None
+    for seed in ("0", "1", "2", "random"):
+        code = ("import json, sys; from openconsult.speech.turns import speaker_of; "
+                "print(json.dumps([speaker_of(s) for s in json.load(sys.stdin)]))")
+        out = subprocess.run([sys.executable, "-c", code], input=json.dumps([first_s1, first_s0, majority]),
+                             capture_output=True, text=True, check=True,
+                             env={**os.environ, "PYTHONHASHSEED": seed}).stdout
+        assert json.loads(out) == [None, None, "S0"], seed
