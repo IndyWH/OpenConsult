@@ -26,21 +26,29 @@ def a_result():
                      "lines": [], "raw": []}}
 
 
-def test_13_3_mark_5_the_wait_is_from_the_lines_own_end_to_first_shown_and_to_final():
+def test_13_3_mark_5_the_wait_to_first_shown_runs_from_the_lines_start_to_final_from_its_end_and_the_true_times_go_to_the_first_and_last_line_of_a_speech():
+    # Fix two of part two of 5c: the details of part one, corrected on 11 Oct 2026.
     found = waits.waits(a_result(), REF)
     rows = found["lines"]
-    assert [(r["to_final"], r["to_first"]) for r in rows] == [(0.25, -0.5), (0.4, -0.35), (0.1, None)]
+    assert [(r["to_final"], r["to_first"]) for r in rows] == [(0.25, 0.4), (0.4, 0.25), (0.1, None)]
     assert rows[0]["t_first"] == 0.5 and rows[1]["t_first"] == 2.25 and found["never_shown"] == 1
     assert found["to_final"] == {"n": 3, "median": 0.25, "longest": 0.4}
-    assert found["to_first"] == {"n": 2, "median": -0.425, "longest": -0.35}
+    assert found["to_first"] == {"n": 2, "median": 0.325, "longest": 0.4}
     # The partial must hold the first two words in order and together.
     assert waits.first_shown([{"n": 1, "t": 0.1, "partial": "you if"}], 2, ["if", "you"]) is None
     assert waits.first_shown([{"n": 1, "t": 0.1, "partial": "if you"}, {"n": 3, "t": 0.3, "partial": "nothing"}], 4, ["if", "you"]) is None
-    # On the made recording the true end of the speech is used as well.
+    # On the made recording: the three lines are all of speech 1; only the
+    # first gets the wait from the true start, only the last from the true end.
     live = build_page("live", [piece(0.1, 1.0, "If you get this pain"), piece(2.0, 2.6, "at rest, go straight"),
                                piece(2.7, 2.9, "to the hospital")], REF)
     true = waits.waits(a_result(), REF, live, true_times={1: (0.0, 2.8)})
-    assert [r.get("to_final_true") for r in true["lines"]] == [-1.55, 0.2, 0.2] and true["to_final_true"]["n"] == 3
+    assert [r.get("speech") for r in true["lines"]] == [1, 1, 1]
+    assert [r.get("to_first_true") for r in true["lines"]] == [0.5, None, None]
+    assert [r.get("to_final_true") for r in true["lines"]] == [None, None, 0.2]
+    assert true["to_final_true"] == {"n": 1, "median": 0.2, "longest": 0.2} and true["to_first_true"]["n"] == 1
+    # A speech whose first line never showed has no wait from the true start.
+    never = waits.waits(a_result(), REF, live, true_times={1: (0.0, 2.8)})
+    assert all("to_first_true" not in r for r in never["lines"][1:])
     assert waits.waits({"pieces": [], "stop": None}, REF)["to_final"] == {"n": 0, "median": None, "longest": None}
 
 

@@ -1,8 +1,8 @@
 """The wait (spec 13.3 mark 5), how exact a choice's times are (ruling
 12), and the count of the signs of the check for missing speech, from a
 stored result. The clock of a result is the clock of the feed: a piece is
-fed when its sound has ended, so a line's wait is the moment it arrived
-minus the end of its own sound."""
+fed when its sound has ended. The wait to first shown runs from the start
+of a line's sound, the wait to final from its end."""
 
 from __future__ import annotations
 
@@ -56,29 +56,49 @@ def _speech_of_line(line_words: list[str], live_page: Page | None, reference: Re
     return None
 
 
-def waits(result: dict, reference: Reference, live_page: Page | None = None,
+def waits(result: dict, reference: Reference, line_page: Page | None = None,
           true_times: dict[int, tuple[float, float]] | None = None) -> dict:
-    """For each live line: from the end of its sound, by the choice's own
-    time, to the moment its first words showed and to the moment it was
-    final; on the made recording also from the true end of its speech."""
+    """For each live line: from the start of its sound, by the choice's own
+    time, to the moment its first words showed; and from the end of its
+    sound to the moment it was final. On the made recording also from the
+    true times: the true start against the first line of a speech and the
+    true end against its last. A line belongs to the speech of its first
+    heard word (the details of part one, as corrected on 11 Oct 2026)."""
     rows, offset = [], 0
     for line in live_lines(result):
         words = normalise(line["text"], reference.joinable)
         shown = first_shown(result["pieces"], line["n"], words[:SHOWN_WORDS]) if words else None
         row = {"text": line["text"], "start": line["start"], "end": line["end"], "t_final": line["t"],
                "to_final": round(line["t"] - line["end"], 3), "t_first": shown,
-               "to_first": round(shown - line["end"], 3) if shown is not None else None}
-        speech = _speech_of_line(words, live_page, reference, offset)
+               "to_first": round(shown - line["start"], 3) if shown is not None else None}
+        speech = _speech_of_line(words, line_page, reference, offset)
         offset += len(words)
-        if speech is not None and true_times and speech in true_times:
-            true_end = true_times[speech][1]
-            row.update(speech=speech, to_final_true=round(line["t"] - true_end, 3),
-                       to_first_true=round(shown - true_end, 3) if shown is not None else None)
+        if speech is not None:
+            row["speech"] = speech
         rows.append(row)
+    _true_waits(rows, true_times or {})
     return {"lines": rows, "to_final": _typical([r["to_final"] for r in rows]),
             "to_first": _typical([r["to_first"] for r in rows if r["to_first"] is not None]),
             "never_shown": sum(1 for r in rows if r["to_first"] is None),
-            "to_final_true": _typical([r["to_final_true"] for r in rows if "to_final_true" in r])}
+            "to_final_true": _typical([r["to_final_true"] for r in rows if "to_final_true" in r]),
+            "to_first_true": _typical([r["to_first_true"] for r in rows if "to_first_true" in r])}
+
+
+def _true_waits(rows: list[dict], true_times: dict) -> None:
+    """The first line of a speech against its true start, the last against
+    its true end; a line between gets neither."""
+    first_of: dict[int, int] = {}
+    last_of: dict[int, int] = {}
+    for index, row in enumerate(rows):
+        speech = row.get("speech")
+        if speech in true_times:
+            first_of.setdefault(speech, index)
+            last_of[speech] = index
+    for speech, index in first_of.items():
+        if rows[index]["t_first"] is not None:
+            rows[index]["to_first_true"] = round(rows[index]["t_first"] - true_times[speech][0], 3)
+    for speech, index in last_of.items():
+        rows[index]["to_final_true"] = round(rows[index]["t_final"] - true_times[speech][1], 3)
 
 
 def _typical(values: list[float]) -> dict:

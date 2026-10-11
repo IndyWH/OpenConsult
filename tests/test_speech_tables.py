@@ -121,3 +121,17 @@ def test_a_script_must_be_found_with_the_lists_checksum(tmp_path, recordings_kep
     (changed / "made_up.md").write_text("**DOCTOR:** Another script.\n", encoding="utf-8")
     with pytest.raises(tables.ScriptNotFound, match="checksum"):
         tables.score_all(results, listed, [changed], MARKS)
+
+
+def test_fix_two_a_one_transcript_arm_gets_the_true_waits_on_a_made_recording(tmp_path, recordings_kept, monkeypatch):
+    # The details of part one, corrected 11 Oct 2026: the true times serve every arm, not WhisperX's live page alone.
+    folder = made_up_recordings(recordings_kept.folder)
+    recordings_kept.settle()
+    listed, results = results_of(folder, tmp_path / "out")
+    monkeypatch.setattr(tables, "true_times_of", lambda recording: {1: (0.5, 1.2), 5: (1.8, 2.2)})
+    scored = tables.score_all(results, listed, [scripts_folder(tmp_path)], MARKS)
+    nem = scored["recordings"]["one"]["arms"]["nemotron"]["stop"]["wait"]
+    assert nem["to_final_true"]["n"] == 2 and [r.get("speech") for r in nem["lines"]] == [1, 3, 5]
+    assert "to_final_true" in nem["lines"][0] and "to_final_true" not in nem["lines"][1]
+    wx = scored["recordings"]["one"]["arms"]["whisperx_pyannote"]["live"]["wait"]
+    assert wx["to_final_true"]["n"] >= 1

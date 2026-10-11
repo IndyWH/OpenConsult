@@ -12,7 +12,7 @@ from pathlib import Path
 
 from openconsult.bench.speech import marks, waits
 from openconsult.bench.speech.banked import Recording, sha256_of
-from openconsult.bench.speech.pages import Page, pages_of
+from openconsult.bench.speech.pages import Page, build_page, live_pieces, pages_of
 from openconsult.bench.speech.reference import Reference, agreement, build, names_as_cut, safety_nets_as_cut
 from openconsult.bench.writer import Refused
 from openconsult.speech.lines import Line
@@ -82,7 +82,10 @@ def score_page(arm: str, page: Page, live: Page | None, result: dict, reference:
     if page.name == "stop":
         scored["who_spoke"] = marks.who_spoke(page, reference)
     if page.name == "live" or not result["stop"]["raw"]:
-        scored["wait"] = waits.waits(result, reference, page if page.name == "live" else None, true_times)
+        # The line page for the wait is the live lines of every arm, so a
+        # line finds its speech and the true times serve every arm (fix two).
+        line_page = page if page.name == "live" else build_page("live", live_pieces(result), reference)
+        scored["wait"] = waits.waits(result, reference, line_page, true_times)
     if true_times:
         scored["times"] = waits.exactness_made(page, reference, true_times, slack)
     scored["hard"] = {"passages_without_sign": sum(1 for p in scored["passages"] if not p["sign"]),
@@ -249,8 +252,12 @@ def page_table(arm: str, name: str, page: dict) -> list[str]:
     if who:
         lines.append(f"- Who spoke: right {who['right']}, wrong {who['wrong']}, no speaker {who['no_speaker']}; labels {who['mapping']}.")
     if "wait" in page:
-        lines.append(f"- The wait: to final {_typ(page['wait']['to_final'])}; to first shown {_typ(page['wait']['to_first'])}; "
-                     f"never shown {page['wait']['never_shown']}" + (f"; to final from the true end {_typ(page['wait']['to_final_true'])}" if page['wait']['to_final_true']['n'] else "") + ".")
+        wait = page["wait"]
+        lines.append(f"- The wait: to final {_typ(wait['to_final'])}; to first shown {_typ(wait['to_first'])}; "
+                     f"never shown {wait['never_shown']}"
+                     + (f"; to final from the true end {_typ(wait['to_final_true'])}" if wait["to_final_true"]["n"] else "")
+                     + (f"; to first shown from the true start {_typ(wait['to_first_true'])}" if wait.get("to_first_true", {}).get("n") else "")
+                     + ".")
     if "times" in page:
         t = page["times"]
         lines.append(f"- How exact the times are: median {t['median_abs']} s, largest {t['largest_abs']} s, "
