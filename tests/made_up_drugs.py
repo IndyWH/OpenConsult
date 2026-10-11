@@ -31,9 +31,9 @@ ROWS = [
     # a name whose words are all salt and form words is kept whole
     ("202607", "Made-up region", "0902021X0AAAAAA", "Sodium chloride 0.9% infusion", "A maker",
      "Sodium chloride 0.9% infusion", "Sodium chloride", "090202", "09", "1", "5"),
-    # left out: an appliance (chapter 21), a food (section 0904), a short name, no substance
+    # left out: an appliance (chapter 21), a food (section 0913), a short name, no substance
     ("202607", "Made-up region", "21010000000AAAA", "Made-up bandage 5cm", "A maker", "", "Made-up bandage", "210100", "21", "3", "1"),
-    ("202607", "Made-up region", "0904010A0AAAAAA", "Made-up food drink 200ml", "A maker", "Made-up food drink 200ml", "Made-up food", "090401", "09", "1", "1"),
+    ("202607", "Made-up region", "0904010A0AAAAAA", "Made-up food drink 200ml", "A maker", "Made-up food drink 200ml", "Made-up food", "091301", "09", "1", "1"),
     ("202607", "Made-up region", "0905010T0AAAAAA", "Tin 10mg tablets", "A maker", "Tin 10mg tablets", "Tin", "090501", "09", "1", "1"),
     ("202607", "Made-up region", "0905010U0AAAAAA", "Nameless 10mg tablets", "A maker", "Nameless 10mg tablets", "", "090501", "09", "1", "1"),
 ]

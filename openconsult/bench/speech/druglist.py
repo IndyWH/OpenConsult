@@ -27,10 +27,11 @@ SOURCE_PAGE = "https://opendata.nhsbsa.net/dataset/prescription-cost-analysis-pc
 LICENCE = "Open Government Licence v3.0"
 NEEDED_COLUMNS = ("YEAR_MONTH", "BNF_PRESENTATION_NAME", "GENERIC_BNF_EQUIVALENT_NAME", "BNF_CHEMICAL_SUBSTANCE",
                   "BNF_CHAPTER_CODE", "BNF_SECTION_CODE", "PREP_CLASS")
-# Dressings and appliances are BNF chapters 20 to 23; foods are the section
-# of borderline substances and nutrition (the details of part two).
+# Dressings and appliances are BNF chapters 20 to 23; foods are the two
+# sections the July 2026 file itself names Oral nutrition and Enteral
+# nutrition (the plan assumed 0904; the file's codes decide).
 LEFT_OUT_CHAPTERS = ("20", "21", "22", "23")
-LEFT_OUT_SECTIONS = ("0904",)
+LEFT_OUT_SECTIONS = ("0913", "0914")
 LEAST_NAME_LETTERS = 4
 # A name is split at these into names of their own (the plan review of part two).
 SPLIT_WORDS = ("with", "and")

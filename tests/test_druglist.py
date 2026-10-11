@@ -26,7 +26,7 @@ def test_the_rule_that_makes_the_list_on_a_made_up_month(tmp_path):
     for left_out in ("bandage", "made up bandage", "made up food", "tin", "nameless", "sodium", "chloride", "with", "light"):
         assert left_out not in names
     assert listed["rows"] == 10 and listed["rows_kept"] == 7                   # the short name's row is kept; its name is left out
-    assert listed["dropped"] == {"chapters": {"21": 1}, "sections": {"0904": 1}, "no_substance": 1}
+    assert listed["dropped"] == {"chapters": {"21": 1}, "sections": {"0913": 1}, "no_substance": 1}
     assert listed["prep_class"] == {"1": {"own_generic_equivalent": 5, "not": 0}, "2": {"own_generic_equivalent": 0, "not": 2}}
     assert listed["names_count"] == 8 and listed["one_word_names"] == 5 and listed["longer_names"] == 3
     assert (listed["month"], listed["licence"]) == ("202607", "Open Government Licence v3.0")
@@ -97,8 +97,11 @@ def test_R18_the_command_refuses_the_forbidden_folders_before_anything_is_fetche
         asked.append(url)
         raise AssertionError("never reached")
 
-    for place in (commands2.REPO / "x", tmp_path / "owner-data" / "o"):
-        assert commands2.speech_drugs("202607", "https://made-up.example/x.csv", place, say=said.append, urlopen=urlopen) == 6
+    from tests.made_up_recordings import made_up_recordings
+    folder = made_up_recordings(tmp_path / "rec")
+    for place in (commands2.REPO / "x", tmp_path / "owner-data" / "o", folder / "o"):
+        assert commands2.speech_drugs("202607", "https://made-up.example/x.csv", place, say=said.append, urlopen=urlopen,
+                                      recordings_folder=folder) == 6
     assert asked == [] and said[-1].startswith("Results may not go under")
     seen = []
     monkeypatch.setattr(commands2, "speech_drugs", lambda *a, **k: seen.append(a) or 0)

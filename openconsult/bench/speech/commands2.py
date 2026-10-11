@@ -79,12 +79,20 @@ def speech_voice(out: Path, recordings_folder: Path, data_folder: Path, names: l
 
 
 def speech_drugs(month: str, url: str, out: Path, say: Callable = print,
-                 urlopen: Callable = urllib.request.urlopen) -> int:
+                 urlopen: Callable = urllib.request.urlopen, recordings_folder: Path | None = None) -> int:
     """One month of the drug file fetched to out, and the list made from it;
-    neither over a file that exists. The one fetch from outside in part two."""
+    neither over a file that exists. The one fetch from outside in part two.
+    With a recordings folder given, its list's folders are refused too."""
     out = Path(out)
+    forbidden = [REPO, paths.default_data_folder()]
+    if recordings_folder is not None:
+        try:
+            forbidden += banked.folders_of(banked.load_list(recordings_folder))
+        except banked.BadList as bad:
+            say(words.BENCH_BAD_LIST.format(reason=bad))
+            return 3
     try:
-        ResultWriter(out, forbidden=(REPO, paths.default_data_folder()))     # a check of the folder only
+        ResultWriter(out, forbidden=forbidden)     # a check of the folder only
     except Refused as refused:
         say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
         return 6

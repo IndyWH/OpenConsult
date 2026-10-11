@@ -212,7 +212,8 @@ def cmd_speech_voice(args) -> int:
 
 
 def cmd_speech_drugs(args) -> int:
-    return speech_commands2.speech_drugs(args.month, getattr(args, "from"), Path(args.out), say=say)
+    return speech_commands2.speech_drugs(args.month, getattr(args, "from"), Path(args.out), say=say,
+                                         recordings_folder=Path(args.recordings) if args.recordings else None)
 
 
 def cmd_speech_calls(args) -> int:
@@ -239,6 +240,7 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--month", required=True, help="the month of the drug file, as YYYYMM")
     p.add_argument("--from", required=True, help="the address of that month's file on the portal")
     p.add_argument("--out", required=True, help="where the file and the list go: not the repo, not a data folder")
+    p.add_argument("--recordings", help="the folder holding recordings.json, so that its folders are refused as well")
     p = sub.add_parser("speech-voice")
     p.set_defaults(fn=cmd_speech_voice)
     p.add_argument("--out", required=True, help="the results folder of speech-run; the voice results go under it")
