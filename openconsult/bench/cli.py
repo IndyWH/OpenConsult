@@ -201,7 +201,9 @@ def cmd_speech_run(args) -> int:
 
 def cmd_speech_score(args) -> int:
     return speech_commands.speech_score(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts],
-                                        Path(args.marks), Path(args.write), say=say)
+                                        Path(args.marks), Path(args.write), say=say,
+                                        key_facts_path=Path(args.key_facts) if args.key_facts else None,
+                                        drug_list_path=Path(args.drug_list) if args.drug_list else None)
 
 
 def cmd_speech_voice(args) -> int:
@@ -213,8 +215,25 @@ def cmd_speech_drugs(args) -> int:
     return speech_commands2.speech_drugs(args.month, getattr(args, "from"), Path(args.out), say=say)
 
 
+def cmd_speech_calls(args) -> int:
+    return speech_commands2.speech_calls(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts], args.job,
+                                         args.round, Path(args.data_folder) if args.data_folder else None, args.recording,
+                                         args.arm, engine_address=args.engine, say=say)
+
+
 def add_speech_commands(sub) -> None:
     """The speech bench (spec 15.9, the details of 5c)."""
+    p = sub.add_parser("speech-calls")
+    p.set_defaults(fn=cmd_speech_calls)
+    p.add_argument("--out", required=True, help="the results folder of speech-run; the calls' results go under it")
+    p.add_argument("--recordings", required=True, help="the folder holding recordings.json")
+    p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
+    p.add_argument("--job", required=True, choices=["label_check", "drug_name", "note", "script_note"], help="the job to run")
+    p.add_argument("--round", type=int, help="the round of the notes, 1 or 2")
+    p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
+    p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
+    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
+    p.add_argument("--arm", nargs="*", help="only these arms")
     p = sub.add_parser("speech-drugs")
     p.set_defaults(fn=cmd_speech_drugs)
     p.add_argument("--month", required=True, help="the month of the drug file, as YYYYMM")
@@ -244,6 +263,8 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
     p.add_argument("--marks", required=True, help="the file of drug names, test names and safety nets")
     p.add_argument("--write", required=True, help="where scores.json and report.md go; never written over")
+    p.add_argument("--key-facts", help="the key-fact file, needed when the results of part two are there")
+    p.add_argument("--drug-list", help="the drug list, needed when the results of part two are there")
 
 
 def main(argv: list[str] | None = None) -> int:

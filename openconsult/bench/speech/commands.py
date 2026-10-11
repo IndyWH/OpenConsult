@@ -86,19 +86,39 @@ def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: P
 
 
 def speech_score(out: Path, recordings_folder: Path, script_folders: list[Path], marks_path: Path, write: Path,
-                 say: Callable = print) -> int:
+                 say: Callable = print, key_facts_path: Path | None = None, drug_list_path: Path | None = None) -> int:
     """The one command: the stored results scored and the tables written,
-    never over an existing file."""
+    never over an existing file. The marks of part one always; the tables
+    of part two where its results are there, which then need the key-fact
+    file and the drug list."""
     try:
         listed = banked.load_list(recordings_folder)
     except banked.BadList as bad:
         say(words.BENCH_BAD_LIST.format(reason=bad))
         return 3
+    out = Path(out)
     results = ResultWriter(out).read_all()
     marks_file = json.loads(Path(marks_path).read_text(encoding="utf-8"))
+    voice_results = ResultWriter(out / "voice").read_all() if (out / "voice" / "results").is_dir() else {}
+    call_results = ResultWriter(out / "calls").read_all() if (out / "calls" / "results").is_dir() else {}
+    part_two = bool(voice_results or call_results)
+    if part_two and key_facts_path is None:
+        say(words.BENCH_NEEDS_FILE.format(option="--key-facts", what="the key-fact file"))
+        return 9
+    if part_two and drug_list_path is None:
+        say(words.BENCH_NEEDS_FILE.format(option="--drug-list", what="the drug list"))
+        return 9
     try:
         scored = tables.score_all(results, listed, [Path(f) for f in script_folders], marks_file)
-        written = tables.write(write, scored, tables.as_markdown(scored))
+        text = tables.as_markdown(scored)
+        if part_two:
+            from openconsult.bench.speech import druglist, keyfacts, tables2
+            facts, drugs = keyfacts.KeyFacts.read(key_facts_path), druglist.DrugList.read(drug_list_path)
+            scored["part_two"] = tables2.score_all(results, voice_results, call_results, listed, [Path(f) for f in script_folders],
+                                                   marks_file, facts, drugs)
+            scored["part_two"]["kinds"] = list(facts.kinds)
+            text += tables2.as_markdown(scored["part_two"])
+        written = tables.write(write, scored, text)
     except tables.ScriptNotFound as missing:
         say(words.BENCH_BAD_LIST.format(reason=missing))
         return 8
@@ -106,4 +126,7 @@ def speech_score(out: Path, recordings_folder: Path, script_folders: list[Path],
         say(words.BENCH_WRITE_EXISTS.format(path=str(refused).split(" exists")[0]))
         return 6
     say(words.BENCH_SCORED.format(results=len(results), arms=len(scored["arms"]), folder=written[0].parent))
+    if part_two:
+        say(words.BENCH_SCORED_TWO.format(pages=sum(len(r["arms"]) for r in scored["part_two"]["recordings"].values()),
+                                          calls=len(call_results), voice=len(voice_results)))
     return 0

@@ -15,10 +15,15 @@ from pathlib import Path
 from typing import Callable
 
 from openconsult import words
-from openconsult.bench.speech import banked, druglist, voice
+from openconsult.bench.speech import banked, calls, druglist, tables, voice
 from openconsult.bench.speech.commands import REPO, forbidden_for
 from openconsult.settings import paths
 from openconsult.bench.writer import Refused, ResultWriter
+from openconsult.db import open_database
+from openconsult.llm.door import Door
+from openconsult.llm.ollama import DEFAULT_ADDRESS, OllamaEngine
+from openconsult.llm.profile import GEMMA_4_QAT
+from openconsult.llm.record import ModelCalls
 from openconsult.speech import environment
 from openconsult.speech.choices import WHISPERX_PYANNOTE
 
@@ -108,3 +113,46 @@ def speech_drugs(month: str, url: str, out: Path, say: Callable = print,
 def csv_error():
     import csv
     return csv.Error
+
+
+def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path], job: str, round_n: int | None,
+                 data_folder: Path | None = None, names: list[str] | None = None, arms: list[str] | None = None,
+                 engine_address: str = DEFAULT_ADDRESS, say: Callable = print,
+                 make_door: Callable[[Path], Door] | None = None, now: Callable = dt.datetime.now) -> int:
+    """The calls of one job (and round) on the stored pages under out/results;
+    the results under out/calls, the record in out/calls/calls.db."""
+    if job not in calls.JOB_KINDS:
+        say(words.BENCH_BAD_JOB.format(job=job, jobs=", ".join(calls.JOB_KINDS)))
+        return 2
+    try:
+        listed = banked.load_list(recordings_folder)
+    except banked.BadList as bad:
+        say(words.BENCH_BAD_LIST.format(reason=bad))
+        return 3
+    out = Path(out)
+    try:
+        writer = ResultWriter(out / "calls", forbidden=forbidden_for(data_folder or out, listed))
+    except Refused as refused:
+        say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
+        return 6
+    results = ResultWriter(out).read_all()
+    (out / "calls").mkdir(parents=True, exist_ok=True)
+    door = make_door(out / "calls") if make_door else Door(OllamaEngine(engine_address),
+                                                          ModelCalls(open_database(out / "calls" / "calls.db")), GEMMA_4_QAT)
+    version, digest = door.identity()
+    if version is None or digest is None:
+        say(words.BENCH_ENGINE_ABSENT.format(address=engine_address, model=door.profile.tag))
+        return 2
+    say(words.BENCH_ENGINE_FOUND.format(version=version, model=door.profile.tag, digest=digest))
+    try:
+        summary = calls.run_calls(door, job, round_n, listed, results, [Path(f) for f in script_folders], writer,
+                                  names, arms, say=say, now=now)
+    except (banked.NotListed, banked.RecordingChanged) as missing:
+        say(words.BENCH_NOT_LISTED.format(name=missing))
+        return 3
+    except tables.ScriptNotFound as missing:
+        say(words.BENCH_BAD_LIST.format(reason=missing))
+        return 8
+    say(words.BENCH_CALLS_DONE.format(made=len(summary["run"]) + len(summary["failed"]), failed=len(summary["failed"]),
+                                      kept=len(summary["kept"])))
+    return 5 if summary["failed"] else 0
