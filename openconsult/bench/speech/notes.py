@@ -23,6 +23,11 @@ _THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}\b)")
 # is days, weeks or months, when the figure is 24 or less (the plan review of
 # part two, change 3); otherwise the slash is the word over, as 110/52 is.
 _SHORT_FORM = re.compile(r"\b(\d+)/(7|52|12)\b")
+# A note cites its turns inside its text as well, [12, 13]: those numbers
+# are turns, not figures. And a hyphen between two figures is a range,
+# 5-10 mins: two figures, not one (found by reading the rehearsal's tables).
+_CITATION = re.compile(r"\[\s*\d+(?:\s*,\s*\d+)*\s*\]")
+_RANGE = re.compile(r"(?<=\d)-(?=\d)")
 SHORT_FORM_LIMIT = 24
 SHORT_FORM_WORDS = {"7": "days", "52": "weeks", "12": "months"}
 # A dose in other units counts as spoken: the units of mass, in milligrams.
@@ -33,11 +38,14 @@ UNCLEAR = "unclear"
 
 
 def read_short_forms(text: str) -> str:
+    """The note's side, read before the matching: turn citations dropped, a
+    thousands comma removed, a range split, the short forms for time read."""
     def replace(match):
         if int(match.group(1)) <= SHORT_FORM_LIMIT:
             return f"{match.group(1)} {SHORT_FORM_WORDS[match.group(2)]}"
         return match.group(0)
-    return _SHORT_FORM.sub(replace, _THOUSANDS.sub("", text))
+    text = _RANGE.sub(" to ", _THOUSANDS.sub("", _CITATION.sub(" ", text)))
+    return _SHORT_FORM.sub(replace, text)
 
 
 def figures_with_units(words: list[str]) -> list[tuple[str, str | None]]:

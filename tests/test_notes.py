@@ -29,6 +29,11 @@ def test_ruling_19_every_figure_the_transcript_does_not_hold_with_doses_in_other
     # 1 g, 1000 mg and 1,000 mg are the spoken gram; 2/52 is the spoken two weeks; 150 and 95 were spoken in words;
     # the 2 of T2DM and the 1 of HbA1c are not figures.
     assert notes.read_short_forms("2/52 and 110/52 and 24/7 and 25/7 and 1,000") == "2 weeks and 110/52 and 24 days and 25/7 and 1000"
+    # A turn citation inside the text is not a figure, and 5-10 is two figures (found in the rehearsal's tables).
+    cited = note(subjective=[("Pain lasting 5-10 mins, radiates to left arm [8].", [8]), ("Breathless [12, 13]", [12, 13])])
+    found = notes.figures_not_spoken(cited, normalise("lasts five to ten minutes"))
+    assert found == [] and notes.read_short_forms("mins [12, 13] and 5-10") == "mins   and 5 to 10"
+    assert [f["figure"] for f in notes.figures_not_spoken(cited, normalise("lasts five minutes"))] == ["10"]
     assert notes.figures_with_units(normalise("40mg once, 2 weeks")) == [("40", "mg"), ("2", None)]
 
 
