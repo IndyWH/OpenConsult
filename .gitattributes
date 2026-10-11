@@ -4,3 +4,5 @@ openconsult/prompts/* text eol=lf
 tests/*.txt text eol=lf
 # The published engine bench is data with checksums: Git never changes a byte of it.
 engine-bench/** -text
+# The line of the bench arm is hashed byte for byte (ruling 3): Git never changes a byte of it.
+openconsult/bench/speech/v1line/v1_live_line.txt -text

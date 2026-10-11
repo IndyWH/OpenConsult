@@ -301,5 +301,5 @@ def write(folder: Path, scored: dict, text: str) -> list[Path]:
         if target.exists():
             raise Refused(f"{target} exists and is never written over")
     for target, content in targets.items():
-        target.write_text(content, encoding="utf-8")
+        target.write_text(content, encoding="utf-8", newline="\n")      # the same bytes on every system
     return list(targets)
