@@ -4,7 +4,7 @@ and the merge into turns as a plain function (V1_LESSONS 1.3)."""
 import pytest
 
 from openconsult.speech.lines import Declares, Line, failed_final, failed_live
-from openconsult.speech.turns import as_line, merge_into_turns
+from openconsult.speech.turns import as_line, merge_into_turns, speaker_of
 
 
 def seg(start, end, text, speaker=None, scores=None):
@@ -70,3 +70,20 @@ def test_1_3_the_merge_changes_no_raw_segment():
     before = [dict(s) for s in raw]
     merge_into_turns(raw)
     assert raw == before
+
+
+def test_1_3_a_segment_split_evenly_takes_the_cluster_of_its_first_word_whatever_the_hash_seed():
+    # Two words of each cluster: the earliest tied cluster wins, and the answer
+    # cannot depend on a set's order (stage 5c: one recording scored two ways).
+    first_s1 = {"start": 0.0, "end": 1.0, "text": "a b c d", "words": [
+        {"word": "a", "speaker": "S1"}, {"word": "b", "speaker": "S0"},
+        {"word": "c", "speaker": "S0"}, {"word": "d", "speaker": "S1"}]}
+    first_s0 = {"start": 0.0, "end": 1.0, "text": "a b c d", "words": [
+        {"word": "a", "speaker": "S0"}, {"word": "b", "speaker": "S1"},
+        {"word": "c", "speaker": "S1"}, {"word": "d", "speaker": "S0"}]}
+    assert speaker_of(first_s1) == "S1" and speaker_of(first_s0) == "S0"
+    majority = {"start": 0.0, "end": 1.0, "text": "a b c", "words": [
+        {"word": "a", "speaker": "S1"}, {"word": "b", "speaker": "S0"}, {"word": "c", "speaker": "S0"}]}
+    assert speaker_of(majority) == "S0"                                   # most words still win
+    assert speaker_of({"start": 0.0, "end": 1.0, "text": "a", "words": [{"word": "a"}]}) is None
+    assert merge_into_turns([first_s1, dict(first_s0, start=1.0, end=2.0)])[0].speaker == "S1"
