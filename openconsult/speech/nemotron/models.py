@@ -44,7 +44,9 @@ RECOMPUTE_FRAMES = 8
 LEAD_FRAMES = 8
 STABLE_MARGIN_FRAMES = 4
 # A line still open this long after its last word is closed by time
-# (a draft for the owner, the 5b plan review).
+# (a draft for the owner, the 5b plan review). A word is complete once the
+# model has moved WORD_CLOSE_S past it (wordflow.py), so the last word
+# before a silence reaches this rule instead of waiting for Stop.
 LINE_WAIT_S = 3.0
 WARM_S = 4.0
 
@@ -256,8 +258,11 @@ class WordsStream:
     as they are; the encoder frames are counted only for the record."""
 
     def __init__(self, models: Models):
+        import sys
         from nemo.collections.asr.parts.utils.streaming_utils import CacheAwareStreamingAudioBuffer
         import torch
+        sys.path.insert(0, str(HERE))
+        import wordflow      # the grouping of tokens into words, a plain class beside the join
         self.m = models
         self.torch = torch
         self.buf = CacheAwareStreamingAudioBuffer(model=models.words, online_normalization=False,
@@ -265,11 +270,19 @@ class WordsStream:
         self.features = FeatureStore(self.buf.preprocessor, models.device)
         self.cache = models.words.encoder.get_initial_cache_state(batch_size=1)
         self.hyps = None
-        self.frames_before = 0
+        self.frames_before = 0               # encoder frames decoded so far, the tokens' own scale
         self.tokens_seen = 0
         self.step = 0
-        self.words: list[dict] = []          # complete words, not yet given
-        self.open: dict | None = None        # the word still being spoken
+        self.flow = wordflow.WordFlow(models.words.tokenizer.ids_to_text, models.output_frame_s)
+
+    @property
+    def words(self) -> list[dict]:
+        """Complete words, not yet given."""
+        return self.flow.complete
+
+    @words.setter
+    def words(self, left: list[dict]) -> None:
+        self.flow.complete = left
 
     def add(self, samples) -> None:
         self.features.add(samples)
@@ -319,33 +332,35 @@ class WordsStream:
         self.tokens_seen = len(ids)
         self.frames_before += int(encoded_len[0])
         self.step += 1
+        # Fix one (part two of 5c): a word the model has moved past is
+        # complete, next word or not, so silence counts for the line's wait.
+        self.flow.moved_to(self.frames_before)
 
     def _take_tokens(self, ids: list, frames: list) -> None:
         tokenizer = self.m.words.tokenizer
         for token_id, frame in zip(ids, frames):
-            piece = tokenizer.ids_to_tokens([token_id])[0]
-            at = frame * self.m.output_frame_s
-            if piece.startswith("▁") or self.open is None:
-                if self.open is not None:
-                    self._close_open()
-                self.open = {"ids": [token_id], "start": at, "end": at + self.m.output_frame_s}
-            else:
-                self.open["ids"].append(token_id)
-                self.open["end"] = at + self.m.output_frame_s
+            self.flow.take(token_id, tokenizer.ids_to_tokens([token_id])[0], int(frame))
 
-    def _close_open(self) -> None:
-        text = self.m.words.tokenizer.ids_to_text(self.open["ids"]).strip()
-        if text:
-            self.words.append({"word": text, "start": round(self.open["start"], 3), "end": round(self.open["end"], 3)})
-        self.open = None
+    @property
+    def open(self) -> dict | None:
+        """The word still being spoken, with its start in seconds, or none."""
+        if self.flow.open is None:
+            return None
+        return {"start": self.flow.open["first"] * self.m.output_frame_s}
 
     def open_text(self) -> str:
-        return self.m.words.tokenizer.ids_to_text(self.open["ids"]).strip() if self.open else ""
+        return self.flow.open_text()
+
+    def counts(self) -> dict:
+        """For the record at Stop, counts only: the proof that no word was
+        split (the details of part two, fix one)."""
+        return {"frames_decoded": self.frames_before, "last_token_frame": self.flow.last_frame,
+                "largest_gap_inside_word_frames": self.flow.largest_gap_frames,
+                "tokens_after_close_by_time": self.flow.tokens_after_close_by_time}
 
     def finish(self) -> None:
         self.run(final=True)
-        if self.open is not None:
-            self._close_open()
+        self.flow.finish()
 
 
 # ----------------------------------------------------------- the speakers
@@ -457,7 +472,8 @@ class Session:
         tail = self._lines(final=True)
         return {"last_live": tail, "revisions": [], "seconds": {"tail": round(time.perf_counter() - started, 2),
                                                                 "step_max": round(max(self.step_seconds), 3) if self.step_seconds else 0.0,
-                                                                "steps": len(self.step_seconds)}}
+                                                                "steps": len(self.step_seconds)},
+                "notes": {**self.words.counts(), "fed_s": round(self.fed_s, 3)}}
 
     def _lines(self, final: bool) -> list[dict]:
         """Lines from the words the speaker model has scored, closed by the
