@@ -1,8 +1,7 @@
 # CLAUDE.md
 
-Orientation for Claude Code working on OpenConsult v2.
-Read V2_SPEC.md next. It is the one document for v2.0.
-Then read the part of V1_LESSONS.md that your stage prompt names.
+Orientation for Claude Code working on OpenConsult v2. Read V2_SPEC.md next:
+it is the one document for v2.0. Then the part of V1_LESSONS.md your stage prompt names.
 
 ## What this is
 
@@ -37,11 +36,9 @@ Think from the patient's side. In teaching mode, from the learner's side.
 4. Write your plan. List every test you intend, with the rule number or the
    incident it pins. Then stop and wait for the owner to type: Approved. Go.
 5. Build. The suite is green before each commit. One logical change in each
-   commit. The why goes in the commit message.
-   Each commit ends with the co-author line your stage prompt gives.
+   commit, the why in its message, and the co-author line your stage prompt gives at its end.
 6. Add a HANDOVER.md entry. Say which document your work has made untrue.
-7. Never push. Never start, stop or restart a service. No sudo. The owner
-   does these himself.
+7. Never push, never start, stop or restart a service, no sudo. The owner does these himself.
 
 ## Hard rules
 
@@ -93,7 +90,10 @@ Think from the patient's side. In teaching mode, from the learner's side.
     uv run openconsult-bench run --cases DIR --out DIR --digest ID [--kind ollama|llamacpp|vllm --engine URL --model NAME] [--together] [--chains A1 ...]
     uv run openconsult-bench score --out DIR | --replies FILE     # the marks of one arm
     uv run openconsult-bench figures --public engine-bench        # the figures of the public report; no engine
+    uv run openconsult-bench speech-fetch --data-folder DIR       # the tied pair's model, for the speech bench only
+    uv run openconsult-bench speech-run --recordings DIR --arm NAME --data-folder DIR --out DIR [--recording NAME ...]   # a banked recording through an arm, as if live
+    uv run openconsult-bench speech-score --out DIR --recordings DIR --scripts DIR [--scripts DIR] --marks FILE --write DIR   # the tables, from the stored results alone
 
-The bench writes only under --out, never to the app's data. Its published form is engine-bench; other cases and results stay in the log folder. install-speech and self-test write only in the data folder they are given. A cloud choice needs no install: its key goes in .env in the data folder (see .env.example), and its self-test sends the clip to the service's EU address.
+The benches write only under --out or --write, never to the app's data, the repo or where recordings are kept. The engine bench's published form is engine-bench; other cases, recordings and results stay in the log folder. install-speech and self-test write only in the data folder they are given. A cloud choice needs no install: its key goes in .env in the data folder (see .env.example), and its self-test sends the clip to the service's EU address.
 
 Data folder: Linux $XDG_DATA_HOME/openconsult or ~/.local/share/openconsult; macOS ~/Library/Application Support/OpenConsult; Windows %LOCALAPPDATA%\OpenConsult.

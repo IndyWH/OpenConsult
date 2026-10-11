@@ -7,8 +7,11 @@ This branch is where OpenConsult v2.0 is being built.
 - So far this version starts, sets up its one user, describes the machine it
   runs on, can reach the local language model, and can turn speech into text
   in four ways: WhisperX with pyannote, Nemotron, Speechmatics and AssemblyAI,
-  each proven by a self-test on a bundled clip. It cannot run a consultation
-  yet.
+  each proven by a self-test on a bundled clip. A replay bench feeds a banked
+  recording through the same door as if it were live and scores the transcript
+  against the script: passages missing with or without a sign, words written
+  in silence, drug names, who spoke, and the wait. It cannot run a
+  consultation yet.
 - The engine bench is in engine-bench: the same cases through Ollama, llama.cpp and vLLM, with every reply and every figure.
 
 OpenConsult is a research and education prototype. It is not a medical

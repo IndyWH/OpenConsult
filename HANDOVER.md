@@ -4,6 +4,171 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-11. Stage 5c, part one: the replay bench and the transcript marks
+
+Built on 10 and 11 Oct 2026. The plan was reviewed by Cowork on 10 Oct
+(ten changes); all are in. The checks and the rehearsal ran on 11 Oct
+with the v1 service off. The rehearsal is a rehearsal: no figure from it
+counts (spec 13.4 rule 2; 15.9 ruling 6).
+
+What was done:
+- The rule against words from silence looks as wide as a choice's times
+  allow (ruling 12): Declares gains time_slack_s (Nemotron 1.0 s, the
+  rest 0), refuse_quiet looks that far to each side and refuses only if
+  the whole stretch is quiet; while sound is still being fed a stretch
+  that reaches past it counts as not quiet, and at Stop nothing is still
+  to come, so a quiet last line is refused for every choice. Two tests of
+  5b feed more quiet sound before their made-up lines, same assertions.
+- The matching of words lives in the app (speech/matching.py): capitals
+  and punctuation ignored; apostrophes, then hyphens and split words, then
+  numbers, then units, then the British and American spellings in one
+  table made the same, in that fixed order; a slash between figures is
+  over; a figure against its unit is split. The alignment classes each
+  page word as heard, in place of a spoken word, or from nowhere.
+- The check for missing speech (speech/missing.py; 11.5 rule 2; D45;
+  ruling 13): five or more live words the transcript at Stop lacks; two
+  seconds or more of sound above -30 dBFS (not yet measured on raw sound)
+  that no line covers, quiet gaps under 0.5 s joined. Stage 6 shows it.
+- The speech bench (bench/speech): the banked list and its reader (a
+  checksum that differs, a name not listed or a list not whole is refused
+  before any sound is read; consent held by code, ruling 14); the
+  reference from a script with the cut and the notes; the replay through
+  the door in 0.25 s pieces, each fed when its sound has ended, with
+  everything the door gives kept, the moments, and the loudness windows;
+  the marks (passages with or without a sign, words from silence, what
+  the rule did, words that differ with negations and numbers, drug and
+  test names as whole words with the bracket form, who spoke by best
+  fit, the wait, how exact the times are, the signs counted); agreement
+  against the script from the arms with a model of their own only, a
+  word every arm left out still counting; the tables, byte for byte the
+  same from the same results, never written over.
+- The two arms of the bench (ruling 15): the tied Nemotron pair, v1's
+  pairing on the 5b frame in the Nemotron environment, its late text
+  changes kept in the result's notes and never sent as a revision; and
+  WhisperX with v1's line, the line given to the live model only and
+  hashed into every result. Neither is in the app's table of choices;
+  the command refuses their names.
+- The conversion of the sound's rate in the three local workers
+  (speech/common/resample.py): scipy's own filter for a change by three,
+  61 taps, Kaiser 5.0, its state carried across pieces; 16,000 or 48,000
+  taken, any other rate refused.
+- Three commands: speech-fetch, speech-run, speech-score (CLAUDE.md).
+- The suite gains a guard on where recordings are kept (R18), with its
+  twin.
+- A segment's speaker at Stop on a tie between two clusters is now the
+  cluster of its earliest word, not the hash order's (found by scoring
+  the rehearsal twice).
+
+The rulings of spec 15.9 for 5c, part one, each in one line:
+12. The wider rule, with the figures as named constants; Nemotron's first
+    word of the clip now reaches the page (it was refused in 5b). Done.
+13. A passage is 5 words or more, a pause 2 s or more: in the marks. Done.
+14. No old recording left the machine: the list says so for each, the
+    bench refused the six cloud tries before any worker, the records are
+    empty; the made recording (two machine voices, script 19) went to the
+    two EU addresses. Done.
+15. Six arms ran: the four choices, the tied pair, WhisperX with v1's line
+    (the line byte for byte, hash c72f4adc...). The other extras are part two.
+16. Drug names counted as whole words, the bracket form caught, names in
+    v1's line apart; a wrong name that is a real drug is part two.
+17 to 20. Part two. Nothing built.
+21. Part one as its own run, with the cycle of 15.3. This is it.
+
+Decided in the plan review (Cowork, 10 Oct), as decisions of this stage:
+at Stop the wider stretch is cut at the end of the sound; the matching
+lives in the app and the app never imports the bench; a piece is fed
+when its sound has ended; a gap covers a passage by words and a stretch
+by time, and a passage whose neighbours sit in one piece is unseeable by
+a stretch; agreement is the same written word from every arm with a model
+of its own, at least three, and a word every arm left out is not
+agreement; the fixed order of the matching's steps; the tied pair's late
+changes travel in the stopped reply's notes; the arguments reaching the
+WhisperX models are recorded in the checks; the connection recorder sits
+on the worker's Python from the driver's side (a sitecustomize named in
+PYTHONPATH), with no code in V2.
+
+Measurements, 10 and 11 Oct 2026, RTX 4090, v1 off:
+- 400 tests, 16.0 s, none skipped. App code 6,328 lines without the
+  bench (10,469 with it), tests 6,774. Largest file speech/nemotron/
+  models.py, 500 lines; no function over 80. CLAUDE.md 99 lines.
+- The two environments built into the working folder from the warm cache
+  in 11 s and under 1 s (7.2 GB and 5.5 GB); every model found at its
+  pinned revision, nothing downloaded; the tied pair's 3.5 model found
+  in the shared cache at v1's revision ea30d66d (2.37 GB).
+- The four self-tests on the working folder passed, 22 of 22 each.
+  Nemotron's first word, And at 0.08 to 0.16 s, was accepted (5b: refused).
+  The WhisperX models received no initial_prompt, prefix or hotwords; the
+  arm with v1's line gave the line to the live model and nothing to the
+  pass at Stop. No local worker opened a connection or looked up a name;
+  each cloud worker reached its EU host and nothing else.
+- Silence (60 s each of zeros, noise at -50 and at -30 dBFS, measured
+  -inf, -49.5 and -29.6 dBFS): none of the four local arms wrote a word,
+  live or at Stop; nothing to refuse.
+- The conversion, in both environments: a 1 kHz tone at -20 dBFS came
+  through at -19.99; a 12 kHz tone came through at -87.3 (67 dB down),
+  the loudest bin below 8 kHz at -84.3 dBFS (4 kHz); lengths equal. The
+  clip at 48,000 through the four local arms: 22 of 22 live and at Stop
+  on three; the tied pair 22 at 48,000 and 21 at 16,000 (American for
+  Americans).
+- The three old recordings became WAV with flac -d (MD5 verified) and
+  their samples equal ffmpeg's independent decode. The made recording:
+  361.5 s, peak -0.75 dBFS, typical -21.6, no clipped sample, pauses at
+  -75 dBFS or quieter; its cut runs to speech 8 at 56.7 s.
+- The bench refused, before anything was fed: a wrong checksum, a file
+  not listed, a result folder in the repo, in the data folder and where
+  recordings are kept; a result asked for a second time; six cloud tries
+  on old recordings and the cut, with empty connection records.
+- The rehearsal (00:37 to 02:23, 1 h 45 min, nobody attending): six arms,
+  18 results, every arm exit 0, no failure; every result carries the
+  list's checksum; the cloud arms sent 361.47 s each (the made recording)
+  and nothing else; the local workers' connection records are empty; the
+  card peaked at 10,309 MiB. No arm wrote a word into silence that the
+  rule let stand; no real word was refused; the one refused line (one
+  word, Speechmatics, in a pause) was invented. Two passages missing with
+  no sign, both on the tied pair, which is not in the app. Nemotron let
+  nine invented words through by looking wider; its diarisation found one
+  cluster only on two of the three old recordings. WhisperX's one
+  segment end 2.9 s early made a false sign. In 477's three minutes of
+  digital silence no arm wrote anything; Nemotron's last line stayed
+  pending until Stop (194 s). v1's line changed no drug-name figure.
+  No figure counts; the report in the log folder has them all.
+- Scoring the same 18 results twice gave two different tables (who
+  spoke on 477): a segment's speaker at Stop came from a set, and a tie
+  followed the hash seed. Fixed in turns.py (the earliest tied cluster
+  wins); after it, byte for byte the same under four hash seeds.
+- The private word check printed nothing before every commit. The two
+  keys' values appear in no file of LOGS newer than the start marker, in
+  the working tree or in the commits (counts 0).
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: the three bench commands; fixed in this commit.
+  The README's line; fixed in this commit.
+- V2_SPEC.md 15.9, the details of 5c: "sound that has not been fed yet
+  counts as not quiet" now holds while sound is still fed, and at Stop
+  the stretch is cut (plan review change 1); the agreement rule counts
+  only the arms with a model of their own and a word every arm left out
+  is not agreement (change 5); the tied pair's late changes travel in
+  notes (change 7); the matching lives in the app (change 2). Cowork
+  folds these in.
+- The plan's figure for the card (9,000 MiB): the rehearsal peaked at
+  10,309 MiB, during WhisperX's Stop on the made recording.
+
+For part two: the key-fact lists and the UK drug list (spec); the tied
+pair's late changes (9 lines over the four recordings, 8 of them on the
+made recording, no word lacking on the page); the arms' times beside the
+figures of the wider rule (Nemotron's speech ends up to 1.33 s late, 3 of
+84 beyond its 1.0 s; the tied pair's starts up to 1.09 s late; the exact
+choices within 0.5 s but for WhisperX's one segment end 2.9 s early); the
+signs (one right, three false, each explained in the report; the -30 dBFS
+figure of the check has not been measured on raw sound, and a recording's
+quiet words sat under it where a passage went unsigned); whether a
+pending line should close after some seconds of silence (owner).
+
+Next: the owner's check (uv sync, then the four self-tests on his real
+data folder), then push; the GitHub check must be green on all three
+systems. Then Cowork checks the report from the raw files, and the prompt
+for part two is written.
+
 ## 2026-10-10. Stage 5b: the Nemotron choice and the two cloud choices
 
 Built on 10 Oct 2026. The plan was reviewed by Cowork the same day (nine
@@ -287,166 +452,3 @@ This machine shows the two rows), then push; the GitHub check must be
 green on all three systems. Then the 5b brainstorm. For stage 6: the
 gate must expect a confidence of none; the worker's log and the sound
 the worker keeps belong to no consultation yet.
-
-## 2026-10-07. Stage 3b: the engine bench
-
-Built over 6 and 7 Oct 2026 and published on 7 Oct, after the owner ruled
-that the bench of 7 Oct is the one public bench (spec 15.8, ruling 24).
-The two local publish commits of the first bench came out of the history
-first, in one rebase, with a bundle of the repo kept outside it.
-
-What was done, 6 Oct:
-- Two small items first. An empty list keeps the earlier list: when an
-  assessment reply fits its form but its list of differentials is empty,
-  and an earlier list exists, the pass gives the earlier entries whole,
-  says that the list was kept, and hands the same names to the next pass.
-  The record still holds the model's own reply. At the first pass empty
-  stays empty. And the terminal's second line now says the browser will
-  open by itself; the old line stays for --no-browser.
-- The pass is three plain functions: the two messages, the sending, the
-  settling. run_pass calls them in the same order and behaves as before.
-- Two more engines, llama.cpp and vLLM, as modules of the bench behind
-  the joint of stage 3 (bench/chat_engine.py, llamacpp.py, vllm.py). The
-  bench command takes the kind of engine, its address and the name it
-  knows the model by. The app cannot reach them and has no switch for
-  one; a test in a fresh Python proves it. No setting was built.
-- In the bench: the two calls of a pass sent together; the repeat test;
-  the exporter, which writes an arm's public form and never writes over
-  a published file; and the marks worked out again from published
-  replies (score --replies).
-What was done, 7 Oct:
-- Candidate means ruling 18: every hard mark met on the chains at
-  temperature 0, read from the data and never from a chain's name, and
-  none of them failed. The chains at 0.5 are a stress test, counted the
-  same way and reported apart. The 18 marks over 13 chains do not change.
-- bench/figures.py and the command openconsult-bench figures: the rules
-  of 7 Oct in the repo's own tool. The typical pass of a round, Rule B at
-  half a second in every round, the steadiness of the day on Ollama's own
-  rounds, the tokens written and the time for each token, and the counts
-  from the replies: failed chains, replies cut mid-sentence, empty and
-  kept lists, time critical with no action, the first alarm, the same
-  answer in every chain at 0. It works from the public folder alone and
-  gives the same figures from the private result folders. The rounds and
-  the arms' roles are data (engine-bench/rounds.json). Every figure in
-  seconds is rounded half up from the milliseconds, once. The compare
-  command, its line of 1 second and the 13-chain candidate went.
-- The exporter takes the card's memory over an arm's own steps (--steps),
-  because the arms took turns through the day.
-- Published in engine-bench: the report, how the bench was run, the
-  cases, the six arms of 7 Oct, rounds.json, the tool's figures as data,
-  the machine's figures as small data files, and bench-of-6-oct with the
-  two kept parts of the first bench. 71 files, 4.2 MB.
-- No library added. NOTICE has nothing to add.
-
-The rulings of spec 15.8, each in one line:
-1. Every prompt a model reads is put to the owner word for word. No
-   prompt changed; the two hashes are as v1's.
-2. The engine bench is published. Done: engine-bench.
-3. The v1 service is off. Nothing to do here.
-4. What the plan review of stage 3 settled is in the spec. Nothing here.
-5. An empty list keeps the earlier list. Done, in the pass.
-6. Showing the app somewhere else: stage 6's brainstorm. Nothing built.
-7. The vLLM arm ran the repack by xbill9, at its fixed revision. Done.
-8. The calls of a pass are also sent together, as a measurement. Done.
-9. Does an engine give the same answer twice: the repeat test, 6 Oct. Done.
-10. What counts as faster, as first fixed. Replaced by 17 and 18.
-11. Every case the bench reads is published. Done.
-12. The words in the terminal at the start. Done.
-13. The together arm on Ollama ran on a second Ollama process. Done.
-14. Ollama runs llama.cpp inside it. Said in the report.
-15. The two travel cases are published unchanged, with a note. Done.
-16. The push was held and vLLM got a second arm, with the switch. Done.
-17. Faster means half a second, in every round. In the tool.
-18. Temperature 0 decides who is a candidate. In the tool.
-19. The full bench ran again on 7 Oct. Done.
-20. The together arms ran the three chains at temperature 0. Done.
-21. Three rounds, the order rotating; steadiness on Ollama. Done.
-22. vLLM ran with the switch only; two figures per engine. Done.
-23. The first bench waited for the second. Done.
-24. One public bench, the bench of 7 Oct. Done.
-25. What the public folder holds. Done, as written.
-26. Anyone can rerun the figures: openconsult-bench figures. Done.
-27. How the two commits came out: bundle, then one rebase. Done.
-28. The first lines of the report in the owner's words; the docs script
-    checks each figure in them against the tool. Done.
-
-Decided in the plan reviews (Cowork), as decisions of this stage:
-- 6 Oct: the kept list holds the earlier entries whole, marked kept; a
-  failed assessment call is not an empty list. vLLM 0.31.0 and llama.cpp
-  v0.6.0, the newest on the day. In the repeat test the earlier list came
-  from the reference arm's chain A1. Nothing public names a path, a user
-  or a host; the word check reads the unpacked text of each packed file.
-- 7 Oct: the card over an arm's own steps is the pooled median. A reply
-  that did not end ok or cannot be read as its form is counted apart,
-  never as cut. A difference below zero is written as longer. The kept
-  files of 6 Oct are as written then, and the note in bench-of-6-oct says
-  what candidate meant that day. No figure from an arm that is not in
-  the folder. Seconds are rounded half up from the milliseconds, once.
-
-For stage 6:
-- Whether the screen keeps the earlier list through a failed assessment
-  call is the owner's ruling then. Nothing is built for it.
-- Sending the two calls together shortens the pass on every engine, but
-  the alarm itself comes back later (1.46 s against 1.12 s on Ollama),
-  and on Ollama it needs OLLAMA_NUM_PARALLEL=2, which the service does
-  not set. The app still sends one after another.
-- The stray quote (ruling 16) goes to the session on the two carried
-  prompts. The engine choice has a brainstorm of its own: a compact form
-  for Ollama or llama.cpp, and the speech model beside the language model
-  on the card, were not tested.
-
-Measurements. The bench's figures are from engine-bench/README.md.
-- 199 tests, 4.5 s, none skipped (191 before). App code about 2,260 lines
-  without the bench; the bench 2,064; tests 3,190. Largest file
-  bench/figures.py, 407 lines. CLAUDE.md 99 lines.
-- The run of 7 Oct: 768 chains, 14,016 calls, every call ok, no chain
-  failed; 07:17 to 15:25, nobody at the desk, the screensaver never seen
-  in 487 minutes.
-- Every hard mark met on every engine at both temperatures. Over 13
-  chains llama.cpp missed two soft marks (S10 13, 9 and S14 6).
-- The typical pass of 495 by round, one after another: Ollama 5.13,
-  5.07, 5.12 s; llama.cpp 5.12, 5.12, 5.12; vLLM 3.56, 3.47, 3.43. Sent
-  together: 3.76, 3.76, 3.75; 3.83, 3.81, 3.85; 2.78, 2.78, 2.77. The day
-  was steady: Ollama's rounds 0.06 s apart.
-- Rule B: vLLM faster by the rule, 1.57, 1.61 and 1.69 s shorter than
-  Ollama one after another and 0.98, 0.99, 0.98 s shorter together.
-  llama.cpp not faster either way (0.01 shorter to 0.05 longer; 0.07 to
-  0.10 longer together). Every together arm is more than 1.25 s shorter
-  than Ollama one after another in every round.
-- At temperature 0 vLLM wrote 254,979 tokens against 319,170 on Ollama
-  and 325,947 on llama.cpp (20 % fewer), at 5.33 ms a token against 6.44
-  and 6.52 (17 % less). About half of its gain is the switch.
-- Replies cut mid-sentence at 0.5: Ollama 23, llama.cpp 35, vLLM 21 of
-  2,920; at 0: 0, 6, 0. The vLLM arm of 6 Oct without the switch: 14
-  chains failed, all at 0.5. Time critical with no action: 65, 29, 73.
-- The same answer in all three chains at 0: 16 of 16 cases on Ollama
-  and llama.cpp, 0 on vLLM. The repeat test of 6 Oct, sets of ten all the
-  same, of 12: Ollama 2; llama.cpp 3, and 12 with its prompt cache off;
-  vLLM 0, and 10 with batch invariance on.
-- The card, pooled over each arm's own steps: Ollama 17,139 MiB (70 %),
-  llama.cpp 15,591 (63 %), vLLM 23,137 (94 %, its fixed share). Starts:
-  llama.cpp 2.0 s, vLLM 25.8 s; Ollama's first call with the model not
-  loaded 3.4 to 3.5 s.
-- Empty lists: 3 on Ollama, each kept, all at 0.5; none elsewhere.
-- The private word check printed nothing before every commit but the
-  published folder's, where its 61 lines are all in case and reply files
-  and equal the list Cowork read at the gate.
-
-Made untrue by this stage:
-- CLAUDE.md, Running it: the bench commands, now with figures and export
-  and the kinds of engine. README: the line that points to engine-bench.
-  Both fixed in this commit.
-- V2_SPEC.md 15.8, the details of 6 Oct: the reference arm is not
-  published (ruling 25 says so); compare.json and compare.md no longer
-  exist; the typical pass of ruling 10 is replaced by that of 17. Ruling 7
-  and 15.7 ruling 5 were corrected by the owner on 6 Oct. 15.8 ruling 24
-  gives the card as 23,137 and 17,139 MiB: that is the pooled median over
-  the arm's own steps, which the tool and the exporter now use.
-- V1_LESSONS 9.1 says temperature 0 with a fixed seed is not
-  reproducible. On 7 Oct it was, on Ollama and llama.cpp, on 16 of 16
-  cases over three chains hours apart; on vLLM it was not.
-
-Next: the owner reads the report and pushes; the GitHub check must be
-green on all three systems. Then, if he wishes, his answer to issue 1 in
-his own words. Owed before stage 6: the session in which the owner and
-Cowork read the two carried prompts word for word.
