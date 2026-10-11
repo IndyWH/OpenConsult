@@ -54,10 +54,15 @@ What was done:
   taken, any other rate refused.
 - Three commands: speech-fetch, speech-run, speech-score (CLAUDE.md).
 - The suite gains a guard on where recordings are kept (R18), with its
-  twin.
-- A segment's speaker at Stop on a tie between two clusters is now the
-  cluster of its earliest word, not the hash order's (found by scoring
-  the rehearsal twice).
+  twin. After Cowork's check the guard tells a changed file by the sha256
+  of its bytes as well as its size and time: a coarse file clock gave a
+  clean copy "DID NOT RAISE" on the twin once in two runs.
+- A segment's speaker at Stop on a tie between two clusters is now no
+  speaker (spec 15.9 ruling 4: unsure, never guessed), and the answer no
+  longer follows the hash order (found by scoring the rehearsal twice).
+- The bench's files are the same bytes on the three systems: the tables
+  are written with "\n" line ends, and v1's line is marked -text in
+  .gitattributes so Git never changes a byte of what is hashed (ruling 3).
 
 The rulings of spec 15.9 for 5c, part one, each in one line:
 12. The wider rule, with the figures as named constants; Nemotron's first
@@ -134,8 +139,10 @@ Measurements, 10 and 11 Oct 2026, RTX 4090, v1 off:
   No figure counts; the report in the log folder has them all.
 - Scoring the same 18 results twice gave two different tables (who
   spoke on 477): a segment's speaker at Stop came from a set, and a tie
-  followed the hash seed. Fixed in turns.py (the earliest tied cluster
-  wins); after it, byte for byte the same under four hash seeds.
+  followed the hash seed. Fixed in turns.py: on a tie, no speaker. Scored
+  again twice after the fix, byte for byte the same; on 477 the two
+  WhisperX arms moved ten words from the right speaker to no speaker,
+  and no other figure in the tables changed.
 - The private word check printed nothing before every commit. The two
   keys' values appear in no file of LOGS newer than the start marker, in
   the working tree or in the commits (counts 0).
