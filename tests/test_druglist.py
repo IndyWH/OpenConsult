@@ -99,9 +99,10 @@ def test_R18_the_command_refuses_the_forbidden_folders_before_anything_is_fetche
 
     from tests.made_up_recordings import made_up_recordings
     folder = made_up_recordings(tmp_path / "rec")
-    for place in (commands2.REPO / "x", tmp_path / "owner-data" / "o", folder / "o"):
+    for place in (commands2.REPO / "x", tmp_path / "owner-data" / "o", folder / "o", tmp_path / "data" / "o"):
         assert commands2.speech_drugs("202607", "https://made-up.example/x.csv", place, say=said.append, urlopen=urlopen,
-                                      recordings_folder=folder) == 6
+                                      recordings_folder=folder, data_folder=tmp_path / "data") == 6
+    assert not (tmp_path / "data").exists()                      # nothing was made before the refusal
     assert asked == [] and said[-1].startswith("Results may not go under")
     seen = []
     monkeypatch.setattr(commands2, "speech_drugs", lambda *a, **k: seen.append(a) or 0)
