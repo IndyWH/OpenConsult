@@ -4,6 +4,171 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-11. Stage 5c, part two: what is done with the transcripts, and the full rehearsal
+
+Built on 11 Oct 2026. The plan was reviewed by Cowork the same day (five
+changes); all are in. The checks and the rehearsal ran on 11 Oct with the
+v1 service off. The rehearsal is a rehearsal: no figure from it counts
+(spec 13.4 rule 2; 15.9 ruling 6).
+
+What was done:
+- Fix one: the Nemotron worker's last word before a silence is passed on
+  once the model has decoded WORD_CLOSE_S past its last token (a plain
+  class, speech/nemotron/wordflow.py, loaded by path as the join is), so
+  the line's own wait of 3.0 s can run in silence. The figure is 2.0 s,
+  not the plan's 1.0: on the card the model gave one word of the clip its
+  two tokens 16 frames (1.28 s) apart across two decoding steps, and one
+  second could have cut it in two. The Stop reply's notes carry the counts
+  that prove no word was split. The tied pair has its own stream and does
+  not change.
+- Fix two: the wait to first shown runs from the line's start; the true
+  times serve every arm; the true start goes to the first line of a speech
+  and the true end to its last (bench/speech/waits.py, tables.py). Part
+  one's 18 results rescored: only the wait differs.
+- The lines a model reads (bench/speech/model_lines.py): from the smallest
+  timed pieces at Stop, two neighbours joined when the first does not end a
+  sentence, both carry the same label and less than 1.0 s lies between; a
+  piece never split; turns as v1 joins them; v1's two role words and
+  Unknown (ruling 22); the words around a transcript exactly as the details
+  give them, pinned byte for byte.
+- The three jobs of the bench (bench/speech/jobs.py, prompts/): the
+  owner's three prompts byte for byte, hashed before they are read and
+  marked -text; the forms, the note's being v1's as it stands; the limits as
+  named figures; through the door's one new method, ask_own, with the same
+  limits, form check and record; the app's table of jobs untouched (the
+  word check of stage 3: 4,038 of 4,038 before and after).
+- The voice method (bench/speech/voice.py, voice/worker.py): the doctor's
+  voice learnt from a listed recording marked voice_only, each line given
+  its distance from that voice by pyannote's wespeaker model loaded by path
+  with the hub's network off; the reading made on the bench's side from
+  two figures around the pinned pipeline's clustering threshold (0.7046,
+  a band of 0.1) and a line under 1.0 s unsure; the list gains
+  doctor_voice and voice_only; the replay refuses a voice-only recording.
+- Who spoke, four readings side by side (bench/speech/who.py): the choice,
+  the label check, the voice, and together, each counted word by word.
+- The UK drug list (bench/speech/druglist.py; speech-drugs): one month of
+  the Prescription Cost Analysis fetched and made into a list of whole
+  names, generic without salt and form words, brand from the front of a
+  product that is not its own generic equivalent, split at a bracket, a
+  slash, a plus and the words with and and; dressings, appliances and the
+  two nutrition sections left out; the class codes counted, not leaned on.
+- The three ways to spot a doubtful drug name and the three classes
+  (bench/speech/doubt.py), the key facts (keyfacts.py), the notes' five
+  counts and the chance (notes.py), the calls (calls.py) and the tables of
+  part two (tables2.py), with the one scoring command taking the key-fact
+  file and the drug list where part two's results are there.
+- Three commands: speech-voice, speech-drugs, speech-calls; speech-score
+  gains --key-facts and --drug-list (CLAUDE.md).
+
+The rulings of spec 15.9 for part two, each in one line:
+2. The three ways benched as a report only; nothing marks a name on a page.
+   Done for the rehearsal.
+4. The voice (D53) and the words (ruling 17) benched, together and apart;
+   nothing built into the app. Done for the rehearsal.
+15. The notes written twice from each page and twice from the script.
+    Done.
+16. A real drug that is not the one spoken counted, with the list, for
+    every choice, as a whole name of the list. Done.
+17, 18, 19. The three prompts byte for byte (sha256 pinned). Done.
+20. The key facts applied by code; the lists are Cowork's. Done.
+22. A turn with no speaker is Unknown. Done.
+21. Part two as its own run, with the cycle of 15.3. This is it.
+
+Decided in the plan review (Cowork, 11 Oct), as decisions of this stage:
+a drug is a whole name of the list, never one word of a longer name; the
+driver never loads the language model beside a speech model and marks the
+calls failed if a worker is still alive; the short form n/7, n/52, n/12 is
+days, weeks or months only when n is 24 or less; the voice figure is a
+distance; the nearest entry is none when no entry meets a single group.
+Decided while building: WORD_CLOSE_S is 2.0 s (above); foods are the
+sections the drug file names Oral nutrition and Enteral nutrition (0913,
+0914), not 0904; speech-drugs takes the recordings and data folders so it
+refuses them; a failed call is failed and not refused.
+
+Measurements, 11 Oct 2026, RTX 4090, v1 off:
+- 451 tests, 16.4 s, none skipped. App code 6,464 lines without the
+  bench (12,703 with it), tests 8,185. Largest file speech/nemotron/
+  models.py, 516 lines; no function over 80. CLAUDE.md 99 lines.
+- The two environments built into the working folder from the warm cache
+  in 11 s and 1 s (7.2 GB and 5.5 GB); the two local self-tests passed,
+  22 of 22 each, before the run and again after it. The word check of
+  stage 3: 4,038 of 4,038 calls rebuilt exactly before and after the
+  door's change.
+- Fix one on the card: 60 s each of zeros, noise at -50 and at -30 dBFS,
+  no line; the clip then 30 s of silence with no Stop until the end, 22 of
+  22 words, the last line final 3.09 s after its end and 28 s before Stop;
+  the largest gap between two tokens of one word 16 frames, no token after
+  a close by time. Recording 477: the last word's line final 3.21 s after
+  its end, 191 s before Stop (part one: at Stop, 194 s). The new Nemotron
+  pages beside the old: 462 94 lines and 661 words on both, 0 words
+  differ; 473 117 to 114 lines, 741 to 742 words, 3 differ; 477 51 to 50
+  lines, 359 words, 0; the made recording 92 to 90 lines, 971 words, 0;
+  the longest wait to final 3.2 to 3.4 s on every recording (the made
+  recording 4.22 to 3.24).
+- Fix two: part one's 18 results rescored with the new code, 3,838 leaves
+  of scores.json differ and every one is under the wait; 36 lines of
+  report.md, every one a wait. The least true wait to final is above zero
+  on every arm; to first shown it reads below zero on the one-transcript
+  choices (a line's first two words can stand in an earlier partial).
+- The drug list: July 2026, 235,494,243 bytes, 533,087 rows, fetched in
+  8 s; 3,801 names (2,679 of one word, 1,122 longer; 1,181 generic, 2,620
+  brand) made in 5 s; 19 of script 19's 20 drug names in it.
+- The minute of the doctor's voice: 39.3 s, 37.3 s of speech, peak -0.97
+  dBFS, typical -22.3, no sample clips.
+- The rehearsal (13:22 to 13:51, 29 min, nobody attending): Nemotron's
+  four results in 23 min; the voice method on the five pages of the made
+  recording in 6 s, and the plain not-run record on the nine pages of the
+  old recordings; 64 calls in 6 min, 1 failed (the doubtful drug names on
+  Nemotron's page of the made recording, cut at 1,500 tokens), 0 refused;
+  the tables twice from the stored results, byte for byte the same. The
+  connection records of the speech steps are empty. The card: Nemotron
+  4,022 MiB, the voice worker 1,396, the language model 17,444 at its
+  highest; never both at once.
+- The calls: the label check median 9.9 s, longest 16.9; output median
+  1,411 tokens, longest 2,665 of 3,000 (about 21 tokens a line, not the
+  13 the limit was set from). The doubtful drug names median 0.6 s,
+  longest 10.1 (the cut one). The notes median 4.8 s, longest 8.2; output
+  median 736, longest 1,284. The notes from the scripts median 4.1 s.
+- Read as a doubter (item 14): the scoring of figures counted a note's
+  own turn citations and read 5-10 as 510, fixed in c03b5de (361 figures
+  "not spoken" over 28 notes became 34); the tied pair's pages of 462 and
+  477 carry one speaker label, so their notes were given one turn and
+  cited turns that do not exist (every entry); on the made recording
+  AssemblyAI wrote glipizide for gliclazide three times early on, and the
+  language model then flagged the three later, right, gliclazide as
+  doubtful and named glipizide as the medicine meant; the list way marks
+  everyday words close to a brand (perfect, diabetes); a garbled name at
+  a closeness of 0.72 is missed at the figure of 0.75; no reply was
+  refused and no reasoning was cut.
+- The private word check printed nothing before every commit. Nothing
+  private is in V2: the private check's counts are all 0.
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: the three new commands and the two options;
+  fixed in this commit. The README's line; fixed in this commit.
+- V2_SPEC.md 15.9, the details of part two: WORD_CLOSE_S is 2.0 s, not
+  the join's pause; the drug file's columns (27, ICB in place of STP, one
+  new) and the lack of a class-code table on the portal's pages, so the
+  rule tells generic from branded by the data; the licence sentence is not
+  on the dataset page; the foods' sections. Cowork folds these in.
+- The plan's figure for the card (18,000 MiB): the language model took
+  17,444 MiB at its highest.
+
+For 5d: the language model with its 16,384 context took 17,444 MiB
+on the card; the voice worker under 1,396 MiB. For 5e: the two figures of
+the voice method and the closeness figure of the list are drafts, to be
+set again from the stored distances and marks on the new recordings; the
+wait to first shown can read below zero against the true start on the
+one-transcript choices (a line's first two words can stand in an earlier
+partial), a limit of the measure to put right. For stage 6: the four
+readings' counts on the old recordings say what the label check alone
+does on a real voice, and the made recording's say nothing of the voice
+method (a man's and a woman's machine voice).
+
+Next: the owner's check (uv sync, then the four self-tests on his real
+data folder), then push; the GitHub check must be green on all three
+systems. Then Cowork checks the report from the raw files.
+
 ## 2026-10-11. Stage 5c, part one: the replay bench and the transcript marks
 
 Built on 10 and 11 Oct 2026. The plan was reviewed by Cowork on 10 Oct
@@ -332,134 +497,3 @@ Next: the owner's check (install-speech --choice nemotron, the four
 self-tests, the app on 8001: This machine shows the rows), then push;
 the GitHub check must be green on all three systems. Then the 5c
 brainstorm.
-
-## 2026-10-10. Stage 5a: the transcription door
-
-Built on 9 and 10 Oct 2026. The plan was reviewed by Cowork on 9 Oct
-(seven changes) and the build again at the gate for the card (six
-changes); both are in. The checks on the card ran on 10 Oct with the v1
-service off.
-
-What was done:
-- One door to transcription (openconsult/speech): open at the sound's
-  rate, feed, stop with the number of speakers given. Every call gives
-  lines of text, each with a speaker or none, a start, an end and a
-  confidence or none (11.4), or a failure with its reason: not
-  installed, died, no answer, worker error, bad reply, no session,
-  session open, rate not supported, bad speakers. It never raises into
-  the app, and tries nothing else (10.4). Every result carries the stamp:
-  the choice, its models with their revisions or checksums, and its
-  library versions (R20).
-- The rule against words from silence, in the door, as a plain function:
-  the loudness of every piece fed, in 100 ms windows on the session
-  clock; a line is refused when even its loudest window is at or below
-  QUIET_DBFS = -40 dBFS. It runs on live lines, on the text not yet
-  final, on the last live lines made final at Stop, and on the raw
-  segments before the merge. What it refuses is kept and marked.
-- The worker frame: v1's frames kept word for word, a reader thread in
-  place of select, each start with its own queue and event; a made-up
-  worker runs as a real subprocess in the suite on the three systems.
-- The first choice, WhisperX with pyannote, as a worker run only by its
-  own environment's Python: the live stream on faster-whisper
-  distil-large-v3 (v1's buffer and commit margin), and at Stop the
-  live buffer transcribed once more so the last seconds are final, then
-  WhisperX large-v3 with word times and pyannote 3.1 with the count
-  given. No text is given to any model. The merge of raw segments into
-  turns is a plain function in the base app; raw segments are kept as
-  they came, flagged refused or not.
-- The environment lives in the data folder, built from the committed
-  lock file by openconsult install-speech, which then finds or fetches
-  every model at a pinned revision or checksum. The worker runs with the
-  hub's network off and loads from disk only; the voice activity model
-  is loaded by path, not by name. No model downloads without a click.
-- The self-test: the clip in 250 ms pieces at real time, Stop with one
-  speaker, at least 20 of the 22 expected words in order, live and at
-  Stop. openconsult self-test runs it; the result is stored in the new
-  table speech_self_test (version 3); This machine shows the two rows
-  on a suitable card.
-- The base app gains no library. NOTICE gains the environment's direct
-  libraries, the models it fetches, and the clip.
-
-The rulings of spec 15.9, each in one line:
-1. Two hard marks for a speech choice: the bench of 5c and 5e. Nothing
-   built; the rule against words from silence is the app's side of the
-   second mark.
-2. A misheard drug name is marked, never corrected silently: stage 6
-   and the bench. Nothing built.
-3. No speech model is given a line of drug names: v1's line is not
-   carried; the record of item 8 shows no prompt, prefix or hotwords.
-4. An unsure line is shown as unsure: stage 6. Nothing built.
-5. Two cloud services enter the bench: 5b. Nothing built.
-6. Stage 5 in five steps; this is 5a. Done when This machine says the
-   choice is installed and the self-test passed: it does.
-7. The sound as the microphone gives it: the door takes the rate with
-   the session (the new recordings are 48 kHz); the real worker takes
-   16,000 in 5a. Conversion is 5c's.
-
-Decided in the plan review of 9 Oct (Cowork), as decisions of this stage:
-the models are fetched at install, never by the worker; the sound's rate
-travels with the session; the last live lines are made final at Stop;
-no made-up confidence, so a turn with no scored word has none (v1 gave
-0.5: the gate of stage 6 must expect none); no test for a control a
-later stage builds; the archive is archive/HANDOVER_ARCHIVE.md; the
-clip's source is proven (whisper.cpp's sample, identical by checksum).
-Decided at the gate (Cowork): the pass at Stop asks the network nothing;
-a second open never throws sound away; a count below one is refused by
-the door; the stamp says only what is known (pyannote's inner models are
-stamped with the revision their main ref loads, read from disk); names
-and comments cite what they pin; the worker's log never holds what was
-said (its libraries held to warnings and above).
-
-Measurements, 10 Oct 2026, RTX 4090, v1 off:
-- 255 tests, 6.4 s, none skipped. App code 4,063 lines without the
-  bench (6,138 with it), tests 4,165. Largest file
-  speech/whisperx/models.py, 399 lines; no function over 80. CLAUDE.md
-  99 lines.
-- The environment: 123 packages locked, 119 installed on Linux, 7.2 GB,
-  built in 10 s from a warm uv cache; the second run audited and
-  changed nothing in 3.0 s. Every model found in the caches, none
-  downloaded. Every library permissive except the nvidia-* wheels
-  (NVIDIA's proprietary CUDA licence).
-- The self-test passed: 22 of 22 words live and at Stop. The worker
-  loaded in 2.9 s. The one live line that was final before Stop came
-  3.0 s after its sound ended; the last line was made final at Stop in
-  0.07 s. The pass at Stop took 2.1 s: load 1.0, transcribe 0.3, align
-  0.5, diarise 0.3. Nothing refused. The card's highest sample 7,600 MiB
-  (every 2 s). A second run with every connection and name lookup in the
-  worker recorded: the record was empty. The worker's log holds none of
-  the clip's words.
-- Silence: 60 s of zeros, of white noise at -50 dBFS and of white noise
-  at -30 dBFS, live and at Stop: neither model wrote a word, so the rule
-  had nothing to refuse, the -30 dBFS noise included. Measured levels
-  -inf, -50.0 and -30.0 dBFS. A measurement for 5e, not a pass mark.
-- v1's 445 figure, the source of the threshold, was an RMS over each
-  filler line's whole span; the rule uses the loudest 100 ms window of a
-  line, which is the stricter measure for refusing.
-- No text to a model: the live model's transcribe is called with
-  language en, beam 5, vad_filter, no condition on previous text and
-  nothing else; every prompt built is the bare start sequence (start of
-  transcript, English, transcribe; plus no timestamps for WhisperX), with
-  prefix None and hotwords None; WhisperX's options carry initial_prompt
-  None, prefix None, hotwords None.
-- The worker killed mid-clip: the next feed failed with died, the exit
-  code and the log's last line; feed and stop after it said no session;
-  no second worker was started; a new open loaded a new worker and the
-  whole clip went through.
-- The private word check printed nothing before every commit.
-
-Made untrue by this stage:
-- CLAUDE.md, Running it: the two new commands; the archive's path. The
-  README's line. Both fixed in this commit.
-- V2_SPEC.md 11.1 and 15.9 say the pass at Stop runs on the recording:
-  in 5a the worker keeps the sound it was fed and runs the pass on that;
-  stage 6 may hand it the file. 15.9 says the library versions are v1's:
-  the speech libraries are, and 43 helper packages resolved newer. The
-  spec is silent on the self-test's pass rule (20 of 22) and on the
-  rate carried with the session. Cowork folds these in.
-- The plan's figure for the threshold on raw sound is still owed to 5e.
-
-Next: the owner's check (install-speech, self-test, the app on 8001:
-This machine shows the two rows), then push; the GitHub check must be
-green on all three systems. Then the 5b brainstorm. For stage 6: the
-gate must expect a confidence of none; the worker's log and the sound
-the worker keeps belong to no consultation yet.

@@ -3,6 +3,137 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-10-10. Stage 5a: the transcription door
+
+Built on 9 and 10 Oct 2026. The plan was reviewed by Cowork on 9 Oct
+(seven changes) and the build again at the gate for the card (six
+changes); both are in. The checks on the card ran on 10 Oct with the v1
+service off.
+
+What was done:
+- One door to transcription (openconsult/speech): open at the sound's
+  rate, feed, stop with the number of speakers given. Every call gives
+  lines of text, each with a speaker or none, a start, an end and a
+  confidence or none (11.4), or a failure with its reason: not
+  installed, died, no answer, worker error, bad reply, no session,
+  session open, rate not supported, bad speakers. It never raises into
+  the app, and tries nothing else (10.4). Every result carries the stamp:
+  the choice, its models with their revisions or checksums, and its
+  library versions (R20).
+- The rule against words from silence, in the door, as a plain function:
+  the loudness of every piece fed, in 100 ms windows on the session
+  clock; a line is refused when even its loudest window is at or below
+  QUIET_DBFS = -40 dBFS. It runs on live lines, on the text not yet
+  final, on the last live lines made final at Stop, and on the raw
+  segments before the merge. What it refuses is kept and marked.
+- The worker frame: v1's frames kept word for word, a reader thread in
+  place of select, each start with its own queue and event; a made-up
+  worker runs as a real subprocess in the suite on the three systems.
+- The first choice, WhisperX with pyannote, as a worker run only by its
+  own environment's Python: the live stream on faster-whisper
+  distil-large-v3 (v1's buffer and commit margin), and at Stop the
+  live buffer transcribed once more so the last seconds are final, then
+  WhisperX large-v3 with word times and pyannote 3.1 with the count
+  given. No text is given to any model. The merge of raw segments into
+  turns is a plain function in the base app; raw segments are kept as
+  they came, flagged refused or not.
+- The environment lives in the data folder, built from the committed
+  lock file by openconsult install-speech, which then finds or fetches
+  every model at a pinned revision or checksum. The worker runs with the
+  hub's network off and loads from disk only; the voice activity model
+  is loaded by path, not by name. No model downloads without a click.
+- The self-test: the clip in 250 ms pieces at real time, Stop with one
+  speaker, at least 20 of the 22 expected words in order, live and at
+  Stop. openconsult self-test runs it; the result is stored in the new
+  table speech_self_test (version 3); This machine shows the two rows
+  on a suitable card.
+- The base app gains no library. NOTICE gains the environment's direct
+  libraries, the models it fetches, and the clip.
+
+The rulings of spec 15.9, each in one line:
+1. Two hard marks for a speech choice: the bench of 5c and 5e. Nothing
+   built; the rule against words from silence is the app's side of the
+   second mark.
+2. A misheard drug name is marked, never corrected silently: stage 6
+   and the bench. Nothing built.
+3. No speech model is given a line of drug names: v1's line is not
+   carried; the record of item 8 shows no prompt, prefix or hotwords.
+4. An unsure line is shown as unsure: stage 6. Nothing built.
+5. Two cloud services enter the bench: 5b. Nothing built.
+6. Stage 5 in five steps; this is 5a. Done when This machine says the
+   choice is installed and the self-test passed: it does.
+7. The sound as the microphone gives it: the door takes the rate with
+   the session (the new recordings are 48 kHz); the real worker takes
+   16,000 in 5a. Conversion is 5c's.
+
+Decided in the plan review of 9 Oct (Cowork), as decisions of this stage:
+the models are fetched at install, never by the worker; the sound's rate
+travels with the session; the last live lines are made final at Stop;
+no made-up confidence, so a turn with no scored word has none (v1 gave
+0.5: the gate of stage 6 must expect none); no test for a control a
+later stage builds; the archive is archive/HANDOVER_ARCHIVE.md; the
+clip's source is proven (whisper.cpp's sample, identical by checksum).
+Decided at the gate (Cowork): the pass at Stop asks the network nothing;
+a second open never throws sound away; a count below one is refused by
+the door; the stamp says only what is known (pyannote's inner models are
+stamped with the revision their main ref loads, read from disk); names
+and comments cite what they pin; the worker's log never holds what was
+said (its libraries held to warnings and above).
+
+Measurements, 10 Oct 2026, RTX 4090, v1 off:
+- 255 tests, 6.4 s, none skipped. App code 4,063 lines without the
+  bench (6,138 with it), tests 4,165. Largest file
+  speech/whisperx/models.py, 399 lines; no function over 80. CLAUDE.md
+  99 lines.
+- The environment: 123 packages locked, 119 installed on Linux, 7.2 GB,
+  built in 10 s from a warm uv cache; the second run audited and
+  changed nothing in 3.0 s. Every model found in the caches, none
+  downloaded. Every library permissive except the nvidia-* wheels
+  (NVIDIA's proprietary CUDA licence).
+- The self-test passed: 22 of 22 words live and at Stop. The worker
+  loaded in 2.9 s. The one live line that was final before Stop came
+  3.0 s after its sound ended; the last line was made final at Stop in
+  0.07 s. The pass at Stop took 2.1 s: load 1.0, transcribe 0.3, align
+  0.5, diarise 0.3. Nothing refused. The card's highest sample 7,600 MiB
+  (every 2 s). A second run with every connection and name lookup in the
+  worker recorded: the record was empty. The worker's log holds none of
+  the clip's words.
+- Silence: 60 s of zeros, of white noise at -50 dBFS and of white noise
+  at -30 dBFS, live and at Stop: neither model wrote a word, so the rule
+  had nothing to refuse, the -30 dBFS noise included. Measured levels
+  -inf, -50.0 and -30.0 dBFS. A measurement for 5e, not a pass mark.
+- v1's 445 figure, the source of the threshold, was an RMS over each
+  filler line's whole span; the rule uses the loudest 100 ms window of a
+  line, which is the stricter measure for refusing.
+- No text to a model: the live model's transcribe is called with
+  language en, beam 5, vad_filter, no condition on previous text and
+  nothing else; every prompt built is the bare start sequence (start of
+  transcript, English, transcribe; plus no timestamps for WhisperX), with
+  prefix None and hotwords None; WhisperX's options carry initial_prompt
+  None, prefix None, hotwords None.
+- The worker killed mid-clip: the next feed failed with died, the exit
+  code and the log's last line; feed and stop after it said no session;
+  no second worker was started; a new open loaded a new worker and the
+  whole clip went through.
+- The private word check printed nothing before every commit.
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: the two new commands; the archive's path. The
+  README's line. Both fixed in this commit.
+- V2_SPEC.md 11.1 and 15.9 say the pass at Stop runs on the recording:
+  in 5a the worker keeps the sound it was fed and runs the pass on that;
+  stage 6 may hand it the file. 15.9 says the library versions are v1's:
+  the speech libraries are, and 43 helper packages resolved newer. The
+  spec is silent on the self-test's pass rule (20 of 22) and on the
+  rate carried with the session. Cowork folds these in.
+- The plan's figure for the threshold on raw sound is still owed to 5e.
+
+Next: the owner's check (install-speech, self-test, the app on 8001:
+This machine shows the two rows), then push; the GitHub check must be
+green on all three systems. Then the 5b brainstorm. For stage 6: the
+gate must expect a confidence of none; the worker's log and the sound
+the worker keeps belong to no consultation yet.
+
 ## 2026-10-07. Stage 3b: the engine bench
 
 Built over 6 and 7 Oct 2026 and published on 7 Oct, after the owner ruled

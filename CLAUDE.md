@@ -84,16 +84,16 @@ Think from the patient's side. In teaching mode, from the learner's side.
     uv run openconsult reset-password [--data-folder DIR]
     uv run openconsult install-speech [--choice NAME] [--data-folder DIR]   # a choice's environment and models, into the data folder
     uv run openconsult self-test [--choice NAME] [--data-folder DIR]        # the clip through the door; stored. NAME: whisperx_pyannote (the default), nemotron, speechmatics, assemblyai
-    uv run pytest                                      # the suite
-    uv run python .github/scripts/start_check.py       # start, answer, stop
+    uv run pytest; uv run python .github/scripts/start_check.py   # the suite; then start, answer, stop
     uv run openconsult-bench wordcheck --cases DIR --out DIR --v1-calls FILE...  # no model
     uv run openconsult-bench run --cases DIR --out DIR --digest ID [--kind ollama|llamacpp|vllm --engine URL --model NAME] [--together] [--chains A1 ...]
-    uv run openconsult-bench score --out DIR | --replies FILE     # the marks of one arm
-    uv run openconsult-bench figures --public engine-bench        # the figures of the public report; no engine
-    uv run openconsult-bench speech-fetch --data-folder DIR       # the tied pair's model, for the speech bench only
-    uv run openconsult-bench speech-run --recordings DIR --arm NAME --data-folder DIR --out DIR [--recording NAME ...]   # a banked recording through an arm, as if live
-    uv run openconsult-bench speech-score --out DIR --recordings DIR --scripts DIR [--scripts DIR] --marks FILE --write DIR   # the tables, from the stored results alone
+    uv run openconsult-bench score --out DIR | --replies FILE     # the marks of one arm; figures --public engine-bench: the public report's figures, no engine
+    uv run openconsult-bench speech-run --recordings DIR --arm NAME --data-folder DIR --out DIR [--recording NAME ...]   # a banked recording through an arm, as if live; speech-fetch --data-folder DIR first for the tied pair's model
+    uv run openconsult-bench speech-voice --out DIR --recordings DIR --data-folder DIR [--recording NAME ...] [--arm NAME ...]   # the doctor's voice learnt once, each line marked; under DIR/voice
+    uv run openconsult-bench speech-drugs --month YYYYMM --from URL --out DIR [--recordings DIR]   # the UK drug list from one month of the prescribing data; the one fetch from outside
+    uv run openconsult-bench speech-calls --out DIR --recordings DIR --scripts DIR [--scripts DIR] --job label_check|drug_name|note|script_note [--round N] [--data-folder DIR] [--engine URL]   # the language model on the stored pages; under DIR/calls
+    uv run openconsult-bench speech-score --out DIR --recordings DIR --scripts DIR [--scripts DIR] --marks FILE --write DIR [--key-facts FILE --drug-list FILE]   # the tables, from the stored results alone; the two files where part two's results are there
 
-The benches write only under --out or --write, never to the app's data, the repo or where recordings are kept. The engine bench's published form is engine-bench; other cases, recordings and results stay in the log folder. install-speech and self-test write only in the data folder they are given. A cloud choice needs no install: its key goes in .env in the data folder (see .env.example), and its self-test sends the clip to the service's EU address.
+The benches write only under --out or --write, never to the app's data, the repo or where recordings are kept; a recording of the doctor's voice alone (voice_only in the list) is learnt from and never replayed. The engine bench's published form is engine-bench; other cases, recordings and results stay in the log folder. install-speech and self-test write only in the data folder they are given. A cloud choice needs no install: its key goes in .env in the data folder (see .env.example), and its self-test sends the clip to the service's EU address.
 
 Data folder: Linux $XDG_DATA_HOME/openconsult or ~/.local/share/openconsult; macOS ~/Library/Application Support/OpenConsult; Windows %LOCALAPPDATA%\OpenConsult.

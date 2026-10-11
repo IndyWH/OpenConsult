@@ -10,7 +10,12 @@ This branch is where OpenConsult v2.0 is being built.
   each proven by a self-test on a bundled clip. A replay bench feeds a banked
   recording through the same door as if it were live and scores the transcript
   against the script: passages missing with or without a sign, words written
-  in silence, drug names, who spoke, and the wait. It cannot run a
+  in silence, drug names, who spoke, and the wait. The bench can then measure
+  what is done with a transcript: who spoke each line by the doctor's own
+  voice and by the language model's reading of the words, which drug names
+  are in doubt by a UK drug list, a second listen and the language model,
+  and which key facts reach a note. Every figure so far is from a rehearsal
+  on old recordings and machine voices; none counts. It cannot run a
   consultation yet.
 - The engine bench is in engine-bench: the same cases through Ollama, llama.cpp and vLLM, with every reply and every figure.
 
