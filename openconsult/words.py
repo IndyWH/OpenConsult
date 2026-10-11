@@ -279,3 +279,9 @@ BENCH_VOICE_NEEDS_VOICE_ONLY = ("{name} names {voice} as the doctor's voice, but
                                 "so nothing was run.")
 BENCH_VOICE_ONLY_REFUSED = "{name} holds the doctor's voice alone and is never fed as a consultation."
 BENCH_VOICE_DONE = "The voice method ran on {run} pages, was not run on {not_run}, failed on {failed}; {kept} results were already there."
+
+# The UK drug list of the speech bench. Drafts for the owner.
+BENCH_DRUGS_FETCHING = "Fetching the month {month} from {url}."
+BENCH_DRUGS_FETCHED = "Fetched {size}, sha256 {sha256}, to {path}."
+BENCH_DRUGS_BAD_FILE = "The file could not be used: {reason}"
+BENCH_DRUGS_MADE = "The drug list holds {names} names from {rows} rows of {month}. Written: {path}"

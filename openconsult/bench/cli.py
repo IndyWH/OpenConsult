@@ -209,8 +209,17 @@ def cmd_speech_voice(args) -> int:
                                          args.arm, say=say)
 
 
+def cmd_speech_drugs(args) -> int:
+    return speech_commands2.speech_drugs(args.month, getattr(args, "from"), Path(args.out), say=say)
+
+
 def add_speech_commands(sub) -> None:
     """The speech bench (spec 15.9, the details of 5c)."""
+    p = sub.add_parser("speech-drugs")
+    p.set_defaults(fn=cmd_speech_drugs)
+    p.add_argument("--month", required=True, help="the month of the drug file, as YYYYMM")
+    p.add_argument("--from", required=True, help="the address of that month's file on the portal")
+    p.add_argument("--out", required=True, help="where the file and the list go: not the repo, not a data folder")
     p = sub.add_parser("speech-voice")
     p.set_defaults(fn=cmd_speech_voice)
     p.add_argument("--out", required=True, help="the results folder of speech-run; the voice results go under it")

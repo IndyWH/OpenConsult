@@ -172,6 +172,15 @@ alone and are not part of the app:
   choice's own worker and models, loaded by path, with v1's line of drug
   names given to the live model only. No new component.
 
+Stage 5c, part two, 11 Oct 2026. The UK drug list of the speech bench is
+made by openconsult-bench speech-drugs from one month of the Prescription
+Cost Analysis monthly data of the NHS Business Services Authority, from its
+Open Data Portal (https://opendata.nhsbsa.net/dataset/prescription-cost-analysis-pca-monthly-data),
+under the Open Government Licence v3.0: contains public sector information
+licensed under the Open Government Licence v3.0. Neither the file nor the
+list is in the repo; the command fetches the file and makes the list on the
+user's own computer. No library is added for it.
+
 The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 

@@ -9,12 +9,15 @@ exists. A failure is kept as failed and counted; nothing is tried again."""
 from __future__ import annotations
 
 import datetime as dt
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Callable
 
 from openconsult import words
-from openconsult.bench.speech import banked, voice
-from openconsult.bench.speech.commands import forbidden_for
+from openconsult.bench.speech import banked, druglist, voice
+from openconsult.bench.speech.commands import REPO, forbidden_for
+from openconsult.settings import paths
 from openconsult.bench.writer import Refused, ResultWriter
 from openconsult.speech import environment
 from openconsult.speech.choices import WHISPERX_PYANNOTE
@@ -68,3 +71,40 @@ def speech_voice(out: Path, recordings_folder: Path, data_folder: Path, names: l
     say(words.BENCH_VOICE_DONE.format(run=len(summary["run"]), not_run=len(summary["not_run"]),
                                       failed=len(summary["failed"]), kept=len(summary["kept"])))
     return 5 if summary["failed"] else 0
+
+
+def speech_drugs(month: str, url: str, out: Path, say: Callable = print,
+                 urlopen: Callable = urllib.request.urlopen) -> int:
+    """One month of the drug file fetched to out, and the list made from it;
+    neither over a file that exists. The one fetch from outside in part two."""
+    out = Path(out)
+    try:
+        ResultWriter(out, forbidden=(REPO, paths.default_data_folder()))     # a check of the folder only
+    except Refused as refused:
+        say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
+        return 6
+    target, listing = out / f"pca_{month}.csv", out / "drug_list.json"
+    for existing in (target, listing):
+        if existing.exists():
+            say(words.BENCH_WRITE_EXISTS.format(path=existing))
+            return 6
+    say(words.BENCH_DRUGS_FETCHING.format(month=month, url=url))
+    try:
+        fetched = druglist.fetch(url, target, urlopen=urlopen)
+    except (OSError, urllib.error.URLError, ValueError) as failed:
+        say(words.BENCH_DRUGS_BAD_FILE.format(reason=failed))
+        return 3
+    say(words.BENCH_DRUGS_FETCHED.format(size=environment.plain_size(fetched["bytes"]), sha256=fetched["sha256"], path=target))
+    try:
+        listed = druglist.make_list(target, month)
+    except (druglist.BadFile, UnicodeDecodeError, csv_error()) as bad:
+        say(words.BENCH_DRUGS_BAD_FILE.format(reason=bad))
+        return 3
+    druglist.write_list(listing, listed)
+    say(words.BENCH_DRUGS_MADE.format(names=listed["names_count"], rows=listed["rows"], month=month, path=listing))
+    return 0
+
+
+def csv_error():
+    import csv
+    return csv.Error
