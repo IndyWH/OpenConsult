@@ -29,6 +29,8 @@ def test_ruling_19_every_figure_the_transcript_does_not_hold_with_doses_in_other
     # 1 g, 1000 mg and 1,000 mg are the spoken gram; 2/52 is the spoken two weeks; 150 and 95 were spoken in words;
     # the 2 of T2DM and the 1 of HbA1c are not figures.
     assert notes.read_short_forms("2/52 and 110/52 and 24/7 and 25/7 and 1,000") == "2 weeks and 110/52 and 24 days and 25/7 and 1000"
+    signed = note(objective=[("BP ~150/95, HR <95", [1]), ("Weight 2-3 kg down", [0])])
+    assert [f["figure"] for f in notes.figures_not_spoken(signed, TRANSCRIPT)] == ["3"]      # the signs are dropped; 150, 95 and 2 were spoken
     # A turn citation inside the text is not a figure, and 5-10 is two figures (found in the rehearsal's tables).
     cited = note(subjective=[("Pain lasting 5-10 mins, radiates to left arm [8].", [8]), ("Breathless [12, 13]", [12, 13])])
     found = notes.figures_not_spoken(cited, normalise("lasts five to ten minutes"))
@@ -62,6 +64,9 @@ def test_ruling_19_the_drug_names_of_a_note(tmp_path):
     assert [(n["name"], n["section"]) for n in found["names_not_spoken"]] == [
         ("glucoform", "subjective"), ("night calm", "subjective"), ("night calm", "plan"), ("light mineral parafil", "plan")]
     assert found["unclear_entries"] == 1
+    # A name joined to another word by a slash or a hyphen is seen (the check of part two, fix 1).
+    joined = notes.drug_names_in_note(note(plan=[("Stop glucoform/metforma if unwell", [0]), ("Dormirex-induced rash", [0])]), drugs, ["metforma"], ["metforma"])
+    assert [n["name"] for n in joined["names_not_spoken"]] == ["glucoform", "dormirex"] and joined["right_name_present"] == {"metforma": True}
     # One word of a longer name is not a name (the plan review's change 1): "light" alone, "night" alone.
     alone = notes.drug_names_in_note(note(plan=[("A light night", [0])]), drugs, [], ["dormirex"])
     assert alone["names_not_spoken"] == [] and alone["right_name_present"] == {"dormirex": False}

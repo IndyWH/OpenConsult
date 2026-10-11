@@ -18,16 +18,10 @@ from openconsult.speech.matching import UNITS, normalise
 
 SECTIONS = keyfacts.SECTIONS
 _FIGURE = re.compile(r"^\d+(\.\d+)?$")
-_THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}\b)")
 # A GP's short form for a length of time: a figure, a slash and 7, 52 or 12
 # is days, weeks or months, when the figure is 24 or less (the plan review of
 # part two, change 3); otherwise the slash is the word over, as 110/52 is.
 _SHORT_FORM = re.compile(r"\b(\d+)/(7|52|12)\b")
-# A note cites its turns inside its text as well, [12, 13]: those numbers
-# are turns, not figures. And a hyphen between two figures is a range,
-# 5-10 mins: two figures, not one (found by reading the rehearsal's tables).
-_CITATION = re.compile(r"\[\s*\d+(?:\s*,\s*\d+)*\s*\]")
-_RANGE = re.compile(r"(?<=\d)-(?=\d)")
 SHORT_FORM_LIMIT = 24
 SHORT_FORM_WORDS = {"7": "days", "52": "weeks", "12": "months"}
 # A dose in other units counts as spoken: the units of mass, in milligrams.
@@ -38,14 +32,14 @@ UNCLEAR = "unclear"
 
 
 def read_short_forms(text: str) -> str:
-    """The note's side, read before the matching: turn citations dropped, a
-    thousands comma removed, a range split, the short forms for time read."""
+    """The note's side, read before the matching: the shorthand read as
+    words (keyfacts.read_shorthand: citations, thousands commas, signs,
+    ranges, slashes between words), then the short forms for time."""
     def replace(match):
         if int(match.group(1)) <= SHORT_FORM_LIMIT:
             return f"{match.group(1)} {SHORT_FORM_WORDS[match.group(2)]}"
         return match.group(0)
-    text = _RANGE.sub(" to ", _THOUSANDS.sub("", _CITATION.sub(" ", text)))
-    return _SHORT_FORM.sub(replace, text)
+    return _SHORT_FORM.sub(replace, keyfacts.read_shorthand(text))
 
 
 def figures_with_units(words: list[str]) -> list[tuple[str, str | None]]:
@@ -115,21 +109,23 @@ def drug_names_in_note(note: dict, drugs: DrugList, spoken_names: list[str], nev
     spoken = {" ".join(normalise(n)) for n in spoken_names}
     right = {}
     not_spoken, unclear = [], 0
-    all_words = []
+    all_readings: list[list[str]] = []
     for section, text in _texts(note):
-        words = normalise(text)
-        all_words += words
-        if UNCLEAR in words and section != "reasoning":
+        # Both readings of the entry, so a name joined to another word by a
+        # slash or a hyphen is seen (fix 1 of the check of part two).
+        entry = keyfacts.readings(text)
+        all_readings += entry
+        if any(UNCLEAR in words for words in entry) and section != "reasoning":
             unclear += 1
         seen = set()
-        for index in range(len(words)):
-            whole = drugs.in_list_at(words, index)
-            if whole and whole not in spoken and whole not in seen:
-                seen.add(whole)
-                not_spoken.append({"name": whole, "section": section, "text": text})
+        for words in entry:
+            for index in range(len(words)):
+                whole = drugs.in_list_at(words, index)
+                if whole and whole not in spoken and whole not in seen:
+                    seen.add(whole)
+                    not_spoken.append({"name": whole, "section": section, "text": text})
     for name in never_right:
-        target = normalise(name)
-        right[name] = any(all_words[i:i + len(target)] == target for i in range(len(all_words) - len(target) + 1))
+        right[name] = any(keyfacts._holds(words, target) for words in all_readings for target in keyfacts.readings(name))
     return {"right_name_present": right, "names_not_spoken": not_spoken, "unclear_entries": unclear}
 
 

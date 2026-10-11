@@ -20,7 +20,7 @@ def note(**sections):
 
 
 def outcome(text, fact_id):
-    return keyfacts.outcome_for_entry(keyfacts.normalise(text), fact(fact_id), NEG)
+    return keyfacts.outcome_for_entry(keyfacts.readings(text), fact(fact_id), NEG)
 
 
 def test_ruling_20_the_four_outcomes_for_one_entry():
@@ -73,4 +73,34 @@ def test_9_3_every_alternative_and_negation_word_goes_through_the_matching(tmp_p
     assert "nil" in read.negations and "afebrile" in read.negations and "not" in read.negations
     assert read.kinds[0] == "red_flag" and read.kinds[-1] == "plan"
     # Curly apostrophes and capitals on the note's side read the same as the file's words.
-    assert keyfacts.outcome_for_entry(keyfacts.normalise("DENIES pain AT REST"), fact("MU-01"), read.negations) == "found"
+    assert keyfacts.outcome_for_entry(keyfacts.readings("DENIES pain AT REST"), fact("MU-01"), read.negations) == "found"
+
+
+def test_a_notes_shorthand_is_read_as_words_before_a_key_fact_is_looked_for():
+    # The check of part two, fix 1: each shorthand in both directions, found where it hid the words and
+    # still missing where the group is truly lacking.
+    slashed = {"id": "x", "kind": "safety_net", "fact": "x", "said_in": [1], "needs": [["vomiting", "sick"], ["stop"]], "negated": False}
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Vomiting/diarrhoea/unable to eat: stop metforma"), slashed, NEG) == "found"   # a
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Diarrhoea/unable to eat: stop metforma"), slashed, NEG) == "missing"
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Review 3/month if vomiting; stop"), slashed, NEG) == "found"   # a figure and a word
+    assert outcome("BP ~150/95", "MU-02") == "found" and outcome("BP >150/95", "MU-02") == "found"           # b
+    assert outcome("BP ~140/95", "MU-02") == "changed"
+    timed = {"id": "y", "kind": "drug", "fact": "y", "said_in": [1], "needs": [["metforma"]], "numbers": [["3"]], "negated": False}
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Metforma 3x daily"), timed, NEG) == "found"            # c
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Metforma 4x daily"), timed, NEG) == "changed"
+    ranged = {"id": "z", "kind": "positive", "fact": "z", "said_in": [1], "needs": [["attacks"]], "numbers": [["2", "3"]], "negated": False}
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Attacks 2-3 a month"), ranged, NEG) == "found"        # d
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Attacks 4-5 a month"), ranged, NEG) == "changed"
+    joined = {"id": "w", "kind": "drug", "fact": "w", "said_in": [1], "needs": [["metforma"], ["cough", "induced"]], "negated": False}
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Metforma-induced cough"), joined, NEG) == "found"      # e, parted
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Metformainduced cough"), joined, NEG) == "missing"
+    cocod = {"id": "v", "kind": "drug", "fact": "v", "said_in": [1], "needs": [["co-codamol"]], "negated": False}
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Takes co-codamol"), cocod, NEG) == "found"             # e, joined as today
+    assert keyfacts.outcome_for_entry(keyfacts.readings("Takes cocodamol"), cocod, NEG) == "found"
+    # An alternative with a slash and one with a range are read as the note is; a citation and a thousands comma too.
+    alt = {"id": "u", "kind": "plan", "fact": "u", "said_in": [1], "needs": [["b/l", "both sides"], ["2-3 weeks"]], "negated": False}
+    assert keyfacts.outcome_for_entry(keyfacts.readings("B/L oedema, review 2-3 weeks [4]"), alt, NEG) == "found"
+    assert keyfacts.outcome_for_entry(keyfacts.readings("B L oedema, review 2 to 3 weeks"), alt, NEG) == "found"
+    assert outcome("Metforma 1,000mg BD [2, 3]", "MU-05") == "found"
+    assert keyfacts.readings("Metforma-induced") == [["metformainduced"], ["metforma", "induced"]]
+    assert keyfacts.readings("BP 150/95") == [["bp", "150", "over", "95"]]

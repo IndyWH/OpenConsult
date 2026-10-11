@@ -19,6 +19,41 @@ from openconsult.speech.matching import normalise
 OUTCOMES = ("found", "changed", "part", "missing")
 SECTIONS = ("subjective", "objective", "assessment", "plan")
 _FIGURE = re.compile(r"^\d+(\.\d+)?$")
+# A note is full of shorthand, and the matching of part one reads shorthand
+# as one word (the check of part two, fix 1). Before the matching, a note's
+# text, and every alternative, unless phrase and word of negation of a rule,
+# go through the same reading: a turn citation dropped; a thousands comma
+# removed; a sign of about, more than or less than before a figure dropped;
+# a figure with x after it parted; a range of two figures parted; a slash
+# between two words, or between a figure and a word, parted (a slash
+# between two figures stays: 150/95 is 150 over 95). A hyphen between two
+# words is read both ways, joined as the matching joins it (co-codamol) and
+# parted, and a thing is met when it is met in either reading.
+_CITATION = re.compile(r"\[\s*\d+(?:\s*,\s*\d+)*\s*\]")
+_THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}(?!\d))")
+_SIGN_BEFORE_FIGURE = re.compile(r"[~\u2248<>\u2265\u2264]+\s*(?=\d)")
+_TIMES = re.compile(r"(?<=\d)x\b")
+_RANGE = re.compile(r"(?<=\d)-(?=\d)")
+_SLASH_WORDS = re.compile(r"(?<=[A-Za-z])/(?=[A-Za-z0-9])|(?<=\d)/(?=[A-Za-z])")
+_HYPHEN_WORDS = re.compile(r"(?<=[A-Za-z])-(?=[A-Za-z])")
+
+
+def read_shorthand(text: str) -> str:
+    """A note's text with its shorthand read as words, before the matching."""
+    text = _THOUSANDS.sub("", _CITATION.sub(" ", str(text)))
+    text = _SIGN_BEFORE_FIGURE.sub("", text)
+    text = _TIMES.sub(" x", text)
+    text = _RANGE.sub(" to ", text)
+    return _SLASH_WORDS.sub(" ", text)
+
+
+def readings(text: str) -> list[list[str]]:
+    """The words of a text in its one or two readings: hyphenated words
+    joined, and, where that differs, parted."""
+    plain = read_shorthand(text)
+    joined = normalise(plain)
+    parted = normalise(_HYPHEN_WORDS.sub(" ", plain))
+    return [joined] if parted == joined else [joined, parted]
 
 
 class KeyFacts:
@@ -27,7 +62,8 @@ class KeyFacts:
 
     def __init__(self, data: dict):
         self.kinds = tuple(data["kinds_in_order"])
-        self.negations = frozenset(NEGATIONS) | frozenset(_word(w)[0] for w in data.get("negation_words_added", []) if _word(w))
+        self.negations = frozenset(NEGATIONS) | frozenset(w for added in data.get("negation_words_added", [])
+                                                          for reading in readings(added) for w in reading[:1])
         self.scripts = {key: dict(script) for key, script in data["scripts"].items()}
 
     @classmethod
@@ -47,27 +83,30 @@ class KeyFacts:
         return found
 
 
-def _word(text: str) -> list[str]:
-    return normalise(text)
-
-
 def _holds(words: list[str], part: list[str]) -> bool:
     return bool(part) and any(words[i:i + len(part)] == part for i in range(len(words) - len(part) + 1))
 
 
-def groups_met(entry_words: list[str], fact: dict) -> int:
+def stands(entry: list[list[str]], phrase: str) -> bool:
+    """Whether a phrase of a rule stands in an entry as whole words in
+    order, in either reading of either side."""
+    return any(_holds(words, part) for words in entry for part in readings(phrase))
+
+
+def groups_met(entry: list[list[str]], fact: dict) -> int:
     """How many of the fact's groups stand in the entry: a group is met when
     any of its alternatives stands there as whole words in order."""
-    return sum(1 for group in fact["needs"] if any(_holds(entry_words, _word(alt)) for alt in group))
+    return sum(1 for group in fact["needs"] if any(stands(entry, alt) for alt in group))
 
 
-def outcome_for_entry(entry_words: list[str], fact: dict, negations: frozenset) -> str | None:
-    """One entry: found, changed, part or missing; None when the entry is
-    passed over (an unless phrase stands in it)."""
-    if any(_holds(entry_words, _word(phrase)) for phrase in fact.get("unless", [])):
+def outcome_for_entry(entry: list[list[str]], fact: dict, negations: frozenset) -> str | None:
+    """One entry, in its readings: found, changed, part or missing; None
+    when the entry is passed over (an unless phrase stands in it)."""
+    if any(stands(entry, phrase) for phrase in fact.get("unless", [])):
         return None
-    if groups_met(entry_words, fact) < len(fact["needs"]):
+    if groups_met(entry, fact) < len(fact["needs"]):
         return "missing"
+    entry_words = [w for words in entry for w in words]
     figures = [w for w in entry_words if _FIGURE.match(w)]
     numbers_met = all(any(str(f) in figures for f in group) for group in fact.get("numbers", []))
     negated_ok = (not fact.get("negated")) or any(w in negations for w in entry_words)
@@ -95,7 +134,7 @@ def check_note(note: dict, fact: dict, negations: frozenset) -> dict:
     outcomes, nearest, most, found_with_negation, found_without = [], None, 0, False, False
     for section in sections:
         for entry in note.get(section, []):
-            words = normalise(str(entry.get("text", "")))
+            words = readings(str(entry.get("text", "")))
             outcome = outcome_for_entry(words, fact, negations)
             if outcome is None:
                 continue
@@ -104,7 +143,7 @@ def check_note(note: dict, fact: dict, negations: frozenset) -> dict:
             if met > most:
                 most, nearest = met, {"section": section, "text": entry.get("text", ""), "groups_met": met}
             if outcome == "found" and not fact.get("negated"):
-                if any(w in negations for w in words):
+                if any(w in negations for reading in words for w in reading):
                     found_with_negation = True
                 else:
                     found_without = True
