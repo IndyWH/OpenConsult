@@ -63,6 +63,10 @@ What was done:
 - The bench's files are the same bytes on the three systems: the tables
   are written with "\n" line ends, and v1's line is marked -text in
   .gitattributes so Git never changes a byte of what is hashed (ruling 3).
+- The GitHub check was red on Windows at 41025f2, in four tests only: a
+  made-up script written in text mode no longer matched its checksum, and
+  a path was compared as a string with a slash. The script is now written
+  as bytes and the path compared by its parts. The owner's push is the proof.
 
 The rulings of spec 15.9 for 5c, part one, each in one line:
 12. The wider rule, with the figures as named constants; Nemotron's first

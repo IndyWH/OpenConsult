@@ -68,5 +68,7 @@ def made_up_recordings(folder: Path, rate: int = 16000, seconds: float = 3.0, ex
 def scripts_folder(tmp_path: Path) -> Path:
     folder = tmp_path / "scripts"
     folder.mkdir(parents=True, exist_ok=True)
-    (folder / "made_up.md").write_text(SCRIPT, encoding="utf-8")
+    # As bytes, the bytes SCRIPT_SHA256 is taken from: text mode would write
+    # each line break as two bytes on Windows, and the bench would refuse it.
+    (folder / "made_up.md").write_bytes(SCRIPT.encode("utf-8"))
     return folder

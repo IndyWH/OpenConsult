@@ -3,6 +3,7 @@ R18; 13.4 rule 3; ruling 14; ruling 15). A made-up door; the recordings
 are made sound."""
 
 import json
+from pathlib import Path
 
 import pytest
 
@@ -121,6 +122,7 @@ def test_speech_fetch_runs_the_tied_pairs_fetch_with_the_nemotron_environment(tm
         return Done()
 
     assert commands.speech_fetch(data, say=said.append, run=run) == 0
-    assert calls[0][0] == str(environment.python(data, NEMOTRON)) and calls[0][1].endswith("tied/fetch.py")
+    assert calls[0][0] == str(environment.python(data, NEMOTRON))
+    assert Path(calls[0][1]).parts[-2:] == ("tied", "fetch.py")           # by parts: the separator differs by system
     assert said[-1] == words.MODEL_FOUND.format(model="words: made-up", size="1 kB")
     assert commands.speech_fetch(tmp_path / "no-env", say=said.append, run=run) == 7
