@@ -6,6 +6,7 @@ user's own settings or data, and the guard fails any test that tries.
 
 from __future__ import annotations
 
+import hashlib
 import html
 import os
 import sqlite3
@@ -177,8 +178,11 @@ class _RefusalFinder(HTMLParser):
 # ---------------------------------------- where recordings are kept (R18)
 
 def snapshot(folder: Path) -> dict:
-    """Every file under the folder with its size and its time of change."""
-    return {p.relative_to(folder).as_posix(): (p.stat().st_size, p.stat().st_mtime_ns)
+    """Every file under the folder with its size, its time of change and the
+    sha256 of its bytes: a file system's clock may move in coarse steps, and
+    two writes within one step keep the same time, so content tells."""
+    return {p.relative_to(folder).as_posix():
+            (p.stat().st_size, p.stat().st_mtime_ns, hashlib.sha256(p.read_bytes()).hexdigest())
             for p in sorted(folder.rglob("*")) if p.is_file()}
 
 

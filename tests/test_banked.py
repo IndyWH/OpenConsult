@@ -42,16 +42,28 @@ def test_R18_a_recording_whose_checksum_differs_is_refused_before_anything_is_re
 
 
 def test_R18_the_guard_fails_a_test_that_writes_where_recordings_are_kept(recordings_kept):
+    # None of the three leans on the file clock: a file system whose times move
+    # in coarse steps gives two quick writes the same time. The guard keeps the
+    # time too, so a restored file is settled, never expected to pass as quiet.
     folder = made_up_recordings(recordings_kept.folder)
     recordings_kept.settle()
     recordings_kept.check()                                                 # nothing written: quiet
-    (folder / "new.wav").write_bytes(b"x")
-    with pytest.raises(pytest.fail.Exception, match="R18"):
+    (folder / "new.wav").write_bytes(b"x")                                 # a file added
+    with pytest.raises(pytest.fail.Exception, match="R18.*new.wav"):
         recordings_kept.check()
     (folder / "new.wav").unlink()
-    (folder / "one.wav").write_bytes((folder / "one.wav").read_bytes())    # the same bytes, written again
-    with pytest.raises(pytest.fail.Exception, match="one.wav"):
+    recordings_kept.settle()
+    two = (folder / "two.wav").read_bytes()
+    (folder / "two.wav").unlink()                                           # a file removed
+    with pytest.raises(pytest.fail.Exception, match="two.wav"):
         recordings_kept.check()
+    (folder / "two.wav").write_bytes(two)
+    recordings_kept.settle()
+    one = (folder / "one.wav").read_bytes()
+    (folder / "one.wav").write_bytes(one[:-1] + bytes([one[-1] ^ 1]))     # one byte changed, the same length
+    with pytest.raises(pytest.fail.Exception, match="one.wav") as caught:
+        recordings_kept.check()
+    assert "two.wav" not in str(caught.value)                              # the changed file is named, no other
     recordings_kept.settle()                                                # so the teardown passes after the twin
 
 
