@@ -3,6 +3,159 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-10-10. Stage 5b: the Nemotron choice and the two cloud choices
+
+Built on 10 Oct 2026. The plan was reviewed by Cowork the same day (nine
+changes and one addition to Part 4); all are in. The checks on the card
+and against the two services ran on 10 Oct with the v1 service off.
+
+What was done:
+- Three more speech choices behind the door of 5a (openconsult/speech):
+  Nemotron on the card, Speechmatics and AssemblyAI through their EU
+  addresses. Each is proven by the self-test of 5a, each command names
+  its choice (--choice), and This machine has one line for each.
+- The door: a choice whose labels are live is told the number of
+  speakers at open and the number goes to the worker; a choice with one
+  transcript gets at Stop every line the door already gave, with the
+  last ones made final, from the door's own record by id (11.1). Stop
+  never refuses over a count that differs from the one at open: both
+  counts are recorded (the last words are said at Stop). A revision
+  from a service changes a label and nothing else, and never costs a
+  line. New failures by name: no_key, key_refused, no_credit,
+  no_internet, service_down, limit_reached, address_refused,
+  connection_lost. The WhisperX choice behaves as before.
+- The keys: one module (settings/keys.py) reads SPEECHMATICS_API_KEY
+  and ASSEMBLYAI_API_KEY from the process environment, then from .env
+  in the data folder; a key goes into its own worker's environment and
+  nowhere else, and every worker's environment has every other key's
+  name taken out. .env.example is committed with empty values.
+- The cloud frame (speech/common/cloud.py), on websockets 17.2, the one
+  library added to the base app: the EU address is a named constant,
+  dial refuses any other before a connection, main takes no argument
+  and reads no environment value for it; the certificate and the host
+  are checked by the library's default context with no argument that
+  could weaken it; a dead line is noticed within 50 s (ping 20, pong
+  20, close 10, the library's own defaults) and is connection_lost;
+  nothing reconnects. A made-up service on loopback stands in for both
+  services in the suite; the suite never reaches the internet.
+- Speechmatics: StartRecognition with the enhanced model, the medical
+  domain, speaker diarization, partials on, the session's rate,
+  max_speakers from 2 up, no additional_vocab. One line per run of
+  label from an AddTranscript; UU is no speaker. EndOfStream, then
+  EndOfTranscript. The service sends Info (its usage and its region)
+  before RecognitionStarted; the worker reads past it.
+- AssemblyAI: the parameters in the query, model universal-3-6-pro
+  named, speaker_labels, domain medical-v1, max_speakers as given, no
+  keyterms_prompt, no format_turns (the model always formats). The
+  Begin echo is checked field by field; a field the echo does not carry
+  is recorded as not echoed. A Turn that ends is one line; PENDING and
+  UNKNOWN are no speaker; a SpeakerRevision gives id and label only.
+  Terminate, then Termination. A wrong key is answered after the
+  handshake with an Error frame (1008) and a close.
+- Nemotron (ruling 8): one worker, one environment built from a
+  committed lock with NeMo at v1's commit 1688cc3d, torch 2.12.0 from
+  PyPI, Python 3.12. The English model alone writes the words at the
+  revision and the setting of Task 17's third arm ([70, 13]); the
+  speaker model beside it, at v1's revision, in the Low latency row of
+  its card (1.04 s). Each has its own features (v1's splice), chunker
+  and cache; nothing of v1's pairing. The join (nemotron/join.py) is a
+  plain function: a word that no stretch covers, or that two speakers
+  cover equally, has no speaker; a line closes at a sentence's end, a
+  change of speaker or a pause of 1.0 s, or by time at 3.0 s.
+- Carried from 5a: the home page's line; a death's reason is one plain
+  sentence (codes stripped, traceback and warning lines skipped, a cut
+  first line of the log window dropped, a library's own log lines and a
+  worker's [note] lines never taken); the worker-side frames shared by
+  every worker folder (speech/common/frames.py). Eighteen comments
+  that cited private plan reviews now give their reason (ruling 11).
+
+The rulings of spec 15.9 for 5b, each in one line:
+8. The English model alone writes the words; the speaker model only
+   says who spoke; item 6 proved the words identical with and without
+   it; the join can change no word. Done.
+9. The EU address only, medical on, labels live, no word list: pinned
+   word for word against the made-up service and proven on the real
+   connections (items 11 to 13). Done.
+10. AssemblyAI stays; what it keeps is for the bench report and stage
+    9. Nothing built; the self-test's sentence says the clip leaves.
+11. The tidy-up commit opened the stage. Done.
+
+Decided in the plan review (Cowork, 10 Oct), as decisions of this stage:
+the number given at open is sent to AssemblyAI as max_speakers as given
+and to Speechmatics from 2 up, with no headroom; a label beyond a number
+a service could not be given stands as the service gave it; Stop never
+refuses over a count; a revision never costs a line; a worker holds its
+own key and no other; the certificate is always checked; the dead-line
+figures are the library's own; AssemblyAI's text is formatted without
+format_turns (its migration page); the home page's line is the review's
+draft; the Nemotron environment is not Task 17's (Python 3.12 and torch
+from PyPI here; 3.13 and NVIDIA's index there), the model, revision and
+setting the same. Decided while building: a field the Begin echo does
+not carry is not a difference (it echoes no max_speakers); the workers
+log the opening sent and the first reply as [note] lines.
+
+Measurements, 10 Oct 2026, RTX 4090, v1 off:
+- 346 tests, 16.1 s, none skipped. App code 5,864 lines without the
+  bench, tests 5,492. Largest file speech/nemotron/models.py, 497
+  lines; no function over 80. CLAUDE.md 99 lines.
+- The Nemotron environment: 159 packages locked, 156 installed on
+  Linux, 5.5 GB, built in 22 s from a warm cache; the second run
+  audited and changed nothing in 0.3 s. Both models found in the shared
+  cache at their pinned revisions, none downloaded.
+- Nemotron self-test passed: 21 of 22 words live and at Stop (the same
+  lines). The first word, And, came at 0.08 to 0.16 s, in the clip's
+  opening silence, and the rule refused it at -43 dBFS: the model's
+  frame times can run ahead of the first word. Load 6.9 s, then the
+  warm-up. Lines 2.19 to 3.18 s after their last word; Stop 0.04 s; the
+  slowest step 0.18 s. Four lines of 4, 2, 7 and 8 words. The card's
+  highest sample 4,321 MiB. The English model alone gave the same 22
+  words, word for word. Silence and noise (zeros, -50, -30 dBFS, 60 s
+  each): no word, nothing to refuse. The connection record was empty.
+  Killed mid-clip: died with the exit code, no second start, a new open
+  worked.
+- Speechmatics self-test passed, 22 of 22; open 0.1 to 0.16 s; a line
+  4.7 to 4.9 s after its last word (the service's default max_delay);
+  Stop 0.18 s; 11 lines (ten of one word, one of twelve), every word
+  S1, every confidence 1.0; RecognitionStarted after an Info with
+  region eu. AssemblyAI self-test passed, 22 of 22; open 0.85 s; lines
+  1.2 and 2.1 s after their last word; Stop 1.1 to 1.4 s; 3 lines (5, 2
+  and 15 words) with confidences 0.994, 0.705 and 0.981; the middle
+  line PENDING live and revised to A at Stop. The connection records
+  hold only the EU host's lookup and connection, three lines each.
+  Silence and noise, 180 s to each: no word. A wrong key: Speechmatics
+  HTTP 401, AssemblyAI an Error frame 1008; both the plain sentence,
+  one attempt. Killed mid-clip: as Nemotron. Sound sent: about 234 s to
+  Speechmatics, 218 s to AssemblyAI, the clip and made sound only.
+- The keys' values appear in no file under the working data folder,
+  the log, the plan, the report or the repo (counts 0).
+- This machine on the working data folder: Nemotron installed and
+  passed, Speechmatics passed, AssemblyAI passed, each with its date.
+- The WhisperX self-test on 5a's folder passed with this code, 22 of 22.
+- The private word check printed nothing before every commit.
+
+Made untrue by this stage:
+- CLAUDE.md, Running it: --choice on the two commands; the README's
+  line. Both fixed in this commit.
+- V2_SPEC.md 15.9, the details of 5b: "the number is given to the
+  worker" holds, but a service may not take it (Speechmatics below 2)
+  or may not echo it (AssemblyAI); the list of new failures lacks
+  connection_lost; a line now has an id; the Begin echo rule is as
+  decided above. Cowork folds these in.
+- The plan's figure for the Nemotron card memory (4,000 MiB) was met
+  (4,321 at the highest sample, with the clip; 5a's WhisperX took 7,600).
+
+For stage 6: a cloud worker's connection is opened at the door's open,
+so Start pays 0.1 to 0.9 s; a dead line is noticed within 50 s; the
+Nemotron English model's first word can be timed in silence before it,
+so the rule may refuse a real first word; AssemblyAI's labels come
+PENDING for a short turn and are revised at Stop; Speechmatics gives
+one line per word early in a session.
+
+Next: the owner's check (install-speech --choice nemotron, the four
+self-tests, the app on 8001: This machine shows the rows), then push;
+the GitHub check must be green on all three systems. Then the 5c
+brainstorm.
+
 ## 2026-10-10. Stage 5a: the transcription door
 
 Built on 9 and 10 Oct 2026. The plan was reviewed by Cowork on 9 Oct
