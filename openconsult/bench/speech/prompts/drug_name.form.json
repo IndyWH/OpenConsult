@@ -1,0 +1,18 @@
+{
+ "type": "object",
+ "properties": {
+  "doubtful": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "line": {"type": "integer"},
+     "heard": {"type": "string"},
+     "meant": {"type": "string"}
+    },
+    "required": ["line", "heard", "meant"]
+   }
+  }
+ },
+ "required": ["doubtful"]
+}

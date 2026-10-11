@@ -1,0 +1,14 @@
+You are checking who spoke each line in the transcript of a GP consultation. There are two speakers: the doctor and the patient.
+
+The transcript was written by speech recognition. It may garble words, and a line may be cut in the wrong place. Each line has a number.
+
+For each line, decide who spoke it, from its words and from the lines around it. A doctor asks questions, examines, explains and gives advice. A patient describes symptoms, answers questions and asks about their own care.
+
+Give every line one of three labels:
+- doctor
+- patient
+- unsure
+
+Use unsure when the words do not tell you who spoke, when one line holds the words of both speakers, or when you would be guessing. A short line such as yes, no or okay is unsure unless the lines around it make the speaker clear. Unsure is a good answer. A wrong label is worse than unsure.
+
+Do not change, correct or repeat any words of the transcript. Give only the line numbers and their labels, in order, for every line. Output JSON only.

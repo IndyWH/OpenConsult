@@ -1,0 +1,17 @@
+{
+ "type": "object",
+ "properties": {
+  "lines": {
+   "type": "array",
+   "items": {
+    "type": "object",
+    "properties": {
+     "line": {"type": "integer"},
+     "label": {"type": "string", "enum": ["doctor", "patient", "unsure"]}
+    },
+    "required": ["line", "label"]
+   }
+  }
+ },
+ "required": ["lines"]
+}

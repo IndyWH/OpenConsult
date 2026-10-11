@@ -56,8 +56,20 @@ class Door:
                     think=self.profile.think, timeout_s=job.timeout_s)
 
     def ask(self, job_name: str, user: str, sampling: Sampling | None = None) -> Result:
-        job = job_named(job_name)
-        call = self.call_for(job_name, user, sampling)
+        return self._run(job_named(job_name), self.call_for(job_name, user, sampling))
+
+    def ask_own(self, job: Job, system: str, form: dict, user: str, sampling: Sampling | None = None) -> Result:
+        """A job that is not in the app's table, with its own prompt text
+        and form: the speech bench's three (spec 15.9, the details of part
+        two). The same limits, the same form check and the same record as
+        ask(); the app's jobs are not touched."""
+        sampling = sampling or self.profile.sampling
+        call = Call(job=job.name, tag=self.profile.tag, system=system, user=user, form=form,
+                    temperature=sampling.temperature, seed=sampling.seed, context=self.profile.context,
+                    max_tokens=job.max_tokens, think=self.profile.think, timeout_s=job.timeout_s)
+        return self._run(job, call)
+
+    def _run(self, job: Job, call: Call) -> Result:
         started = self._timer()
         try:
             reply = self._engine.chat(call)

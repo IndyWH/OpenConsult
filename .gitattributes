@@ -6,3 +6,6 @@ tests/*.txt text eol=lf
 engine-bench/** -text
 # The line of the bench arm is hashed byte for byte (ruling 3): Git never changes a byte of it.
 openconsult/bench/speech/v1line/v1_live_line.txt -text
+# The three prompts of the speech bench are hashed byte for byte (rulings 17 to 19): Git never changes a byte of them.
+openconsult/bench/speech/prompts/*.prompt.txt -text
+openconsult/bench/speech/prompts/*.form.json text eol=lf
