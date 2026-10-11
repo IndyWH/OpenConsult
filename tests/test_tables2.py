@@ -33,7 +33,9 @@ def test_15_8_ruling_26_the_tables_of_part_two_are_the_same_byte_for_byte_and_pu
     assert score(part_two, tmp_path / "w1", **files)[0] == 6                         # never written over
     text = (tmp_path / "w1" / "report.md").read_text(encoding="utf-8")
     assert "# Part two: what is done with the transcripts\nTHIS IS A REHEARSAL. NO FIGURE IN IT COUNTS." in text.replace("\n\n", "\n")
-    assert "| speech choice | a drug written as another real drug |" in text
+    assert "| speech choice | a drug written as another real drug, and in how many notes |" in text
+    # The voice ran on the one page that names a voice; the made-up pages wrote no wrong drug.
+    assert "| nemotron | no | " in text and "/ 0 (1 of 1 pages) / 0 (1 of 1 pages) |" in text
     scored = json.loads((tmp_path / "w1" / "scores.json").read_text(encoding="utf-8"))["part_two"]
     arms = scored["arms"]
     assert sorted(arms) == ["nemotron", "nemotron_tied_pair", "whisperx_pyannote"]
@@ -73,3 +75,32 @@ def test_with_results_of_part_two_and_a_file_lacking_the_command_says_which_and_
     code, said = score(part_two, tmp_path / "w", key_facts_path=part_two["key_facts"])
     assert code == 9 and said[-1] == words.BENCH_NEEDS_FILE.format(option="--drug-list", what="the drug list")
     assert not (tmp_path / "w").exists()
+
+
+def test_the_first_table_says_where_a_reading_was_not_run_and_whether_a_wrong_drug_reached_the_note():
+    # The check of part two, fixes 2 and 3, with made-up names.
+    from openconsult.bench.speech import tables2
+    counts_run = {"right": 1, "wrong": 2, "unsure": 0, "nowhere": 0}
+
+    def page(voice_ran, wrong_names, holding, notes):
+        return {"classes": {"rows": [{"name": "metforma", "written": n, "class": "real_drug_not_spoken"} for n in wrong_names],
+                            "missing": 0, "garbled": 0, "real_drug_not_spoken": len(wrong_names)},
+                "wrong_drug_in_notes": {"names": wrong_names, "notes": notes, "holding": holding},
+                "notes": {"not_found": {}}, "label_check": {"refused": False, "failed": False},
+                "who": {"counts": {"choice": counts_run, "label_check": counts_run,
+                                   "voice": counts_run if voice_ran else {"not_run": True},
+                                   "together": counts_run if voice_ran else {"not_run": True}}}}
+
+    recordings = {"one": {"arms": {"made_up": page(True, ["glucoform"], 2, 2), "other": page(False, [], 0, 2)}},
+                  "two": {"arms": {"made_up": page(False, ["glucoform"], 0, 2), "other": page(False, [], 0, 2)}}}
+    arms = tables2.arm_summary(recordings)
+    assert arms["made_up"]["wrong_drug"] == 2 and arms["made_up"]["wrong_drug_notes"] == {"notes": 4, "holding": 2}
+    assert arms["made_up"]["pages_run"] == {"choice": 2, "label_check": 2, "voice": 1, "together": 1} and arms["made_up"]["pages"] == 2
+    text = "\n".join(tables2.first_table({"arms": arms}))
+    assert "| made_up | yes, 2; in 2 of 4 notes | 0 (of 0 not found) | 4 (2 of 2 pages) / 4 (2 of 2 pages) / 2 (1 of 2 pages) / 2 (1 of 2 pages) | one, two |" in text
+    assert "| other | no | 0 (of 0 not found) | 4 (2 of 2 pages) / 4 (2 of 2 pages) / not run / not run | one, two |" in text
+    # The notes' names are compared as the page wrote them: a wrong name the notes do not hold counts as 0 holding.
+    rounds = {1: {"drugs": {"names_not_spoken": [{"name": "glucoform"}]}}, 2: {"drugs": {"names_not_spoken": []}}}
+    classes = {"rows": [{"name": "metforma", "written": "glucoform", "class": "real_drug_not_spoken"}]}
+    assert tables2._wrong_drug_in_notes(classes, rounds) == {"names": ["glucoform"], "notes": 2, "holding": 1}
+    assert tables2._wrong_drug_in_notes({"rows": []}, rounds) == {"names": [], "notes": 2, "holding": 0}

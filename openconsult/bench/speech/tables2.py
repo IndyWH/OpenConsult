@@ -98,10 +98,21 @@ def score_page(arm: str, name: str, result: dict, recording: Recording, referenc
     not_found = _not_found(rounds[1], rounds[2])
     for fact_id, fact in not_found.items():
         fact["script_missed"] = fact_id in (script_notes or {}).get("not_found", {})
+    scored["wrong_drug_in_notes"] = _wrong_drug_in_notes(scored["classes"], rounds)
     scored["notes"] = {"rounds": {str(r): rounds[r] for r in ROUNDS}, "not_found": not_found,
                        "chance": notes.chance(rounds[1].get("key_facts", []), rounds[2].get("key_facts", []))
                        if rounds[1].get("key_facts") and rounds[2].get("key_facts") else None}
     return scored
+
+
+def _wrong_drug_in_notes(classes: dict | None, rounds: dict) -> dict:
+    """The worst case of ruling 2, followed into the note: of the page's
+    notes, how many hold a name that the page wrote in place of another
+    drug (the check of part two, fix 3)."""
+    names = sorted({row["written"] for row in (classes or {}).get("rows", []) if row["class"] == "real_drug_not_spoken"})
+    notes = [counts for counts in rounds.values() if counts.get("drugs")]
+    holding = sum(1 for counts in notes if any(n["name"] in names for n in counts["drugs"]["names_not_spoken"]))
+    return {"names": names, "notes": len(notes), "holding": holding}
 
 
 def _skipped(recording: Recording) -> tuple[int, ...]:
@@ -165,17 +176,25 @@ def arm_summary(recordings: dict) -> dict:
     summary: dict[str, dict] = {}
     for name, rec in sorted(recordings.items()):
         for arm, page in sorted(rec["arms"].items()):
-            total = summary.setdefault(arm, {"recordings": [], "wrong_drug": 0, "facts_not_found_script_found": 0,
-                                             "facts_not_found": 0, "wrong_speaker": {r: 0 for r in who.READINGS},
+            total = summary.setdefault(arm, {"recordings": [], "wrong_drug": 0, "wrong_drug_notes": {"notes": 0, "holding": 0},
+                                             "facts_not_found_script_found": 0, "facts_not_found": 0,
+                                             "wrong_speaker": {r: 0 for r in who.READINGS},
+                                             "pages_run": {r: 0 for r in who.READINGS}, "pages": 0,
                                              "label_checks_refused": 0, "label_checks_failed": 0})
             total["recordings"].append(name)
+            total["pages"] += 1
             if page["classes"]:
                 total["wrong_drug"] += page["classes"]["real_drug_not_spoken"]
+            wrong = page.get("wrong_drug_in_notes") or {"names": [], "notes": 0, "holding": 0}
+            if wrong["names"]:
+                total["wrong_drug_notes"]["notes"] += wrong["notes"]
+                total["wrong_drug_notes"]["holding"] += wrong["holding"]
             total["facts_not_found"] += len(page["notes"]["not_found"])
             total["facts_not_found_script_found"] += sum(1 for f in page["notes"]["not_found"].values() if not f["script_missed"])
             for reading in who.READINGS:
                 counts = page["who"]["counts"][reading]
                 total["wrong_speaker"][reading] += counts.get("wrong", 0)
+                total["pages_run"][reading] += 0 if counts.get("not_run") else 1
             total["label_checks_refused"] += int(page["label_check"]["refused"])
             total["label_checks_failed"] += int(page["label_check"]["failed"])
     return summary
@@ -207,14 +226,33 @@ def _typical(values: list) -> dict:
 
 # ------------------------------------------------------------------ tables
 
+def wrong_drug_cell(total: dict) -> str:
+    """yes with the count, and whether it reached the note: in how many of
+    the notes of the pages that wrote it; or no."""
+    if not total["wrong_drug"]:
+        return "no"
+    notes = total.get("wrong_drug_notes") or {"notes": 0, "holding": 0}
+    return f"yes, {total['wrong_drug']}; in {notes['holding']} of {notes['notes']} notes"
+
+
+def reading_cell(total: dict, reading: str) -> str:
+    """The words under the wrong speaker, with on how many of the arm's
+    pages the reading ran; not run where it ran on none (a nought is not
+    written where nothing was run)."""
+    run = total.get("pages_run", {}).get(reading, total["pages"])
+    if run == 0:
+        return "not run"
+    return f"{total['wrong_speaker'][reading]} ({run} of {total['pages']} pages)"
+
+
 def first_table(scored: dict) -> list[str]:
-    lines = ["| speech choice | a drug written as another real drug | key facts not found, found in both notes from the script | "
-             "words under the wrong speaker: choice / label check / voice / together | recordings |", "|---|---|---|---|---|"]
+    lines = ["| speech choice | a drug written as another real drug, and in how many notes | key facts not found, found in both notes from the script | "
+             "words under the wrong speaker: choice / label check / voice / together, with the pages each reading ran on | recordings |",
+             "|---|---|---|---|---|"]
     for arm, total in sorted(scored["arms"].items()):
-        wrong = total["wrong_speaker"]
-        lines.append(f"| {arm} | {tables.yes_no(total['wrong_drug'])} | {total['facts_not_found_script_found']} "
-                     f"(of {total['facts_not_found']} not found) | {wrong['choice']} / {wrong['label_check']} / {wrong['voice']} / "
-                     f"{wrong['together']} | {', '.join(total['recordings'])} |")
+        cells = " / ".join(reading_cell(total, reading) for reading in who.READINGS)
+        lines.append(f"| {arm} | {wrong_drug_cell(total)} | {total['facts_not_found_script_found']} "
+                     f"(of {total['facts_not_found']} not found) | {cells} | {', '.join(total['recordings'])} |")
     return lines
 
 
