@@ -19,6 +19,7 @@ from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
+from openconsult.bench.shared import commands as shared_commands
 from openconsult.bench.speech import commands as speech_commands
 from openconsult.bench.speech import commands2 as speech_commands2
 from openconsult.bench.speech.arms import ARMS
@@ -225,6 +226,61 @@ def cmd_speech_calls(args) -> int:
                                          args.arm, engine_address=args.engine, say=say)
 
 
+def cmd_shared(args) -> int:
+    """The commands of the test of 5d (spec 15.9, the details of 5d)."""
+    path = lambda value: Path(value) if value else None  # noqa: E731
+    if args.command == "shared-install":
+        return shared_commands.shared_install(Path(args.data_folder), say=say)
+    if args.command == "shared-search":
+        return shared_commands.shared_search(Path(args.out), args.embedding, args.where, path(args.data_folder), args.service,
+                                             args.every, args.searches, path(args.until), args.load_only, path(args.recordings), say=say)
+    if args.command == "shared-index":
+        return shared_commands.shared_index(Path(args.out), args.embedding, args.where, path(args.data_folder), args.service,
+                                            path(args.recordings), say=say)
+    if args.command == "shared-watch":
+        return shared_commands.shared_watch(Path(args.out), Path(args.until), args.service, args.private, args.vllm, args.every,
+                                            path(args.data_folder), path(args.recordings), say=say)
+    return shared_commands.shared_judge(Path(args.run), path(args.write), path(args.card), path(args.apps), args.ask_wayround,
+                                        say=say, data_folder=path(args.data_folder), recordings=path(args.recordings))
+
+
+def add_shared_commands(sub) -> None:
+    """The test of 5d: the three models together on one card."""
+    def common(p, out=True):
+        p.set_defaults(fn=cmd_shared)
+        if out:
+            p.add_argument("--out", required=True, help="the setup's folder: not the repo, not a data folder, not where recordings are kept")
+        p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
+        p.add_argument("--recordings", help="the folder of recordings, which results may not go under")
+        return p
+
+    p = sub.add_parser("shared-install")
+    p.set_defaults(fn=cmd_shared)
+    p.add_argument("--data-folder", required=True, help="where the environment and the model of EmbeddingGemma 2 go")
+    for name in ("shared-search", "shared-index"):
+        p = common(sub.add_parser(name))
+        p.add_argument("--embedding", required=True, choices=["first", "second"], help="the first EmbeddingGemma, or version 2")
+        p.add_argument("--where", required=True, choices=["card", "processor"], help="where the model runs")
+        p.add_argument("--service", default=DEFAULT_ADDRESS, help="the Ollama service's address, for the first model")
+    p = sub.choices["shared-search"]
+    p.add_argument("--every", type=float, default=5.0, help="seconds between searches")
+    p.add_argument("--searches", type=int, help="how many searches, for a base line")
+    p.add_argument("--until", help="a file whose appearance ends the searches, in a setup")
+    p.add_argument("--load-only", action="store_true", help="one call, so the model is placed; placed.json, not a search")
+    p = common(sub.add_parser("shared-watch"))
+    p.add_argument("--until", required=True, help="a file whose appearance ends the watch, after one last reading")
+    p.add_argument("--service", default=DEFAULT_ADDRESS, help="the Ollama service's address")
+    p.add_argument("--private", help="the private Ollama's address, for the together way")
+    p.add_argument("--vllm", help="vLLM's address, for its two ways")
+    p.add_argument("--every", type=float, default=5.0, help="seconds between readings")
+    p = common(sub.add_parser("shared-judge"), out=False)
+    p.add_argument("--run", required=True, help="the run folder: base-before, setups, base-after, wayround")
+    p.add_argument("--write", help="where tables.json and tables.md go; never written over")
+    p.add_argument("--card", help="the sampler's file of the card's memory")
+    p.add_argument("--apps", help="the sampler's file of the programs on the card")
+    p.add_argument("--ask-wayround", action="store_true", help="print the engines whose stored results call for the way round, and stop")
+
+
 def add_speech_commands(sub) -> None:
     """The speech bench (spec 15.9, the details of 5c)."""
     p = sub.add_parser("speech-calls")
@@ -279,6 +335,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="openconsult-bench")
     sub = parser.add_subparsers(dest="command", required=True)
     add_speech_commands(sub)
+    add_shared_commands(sub)
 
     def command(name: str, fn, out: bool = True):
         p = sub.add_parser(name)
