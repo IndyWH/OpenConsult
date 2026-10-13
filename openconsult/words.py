@@ -73,7 +73,8 @@ NAV_LOGOUT = "Log out"
 HOME_TITLE = "Home"
 HOME_SO_FAR = (
     "So far this version starts, sets up its one user, describes the machine it runs on, "
-    "can reach the local language model, and can turn speech into text in four ways: "
+    "chooses its language model engine once at start and sends the two calls of a pass together, "
+    "reads the room on the graphics card once, and can turn speech into text in four ways: "
     "WhisperX with pyannote, Nemotron, Speechmatics and AssemblyAI. "
     "It cannot run a consultation yet."
 )

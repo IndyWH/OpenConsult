@@ -5,9 +5,12 @@ This branch is where OpenConsult v2.0 is being built.
 - The working app, v1, is on the main branch.
 - The plan for v2 is in V2_SPEC.md.
 - So far this version starts, sets up its one user, describes the machine it
-  runs on, can reach the local language model, and can turn speech into text
-  in four ways: WhisperX with pyannote, Nemotron, Speechmatics and AssemblyAI,
-  each proven by a self-test on a bundled clip. A replay bench feeds a banked
+  runs on, chooses its language model engine once at start (vLLM first on
+  Linux with a suitable graphics card, Ollama otherwise) and sends the two
+  calls of a pass together, reads the room on the card once and says where
+  the guideline search will sit and whether the WhisperX choice fits, and can
+  turn speech into text in four ways: WhisperX with pyannote, Nemotron,
+  Speechmatics and AssemblyAI, each proven by a self-test on a bundled clip. A replay bench feeds a banked
   recording through the same door as if it were live and scores the transcript
   against the script, then measures what is done with a transcript: who spoke
   each line, which drug names are in doubt, and which key facts reach a note.
