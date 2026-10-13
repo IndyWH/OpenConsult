@@ -191,7 +191,7 @@ ruling 25). The model and these libraries run as a separate process, in
 their own environment in the user's data folder, built by openconsult-bench
 shared-install from the lock file openconsult/bench/shared/embedding2/uv.lock.
 The app never imports any of them, and the model is fetched into the data
-folder only, never into this machine's shared cache. The lock holds 61
+folder only, never into this machine's shared cache. The lock holds 63
 packages; the direct ones are:
 
   google/embeddinggemma-2    Apache-2.0       https://huggingface.co/google/embeddinggemma-2
@@ -203,6 +203,11 @@ packages; the direct ones are:
   huggingface-hub 1.33.0     Apache-2.0       https://pypi.org/project/huggingface-hub/
   safetensors 0.8.0          Apache-2.0       https://pypi.org/project/safetensors/
   numpy 2.5.4                BSD-3-Clause     https://pypi.org/project/numpy/
+  pillow 12.3.0              MIT-CMU          https://pypi.org/project/pillow/
+  torchvision 0.27.0         BSD-3-Clause     https://pypi.org/project/torchvision/
+    (transformers imports the model's processor, and with it the Gemma 4
+    image processor, even when only the text part is loaded; no image is
+    ever given to the model.)
     tokenizers 0.23.3        Apache-2.0       https://pypi.org/project/tokenizers/
     scikit-learn 1.9.1       BSD-3-Clause     https://pypi.org/project/scikit-learn/
     scipy 1.18.1             BSD-3-Clause     https://pypi.org/project/scipy/
