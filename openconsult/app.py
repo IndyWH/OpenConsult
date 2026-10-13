@@ -54,7 +54,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     db = open_database(settings.database_path)
     audit = Audit(db, clock)
     users = Users(db, audit, clock)
-    engine = engine or OllamaEngine(settings.engine_address)
+    engine = engine or OllamaEngine(settings.ollama_address)
     doors = dict(doors or {})
     if speech is not None:
         doors.setdefault(WHISPERX_PYANNOTE.name, speech)

@@ -1,7 +1,7 @@
 """The one settings store (spec 5.1, 15.6). No other code reads a setting
 directly. It is built fresh at each start and for each test.
 
-Stage 3 has only the three values its behaviour uses, all fixed when the
+It holds only the values the app's behaviour uses, all fixed when the
 app starts. A setting a page can change, with its audited from-and-to,
 arrives with the first stage that has one (spec 7.3, rule 4).
 """
@@ -42,10 +42,19 @@ SETTINGS = (
         "8001 when run from source, beside v1 on 8000 (spec 14.1).",
     ),
     Setting(
-        "engine_address",
+        "ollama_address",
         "http://127.0.0.1:11434",
-        "Where Ollama answers on this computer, the same on every system (spec 3.4, 15.7). "
-        "Fixed when the app starts; the engine choice is a question for stage 3b.",
+        "Where Ollama answers on this computer, the same on every system (spec 15.7). "
+        "Fixed when the app starts. Ollama is the fallback everywhere (15.8, ruling 30).",
+    ),
+    Setting(
+        "vllm_address",
+        "http://127.0.0.1:8172",
+        "Where vLLM answers on this computer: the address the engine bench and 5d used, so that "
+        "port 8000 stays v1's (15.8, the details of 3c). Fixed when the app starts; vLLM is tried "
+        "first on Linux with a suitable card (ruling 30). The installer settles the default for a "
+        "machine it sets up (stage 15). There is no setting to pick an engine by hand: the order is "
+        "the setting (ruling 37).",
     ),
 )
 
@@ -56,7 +65,8 @@ _DEFAULTS = {setting.name: setting.default for setting in SETTINGS}
 class Settings:
     data_folder: Path
     port: int
-    engine_address: str
+    ollama_address: str
+    vllm_address: str
 
     @property
     def database_path(self) -> Path:
@@ -72,4 +82,4 @@ def build(data_folder: Path | str | None = None, port: int | None = None) -> Set
     only when no folder is given."""
     folder = Path(data_folder) if data_folder is not None else paths.default_data_folder()
     return Settings(data_folder=folder, port=port if port is not None else _DEFAULTS["port"],
-                    engine_address=_DEFAULTS["engine_address"])
+                    ollama_address=_DEFAULTS["ollama_address"], vllm_address=_DEFAULTS["vllm_address"])
