@@ -233,7 +233,8 @@ def cmd_shared(args) -> int:
         return shared_commands.shared_install(Path(args.data_folder), say=say)
     if args.command == "shared-search":
         return shared_commands.shared_search(Path(args.out), args.embedding, args.where, path(args.data_folder), args.service,
-                                             args.every, args.searches, path(args.until), args.load_only, path(args.recordings), say=say)
+                                             args.every, args.searches, path(args.until), args.load_only, path(args.recordings), say=say,
+                                             after=path(args.after), delay_s=args.delay)
     if args.command == "shared-index":
         return shared_commands.shared_index(Path(args.out), args.embedding, args.where, path(args.data_folder), args.service,
                                             path(args.recordings), say=say)
@@ -267,6 +268,8 @@ def add_shared_commands(sub) -> None:
     p.add_argument("--searches", type=int, help="how many searches, for a base line")
     p.add_argument("--until", help="a file whose appearance ends the searches, in a setup")
     p.add_argument("--load-only", action="store_true", help="one call, so the model is placed; placed.json, not a search")
+    p.add_argument("--after", help="the file the speech replay writes when its feed begins: the searches start --delay s after")
+    p.add_argument("--delay", type=float, default=15.0, help="seconds after the feed began at which the searches start")
     p = common(sub.add_parser("shared-watch"))
     p.add_argument("--until", required=True, help="a file whose appearance ends the watch, after one last reading")
     p.add_argument("--service", default=DEFAULT_ADDRESS, help="the Ollama service's address")

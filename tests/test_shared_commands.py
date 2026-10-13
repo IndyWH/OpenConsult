@@ -187,3 +187,29 @@ def test_15_9_5d_an_install_that_cannot_find_uv_or_whose_fetch_is_gated_says_so(
     assert commands.shared_install(tmp_path / "data", say=said.append, run=run_ok, which=lambda name: "/made-up/uv", environ={}) == 0
     assert said[-1] == "Downloaded EmbeddingGemma 2 at revision r (1.5 GB)."
     assert Vectors(True).ok and tables.cell(None) == "not run"
+
+
+def test_15_9_5d_the_searches_wait_for_the_feed_and_start_15_s_after_it(folders):
+    """The chains and the searches begin together, 15 s into the sound:
+    the search command places the model, then waits for the replay's file."""
+    out = folders / "out"
+    clock = MovedClock()
+    embedder = MadeUpEmbedder(clock)
+    feed = folders / "feeding.json"
+
+    def sleep(s):
+        clock.sleep(s)
+        if clock.t >= 103.0 and not feed.exists():
+            feed.write_text(json.dumps({"t0_epoch": 1000.0 + 103.0}), encoding="utf-8")
+    code = commands.shared_search(out, "first", "card", searches=2, say=lambda s: None, make_embedder=lambda *a, **k: embedder,
+                                  sleep=sleep, clock=clock, wall=lambda: 1000.0 + clock.t, after=feed, delay_s=15.0)
+    assert code == 0
+    placed = json.loads((out / "placed.json").read_text(encoding="utf-8"))
+    stored = json.loads((out / "searches.json").read_text(encoding="utf-8"))
+    assert placed["ok"] and embedder.texts[0] == ["task: search result | query: Depressive episode"]
+    assert abs(stored["t0_epoch"] - 1118.0) < 0.06 and len(stored["searches"]) == 2      # 103 + 15
+    said = []
+    gone = commands.shared_search(folders / "out2", "first", "card", searches=1, say=said.append,
+                                  make_embedder=lambda *a, **k: MadeUpEmbedder(clock), sleep=clock.sleep, clock=clock,
+                                  wall=lambda: 1000.0 + clock.t, after=folders / "never.json")
+    assert gone == 7 and said[-1].startswith("The feed never began")

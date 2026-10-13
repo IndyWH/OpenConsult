@@ -322,3 +322,4 @@ EMBED_WATCHING = "Watching: Ollama's list, {engine}'s health and the card's prog
 EMBED_WATCHED = "Watched {readings} readings. Written: {path}"
 EMBED_JUDGED = "Judged {setups} setups, {base} base lines of the language model and {wayround} ways round. Tables written to {folder}."
 EMBED_JUDGE_NEEDS_WRITE = "shared-judge needs --write, or --ask-wayround."
+EMBED_NO_FEED = "The feed never began: {file} did not appear. No search was made."

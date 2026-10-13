@@ -14,6 +14,7 @@ import json
 import os
 import shutil
 import subprocess
+import time
 from pathlib import Path
 from typing import Callable, Mapping
 
@@ -123,10 +124,38 @@ def _until(path: Path | None) -> Callable[[], bool] | None:
     return (lambda: Path(path).exists()) if path else None
 
 
+def _placed(embedder, embedding: str, where: str, out: Path, say: Callable, wall: Callable) -> bool:
+    """One call with the first name, so the model is placed where the
+    setup asked; what it says of itself goes to placed.json. Not a search."""
+    found = embedder.embed([runner.search_text(read_lists()[0][0])])
+    placed = {"embedding": embedding, "where": where, "ok": found.ok, "error": found.error,
+              "wall_s": round(found.wall_s, 4), "info": embedder.info(), "at_epoch": wall()}
+    say(words.EMBED_PLACED.format(embedding=embedding, where=where, info=json.dumps(placed["info"], sort_keys=True)))
+    return _write_once(out / "placed.json", placed, say) and found.ok
+
+
+def _wait_for_feed(after: Path, delay_s: float, sleep: Callable, wall: Callable, limit_s: float = 900.0) -> float | None:
+    """Wait for the file the speech replay writes when its feed begins,
+    then until delay_s after the moment it names; None if it never came."""
+    started = wall()
+    while not Path(after).exists():
+        if wall() - started > limit_s:
+            return None
+        sleep(0.2)
+    t0 = json.loads(Path(after).read_text(encoding="utf-8"))["t0_epoch"]
+    while wall() < t0 + delay_s:
+        sleep(min(0.05, max(0.0, t0 + delay_s - wall())))
+    return t0
+
+
 def shared_search(out: Path, embedding: str, where: str, data_folder: Path | None = None, service: str = DEFAULT_ADDRESS,
                   every_s: float = runner.EVERY_S, searches: int | None = None, until: Path | None = None,
                   load_only: bool = False, recordings: Path | None = None, say: Callable = print,
-                  make_embedder: Callable = embedder_for, sleep=None, clock=None, wall=None) -> int:
+                  make_embedder: Callable = embedder_for, sleep=None, clock=None, wall=None,
+                  after: Path | None = None, delay_s: float = 15.0) -> int:
+    """The searches of a setup or a base line. With --after, the model is
+    placed first, then the searches begin delay_s after the feed began,
+    which is the moment the driver starts the chains (the details of 5d)."""
     out = Path(out)
     if not _check_out(out, data_folder, recordings, say):
         return 6
@@ -139,11 +168,12 @@ def shared_search(out: Path, embedding: str, where: str, data_folder: Path | Non
         return 7
     try:
         if load_only:
-            found = embedder.embed([runner.search_text(read_lists()[0][0])])
-            placed = {"embedding": embedding, "where": where, "ok": found.ok, "error": found.error,
-                      "wall_s": round(found.wall_s, 4), "info": embedder.info(), "at_epoch": dt.datetime.now().timestamp()}
-            say(words.EMBED_PLACED.format(embedding=embedding, where=where, info=json.dumps(placed["info"], sort_keys=True)))
-            return 0 if _write_once(target, placed, say) and found.ok else (6 if found.ok else 7)
+            return 0 if _placed(embedder, embedding, where, out, say, wall or dt.datetime.now().timestamp) else 7
+        if after is not None:
+            _placed(embedder, embedding, where, out, say, wall or dt.datetime.now().timestamp)
+            if _wait_for_feed(after, delay_s, sleep or time.sleep, wall or time.time) is None:
+                say(words.EMBED_NO_FEED.format(file=after))
+                return 7
         extra = {k: v for k, v in (("sleep", sleep), ("clock", clock), ("wall", wall)) if v is not None}
         found = runner.run_searches(embedder, read_lists(), every_s=every_s, limit=searches, until=_until(until),
                                     say=lambda s: say(words.EMBED_SEARCH.format(
