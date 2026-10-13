@@ -1,0 +1,87 @@
+{
+ "note": "The lists of differentials of consultation 495, one for each of its 11 passes, as the public engine bench holds them: the arm ollama-google-file, chain A1 (temperature 0, seed 42). The test of 5d sends each name as a guideline search, in v1's form. Nothing here was written by hand.",
+ "source": {
+  "folder": "engine-bench",
+  "arm": "ollama-google-file",
+  "case": "495",
+  "chain": "A1"
+ },
+ "lists": [
+  [
+   "Depressive episode",
+   "Anxiety disorder",
+   "Viral prodrome or post-viral fatigue",
+   "Hypothyroidism"
+  ],
+  [
+   "Gastroenteritis with post-infectious sequelae",
+   "Pelvic Inflammatory Disease (PID)",
+   "Ovarian cyst / Ovarian torsion",
+   "Diverticulitis",
+   "Ectopic pregnancy"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Pelvic Inflammatory Disease (PID)",
+   "Ovarian cyst / Ovarian torsion",
+   "Gastroenteritis with post-infectious sequelae",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ovarian torsion",
+   "Ovarian cyst (ruptured or leaking)",
+   "Pelvic Inflammatory Disease (PID)",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ovarian cyst (ruptured or leaking)",
+   "Ovarian torsion",
+   "Pelvic Inflammatory Disease (PID)",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ovarian cyst (ruptured or leaking)",
+   "Pelvic Inflammatory Disease (PID)",
+   "Ovarian torsion",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ruptured ovarian cyst",
+   "Pelvic Inflammatory Disease (PID)",
+   "Ovarian torsion",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ruptured ovarian cyst",
+   "Pelvic Inflammatory Disease (PID)",
+   "Ovarian torsion",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ruptured ovarian cyst",
+   "Ovarian torsion",
+   "Pelvic Inflammatory Disease (PID)",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ruptured ovarian cyst",
+   "Ovarian torsion",
+   "Pelvic Inflammatory Disease (PID)",
+   "Diverticulitis"
+  ],
+  [
+   "Ectopic pregnancy",
+   "Ruptured ovarian cyst",
+   "Ovarian torsion",
+   "Pelvic Inflammatory Disease (PID)",
+   "Diverticulitis"
+  ]
+ ]
+}

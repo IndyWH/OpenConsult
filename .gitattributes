@@ -9,3 +9,5 @@ openconsult/bench/speech/v1line/v1_live_line.txt -text
 # The three prompts of the speech bench are hashed byte for byte (rulings 17 to 19): Git never changes a byte of them.
 openconsult/bench/speech/prompts/*.prompt.txt -text
 openconsult/bench/speech/prompts/*.form.json text eol=lf
+# The lists of the searches of 5d are hashed by a test: Git never changes a byte of them.
+openconsult/bench/shared/searches.json -text
