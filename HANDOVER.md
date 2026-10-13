@@ -154,6 +154,8 @@ After Cowork's check, 11 Oct 2026 (STAGE5C2_FIX.md):
 - Cowork corrected five rules of the key-fact file (13-01, 01-04, 01-18,
   15-13, 19-23); the tables to read are stage5c2-rehearsal-tables-v4,
   made once with the three fixes, byte for byte the same twice.
+- Windows, 13 Oct: one test removed the folder of calls with the made-up
+  door's database still open. The fault was in the test; the app is unchanged.
 
 Made untrue by this stage:
 - CLAUDE.md, Running it: the three new commands and the two options;

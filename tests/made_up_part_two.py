@@ -65,7 +65,7 @@ def build(tmp_path: Path, recordings_kept, monkeypatch, voice_worker, with_calls
     minute = entry("minute", "minute.wav", minute_sha, speakers=1, length_s=2.0, machine_voices=True, voice_only=True,
                    doctor_voice=None, parts={"DOCTOR": "a machine voice"})
     made_up_recordings(folder, extra=[minute])
-    listed = json.loads((folder / "recordings.json").read_text())
+    listed = json.loads((folder / "recordings.json").read_text(encoding="utf-8"))
     listed["recordings"][0]["doctor_voice"] = "minute"
     (folder / "recordings.json").write_text(json.dumps(listed, indent=1), encoding="utf-8")
     recordings_kept.settle()
@@ -81,7 +81,8 @@ def build(tmp_path: Path, recordings_kept, monkeypatch, voice_worker, with_calls
     said: list[str] = []
     assert commands2.speech_voice(out, folder, data, None, None, say=said.append, make_worker=lambda d: voice_worker()) == 0
     engine = ScriptedEngine()
-    door = Door(engine, ModelCalls(open_database(out / "calls" / "calls.db")), GEMMA_4_QAT)
+    database = open_database(out / "calls" / "calls.db")
+    door = Door(engine, ModelCalls(database), GEMMA_4_QAT)
     codes = []
     if with_calls:
         for job, round_n in (("label_check", None), ("drug_name", None), ("note", 1), ("script_note", 1), ("note", 2), ("script_note", 2)):
@@ -89,4 +90,4 @@ def build(tmp_path: Path, recordings_kept, monkeypatch, voice_worker, with_calls
             codes.append(commands2.speech_calls(out, folder, [scripts], job, round_n, data, say=said.append, make_door=lambda p: door))
     return {"folder": folder, "out": out, "data": data, "scripts": scripts, "marks": marks, "said": said, "engine": engine,
             "codes": codes, "key_facts": write_made_up(tmp_path), "drug_list": write_list(tmp_path), "door": door,
-            "results": ResultWriter(out / "calls").read_all()}
+            "database": database, "results": ResultWriter(out / "calls").read_all()}

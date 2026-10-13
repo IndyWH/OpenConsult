@@ -61,12 +61,13 @@ def test_15_8_ruling_26_the_tables_of_part_two_are_the_same_byte_for_byte_and_pu
 def test_with_no_result_of_part_two_the_marks_of_part_one_are_written_and_no_file_is_needed(tmp_path, recordings_kept, monkeypatch):
     part = build(tmp_path, recordings_kept, monkeypatch, MadeUpVoiceWorker, with_calls=False)
     import shutil
+    part["database"].close()                  # Windows will not remove a file that is still open
     shutil.rmtree(part["out"] / "voice")
     shutil.rmtree(part["out"] / "calls")
     code, said = score(part, tmp_path / "w")
     assert code == 0 and said[-1].startswith("Scored 4 results of 4 arms")
     text = (tmp_path / "w" / "report.md").read_text(encoding="utf-8")
-    assert "Part two" not in text and "part_two" not in json.loads((tmp_path / "w" / "scores.json").read_text())
+    assert "Part two" not in text and "part_two" not in json.loads((tmp_path / "w" / "scores.json").read_text(encoding="utf-8"))
 
 
 def test_with_results_of_part_two_and_a_file_lacking_the_command_says_which_and_writes_nothing(tmp_path, part_two):
