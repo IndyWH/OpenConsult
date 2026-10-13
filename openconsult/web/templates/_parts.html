@@ -9,8 +9,7 @@
   <tr><th>{{ words.ROW_SYSTEM }}</th><td>{{ machine.system }}</td></tr>
   <tr><th>{{ words.ROW_CARD }}</th><td>{{ machine.card_line }}</td></tr>
   {% if models %}
-  <tr><th>{{ words.ROW_OLLAMA }}</th><td>{{ models.ollama }}</td></tr>
-  <tr><th>{{ words.ROW_MODEL }}</th><td>{{ models.model }}</td></tr>
+  <tr><th>{{ words.ROW_MODEL }}</th><td>{{ models }}</td></tr>
   {% endif %}
   {% if speech %}
   <tr><th>{{ words.ROW_SPEECH }}</th><td>{{ speech.installed }}</td></tr>

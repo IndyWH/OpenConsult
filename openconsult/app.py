@@ -11,13 +11,17 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from openconsult.db import Database, open_database
+from openconsult.llm.choose import NoEngine, choose
 from openconsult.llm.door import Door
 from openconsult.llm.engine import Engine
 from openconsult.llm.ollama import OllamaEngine
+from openconsult.llm.profile import GEMMA_4_QAT
 from openconsult.llm.record import ModelCalls
+from openconsult.llm.vllm import VllmEngine
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.patients.logins import Logins
 from openconsult.patients.users import Users
+from openconsult.settings.decisions import Decisions, language_model_element
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.store import Settings
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
@@ -38,23 +42,34 @@ class Parts:
     logins: Logins
     first_run: FirstRun
     machine: Machine
-    engine: Engine
+    engine: Engine                 # the one chosen at start, held for the run (ruling 37)
     door: Door
+    decisions: Decisions
     speech: SpeechDoor             # the WhisperX with pyannote door, as 5a built it
     self_tests: SelfTests
     doors: dict = field(default_factory=dict)      # one door for each choice, by name (15.9)
 
 
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
-              engine: Engine | None = None, speech: SpeechDoor | None = None,
+              engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None) -> FastAPI:
-    """engine, speech and doors are passed in by tests, so the suite needs
-    no Ollama and no speech worker (spec 15.7, 15.9). Building a door
-    starts nothing and reads nothing but a path."""
+    """engines, speech and doors are passed in by tests, so the suite needs
+    no vLLM, no Ollama and no speech worker (spec 15.7, 15.8, 15.9).
+    Building a door starts nothing and reads nothing but a path. The
+    engine is chosen here, once, and the decisions are written to the
+    audit log once (rulings 36 to 38)."""
     db = open_database(settings.database_path)
     audit = Audit(db, clock)
     users = Users(db, audit, clock)
-    engine = engine or OllamaEngine(settings.ollama_address)
+    machine = machine or read_machine()
+    engines = {"vllm": VllmEngine(settings.vllm_address), "ollama": OllamaEngine(settings.ollama_address),
+               **(engines or {})}
+    choice = choose(machine, engines, GEMMA_4_QAT)
+    engine = engines[choice.name] if choice.name else NoEngine()
+    profile = GEMMA_4_QAT.for_engine(choice.name) if choice.name else GEMMA_4_QAT
+    decisions = Decisions({"language_model": language_model_element(choice, profile.tag if choice.name else None)})
+    for element in decisions.elements.values():
+        audit.record(f"decision.{element.name}", element.audit_detail)
     doors = dict(doors or {})
     if speech is not None:
         doors.setdefault(WHISPERX_PYANNOTE.name, speech)
@@ -67,9 +82,10 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         users=users,
         logins=Logins(audit, clock),
         first_run=FirstRun(db, users, clock),
-        machine=machine or read_machine(),
+        machine=machine,
         engine=engine,
-        door=Door(engine, ModelCalls(db, clock)),
+        door=Door(engine, ModelCalls(db, clock), profile),
+        decisions=decisions,
         speech=doors[WHISPERX_PYANNOTE.name],
         self_tests=SelfTests(db, clock),
         doors=doors,

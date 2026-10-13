@@ -44,6 +44,7 @@ class Machine:
     card: Card | None
     card_line: str
     sentence: str
+    os: str = ""   # the system's own name: Linux, Windows or Darwin (3c asks vLLM on Linux only)
 
 
 def describe(system: str, arch: str, cards: list[Card] | None) -> Machine:
@@ -51,17 +52,17 @@ def describe(system: str, arch: str, cards: list[Card] | None) -> Machine:
     there but could not be read."""
     system_line = f"{_system_name(system)} ({arch})"
     if system == "Darwin":
-        return Machine(system_line, "mac", None, words.CARD_NONE, words.MACHINE["mac"])
+        return Machine(system_line, "mac", None, words.CARD_NONE, words.MACHINE["mac"], system)
     if cards is None:
-        return Machine(system_line, "unreadable", None, words.CARD_UNREADABLE, words.MACHINE["unreadable"])
+        return Machine(system_line, "unreadable", None, words.CARD_UNREADABLE, words.MACHINE["unreadable"], system)
     if not cards:
-        return Machine(system_line, "none", None, words.CARD_NONE, words.MACHINE["none"])
+        return Machine(system_line, "none", None, words.CARD_NONE, words.MACHINE["none"], system)
     card = max(cards, key=lambda c: c.memory_mib)
     line = words.CARD_LINE.format(name=card.name, gb=card.gb)
     if card.gb >= NEEDED_GB:
-        return Machine(system_line, "suitable", card, line, words.MACHINE["suitable"])
+        return Machine(system_line, "suitable", card, line, words.MACHINE["suitable"], system)
     sentence = words.MACHINE["smaller"].format(gb=card.gb, needed=NEEDED_GB)
-    return Machine(system_line, "smaller", card, line, sentence)
+    return Machine(system_line, "smaller", card, line, sentence, system)
 
 
 def parse_cards(output: str) -> list[Card]:

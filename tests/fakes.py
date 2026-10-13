@@ -41,12 +41,13 @@ class FakeEngine:
     made-up list."""
 
     name = "made-up"
+    address = "http://made-up"
 
-    def __init__(self, script=None, version="0.0-made-up", digest="made-up-digest", present=True):
+    def __init__(self, script=None, version="0.0-made-up", digest="made-up-digest", present=True, context=None):
         self.script = list(script) if script is not None else None
         self.calls: list[Call] = []
         self.status_calls = 0
-        self._version, self._digest, self._present = version, digest, present
+        self._version, self._digest, self._present, self._context = version, digest, present, context
 
     def chat(self, call: Call) -> Reply:
         self.calls.append(call)
@@ -81,7 +82,7 @@ class FakeEngine:
         self.status_calls += 1
         if self._version is None:
             return EngineStatus(False, None, None, None)
-        return EngineStatus(True, self._version, self._present, self._digest if self._present else None)
+        return EngineStatus(True, self._version, self._present, self._digest if self._present else None, self._context)
 
 
 # ------------------------------------- a made-up server for the bench's engines

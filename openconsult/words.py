@@ -27,15 +27,26 @@ MACHINE = {
     "unreadable": "The NVIDIA graphics card could not be read. OpenConsult will use cloud models on this computer.",
 }
 CARD_LINE = "{name}, {gb} GB"
-# The two local-model lines, shown only on a machine with a suitable card
-# (spec 15.7; elsewhere Ollama is not even asked). Drafts for the owner.
-ROW_OLLAMA = "Ollama"
-ROW_MODEL = "Local model"
-OLLAMA_RUNNING = "Running, version {version}"
-OLLAMA_NOT_RUNNING = "Not running"
+# The language model's line, shown only on a machine with a suitable card
+# (spec 15.7; elsewhere no engine is asked). Drafts for the owner.
+ROW_MODEL = "Language model"
 MODEL_PRESENT = "Gemma 4 QAT is present."
 MODEL_ABSENT = "Gemma 4 QAT is not present."
-MODEL_UNKNOWN = "Not known, because Ollama is not running."
+# The decisions of the start (15.8, rulings 36 to 38): one sentence for
+# each, with the reason in words and no figures. Drafts for the owner.
+ENGINE_NAMES = {"vllm": "vLLM", "ollama": "Ollama"}
+UNFIT = {
+    "no_answer": "{engine} did not answer at its address",
+    "no_model": "{engine} is running but does not hold Gemma 4 QAT",
+    "small_context": "{engine} is running but its context is too small for a consultation",
+}
+NONE_ASKED = "no local engine is asked on this computer"
+REASONS = {
+    "engine_running": "The language model runs on {engine} {version}. {model}",
+    "engine_fallback": "The language model runs on {engine} {version}, because {reason}. {model}",
+    # The both-missing line of ruling 37; the pointer to the connect screen is stage 9.
+    "engine_none": "No local language model is running, and no cloud model is connected yet. {why}.",
+}
 CARD_NONE = "None found"
 CARD_UNREADABLE = "Could not be read"
 
@@ -132,6 +143,9 @@ EVENTS = {
     "name.changed": "Name changed",
     "password.changed": "Password changed",
     "password.reset": "Password reset from the command",
+    "decision.language_model": "Language model chosen at start",
+    "decision.guideline_search": "Guideline search placed at start",
+    "decision.whisperx_choice": "WhisperX choice judged at start",
 }
 
 # The command. Plain ASCII, for every terminal.

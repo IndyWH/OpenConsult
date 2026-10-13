@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -18,25 +17,16 @@ from openconsult.web.pages import form_fields, refuse, render
 router = APIRouter()
 
 
-@dataclass(frozen=True)
-class ModelLines:
-    ollama: str
-    model: str
-
-
-async def local_model_lines(request: Request) -> ModelLines | None:
-    """The two lines of This machine about the local model, only on a
-    machine with a suitable card; elsewhere Ollama is not even asked
-    (spec 15.7; HANDOVER, stage 3). Read at each view, off the
-    page's thread, with the engine's short limit, so the page never hangs."""
+def model_line(request: Request) -> str | None:
+    """This machine's line about the language model: the engine chosen at
+    start and held for the run, from the decisions, in one sentence with
+    no figures (spec 15.8, rulings 36 and 37). Only on a machine with a
+    suitable card; elsewhere no engine is asked and nothing is shown
+    (15.7). No engine is asked at a view."""
     p = parts(request)
     if p.machine.case != "suitable":
         return None
-    status = await asyncio.to_thread(p.engine.status, p.door.profile.tag)
-    if not status.running:
-        return ModelLines(words.OLLAMA_NOT_RUNNING, words.MODEL_UNKNOWN)
-    return ModelLines(words.OLLAMA_RUNNING.format(version=status.version),
-                      words.MODEL_PRESENT if status.model_present else words.MODEL_ABSENT)
+    return p.decisions.language_model.sentence
 
 
 @dataclass(frozen=True)
@@ -122,7 +112,7 @@ async def first_run(request: Request):
     step = parts(request).first_run.next_step()
     if step is None:
         raise Redirect("/login")
-    models = await local_model_lines(request) if step == "machine" else None
+    models = model_line(request) if step == "machine" else None
     speech = speech_lines(request) if step == "machine" else None
     choices = choice_lines(request) if step == "machine" else None
     return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, speech=speech, choices=choices)
@@ -227,8 +217,8 @@ async def logout(request: Request):
 NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
 
 
-def _settings_page(request: Request, user, refused=None, models=None):
-    context = dict(user=user, active="settings", machine=parts(request).machine, models=models,
+def _settings_page(request: Request, user, refused=None):
+    context = dict(user=user, active="settings", machine=parts(request).machine, models=model_line(request),
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    page_path="/settings")
@@ -239,7 +229,7 @@ def _settings_page(request: Request, user, refused=None, models=None):
 
 @router.get("/settings")
 async def settings_page(request: Request, user=Depends(guards.logged_in)):
-    return _settings_page(request, user, models=await local_model_lines(request))
+    return _settings_page(request, user)
 
 
 def _current_password_refusal(request: Request, fields: dict[str, str]) -> str | None:

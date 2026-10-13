@@ -25,10 +25,13 @@ def test_15_6_the_app_answers_only_when_addressed_as_this_computer(client, host,
 
 
 def test_15_6_a_change_must_come_from_the_apps_own_pages(app):
+    # A refused request leaves no line in the audit log. The lines there
+    # at start are the decisions of 3c, so the log is compared against them.
+    at_start = app.state.parts.audit.lines()
     from_elsewhere = browser(app, origin="http://evil.test")
     assert from_elsewhere.post("/first-run/statement", data={"agree": "yes"}).status_code == 403
     no_origin = browser(app)
     no_origin.headers.pop("Origin")
     assert no_origin.post("/first-run/statement", data={"agree": "yes"}).status_code == 403
-    assert app.state.parts.audit.lines() == []
+    assert app.state.parts.audit.lines() == at_start
     assert browser(app).post("/first-run/statement", data={"agree": "yes"}).status_code == 303

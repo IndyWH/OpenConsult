@@ -28,10 +28,12 @@ def test_ruling_4_no_user_can_be_set_up_before_the_statement(client, app):
 
 
 def test_ruling_4_accepting_the_statement_needs_the_tick_and_is_audited(client, app):
+    # A refusal leaves no line; the lines at start are the decisions of 3c.
+    at_start = app.state.parts.audit.lines()
     refused = client.post("/first-run/statement", data={})
     assert refused.status_code == 400
     assert refusal_on(refused.text, "continue") == words.TICK_TO_CONTINUE
-    assert app.state.parts.audit.lines() == []
+    assert app.state.parts.audit.lines() == at_start
     accepted = client.post("/first-run/statement", data={"agree": "yes"})
     assert accepted.status_code == 303
     assert app.state.parts.audit.lines()[0].event == "statement.accepted"

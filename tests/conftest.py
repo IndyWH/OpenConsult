@@ -17,6 +17,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
+from openconsult import app as app_module
 from openconsult import browser as browser_module
 from openconsult.app import build_app
 from openconsult.settings import paths, store
@@ -56,6 +57,19 @@ def r18_guard(tmp_path, monkeypatch):
         pytest.fail("ruling 2: a test tried to open a real browser")
 
     monkeypatch.setattr(browser_module, "start", refuse_browser)
+
+    # The app asks its engines at start (3c): a test that builds an app
+    # without naming them gets quiet stand-ins, never a real vLLM or Ollama.
+    class Absent(FakeEngine):
+        def __init__(self, address):
+            super().__init__(version=None)
+            self.address = address
+
+        def chat(self, call):
+            pytest.fail("a test sent a call to a real engine")
+
+    monkeypatch.setattr(app_module, "VllmEngine", Absent)
+    monkeypatch.setattr(app_module, "OllamaEngine", Absent)
 
 
 # ------------------------------------------------------------ the fake clock
@@ -97,7 +111,10 @@ def engine():
 
 @pytest.fixture
 def app(tmp_path, clock, machine, engine):
-    return build_app(store.build(tmp_path, PORT), machine=machine, clock=clock, engine=engine)
+    """The made-up card is suitable and Linux, vLLM is absent, so the
+    made-up Ollama is the engine chosen at start (3c)."""
+    return build_app(store.build(tmp_path, PORT), machine=machine, clock=clock,
+                     engines={"vllm": FakeEngine(version=None), "ollama": engine})
 
 
 def browser(app, address="127.0.0.1", origin=ORIGIN):

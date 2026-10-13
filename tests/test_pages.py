@@ -44,4 +44,5 @@ def test_15_6_the_log_page_lists_the_newest_first_and_is_read_only(logged_in, ap
     assert positions == sorted(positions)
     assert "from Example to Sample" in page
     assert logged_in.post("/log", data={}).status_code == 405
-    assert len(app.state.parts.audit.lines()) == 4
+    at_start = [line for line in app.state.parts.audit.lines() if line.event.startswith("decision.")]
+    assert len(app.state.parts.audit.lines()) == 4 + len(at_start)   # the decisions of 3c are written at start
