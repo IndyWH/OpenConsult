@@ -83,7 +83,7 @@ def speech_result(t0: float, arm: str, lines, stop_t=315.0, failure=None, pause=
               "stop": None if failure and failure["at"] == "stop" else
               {"t": stop_t, "t_asked": stop_t - 0.5, "lines": [p["lines"][0] for p in pieces], "last_live": [],
                "refused": [], "raw": [], "seconds": {"stop": 0.5}, "revisions": [], "speakers": {}, "notes": {}},
-              "loudness": {"window_s": 0.1, "dbfs": []}, "stamp": {"choice": arm}}
+              "loudness": {"window_s": 0.1, "dbfs": [None] * int(stop_t * 10)}, "stamp": {"choice": arm}}
     if pause:
         result["stop_pause"] = pause
     return result
@@ -149,6 +149,7 @@ def watch(t0: float, stop_t: float, way, speech, embedding, where, odd: dict | N
 def setup_json(name, way, speech, embedding, where, kind="setup", **extra) -> dict:
     model = VLLM_MODEL if way.startswith("vllm") else LM
     return {"name": name, "kind": kind, "way": way, "speech": speech, "embedding": embedding, "where": where,
+            "chains": list(extra.pop("chains", ("A1", "A2", "A3"))),
             "engine": {"kind": way.split("-")[0], "address": "http://127.0.0.1:1", "model": model, "digest": "d", "version": "0"},
             "vllm_kv_cache_bytes": 1_400_000_000 if way.startswith("vllm") else None, "recording": "473",
             "steps": {"load_language": {"start_epoch": T0 - 60, "end_epoch": T0 - 50},

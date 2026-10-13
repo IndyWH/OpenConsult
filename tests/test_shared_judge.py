@@ -47,6 +47,9 @@ def test_ruling_23_a_setup_that_meets_every_line_works(tmp_path):
     ("speech-oom-at-stop", {"speech_failure": {"at": "stop", "piece": None, "failure": "worker_error",
                                                 "detail": "OutOfMemoryError: CUDA out of memory. Tried to allocate"}},
      "the speech worker ran out of memory at stop"),
+    ("speech-oom-at-stop-ctranslate2", {"speech_failure": {"at": "stop", "piece": None, "failure": "worker_error",
+                                                            "detail": "MemoryError: batch_size ( 32) is probably too large. Try with a smaller value"}},
+     "the speech worker ran out of memory at stop"),
     ("speech-would-not-start", {"speech_failure": {"at": "open", "piece": None, "failure": "died",
                                                     "detail": "The speech worker stopped with exit code 1."}},
      "the speech worker would not start: The speech worker stopped with exit code 1."),
@@ -243,3 +246,20 @@ def test_15_9_5d_words_that_differ_between_two_pages():
     b = [{"text": "No chest pain at rest"}, {"text": "I take met formin today"}]
     assert judge.words_that_differ(a, a) == 0 and judge.words_that_differ(a, b) == 3
     assert judge.says_memory("torch.OutOfMemoryError: CUDA out of memory") and not judge.says_memory("ValueError: x")
+
+
+def test_ruling_23_a_stop_that_gave_nothing_ends_the_window_where_the_feed_ended_and_the_proof_runs_one_chain(tmp_path):
+    """When Stop gave no transcript the worker is usually gone from the card
+    just after; the window of line one ends where the sound ended, not at
+    the last reading. And a setup that says it ran one chain is judged on
+    that chain (the proof of item 9)."""
+    run = a_run(tmp_path)
+    made.write_setup(run, "died-at-stop", speech="whisperx", watch_kwargs={"odd": {320.0: {"speech_on": False}}},
+                     speech_failure={"at": "stop", "piece": None, "failure": "worker_error", "detail": "MemoryError: batch_size"})
+    s = judged(run, "died-at-stop")
+    assert s["lines"]["1"]["reason"] == "the speech worker ran out of memory at stop"
+    assert judge.fed_seconds({"stop": None, "loudness": {"window_s": 0.1, "dbfs": [None] * 567}}) == 56.7
+    made.write_setup(run, "one-chain", chain_kwargs={"chains": ("A1",)}, setup_extra={"chains": ["A1"]})
+    assert judged(run, "one-chain")["lines"]["2"]["met"] is True
+    made.write_setup(run, "one-chain-of-three", chain_kwargs={"chains": ("A1",)})
+    assert "chain A2 is missing" in judged(run, "one-chain-of-three")["lines"]["2"]["reason"]

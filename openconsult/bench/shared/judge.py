@@ -36,7 +36,10 @@ CHAINS = ("A1", "A2", "A3")
 LINE_THREE_S = 0.5        # ruling 23, line three: less than half a second longer
 STEADY_S = 0.25           # 15.8 ruling 21: the two base lines of a way within a quarter of a second
 LINE_FOUR_S = 1.0         # ruling 23, line four: a second or more longer, or growing a second more
-MEMORY_WORDS = ("out of memory", "outofmemory", "cuda error: out of memory")
+# The words a worker's own libraries use when the card is full: torch's
+# OutOfMemoryError, and ctranslate2's "MemoryError: batch_size ... is
+# probably too large" (seen at Stop in the proof of 13 Oct 2026).
+MEMORY_WORDS = ("out of memory", "outofmemory", "memoryerror", "memory error")
 WORDS = {True: "works", False: "not working", None: "not judged"}
 
 
@@ -145,6 +148,19 @@ def steadiness(before: dict, after: dict) -> dict:
 
 # ------------------------------------------------------------------ line one
 
+def fed_seconds(speech: dict | None) -> float | None:
+    """When the sound ended: Stop's moment, or, when Stop gave nothing,
+    the seconds of sound fed by the loudness windows the result keeps."""
+    stop = (speech or {}).get("stop") or {}
+    if stop.get("t") is not None:
+        return stop["t"]
+    loudness = (speech or {}).get("loudness") or {}
+    windows = loudness.get("dbfs") or []
+    if windows and loudness.get("window_s"):
+        return len(windows) * loudness["window_s"]
+    return max((p["fed_s"] for p in (speech or {}).get("pieces", [])), default=0.0)
+
+
 def _readings_in(watch: dict | None, t0: float | None, stop: float | None) -> list[dict]:
     """The reading before the recording, every reading while it ran, and
     the first after Stop."""
@@ -244,8 +260,9 @@ def line_one(setup: dict, watch: dict | None, speech: dict | None, searches: dic
 
 # ------------------------------------------------------------------ line two
 
-def line_two(chains: dict | None, after: dict | None, searches: dict | None) -> dict:
-    """No call fails, and the hard marks of 495 hold in each chain."""
+def line_two(chains: dict | None, after: dict | None, searches: dict | None, expected=CHAINS) -> dict:
+    """No call fails, and the hard marks of 495 hold in each chain the
+    setup ran (three in the test; the proof runs one)."""
     reasons = []
     for label, run in (("the chains", chains), ("the chain after Stop", after)):
         if run is None:
@@ -259,7 +276,7 @@ def line_two(chains: dict | None, after: dict | None, searches: dict | None) -> 
                     if p[job].get("failure"):
                         reasons.append(f"a call failed: {job} at point {p['point']} of chain {name} ({p[job]['failure']})")
     if chains is not None:
-        for name in CHAINS:
+        for name in expected:
             result = chains["results"].get(name)
             if result is None:
                 reasons.append(f"chain {name} is missing")
@@ -366,9 +383,9 @@ def judge_setup(folder: Path, steady: dict, speech_bases: list, card=None) -> di
     speech, searches, watch = read_speech(folder / "speech"), read_json(folder / "searches.json"), read_json(folder / "watch.json")
     t0 = (speech or {}).get("t0_epoch")
     stop = (speech or {}).get("stop") or {}
-    stop_epoch = t0 + stop["t"] if t0 is not None and stop.get("t") is not None else None
+    stop_epoch = t0 + fed_seconds(speech) if t0 is not None else None
     lines = {1: line_one(setup, watch, speech, searches, chains, after, t0, stop_epoch),
-             2: line_two(chains, after, searches),
+             2: line_two(chains, after, searches, tuple(setup.get("chains") or CHAINS)),
              3: line_three(chains, steady),
              4: line_four(speech, chains, speech_bases)}
     missed = [n for n in (1, 2, 3, 4) if lines[n]["met"] is False]
