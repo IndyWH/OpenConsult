@@ -1,0 +1,23 @@
+# The environment of the EmbeddingGemma 2 worker of the bench (spec 15.9,
+# ruling 25; 6.2). Not a package: only its locked libraries are installed,
+# into the user's data folder, by openconsult-bench shared-install. The
+# model's own page asks for sentence-transformers 6.1.0 or later;
+# transformers 5.19.0 is the first release that knows its architecture;
+# torch comes from PyPI (CUDA 13 wheels on Linux, processor wheels on
+# Windows and macOS), as the Nemotron environment's does.
+[project]
+name = "openconsult-bench-embedding2"
+version = "2.0.0.dev0"
+description = "The libraries of OpenConsult's EmbeddingGemma 2 worker, a worker of the bench. A research and education prototype, never for real patients."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "sentence-transformers==6.1.0",
+    "transformers==5.19.0",
+    "torch==2.12.0",
+    "huggingface-hub>=1.3.0,<2.0.0",
+    "safetensors>=0.4",
+    "numpy>=2",
+]
+
+[tool.uv]
+package = false

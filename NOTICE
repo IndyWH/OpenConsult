@@ -185,3 +185,38 @@ The NOTICE file on the main branch is the record for v1. It is the starting
 point for any component that v2 carries from v1.
 
 Nothing here is legal advice.
+
+Stage 5d, 13 Oct 2026. The EmbeddingGemma 2 worker of the bench (spec 15.9,
+ruling 25). The model and these libraries run as a separate process, in
+their own environment in the user's data folder, built by openconsult-bench
+shared-install from the lock file openconsult/bench/shared/embedding2/uv.lock.
+The app never imports any of them, and the model is fetched into the data
+folder only, never into this machine's shared cache. The lock holds 61
+packages; the direct ones are:
+
+  google/embeddinggemma-2    Apache-2.0       https://huggingface.co/google/embeddinggemma-2
+    Google DeepMind's open multimodal embedding model, at revision
+    914f7f89142e33e77833254d9c9b90c3cef7303b; only its text part is loaded.
+  sentence-transformers 6.1.0  Apache-2.0     https://pypi.org/project/sentence-transformers/
+  transformers 5.19.0        Apache-2.0       https://pypi.org/project/transformers/
+  torch 2.12.0               BSD-3-Clause     https://pypi.org/project/torch/
+  huggingface-hub 1.33.0     Apache-2.0       https://pypi.org/project/huggingface-hub/
+  safetensors 0.8.0          Apache-2.0       https://pypi.org/project/safetensors/
+  numpy 2.5.4                BSD-3-Clause     https://pypi.org/project/numpy/
+    tokenizers 0.23.3        Apache-2.0       https://pypi.org/project/tokenizers/
+    scikit-learn 1.9.1       BSD-3-Clause     https://pypi.org/project/scikit-learn/
+    scipy 1.18.1             BSD-3-Clause     https://pypi.org/project/scipy/
+    tqdm 4.70.1              MPL-2.0 and MIT  https://pypi.org/project/tqdm/
+    regex 2026.9.29          Apache-2.0       https://pypi.org/project/regex/
+    hf-xet 1.7.0             Apache-2.0       https://pypi.org/project/hf-xet/
+    httpx 0.28.1             BSD-3-Clause     https://pypi.org/project/httpx/
+    pyyaml 6.0.3             MIT              https://pypi.org/project/PyYAML/
+    filelock 4.1.1           Unlicense        https://pypi.org/project/filelock/
+    fsspec 2026.9.0          BSD-3-Clause     https://pypi.org/project/fsspec/
+    sympy 1.14.0             BSD-3-Clause     https://pypi.org/project/sympy/
+    networkx 3.7             BSD-3-Clause     https://pypi.org/project/networkx/
+    triton 3.7.0             MIT              https://pypi.org/project/triton/ (Linux only)
+    typing-extensions 4.16.0 PSF-2.0          https://pypi.org/project/typing-extensions/
+  nvidia-cudnn-cu13, nvidia-cublas and the other nvidia-* and cuda-* wheels
+    torch requires          NVIDIA proprietary (the CUDA Toolkit end user licence)
+                                             https://pypi.org/project/nvidia-cudnn-cu13/
