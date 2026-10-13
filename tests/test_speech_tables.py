@@ -79,7 +79,7 @@ def test_V1_LESSONS_9_4_the_tables_are_the_same_byte_for_byte_and_never_written_
     with pytest.raises(Refused):
         tables.write(tmp_path / "w1", scored, text)
     assert text.splitlines()[2] == "THIS IS A REHEARSAL. NO FIGURE IN IT COUNTS."
-    assert json.loads(first[0].read_text())["arms"]["nemotron"]["recordings"] == ["one"]
+    assert json.loads(first[0].read_text(encoding="utf-8"))["arms"]["nemotron"]["recordings"] == ["one"]
 
 
 def test_the_scores_hold_the_marks_of_every_arm_and_the_first_table_puts_the_patient_first(tmp_path, recordings_kept):

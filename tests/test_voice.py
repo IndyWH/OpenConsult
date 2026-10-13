@@ -71,7 +71,7 @@ def bench(tmp_path, recordings_kept, monkeypatch):
     minute = entry("minute", "minute.wav", minute_sha, speakers=1, length_s=2.0, machine_voices=True, voice_only=True,
                    doctor_voice=None, parts={"DOCTOR": "a machine voice"})
     made_up_recordings(folder, extra=[minute])
-    listed = json.loads((folder / "recordings.json").read_text())
+    listed = json.loads((folder / "recordings.json").read_text(encoding="utf-8"))
     listed["recordings"][0]["doctor_voice"] = "minute"
     listed["recordings"][1]["doctor_voice"] = None
     (folder / "recordings.json").write_text(json.dumps(listed, indent=1), encoding="utf-8")
@@ -195,7 +195,7 @@ def test_the_command_refuses_before_the_worker_is_started(bench, tmp_path):
         assert run(out_folder=place) == 6 and workers == []
     assert run(data_folder=tmp_path / "no-env") == 7 and workers == []
     assert said[-1] == words.BENCH_ARM_NEEDS_ENVIRONMENT.format(arm="the voice method", choice="whisperx_pyannote")
-    listed = json.loads((folder / "recordings.json").read_text())
+    listed = json.loads((folder / "recordings.json").read_text(encoding="utf-8"))
     listed["recordings"][2]["voice_only"] = False
     other = tmp_path / "other"
     other.mkdir()

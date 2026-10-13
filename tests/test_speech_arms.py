@@ -74,8 +74,8 @@ def test_ruling_8_the_tied_pair_declares_no_confidence_live_labels_one_transcrip
     assert (declares.confidence, declares.speakers, declares.second_transcript) == ("none", "live", False)
     assert declares.time_slack_s == NEMOTRON_TIME_SLACK_S == 1.0
     # The tied pair's speaker model is the one of the Nemotron choice, at its revision.
-    tied = json.loads((REPO / "openconsult" / "bench" / "speech" / "tied" / "models.json").read_text())
-    app = json.loads((REPO / "openconsult" / "speech" / "nemotron" / "models.json").read_text())
+    tied = json.loads((REPO / "openconsult" / "bench" / "speech" / "tied" / "models.json").read_text(encoding="utf-8"))
+    app = json.loads((REPO / "openconsult" / "speech" / "nemotron" / "models.json").read_text(encoding="utf-8"))
     assert tied["speakers"] == app["speakers"]
     assert tied["words"]["revision"] == "ea30d66debe3740a08b573244286791d423d6b3e"        # v1's revision of the 3.5 model
 
