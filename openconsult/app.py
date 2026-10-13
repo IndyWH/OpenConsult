@@ -6,6 +6,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Callable
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
@@ -21,6 +22,7 @@ from openconsult.llm.vllm import VllmEngine
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.patients.logins import Logins
 from openconsult.patients.users import Users
+from openconsult.settings import room
 from openconsult.settings.decisions import Decisions, language_model_element
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.store import Settings
@@ -52,12 +54,13 @@ class Parts:
 
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
               engines: dict | None = None, speech: SpeechDoor | None = None,
-              doors: dict | None = None) -> FastAPI:
-    """engines, speech and doors are passed in by tests, so the suite needs
-    no vLLM, no Ollama and no speech worker (spec 15.7, 15.8, 15.9).
-    Building a door starts nothing and reads nothing but a path. The
-    engine is chosen here, once, and the decisions are written to the
-    audit log once (rulings 36 to 38)."""
+              doors: dict | None = None, card_programs: Callable | None = None) -> FastAPI:
+    """engines, speech, doors and card_programs are passed in by tests, so
+    the suite needs no vLLM, no Ollama, no speech worker and no card (spec
+    15.7, 15.8, 15.9). Building a door starts nothing and reads nothing
+    but a path. The engine is chosen here, once, the room on the card is
+    read once, and the decisions are written to the audit log once
+    (rulings 36 to 38)."""
     db = open_database(settings.database_path)
     audit = Audit(db, clock)
     users = Users(db, audit, clock)
@@ -67,7 +70,9 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     choice = choose(machine, engines, GEMMA_4_QAT)
     engine = engines[choice.name] if choice.name else NoEngine()
     profile = GEMMA_4_QAT.for_engine(choice.name) if choice.name else GEMMA_4_QAT
-    decisions = Decisions({"language_model": language_model_element(choice, profile.tag if choice.name else None)})
+    programs = (card_programs or room.read_programs)() if machine.card else None   # no tool is run on a Mac or with no card
+    decisions = Decisions({"language_model": language_model_element(choice, profile.tag if choice.name else None),
+                           **room.check(machine, choice.name, programs)})
     for element in decisions.elements.values():
         audit.record(f"decision.{element.name}", element.audit_detail)
     doors = dict(doors or {})

@@ -70,6 +70,8 @@ def r18_guard(tmp_path, monkeypatch):
 
     monkeypatch.setattr(app_module, "VllmEngine", Absent)
     monkeypatch.setattr(app_module, "OllamaEngine", Absent)
+    # And the card's programs are never read from the real card: an empty list stands in.
+    monkeypatch.setattr(app_module.room, "read_programs", lambda: [])
 
 
 # ------------------------------------------------------------ the fake clock

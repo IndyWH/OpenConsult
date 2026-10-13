@@ -46,6 +46,17 @@ REASONS = {
     "engine_fallback": "The language model runs on {engine} {version}, because {reason}. {model}",
     # The both-missing line of ruling 37; the pointer to the connect screen is stage 9.
     "engine_none": "No local language model is running, and no cloud model is connected yet. {why}.",
+    # Where the guideline search sits (ruling 32) and whether the WhisperX choice is offered (ruling 33).
+    "guideline_card": "The guideline search will run on the graphics card.",
+    "guideline_processor": ("The guideline search will run on the processor, because the card has no room "
+                            "for it beside the language model and the speech model."),
+    "guideline_no_card": ("The guideline search will run on the processor, because this computer has no "
+                          "suitable graphics card."),
+    "whisperx_available": "Nemotron is the speech choice. The WhisperX with pyannote choice is available.",
+    "whisperx_no_room": ("Nemotron is the speech choice. The WhisperX with pyannote choice is not available, "
+                         "because the card has no room for its pass at Stop beside the language model."),
+    "whisperx_no_card": ("Nemotron is the speech choice. The WhisperX with pyannote choice is not available, "
+                         "because this computer has no suitable graphics card."),
 }
 CARD_NONE = "None found"
 CARD_UNREADABLE = "Could not be read"

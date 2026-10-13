@@ -43,6 +43,14 @@ class Decisions:
         return self.elements[LANGUAGE_MODEL]
 
     @property
+    def guideline_search(self) -> Element:
+        return self.elements[GUIDELINE_SEARCH]
+
+    @property
+    def whisperx_choice(self) -> Element:
+        return self.elements[WHISPERX_CHOICE]
+
+    @property
     def start_offered(self) -> bool:
         """Ruling 37: with no engine fit, Start is not offered. In 3c there is
         no Start control; the element records it for stage 6."""
