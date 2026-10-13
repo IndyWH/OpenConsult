@@ -196,7 +196,9 @@ def cmd_speech_fetch(args) -> int:
 
 def cmd_speech_run(args) -> int:
     return speech_commands.speech_run(Path(args.recordings), args.arm, Path(args.data_folder), Path(args.out),
-                                      args.recording, say=say)
+                                      args.recording, say=say,
+                                      started_file=Path(args.started_file) if args.started_file else None,
+                                      pause_at_stop=Path(args.pause_at_stop) if args.pause_at_stop else None)
 
 
 def cmd_speech_score(args) -> int:
@@ -260,6 +262,8 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--data-folder", required=True, help="the data folder whose environments run the workers")
     p.add_argument("--out", required=True, help="the results folder: not the repo, not a data folder, not where recordings are kept")
     p.add_argument("--recording", nargs="*", help="only these recordings, by name")
+    p.add_argument("--started-file", help="5d: a file written when the feed begins, with the moment")
+    p.add_argument("--pause-at-stop", help="5d: a folder where stop.wanted is written before Stop, which then waits for stop.go")
     p = sub.add_parser("speech-score")
     p.set_defaults(fn=cmd_speech_score)
     p.add_argument("--out", required=True, help="the results folder of speech-run")

@@ -167,3 +167,47 @@ def test_R20_the_result_carries_the_stamp_and_an_arms_hash_when_the_worker_gives
                  sound.read_wav(one.path, 16000), sleep=clock.sleep, clock=clock, now=lambda: NOW)
     assert result["stamp"]["models"]["live_line"] == {"sha256": "c72f4adc"} and result["stamp"]["versions"] == {"made-up": "0.0"}
     assert replay.PIECE_S == 0.25
+
+
+def test_15_9_5d_the_feed_start_is_written_to_the_started_file_and_the_moment_stop_was_asked_is_kept(recordings_kept, tmp_path):
+    """Two switches of the replay for the test of 5d. Given, the moment the
+    feed began goes to the file and t_asked into the result; not given,
+    nothing is written and the result is as today, plus t0_epoch."""
+    listed = recordings_of(recordings_kept)
+    one = named(listed, "one")
+    from openconsult.bench.speech import sound
+    pcm = sound.read_wav(one.path, 16000)
+    worker, clock = MadeUpWorker(), FakeClock()
+    started = tmp_path / "feeding.json"
+    result = run(door_of(worker), ARMS["nemotron"], one, pcm, sleep=clock.sleep, clock=clock, now=lambda: NOW,
+                 wall=lambda: 1234.5, started_file=started)
+    import json
+    assert json.loads(started.read_text(encoding="utf-8")) == {"arm": "nemotron", "recording": "one", "t0_epoch": 1234.5}
+    assert result["t0_epoch"] == 1234.5 and result["stop"]["t_asked"] == 3.0 and result["stop"]["t"] == 3.0
+    assert "stop_pause" not in result
+    plain = run(door_of(MadeUpWorker()), ARMS["nemotron"], one, pcm, sleep=clock.sleep, clock=clock, now=lambda: NOW)
+    assert not (tmp_path / "x").exists() and plain["stop"]["t_asked"] == plain["stop"]["t"] - 0.0
+    assert sorted(plain) == sorted(result)                              # no switch: the same shape
+
+
+def test_15_9_5d_the_pause_before_stop_waits_for_the_go_file_and_stops_anyway_at_its_limit(recordings_kept, tmp_path, monkeypatch):
+    listed = recordings_of(recordings_kept)
+    one = named(listed, "one")
+    from openconsult.bench.speech import sound
+    pcm = sound.read_wav(one.path, 16000)
+    folder = tmp_path / "pause"
+    clock = FakeClock()
+    real_sleep = clock.sleep
+
+    def sleeping(seconds):
+        real_sleep(seconds)
+        if (folder / replay.STOP_WANTED).exists() and clock.now >= 104.0:
+            (folder / replay.STOP_GO).write_text("go", encoding="utf-8")        # the driver answers after 1 s
+    result = run(door_of(MadeUpWorker()), ARMS["nemotron"], one, pcm, sleep=sleeping, clock=clock, now=lambda: NOW,
+                 wall=lambda: 7.0, pause_at_stop=folder)
+    assert result["stop_pause"]["went_ahead"] is False and result["stop_pause"]["waited_s"] == 1.0
+    assert result["stop"]["t_asked"] == 4.0 and result["stop"]["t"] == 4.0        # Stop was asked after the pause
+    monkeypatch.setattr(replay, "PAUSE_LIMIT_S", 2.0)
+    late = run(door_of(MadeUpWorker()), ARMS["nemotron"], one, pcm, sleep=real_sleep, clock=clock, now=lambda: NOW,
+               wall=lambda: 7.0, pause_at_stop=tmp_path / "nobody")
+    assert late["stop_pause"]["went_ahead"] is True and late["stop_pause"]["waited_s"] == 2.0 and late["stop"]

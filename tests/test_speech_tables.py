@@ -135,3 +135,23 @@ def test_fix_two_a_one_transcript_arm_gets_the_true_waits_on_a_made_recording(tm
     assert "to_final_true" in nem["lines"][0] and "to_final_true" not in nem["lines"][1]
     wx = scored["recordings"]["one"]["arms"]["whisperx_pyannote"]["live"]["wait"]
     assert wx["to_final_true"]["n"] >= 1
+
+
+def test_15_9_5d_a_result_with_the_new_fields_is_scored_exactly_as_before(tmp_path, recordings_kept):
+    """The two fields the replay of 5d adds (t0_epoch, t_asked) change no
+    table of 5c: the same results with the fields stripped score the same."""
+    folder = made_up_recordings(recordings_kept.folder)
+    recordings_kept.settle()
+    listed, results = results_of(folder, tmp_path / "out")
+    assert all("t0_epoch" in r and (r["stop"] is None or "t_asked" in r["stop"]) for r in results.values())
+    stripped = {}
+    for key, result in results.items():
+        copy = json.loads(json.dumps(result))
+        del copy["t0_epoch"]
+        if copy["stop"]:
+            del copy["stop"]["t_asked"]
+        stripped[key] = copy
+    scripts = scripts_folder(tmp_path)
+    with_fields = tables.score_all(results, listed, [scripts], MARKS)
+    without = tables.score_all(stripped, listed, [scripts], MARKS)
+    assert json.dumps(with_fields, sort_keys=True) == json.dumps(without, sort_keys=True)

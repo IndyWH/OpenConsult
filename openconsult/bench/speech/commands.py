@@ -49,7 +49,7 @@ def speech_fetch(data_folder: Path, say: Callable = print, run: Callable = subpr
 
 def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: Path, names: list[str] | None,
                say: Callable = print, make_door: Callable[[Arm, Path], object] = door_for,
-               sleep=None, clock=None) -> int:
+               sleep=None, clock=None, started_file: Path | None = None, pause_at_stop: Path | None = None) -> int:
     arm = ARMS[arm_name]
     try:
         listed = banked.load_list(recordings_folder)
@@ -73,7 +73,8 @@ def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: P
     if not environment.installed(data_folder, arm.environment_of):
         say(words.BENCH_ARM_NEEDS_ENVIRONMENT.format(arm=arm.name, choice=arm.environment_of.name))
         return 7
-    extra = {k: v for k, v in (("sleep", sleep), ("clock", clock)) if v is not None}
+    extra = {k: v for k, v in (("sleep", sleep), ("clock", clock), ("started_file", started_file),
+                               ("pause_at_stop", pause_at_stop)) if v is not None}
     try:
         summary = replay.run_many(arm, chosen, lambda: make_door(arm, data_folder), writer, say=say, **extra)
     except banked.RecordingChanged as changed:
