@@ -74,11 +74,16 @@ def test_ruling_23_line_one_on_vllm_and_the_private_ollama_and_version_2(tmp_pat
     made.write_setup(run, "second-wrong-device", way="ollama-together", embedding="second", where="processor",
                      search_kwargs={"device": "cuda"})
     made.write_setup(run, "second-left-card", embedding="second", where="card", watch_kwargs={"odd": {60.0: {"second_on_card": False}}})
+    # The worker lives only while its searches run (made up: 15 s to 175.3 s); gone at 200 s is no miss. The run of
+    # 13 Oct read four setups that work as not working before this was so.
+    made.write_setup(run, "second-gone-after-its-searches", embedding="second", where="card",
+                     watch_kwargs={"odd": {200.0: {"second_on_card": False}}})
     assert judged(run, "vllm-one-nemotron-second-card")["works"] is True
     assert "the language model was unloaded at 50 s" in judged(run, "vllm-down")["lines"]["1"]["reason"]
     assert judged(run, "ollama-together-nemotron-second-processor")["works"] is True
     assert "ran on cuda, not where the setup asked (processor)" in judged(run, "second-wrong-device")["lines"]["1"]["reason"]
-    assert "the embedding model was processor at 60 s" in judged(run, "second-left-card")["lines"]["1"]["reason"]
+    assert judged(run, "second-left-card")["lines"]["1"]["reason"] == "the worker of EmbeddingGemma 2 was not on the card at 60 s"
+    assert judged(run, "second-gone-after-its-searches")["works"] is True
 
 
 def test_ruling_23_line_two_met_and_missed(tmp_path):

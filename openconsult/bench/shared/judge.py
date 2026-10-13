@@ -201,6 +201,26 @@ def _embedding_where(reading: dict, setup: dict) -> str:
     return "card" if on_card else "processor"
 
 
+def _embedding_readings(readings: list[dict], setup: dict, searches: dict | None) -> list[dict]:
+    """The first EmbeddingGemma stays in the service until Stop, so every
+    reading counts. The worker of EmbeddingGemma 2 lives only while its
+    searches run (the driver ends them with the chains): it is looked for
+    from its first search to the end of its last, and not after."""
+    items = (searches or {}).get("searches") or []
+    if setup["embedding"] == "first" or not items:
+        return readings
+    first = min(searches.get("t0_epoch") or items[0]["started_epoch"], items[0]["started_epoch"])
+    last = items[-1]["started_epoch"] + (items[-1].get("seconds") or 0)
+    return [r for r in readings if first <= r["at_epoch"] <= last]
+
+
+def _embedding_moved(reading: dict, setup: dict, where: str, t0: float | None) -> str:
+    if setup["embedding"] == "second":
+        return f"the worker of EmbeddingGemma 2 was not on the card at {_at(reading, t0)}"
+    said = "unloaded" if where == "gone" else where
+    return f"the embedding model was {said} at {_at(reading, t0)}, not on the {setup['where']}"
+
+
 def _speech_on_card(reading: dict, speech: str) -> bool:
     programs = (reading.get("card") or {}).get("programs") or []
     return any(ENV_OF[speech] in (p.get("name") or "") for p in programs)
@@ -245,11 +265,10 @@ def line_one(setup: dict, watch: dict | None, speech: dict | None, searches: dic
                     "processor": "was on the processor", "unread": "could not be read on its list"}[where]
             reasons.append(f"the language model {said} at {_at(reading, t0)}")
             break
-    for reading in readings:
+    for reading in _embedding_readings(readings, setup, searches):
         where = _embedding_where(reading, setup)
         if where != setup["where"]:
-            reasons.append(f"the embedding model was {where if where != 'gone' else 'unloaded'} at {_at(reading, t0)}, "
-                           f"not on the {setup['where']}")
+            reasons.append(_embedding_moved(reading, setup, where, t0))
             break
     during = [r for r in readings if t0 is not None and t0 <= r["at_epoch"] <= (stop_epoch or float("inf"))]
     if during and not all(_speech_on_card(r, setup["speech"]) for r in during):
