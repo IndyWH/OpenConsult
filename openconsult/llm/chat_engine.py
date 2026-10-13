@@ -1,14 +1,13 @@
-"""What the bench's two engines share (spec 15.8). llama.cpp's server
-and vLLM both speak the chat completions shape, so one class holds the
-HTTP exchange, the request built from the parts of a call, and the reply
-read into the joint's one Reply. Standard library only.
-
-These engines are modules of the bench. The app imports none of this
-and cannot reach them (R31): no setting chooses an engine.
+"""What an engine that speaks the chat completions shape needs (spec
+15.8): vLLM, the app's engine from 3c, and llama.cpp, the bench's. One
+class holds the HTTP exchange, the request built from the parts of a
+call, and the reply read into the joint's one Reply. Standard library only.
 
 Such a server fixes its context size when it starts, so the size cannot
 be sent with a call. The engine reads the server's own figure once and
-gives a call back as an error if it is not the call's (R19).
+gives a call back as an error if it is smaller than the call's, so no
+input is ever cut (R19; V1_LESSONS 3.3). A larger one is only more room;
+the bench's arms hold to the exact figure on their own (15.8, 3c).
 """
 
 from __future__ import annotations
@@ -110,9 +109,9 @@ class ChatEngine:
             self._context = self.context(call.tag)   # read once, so no call carries it in its time
         if self._context is None:
             raise EngineUnreachable("the engine did not say what context it runs at", request)
-        if self._context != call.context:
+        if self._context < call.context:
             return Reply("error", None, None, f"the engine runs at a context of {self._context}, "
-                         f"not {call.context}", None, None, None, None, None, None, 0, request, None)
+                         f"below the call's {call.context}", None, None, None, None, None, None, 0, request, None)
         started = time.perf_counter()
         status, text = self._exchange("/v1/chat/completions", sent, call.timeout_s)
         wall_ms = round(1000 * (time.perf_counter() - started))
@@ -137,8 +136,10 @@ class ChatEngine:
                      read_ms, write_ms, wall_ms, request, text)
 
     def status(self, tag: str, timeout_s: float = STATUS_TIMEOUT_S) -> EngineStatus:
+        """With the context the server was started at, which the fit rule
+        of 3c reads (15.8, the details of 3c)."""
         version = self.version(timeout_s)
         if version is None:
             return EngineStatus(False, None, None, None)
         digest = self.model_digest(tag, timeout_s)
-        return EngineStatus(True, version, digest is not None, digest)
+        return EngineStatus(True, version, digest is not None, digest, self.context(tag, timeout_s))

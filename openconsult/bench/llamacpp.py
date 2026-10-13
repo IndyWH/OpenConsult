@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
-from openconsult.bench.chat_engine import STATUS_TIMEOUT_S, ChatEngine, ms
+from openconsult.llm.chat_engine import STATUS_TIMEOUT_S, ChatEngine, ms
 
 
 class LlamaCppEngine(ChatEngine):

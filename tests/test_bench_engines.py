@@ -1,6 +1,7 @@
-"""The bench's two engines, llama.cpp and vLLM, against a made-up server
-(spec 15.8; R19, R31; V1_LESSONS 3.3, 9.6). Everything the server says is
-made up; nothing here is what a model or an engine said."""
+"""The two engines that speak the chat completions shape, llama.cpp (the
+bench's) and vLLM (the app's from 3c), against a made-up server (spec
+15.8; R19, R31; V1_LESSONS 3.3, 9.6). Everything the server says is made
+up; nothing here is what a model or an engine said."""
 
 import hashlib
 import json
@@ -11,7 +12,7 @@ import pytest
 
 from openconsult.bench.cli import main
 from openconsult.bench.llamacpp import LlamaCppEngine
-from openconsult.bench.vllm import VllmEngine
+from openconsult.llm.vllm import VllmEngine
 from openconsult.bench.writer import ResultWriter
 from openconsult.cli import main as app_main
 from openconsult.llm.engine import Call
@@ -89,15 +90,18 @@ def test_15_8_a_bench_engine_keeps_the_engines_own_read_and_write_times(server, 
 
 
 @pytest.mark.parametrize("engine_class", ENGINES)
-def test_R19_a_bench_engine_refuses_a_server_started_at_another_context(server, engine_class):
+def test_R19_a_chat_engine_refuses_a_server_started_at_a_smaller_context(server, engine_class):
     describe(server, engine_class, context=8192)
     server.routes["/v1/chat/completions"] = chat_reply('{"ok": true}')
     reply = engine_class(server.address).chat(CALL)
     assert reply.ended == "error" and "8192" in reply.error and "16384" in reply.error
     assert server.chats() == []                    # the call was never sent
-    # The twin: at the call's own context it goes through.
+    # The twins: at the call's own context it goes through, and at a larger one too (3c: more room, nothing cut).
     describe(server, engine_class, context=16384)
     assert engine_class(server.address).chat(CALL).ended == "complete"
+    describe(server, engine_class, context=32768)
+    assert engine_class(server.address).chat(CALL).ended == "complete"
+    assert engine_class(server.address).status(CALL.tag).context == 32768
 
 
 def test_9_6_a_bench_engine_reports_its_version_and_the_model_it_runs(server, tmp_path):
@@ -144,6 +148,7 @@ def test_15_8_the_bench_is_pointed_at_an_engine_by_kind_address_and_model(server
 
 def test_R31_the_app_never_loads_the_bench_and_has_no_switch_for_an_engine(tmp_path):
     # A fresh Python, so no other test's imports are seen: the app as the command builds it.
+    # The engine of the run is one of the llm folder's (3c: the order is the setting, R31).
     code = (
         "import sys\n"
         "import openconsult.cli\n"
@@ -156,7 +161,8 @@ def test_R31_the_app_never_loads_the_bench_and_has_no_switch_for_an_engine(tmp_p
     )
     done = subprocess.run([sys.executable, "-c", code, str(tmp_path)], capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
-    assert done.stdout.split() == ["openconsult.llm.ollama", "[]"]
+    module, loaded = done.stdout.split()
+    assert module.startswith("openconsult.llm.") and loaded == "[]"
     for option in ("--engine", "--kind", "--model"):
         with pytest.raises(SystemExit):
             app_main([option, "made-up", "--data-folder", str(tmp_path), "--no-browser"], serve=lambda *a: None)

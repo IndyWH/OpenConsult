@@ -23,17 +23,17 @@ from openconsult.bench.shared import commands as shared_commands
 from openconsult.bench.speech import commands as speech_commands
 from openconsult.bench.speech import commands2 as speech_commands2
 from openconsult.bench.speech.arms import ARMS
-from openconsult.bench.vllm import VllmEngine
 from openconsult.bench.writer import Refused, ResultWriter
 from openconsult.db import open_database
 from openconsult.llm.door import Door
 from openconsult.llm.ollama import DEFAULT_ADDRESS, OllamaEngine
 from openconsult.llm.profile import GEMMA_4_QAT
 from openconsult.llm.record import ModelCalls
+from openconsult.llm.vllm import VllmEngine
 from openconsult.settings import paths
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
-# The engines the bench can speak to. The app has the first only (R31).
+# The engines the bench can speak to. The app has Ollama and vLLM (15.8, ruling 30); llama.cpp is the bench's alone.
 KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
 
 
@@ -44,12 +44,16 @@ def say(line: str) -> None:
 def open_arm(args, together: bool = False):
     """The door, its record and the writer of an arm; or the code to stop
     with, when the engine or the model is not the one this arm needs.
-    The door gets a copy of the one profile that carries the name this
-    engine knows the model by. The app's profile is not touched."""
+    The door gets the one profile as this engine knows the model, or with
+    the name given. The app's profile is not touched. An arm's seconds
+    and memory depend on the room the engine was started with, so a
+    server whose context is not exactly the profile's is refused before
+    the arm starts; the app's own rule is at least (15.8, 3c)."""
     out = Path(args.out)
     writer = ResultWriter(out, forbidden=(REPO, paths.default_data_folder()))
     engine = KINDS[args.kind](args.engine)
-    profile = dataclasses.replace(GEMMA_4_QAT, tag=args.model or GEMMA_4_QAT.tag, engine=engine.name)
+    profile = GEMMA_4_QAT.for_engine(engine.name) if engine.name in GEMMA_4_QAT.tags else GEMMA_4_QAT
+    profile = dataclasses.replace(profile, tag=args.model or profile.tag, engine=engine.name)
     record = ModelCalls(open_database(out / "calls.db"))
     door = Door(engine, record, profile)
     version, digest = door.identity()
@@ -60,6 +64,10 @@ def open_arm(args, together: bool = False):
     if args.digest and digest != args.digest:
         say(f"STOP: the model's digest is {digest}, not {args.digest}")
         return 3
+    context = engine.status(profile.tag).context
+    if context is not None and context != profile.context:
+        say(f"STOP: the engine runs at a context of {context}, not {profile.context}; an arm is measured at the profile's")
+        return 8
     held = writer.read_all()
     differs = arm_differs(next(iter(held.values())), door, together) if held else None
     if differs:

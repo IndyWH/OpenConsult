@@ -3,8 +3,10 @@ server (spec 15.8, the clock; stage 3b, rule 19; R19; V1_LESSONS 9.6)."""
 
 import json
 
+import pytest
+
 from openconsult.bench.cli import main
-from openconsult.bench.vllm import VllmEngine
+from openconsult.llm.vllm import VllmEngine
 from openconsult.bench.writer import ResultWriter
 from openconsult.db import open_database
 from openconsult.llm.record import ModelCalls
@@ -61,9 +63,24 @@ def test_15_8_the_first_call_of_an_arm_is_recorded_and_enters_no_time(server, be
 
 def test_15_8_an_arm_does_not_start_when_its_first_call_fails(server, bench_folders, capsys):
     cases, out = bench_folders
-    describe(server, VllmEngine, context=8192)        # a server started at half the context
-    server.routes["/v1/chat/completions"] = answer_by_job
+    describe(server, VllmEngine)
+    server.routes["/v1/chat/completions"] = (500, {"error": {"message": "made-up: the engine fell over"}})
     assert main(run_args(cases, out, server, "--chains", "A1")) == 4
     said = capsys.readouterr().out
-    assert "STOP: the first call failed" in said and "8192" in said and "16384" in said
+    assert "STOP: the first call failed" in said and "fell over" in said
+    assert ResultWriter(out).read_all() == {} and len(server.chats()) == 1
+
+
+@pytest.mark.parametrize("context", [8192, 32768])
+def test_3c_an_arm_is_refused_unless_the_server_runs_at_exactly_the_profiles_context(server, bench_folders, capsys, context):
+    """An arm's seconds and memory depend on the room the engine was started
+    with (15.8, the details of 3c, the plan review): exactly 16,384 for an
+    arm, where the app's own fit rule is at least. The twin at 32,768 is
+    accepted by the app's rule in test_choose."""
+    cases, out = bench_folders
+    describe(server, VllmEngine, context=context)
+    server.routes["/v1/chat/completions"] = answer_by_job
+    assert main(run_args(cases, out, server, "--chains", "A1")) == 8
+    said = capsys.readouterr().out
+    assert "STOP: the engine runs at a context of" in said and str(context) in said and "16384" in said
     assert ResultWriter(out).read_all() == {} and server.chats() == []

@@ -1,14 +1,17 @@
-"""The vLLM engine of the bench (spec 15.8). vLLM does not report which
-revision of a model it serves, so the server is started on a Hugging
-Face snapshot folder, whose name is the revision, and that name is the
-model's digest here.
+"""The vLLM engine behind the joint (spec 15.8, rulings 30 and 37; the
+details of 3c): the app's first choice on Linux with a suitable card, and
+the bench's vLLM arm. The request is the bench's of 7 Oct; the compact
+answer form is set where vLLM is started, so nothing travels in a request
+and nothing a model reads changes. vLLM does not report which revision of
+a model it serves, so the server is started on a Hugging Face snapshot
+folder, whose name is the revision, and that name is the model's digest.
 """
 
 from __future__ import annotations
 
 import re
 
-from openconsult.bench.chat_engine import STATUS_TIMEOUT_S, ChatEngine, ms
+from openconsult.llm.chat_engine import STATUS_TIMEOUT_S, ChatEngine, ms
 
 _REVISION = re.compile(r"[0-9a-f]{40}")
 

@@ -55,6 +55,7 @@ class EngineStatus:
     version: str | None
     model_present: bool | None
     digest: str | None
+    context: int | None = None   # the server's fixed context; None when the call sets it, as on Ollama
 
 
 class EngineFailure(Exception):
