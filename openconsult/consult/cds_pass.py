@@ -1,14 +1,19 @@
-"""One pass of the clinical decision support (spec 15.7): the alarm
-first, then the assessment (R30). Both read the transcript afresh (R9,
-R12) and open with the patient line (R11). Code does the bookkeeping:
-once the urgent step is arranged it stays arranged, and an empty list of
-differentials keeps the earlier list (spec 15.8, ruling 5). If one call
-fails the other still gives its result, and a failed alarm is said to be
-not judged, never read as no alarm (HANDOVER, stage 3).
+"""One pass of the clinical decision support (spec 15.7): the alarm and
+the assessment, sent at the same moment (spec 15.8, ruling 31), the
+alarm submitted first (R30). Both read the transcript afresh (R9, R12)
+and open with the patient line (R11). Each goes through the door on its
+own thread, so each is limited, checked and recorded as ever, and the
+door never raises for an engine's failure, so one call failing cannot
+lose the other. Code does the bookkeeping: once the urgent step is
+arranged it stays arranged, and an empty list of differentials keeps
+the earlier list (spec 15.8, ruling 5). A failed alarm is said to be
+not judged, never read as no alarm (HANDOVER, stage 3). Sending
+together changes the moment of sending, never the words.
 """
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from openconsult.consult.messages import (Patient, alarm_message, assessment_message, names_of,
@@ -80,12 +85,13 @@ def settle(alarm_result: Result, assessment_result: Result, carried: Carried) ->
 
 def run_pass(door: Door, transcript: str, patient: Patient, carried: Carried | None = None,
              sampling: Sampling | None = None) -> PassResult:
-    """The alarm, then the assessment, one after another (R30)."""
+    """The alarm and the assessment at the same moment, the alarm first (R30, ruling 31)."""
     carried = carried or Carried()
     alarm_text, assessment_text = messages(transcript, patient, carried)
-    alarm_result = door.ask("alarm", alarm_text, sampling)
-    assessment_result = door.ask("assessment", assessment_text, sampling)
-    return settle(alarm_result, assessment_result, carried)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        alarm = pool.submit(door.ask, "alarm", alarm_text, sampling)
+        assessment = pool.submit(door.ask, "assessment", assessment_text, sampling)
+    return settle(alarm.result(), assessment.result(), carried)
 
 
 def _alarm(result: Result, arranged_before: bool) -> Alarm:

@@ -1,6 +1,8 @@
-"""One pass: the alarm, then the assessment, with the bookkeeping in code
+"""One pass: the alarm and the assessment, with the bookkeeping in code
 (spec 15.7; R9, R11, R12, R30; V1_LESSONS 3.1, 3.2, 3.14; HANDOVER,
-stage 3; spec 15.8, ruling 5). Every transcript here is made up."""
+stage 3; spec 15.8, ruling 5). Since 3c the two calls are sent at the
+same moment, so the made-up engine answers each job from its own list
+and a test reads the calls by job. Every transcript here is made up."""
 
 import json
 
@@ -26,7 +28,10 @@ def door_of(tmp_path, clock):
     record = ModelCalls(db, clock)
 
     def make(script=None):
-        engine = FakeEngine(script)
+        """script is the replies in the order alarm, assessment, alarm, ... ;
+        the engine answers each job from its own list."""
+        by_job = None if script is None else {"alarm": script[0::2], "assessment": script[1::2]}
+        engine = FakeEngine(by_job)
         return Door(engine, record), engine
 
     yield make
@@ -36,7 +41,7 @@ def door_of(tmp_path, clock):
 def test_R11_both_calls_open_with_the_patient_line(door_of):
     door, engine = door_of()
     run_pass(door, TRANSCRIPT, WOMAN)
-    assert [c.job for c in engine.calls] == ["alarm", "assessment"]
+    assert sorted(c.job for c in engine.calls) == ["alarm", "assessment"]
     for call in engine.calls:
         assert call.user.startswith(f"{LINE}\n\n") and call.user.count("The patient is") == 1
 
@@ -69,7 +74,8 @@ def test_R12_the_assessment_gets_earlier_names_only_and_the_alarm_gets_none(door
     first = run_pass(door, TRANSCRIPT, WOMAN)
     assert first.carried.names == ("Made-up condition A", "Made-up condition B")
     run_pass(door, TRANSCRIPT, WOMAN, first.carried)
-    first_alarm, first_assessment, later_alarm, later_assessment = (c.user for c in engine.calls)
+    first_alarm, later_alarm = (c.user for c in engine.calls_for("alarm"))
+    first_assessment, later_assessment = (c.user for c in engine.calls_for("assessment"))
     assert first_assessment == f"{LINE}\n\n" + loader.fill(loader.frame("assessment.first"), transcript=TRANSCRIPT)
     assert later_assessment == f"{LINE}\n\n" + loader.fill(
         loader.frame("assessment.later"), stale="Made-up condition A\nMade-up condition B",
@@ -80,13 +86,14 @@ def test_R12_the_assessment_gets_earlier_names_only_and_the_alarm_gets_none(door
     assert first_alarm == later_alarm == f"{LINE}\n\n" + loader.fill(loader.frame("alarm"), transcript=TRANSCRIPT)
     # An empty earlier list means the first-pass frame again.
     run_pass(door, TRANSCRIPT, WOMAN, Carried(names=()))
-    assert engine.calls[-1].user == first_assessment
+    assert engine.calls_for("assessment")[-1].user == first_assessment
 
 
 def test_R9_R30_the_alarm_goes_first_and_survives_a_failed_assessment(door_of):
+    # Sent together since 3c: the alarm is submitted first and both are in flight at once.
     door, engine = door_of([ALARM_FIRES, reply(ASSESSMENT, ended="cut")])
     result = run_pass(door, TRANSCRIPT, WOMAN, Carried(names=("Earlier made-up",)))
-    assert [c.job for c in engine.calls] == ["alarm", "assessment"]
+    assert sorted(c.job for c in engine.calls) == ["alarm", "assessment"]
     assert result.alarm.judged and result.alarm.actions == ALARM_FIRES["urgent_actions"]
     assert not result.assessment.ok and result.assessment.failure == "too_long"
     assert result.carried.names == ("Earlier made-up",)  # the stale list is kept
@@ -159,7 +166,8 @@ def test_ruling_5_an_empty_first_list_stays_empty(door_of):
     # Nothing to keep at the next pass either, and it is sent the first-pass frame.
     second = run_pass(door, TRANSCRIPT, WOMAN, first.carried)
     assert second.assessment.differentials == [] and second.assessment.kept is False
-    assert engine.calls[3].user == engine.calls[1].user
+    assessments = engine.calls_for("assessment")
+    assert assessments[1].user == assessments[0].user
 
 
 def test_ruling_5_the_kept_list_is_handed_to_the_next_pass(door_of):
@@ -170,8 +178,9 @@ def test_ruling_5_the_kept_list_is_handed_to_the_next_pass(door_of):
     run_pass(door, TRANSCRIPT, WOMAN, second.carried)
     later = f"{LINE}\n\n" + loader.fill(loader.frame("assessment.later"), stale="\n".join(NAMES),
                                         transcript=TRANSCRIPT)
-    assert engine.calls[3].user == later    # the call that came back empty was given the list
-    assert engine.calls[5].user == later    # and the pass after it is given the same list again
+    assessments = engine.calls_for("assessment")
+    assert assessments[1].user == later    # the call that came back empty was given the list
+    assert assessments[2].user == later    # and the pass after it is given the same list again
 
 
 def test_ruling_5_two_empty_replies_in_a_row_keep_the_list_twice(door_of):

@@ -13,7 +13,7 @@ from dataclasses import asdict, dataclass
 from typing import Callable
 
 from openconsult.bench.cases import Case
-from openconsult.bench.together import run_pass_together
+from openconsult.bench.one_after_another import run_pass_one_after_another
 from openconsult.bench.writer import ResultWriter
 from openconsult.consult.cds_pass import Carried, PassResult, run_pass
 from openconsult.consult.messages import alarm_message, with_patient
@@ -103,9 +103,10 @@ def why_failed(group: str, point: int, failures: list, unreachable: int) -> str 
 
 
 def run_chain(door: Door, case: Case, chain: Chain, log: Callable = print, together: bool = False) -> dict:
-    """One chain of one case. Sent together, the pass's time runs from
-    sending until both calls are back."""
-    a_pass = run_pass_together if together else run_pass
+    """One chain of one case. Sent together, the app's own pass, the
+    pass's time runs from sending until both calls are back; otherwise
+    the bench's one-after-another way."""
+    a_pass = run_pass if together else run_pass_one_after_another
     sampling = Sampling(chain.temperature, chain.seed)
     carried = Carried()
     passes, failed, unreachable = [], None, 0

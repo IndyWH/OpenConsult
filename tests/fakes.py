@@ -35,24 +35,34 @@ ASSESSMENT = {"reasoning": "made up",
 
 
 class FakeEngine:
-    """Answers from a script, in order. An item is a Reply, an exception
-    to raise, or a dict or string that becomes a complete reply. With no
-    script it answers every alarm quietly and every assessment with the
-    made-up list."""
+    """Answers from a script. A list is answered in order of arrival; a
+    dict holds a list for each job, because the two calls of a pass
+    arrive on two threads (3c). An item is a Reply, an exception to
+    raise, or a dict or string that becomes a complete reply. With no
+    script, or when a job's list runs out, it answers every alarm
+    quietly and every assessment with the made-up list."""
 
     name = "made-up"
     address = "http://made-up"
 
     def __init__(self, script=None, version="0.0-made-up", digest="made-up-digest", present=True, context=None):
-        self.script = list(script) if script is not None else None
+        self.script = {job: list(items) for job, items in script.items()} if isinstance(script, dict) else (
+            list(script) if script is not None else None)
         self.calls: list[Call] = []
         self.status_calls = 0
         self._version, self._digest, self._present, self._context = version, digest, present, context
 
+    def calls_for(self, job: str) -> list[Call]:
+        return [call for call in self.calls if call.job == job]
+
     def chat(self, call: Call) -> Reply:
         self.calls.append(call)
+        usual = ALARM_QUIET if call.job == "alarm" else ASSESSMENT
         if self.script is None:
-            item = ALARM_QUIET if call.job == "alarm" else ASSESSMENT
+            item = usual
+        elif isinstance(self.script, dict):
+            waiting = self.script.get(call.job, [])
+            item = waiting.pop(0) if waiting else usual
         else:
             item = self.script.pop(0)
         if isinstance(item, BaseException):

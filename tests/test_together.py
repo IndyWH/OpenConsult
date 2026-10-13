@@ -1,5 +1,7 @@
-"""The two calls of a pass sent at the same moment (spec 15.8, ruling 8;
-R30). A made-up engine stands behind the door; every transcript is made up."""
+"""The two calls of a pass sent at the same moment, the app's own pass
+since 3c (spec 15.8, rulings 8 and 31; R30), and the bench's one after
+another kept beside it. A made-up engine stands behind the door; every
+transcript is made up."""
 
 import json
 import threading
@@ -9,7 +11,7 @@ import pytest
 
 from openconsult.bench.cases import case_named, load_cases
 from openconsult.bench.replay import CHAINS, run_chain
-from openconsult.bench.together import run_pass_together
+from openconsult.bench.one_after_another import run_pass_one_after_another
 from openconsult.consult.cds_pass import run_pass
 from openconsult.consult.messages import Patient
 from openconsult.db import open_database
@@ -53,10 +55,10 @@ def record(tmp_path, clock):
     db.close()
 
 
-def test_ruling_8_the_two_calls_of_a_pass_are_in_flight_at_the_same_moment(record):
+def test_ruling_31_the_two_calls_of_a_pass_are_in_flight_at_the_same_moment(record):
     # One after another, the first call would wait at the barrier for a second that never comes.
     engine = ByJob(meet=True)
-    result = run_pass_together(Door(engine, record), TRANSCRIPT, WOMAN)
+    result = run_pass(Door(engine, record), TRANSCRIPT, WOMAN)
     assert sorted(call.job for call in engine.calls) == ["alarm", "assessment"]
     assert result.alarm.judged and result.assessment.ok
     rows = record.rows()
@@ -66,9 +68,9 @@ def test_ruling_8_the_two_calls_of_a_pass_are_in_flight_at_the_same_moment(recor
 
 
 @pytest.mark.parametrize("failing", ["alarm", "assessment"])
-def test_ruling_8_one_failing_call_does_not_lose_the_other(record, failing):
+def test_ruling_31_one_failing_call_does_not_lose_the_other(record, failing):
     engine = ByJob(**{failing: [EngineUnreachable("gone")]}, meet=True)
-    result = run_pass_together(Door(engine, record), TRANSCRIPT, WOMAN)
+    result = run_pass(Door(engine, record), TRANSCRIPT, WOMAN)
     outcomes = {row["job"]: row["outcome"] for row in record.rows()}
     other = "assessment" if failing == "alarm" else "alarm"
     assert outcomes == {failing: "unreachable", other: "ok"}       # both are recorded
@@ -80,7 +82,7 @@ def test_ruling_8_one_failing_call_does_not_lose_the_other(record, failing):
         assert result.assessment.failure == "unreachable"
 
 
-def test_ruling_8_sending_together_changes_only_the_sending(tmp_path, record):
+def test_ruling_31_sending_together_changes_only_the_sending(tmp_path, record):
     arranged = {**ALARM_FIRES, "already_done_or_arranged": True}
     empty = {**ASSESSMENT, "differentials": []}
     answers = dict(alarm=[ALARM_FIRES, arranged, ALARM_FIRES], assessment=[ASSESSMENT, empty, ASSESSMENT])
@@ -95,7 +97,7 @@ def test_ruling_8_sending_together_changes_only_the_sending(tmp_path, record):
             seen.append(shown)
         return seen
 
-    together, one_after_another = three_passes(run_pass_together), three_passes(run_pass)
+    together, one_after_another = three_passes(run_pass), three_passes(run_pass_one_after_another)
     assert together == one_after_another
     assert together[1]["assessment"]["kept"] is True and together[2]["alarm"]["arranged"] is True
     # In the bench, a chain sent together says so, and its passes are timed as before.
@@ -104,3 +106,16 @@ def test_ruling_8_sending_together_changes_only_the_sending(tmp_path, record):
     plain = run_chain(Door(ByJob(), record), case, CHAINS[0], log=lambda line: None)
     assert sent["together"] is True and plain["together"] is False
     assert [p["point"] for p in sent["passes"]] == [1, 2] and all(p["wall_ms"] >= 0 for p in sent["passes"])
+
+
+def test_ruling_31_the_bench_keeps_one_after_another_and_the_app_has_together_alone(tmp_path, record):
+    """The app has one way to run a pass, together; the bench keeps the
+    other for its arms (the details of 3c). One after another, the
+    engine sees the alarm come back before the assessment is sent."""
+    engine = FakeEngine()
+    result = run_pass_one_after_another(Door(engine, record), TRANSCRIPT, WOMAN)
+    assert [c.job for c in engine.calls] == ["alarm", "assessment"] and result.alarm.judged and result.assessment.ok
+    case = case_named(load_cases(made_up_folder(tmp_path)), "seven")
+    engine = FakeEngine()
+    plain = run_chain(Door(engine, record), case, CHAINS[0], log=lambda line: None, together=False)
+    assert plain["together"] is False and [c.job for c in engine.calls] == ["alarm", "assessment"] * 2
