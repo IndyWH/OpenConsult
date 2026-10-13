@@ -50,7 +50,12 @@ def open_arm(args, together: bool = False):
     server whose context is not exactly the profile's is refused before
     the arm starts; the app's own rule is at least (15.8, 3c)."""
     out = Path(args.out)
-    writer = ResultWriter(out, forbidden=(REPO, paths.default_data_folder()))
+    forbidden = [REPO, paths.default_data_folder()] + ([Path(args.data_folder)] if args.data_folder else [])
+    try:
+        writer = ResultWriter(out, forbidden=forbidden)
+    except Refused as refused:
+        say(f"STOP: {refused}")
+        return 6
     engine = KINDS[args.kind](args.engine)
     profile = GEMMA_4_QAT.for_engine(engine.name) if engine.name in GEMMA_4_QAT.tags else GEMMA_4_QAT
     profile = dataclasses.replace(profile, tag=args.model or profile.tag, engine=engine.name)
@@ -362,6 +367,7 @@ def main(argv: list[str] | None = None) -> int:
         p = sub.choices[name]
         p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
                        help="the kind of engine at that address: ollama, llamacpp or vllm")
+        p.add_argument("--data-folder", help="an app data folder results may not go under, beside the real one")
         p.add_argument("--model", help="the name the engine knows the model by")
         p.add_argument("--digest", help="refuse to run unless the model has this digest")
     p = sub.choices["run"]

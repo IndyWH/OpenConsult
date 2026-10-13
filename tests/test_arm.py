@@ -84,3 +84,22 @@ def test_3c_an_arm_is_refused_unless_the_server_runs_at_exactly_the_profiles_con
     said = capsys.readouterr().out
     assert "STOP: the engine runs at a context of" in said and str(context) in said and "16384" in said
     assert ResultWriter(out).read_all() == {} and server.chats() == []
+
+
+def test_R18_the_run_command_refuses_a_result_folder_in_the_repo_or_a_data_folder(server, bench_folders, capsys, tmp_path):
+    """The bench never writes to the app's data (R18): a result folder
+    under the repo, under the real data folder, or under the data folder
+    it is given, is refused before any call, with nothing written."""
+    from openconsult.bench.cli import REPO
+    cases, out = bench_folders
+    describe(server, VllmEngine)
+    server.routes["/v1/chat/completions"] = answer_by_job
+    given = tmp_path / "given-data"
+    for place in (REPO / "stage3c-refused", tmp_path / "app-data" / "refused", given / "refused"):
+        assert main(run_args(cases, place, server, "--chains", "A1", "--data-folder", str(given))) == 6
+        assert "STOP: results may not go under" in capsys.readouterr().out
+        assert not place.exists() and server.chats() == []
+    # The twin: a folder elsewhere runs.
+    assert main(run_args(cases, out, server, "--chains", "A1", "--data-folder", str(given))) == 0
+    assert ResultWriter(out).exists("seven", "A1")
+    capsys.readouterr()
