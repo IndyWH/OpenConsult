@@ -9,6 +9,7 @@ from openconsult import words
 from openconsult.app import build_app
 from openconsult.settings import store
 from openconsult.settings.machine import Card, describe
+from openconsult.settings.room import Program
 from tests.conftest import PORT, browser, log_in, set_up, text_of
 from tests.fakes import FakeEngine
 
@@ -42,9 +43,10 @@ CASES = [
 ]
 
 
-def pages_of(tmp_path, clock, machine, vllm, ollama):
+def pages_of(tmp_path, clock, machine, vllm, ollama, programs=None):
     engines = {"vllm": FakeEngine(**vllm), "ollama": FakeEngine(**ollama)}
-    app = build_app(store.build(tmp_path, PORT), machine=machine, clock=clock, engines=engines)
+    app = build_app(store.build(tmp_path, PORT), machine=machine, clock=clock, engines=engines,
+                    card_programs=lambda: programs or [])
     client = browser(app)
     client.post("/first-run/statement", data={"agree": "yes"})
     first_run = text_of(client.get("/first-run"))
@@ -71,11 +73,29 @@ def test_ruling_36_the_decisions_are_read_at_start_and_never_at_a_view(tmp_path,
     assert "vLLM" not in settings
 
 
+def test_ruling_36_this_machine_says_where_the_guideline_search_sits_and_whether_whisperx_fits(tmp_path, clock):
+    """At 5d's figures on vLLM (the desktop holding 829 MiB of 24,564): the
+    guideline search on the card, the WhisperX choice not available with
+    the reason; with other programs holding more: the processor. One
+    sentence for each, from the file of words, with no figures."""
+    desktop = [Program(1, "/usr/lib/made-up-desktop", 829)]
+    engines, first_run, settings = pages_of(tmp_path, clock, SUITABLE, VLLM, OLLAMA, desktop)
+    for page in (first_run, settings):
+        assert f"<th>{words.ROW_GUIDELINE_SEARCH}</th><td>{words.REASONS['guideline_card']}</td>" in page
+        assert f"<th>{words.ROW_SPEECH_CHOICE}</th><td>{words.REASONS['whisperx_no_room']}</td>" in page
+        assert "24564" not in page and "MiB" not in page
+    crowded = desktop + [Program(2, "/usr/lib/made-up-game", 1500)]
+    engines, first_run, settings = pages_of(tmp_path / "c", clock, SUITABLE, VLLM, OLLAMA, crowded)
+    assert words.REASONS["guideline_processor"] in settings and words.REASONS["whisperx_no_room"] in settings
+
+
 @pytest.mark.parametrize("machine", [SMALLER, MAC])
 def test_15_7_on_any_other_machine_nothing_about_an_engine_is_shown_and_none_is_asked(tmp_path, clock, machine):
     engines, first_run, settings = pages_of(tmp_path, clock, machine, VLLM, OLLAMA)
     for page in (first_run, settings):
-        assert f"<th>{words.ROW_MODEL}</th>" not in page
+        for row in (words.ROW_MODEL, words.ROW_GUIDELINE_SEARCH, words.ROW_SPEECH_CHOICE):
+            assert f"<th>{row}</th>" not in page
         assert words.MODEL_PRESENT not in page and "vLLM" not in page and "Ollama" not in page
         assert words.REASONS["engine_none"].split("{")[0] not in page
+        assert words.REASONS["guideline_no_card"] not in page and words.REASONS["whisperx_no_card"] not in page
     assert engines["vllm"].status_calls == 0 and engines["ollama"].status_calls == 0

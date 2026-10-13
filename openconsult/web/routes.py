@@ -29,6 +29,18 @@ def model_line(request: Request) -> str | None:
     return p.decisions.language_model.sentence
 
 
+def room_lines(request: Request) -> list[tuple[str, str]]:
+    """The two rows of the room check, from the decisions held since
+    start: where the guideline search sits, and whether the WhisperX
+    choice is offered (rulings 32, 33, 36). On a suitable card only, as
+    the speech rows of 15.9 are; the elements are held everywhere."""
+    p = parts(request)
+    if p.machine.case != "suitable":
+        return []
+    return [(words.ROW_GUIDELINE_SEARCH, p.decisions.guideline_search.sentence),
+            (words.ROW_SPEECH_CHOICE, p.decisions.whisperx_choice.sentence)]
+
+
 @dataclass(frozen=True)
 class SpeechLines:
     installed: str
@@ -113,9 +125,11 @@ async def first_run(request: Request):
     if step is None:
         raise Redirect("/login")
     models = model_line(request) if step == "machine" else None
+    room = room_lines(request) if step == "machine" else []
     speech = speech_lines(request) if step == "machine" else None
     choices = choice_lines(request) if step == "machine" else None
-    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, speech=speech, choices=choices)
+    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, room=room,
+                  speech=speech, choices=choices)
 
 
 def _at_step(request: Request, step: str) -> None:
@@ -219,6 +233,7 @@ NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
 
 def _settings_page(request: Request, user, refused=None):
     context = dict(user=user, active="settings", machine=parts(request).machine, models=model_line(request),
+                   room=room_lines(request),
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    page_path="/settings")

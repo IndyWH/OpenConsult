@@ -32,6 +32,9 @@ CARD_LINE = "{name}, {gb} GB"
 ROW_MODEL = "Language model"
 MODEL_PRESENT = "Gemma 4 QAT is present."
 MODEL_ABSENT = "Gemma 4 QAT is not present."
+# The two rows of the room check, on a suitable card only (15.8, rulings 32, 33, 36).
+ROW_GUIDELINE_SEARCH = "Guideline search"
+ROW_SPEECH_CHOICE = "Speech choice"
 # The decisions of the start (15.8, rulings 36 to 38): one sentence for
 # each, with the reason in words and no figures. Drafts for the owner.
 ENGINE_NAMES = {"vllm": "vLLM", "ollama": "Ollama"}
