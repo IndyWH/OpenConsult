@@ -83,7 +83,7 @@ Think from the patient's side. In teaching mode, from the learner's side.
     uv run openconsult [--data-folder DIR --port 8765] [--no-browser]   # start, on 8001; a development run; without a browser. At start, on Linux with a suitable card, vLLM at 127.0.0.1:8172 is tried first, then Ollama (the order is the setting); the room on the card is read once; This machine says each decision
     uv run openconsult reset-password | install-speech [--choice NAME] | self-test [--choice NAME]  [--data-folder DIR]   # a choice's environment and models into the data folder; the clip through the door, stored. NAME: whisperx_pyannote (the default), nemotron, speechmatics, assemblyai
     uv run pytest; uv run python .github/scripts/start_check.py   # the suite; then start, answer, stop
-    uv run openconsult-bench wordcheck --cases DIR --out DIR --v1-calls FILE...  # no model
+    uv run openconsult-bench wordcheck --cases DIR --out DIR --v1-calls FILE... --v1-prompts DIR  # no model; DIR holds v1's two prompt files, proven against the calls' own record
     uv run openconsult-bench run --cases DIR --out DIR --digest ID [--kind ollama|llamacpp|vllm --engine URL --model NAME --data-folder DIR] [--together] [--chains A1 ...]   # --together is the app's own pass
     uv run openconsult-bench score --out DIR | --replies FILE     # the marks of one arm; figures --public engine-bench: the public report's figures, no engine
     uv run openconsult-bench speech-run --recordings DIR --arm NAME --data-folder DIR --out DIR [--recording NAME ...] [--started-file F --pause-at-stop DIR]   # a banked recording through an arm, as if live; speech-fetch --data-folder DIR first for the tied pair's model

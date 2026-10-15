@@ -4,6 +4,76 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-15. The two carried prompts: the double quotes out, benched on vLLM
+
+Built and run on 15 Oct 2026 in one session, after the owner and Cowork
+read the two prompts word for word (spec 15.8, rulings 41 to 43). The plan
+was reviewed by Cowork the same day (three points; all are in). The report
+is PROMPTS_BENCH_REPORT.md in the private log folder.
+
+What changed: every double quote came out of both prompts (two in the
+assessment, fourteen in the alarm) and one sentence was added to each,
+asking the model never to write one. The files are the spec's two blocks
+byte for byte. sha256 of each as the loader reads it, less the final line
+break: assessment 437d7f32b3b020f8757ce96fdcf31ae4b85aef0b949e56f81546b3e200e1c6bb,
+alarm 1e05ffc8634b4093897ec53cd590111fbb2bdeac0abbd4462c8298f5582c9451.
+The three frames and the two forms are untouched (ruling 43). The test
+pins each file to its ruling's hash, prompts/loader.py holds the same two
+in APPROVED, and a test pins that no prompt or frame holds a double quote.
+
+The word check of stage 3 (15.7, ruling 3) now matches the prompt sent
+against the approved hash, not v1's. The whole request is still compared
+against v1's recorded hash, with v1's own prompt put back in its slot,
+which is what still proves the form and every other part call for call.
+v1's two texts are given with --v1-prompts and proven first against the
+arm-start records of the v1 file; the approved texts given in their place
+are refused with both hashes named. The counts are unchanged: 892 of 892
+for task 5 and 3,146 of 3,146 for task 5b, 1,898 of 1,898 for each call
+(143 + 182 + 598 + 975), mismatches 0.
+
+The bench of ruling 43: vLLM 0.31.0 started as 3c starts it (the repack
+at revision 2096d38d, context 16,384, the compact form of ruling 22 at
+start, the room 1,400,000,000 bytes), all 16 cases, the 13 chains, the
+two calls of a pass sent together; 3,796 calls, none failed, no chain
+failed; thinking off in every request and no thinking text in any reply;
+87 minutes. The marks by the repo's score tool, and the same by a private
+count from the raw files that imports nothing of the bench:
+- Temperature 0, which decides (ruling 18): H1 to H6 3 of 3 each; H7
+  none. Candidate: yes. The typical pass of 495 2.72 s (chains 2.78,
+  2.71, 2.72), the slowest 2.91, beside 5d's 2.73 and 3c's 2.78.
+- Temperature 0.5, apart: H1 to H6 10 of 10 each; H7 missed on one chain
+  of ten, script 10 B6, where one differential at one update named an
+  ovarian torsion while saying the patient is male. Over all 13 chains the
+  soft marks are 8 of 9: S12 missed on script 05, which fired in 9 chains
+  against the mark of 4; the time marks met (2.94 s typical, 4.07 slowest).
+- The three counts, beside the vLLM arms of 7 Oct (the together arm for
+  the chains at 0, the thirteen-chain arm for 0.5 and the totals):
+  replies cut by a stray quote 0 at 0 (7 Oct 0) and 0 at 0.5 (7 Oct 21 of
+  2,920); no reasoning holds a double quote, and 384 of 3,796 hold a
+  single one. Empty lists 0 at 0 (7 Oct 0) and 1 at 0.5 (7 Oct 0): script
+  13 chain B2 at its last update, a whole reply with a full reasoning and
+  every list empty, so the earlier list was kept (ruling 5). Alarms time
+  critical with no action 12 at 0 (7 Oct 8 together, 10 one after another)
+  and 57 at 0.5 (7 Oct 63): 69 in all against 73, every one in a whole
+  reply.
+- Kept by ruling 43's rule: yes. Every hard mark met at 0 with no failed
+  chain, the cut replies fewer at 0.5 (0 against 21) and still none at 0.
+  The form pattern held in reserve is not needed on this showing.
+
+Measurements, 15 Oct 2026, RTX 4090, v1 off: 558 tests, green three times
+before the last commit. CLAUDE.md 99 lines. The private word check printed
+nothing before every commit. Nothing left the machine: vLLM ran with its
+reach to the hub and its usage reports off; no key and no token was read;
+the engine folder is unchanged but for the script's own run files, whose
+13 Oct copies are kept in the log folder; the Ollama service is as it was.
+
+Made untrue by this stage: CLAUDE.md's wordcheck line, fixed in this
+commit. The line of the stage 3 entry below that the prompts are v1's
+words exactly is history: from this commit they are the spec's approved
+wording. The public engine-bench folder records 7 Oct's prompt hashes in
+its arm.json files, which is right as the record of that bench; it is not
+touched and not run again (ruling 43).
+
 ## 2026-10-13. Stage 3c: the engine setting
 
 Built and run on 13 Oct 2026. The plan was reviewed by Cowork the same
