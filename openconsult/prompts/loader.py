@@ -16,6 +16,14 @@ from pathlib import Path
 
 FOLDER = Path(__file__).parent
 
+# The spec's approved wording of the two prompts, as sha256 of the text as it
+# is read here (15.8, rulings 41 and 42). The word check compares the prompt
+# sent against these; the test pins the files to them.
+APPROVED = {
+    "assessment": "437d7f32b3b020f8757ce96fdcf31ae4b85aef0b949e56f81546b3e200e1c6bb",
+    "alarm": "1e05ffc8634b4093897ec53cd590111fbb2bdeac0abbd4462c8298f5582c9451",
+}
+
 
 def _text(path: Path) -> str:
     text = path.read_text(encoding="utf-8")

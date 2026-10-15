@@ -192,10 +192,17 @@ def cmd_wordcheck(args) -> int:
     out.mkdir(parents=True, exist_ok=True)
     cases = load_cases(Path(args.cases))
     door = Door(OllamaEngine(args.engine), ModelCalls(open_database(out / "wordcheck-unused.db")))
-    records = [r for path in args.v1_calls for r in wordcheck.load_records(Path(path))]
+    records, v1_prompts = [], {}
+    for path in args.v1_calls:
+        try:
+            v1_prompts = wordcheck.v1_prompts_as_recorded(Path(path), Path(args.v1_prompts))
+        except ValueError as refused:
+            say(f"STOP: {refused}")
+            return 1
+        records += wordcheck.load_records(Path(path))
     if args.workload:
         records = [r for r in records if r["workload"] in args.workload]
-    found = wordcheck.check(records, cases, door)
+    found = wordcheck.check(records, cases, door, v1_prompts)
     (out / "wordcheck.json").write_text(json.dumps(found, indent=1, ensure_ascii=False), encoding="utf-8")
     print(f"word check: {found['matched']} of {found['total']} calls rebuilt exactly; "
           f"{found['by_workload_and_job']}; mismatches {len(found['mismatches'])}")
@@ -378,6 +385,8 @@ def main(argv: list[str] | None = None) -> int:
                                        help="a finished run whose chain A1 gives the earlier lists")
     p = sub.choices["wordcheck"]
     p.add_argument("--v1-calls", nargs="+", required=True, help="v1's recorded calls")
+    p.add_argument("--v1-prompts", required=True,
+                   help="the folder holding v1's two prompt files, proven against the arm-start records of the calls")
     p.add_argument("--workload", nargs="*", help="only these v1 workloads")
     p = command("score", cmd_score, out=False)
     p.add_argument("--replies", help="score a published replies file")

@@ -1,6 +1,8 @@
-"""The word check (spec 15.7, ruling 3): a made-up v1 record, built by
-this test's own serialiser in v1's shape, matches; a one-character
-change in any of the compared parts is counted as a mismatch."""
+"""The word check (spec 15.7, ruling 3; 15.8, ruling 43): a made-up v1
+record, built by this test's own serialiser in v1's shape with made-up
+v1 prompt words, matches when v2 sends the approved prompt; a
+one-character change in any of the compared parts is counted as a
+mismatch; v1's prompt texts are proven against v1's own arm-start record."""
 
 import hashlib
 import json
@@ -8,7 +10,7 @@ import json
 import pytest
 
 from openconsult.bench.cases import case_named, load_cases
-from openconsult.bench.wordcheck import check, load_records
+from openconsult.bench.wordcheck import check, load_records, v1_prompts_as_recorded
 from openconsult.db import open_database
 from openconsult.llm.door import Door
 from openconsult.llm.record import ModelCalls
@@ -17,7 +19,9 @@ from tests.fakes import FakeEngine
 from tests.test_bench import made_up_folder
 
 LINE = "The patient is a 31-year-old woman."
-SYSTEM = {"assessment": loader.prompt("assessment"), "urgency": loader.prompt("alarm")}
+# v1's own prompt words, made up: what its records were hashed with, not what v2 sends now.
+SYSTEM = {"assessment": "Made-up v1 words for the assessment.", "urgency": "Made-up v1 words for the alarm."}
+V1_PROMPTS = {"assessment": SYSTEM["assessment"], "alarm": SYSTEM["urgency"]}
 FORM = {"assessment": loader.form("assessment"), "urgency": loader.form("alarm")}
 CAP = {"assessment": 1500, "urgency": 1000}
 
@@ -69,24 +73,47 @@ def records():
 
 def test_15_7_the_word_check_matches_a_recorded_request_and_catches_a_changed_one(setting, tmp_path):
     cases, door = setting
-    found = check(records(), cases, door)
+    found = check(records(), cases, door, V1_PROMPTS)
     assert found["matched"] == found["total"] == 4 and found["mismatches"] == []
     assert found["by_workload_and_job"] == {"495/alarm": 1, "495/assessment": 3}
+    # Twin: a prompt file that is not the spec's approved wording fails every call of its job.
+    off = check(records(), cases, door, V1_PROMPTS, approved={"assessment": "0" * 64, "alarm": loader.APPROVED["alarm"]})
+    assert off["matched"] == 1 and [m["differs_in"] for m in off["mismatches"]] == [["prompt"]] * 3
     # Twins: each changed part is named.
     changed = records()
     changed[0]["user_sha256"] = sha("other words")
     changed[1]["options_sent"]["num_ctx"] = 8192
     changed[2]["model"] = "other:tag"
     changed[3]["think_sent"] = True
-    found = check(changed, cases, door)
+    found = check(changed, cases, door, V1_PROMPTS)
     assert found["matched"] == 0
     assert [m["differs_in"] for m in found["mismatches"]] == [["message"], ["options"], ["model"], ["think"]]
-    # A record whose request hash alone differs (a changed prompt or form in v1) is caught too.
+    # A record whose request hash alone differs (a changed form or frame) is caught too.
     off = records()[:1]
     off[0]["request_sha256"] = "0" * 64
-    assert check(off, cases, door)["mismatches"][0]["differs_in"] == ["whole request (prompt, form or any part)"]
+    assert check(off, cases, door, V1_PROMPTS)["mismatches"][0]["differs_in"] == [
+        "whole request with v1's prompt in place (form or any part)"]
     # Records are read from a file; an errored call is left out, as v1's verifier did.
     path = tmp_path / "calls.jsonl"
     rows = records() + [{**records()[0], "error": "ConnectError"}, {"arm": "N", "call": "assessment"}]
     path.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
     assert len(load_records(path)) == 4
+
+
+def test_15_8_ruling_43_v1s_prompts_are_proven_against_its_own_record(tmp_path):
+    start = {"arm": "D", "call": "arm_start", "assessment_prompt_sha256": sha(SYSTEM["assessment"]),
+             "urgency_prompt_sha256": sha(SYSTEM["urgency"])}
+    calls = tmp_path / "calls.jsonl"
+    calls.write_text(json.dumps(start) + "\n" + json.dumps(records()[0]) + "\n", encoding="utf-8")
+    folder = tmp_path / "v1-prompts"
+    folder.mkdir()
+    (folder / "assessment.prompt.txt").write_text(SYSTEM["assessment"] + "\n", encoding="utf-8")   # an editor's final line break
+    (folder / "alarm.prompt.txt").write_text(SYSTEM["urgency"], encoding="utf-8")
+    assert v1_prompts_as_recorded(calls, folder) == V1_PROMPTS
+    # Twins: a changed text is refused with both hashes named; a file with no arm-start record proves nothing.
+    (folder / "alarm.prompt.txt").write_text(SYSTEM["urgency"] + " ", encoding="utf-8")
+    with pytest.raises(ValueError, match=f"{sha(SYSTEM['urgency'] + ' ')}; .*recorded {sha(SYSTEM['urgency'])}"):
+        v1_prompts_as_recorded(calls, folder)
+    calls.write_text(json.dumps(records()[0]) + "\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="recorded nothing"):
+        v1_prompts_as_recorded(calls, folder)

@@ -1,10 +1,14 @@
-"""The word check (spec 15.7, ruling 3). It needs no model. For every
-assessment and alarm call v1 recorded with the patient line, v2 builds
-its own request from the same case, the same point in it and the same
-earlier answer, and compares: the message, the form, the model, the
-thinking switch and the options one by one, and then the whole body
-with v1's key order, which carries the prompt. The Ollama engine's own
-builder makes the body; truncate, the one key v1 did not send, is
+"""The word check (spec 15.7, ruling 3; 15.8, ruling 43). It needs no
+model. For every assessment and alarm call v1 recorded with the patient
+line, v2 builds its own request from the same case, the same point in it
+and the same earlier answer, and compares: the message, the model, the
+thinking switch and the options one by one; the prompt sent against the
+spec's approved hash (ruling 43: the prompts are the spec's words now,
+not v1's); and then the whole body with v1's key order and v1's own
+prompt put back in its slot, which carries the form and every other
+part. v1's prompt texts are given in a folder and are proven first
+against the hashes v1's own arm-start records carry. The Ollama engine's
+own builder makes the body; truncate, the one key v1 did not send, is
 removed before the whole-body hash (HANDOVER, stage 3: the door sends truncate false).
 """
 
@@ -20,8 +24,34 @@ from openconsult.consult.messages import alarm_message, assessment_message, name
 from openconsult.llm.door import Door
 from openconsult.llm.ollama import build_request, encode
 from openconsult.llm.profile import Sampling
+from openconsult.prompts import loader
 
 V1_JOB = {"assessment": "assessment", "urgency": "alarm"}
+V1_RECORDED = {"assessment": "assessment_prompt_sha256", "alarm": "urgency_prompt_sha256"}
+
+
+def v1_prompts_as_recorded(path: Path, folder: Path, arm: str = "D") -> dict[str, str]:
+    """v1's two prompt texts from the folder, read as the loader reads a
+    prompt, each proven against the hash the v1 file's arm-start records
+    carry. A text that differs is refused with both hashes named."""
+    recorded: dict[str, set[str]] = {job: set() for job in V1_RECORDED}
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        r = json.loads(line)
+        if r.get("arm") == arm and r.get("call") == "arm_start":
+            for job, key in V1_RECORDED.items():
+                recorded[job].add(r[key])
+    texts = {}
+    for job in V1_RECORDED:
+        text = Path(folder, f"{job}.prompt.txt").read_text(encoding="utf-8")
+        text = text[:-1] if text.endswith("\n") else text
+        found = loader.sha256(text)
+        if recorded[job] != {found}:
+            raise ValueError(f"v1's {job} prompt in {folder} hashes to {found}; "
+                             f"{path} recorded {', '.join(sorted(recorded[job])) or 'nothing'}")
+        texts[job] = text
+    return texts
 
 
 def load_records(path: Path, arm: str = "D") -> list[dict]:
@@ -68,7 +98,8 @@ def earlier_names(by_chain: dict, chain: str, point: int) -> tuple[str, ...]:
     return ()
 
 
-def check(records: list[dict], cases: list[Case], door: Door) -> dict:
+def check(records: list[dict], cases: list[Case], door: Door, v1_prompts: dict[str, str],
+          approved: dict[str, str] = loader.APPROVED) -> dict:
     """The count of v1 calls v2 rebuilds exactly, and every mismatch."""
     transcripts: dict[str, list[tuple[int, str]]] = {}
     by_chain: dict[tuple[str, str], dict[int, str]] = {}
@@ -97,6 +128,8 @@ def check(records: list[dict], cases: list[Case], door: Door) -> dict:
         wrong = []
         if hashlib.sha256(user.encode("utf-8")).hexdigest() != r["user_sha256"]:
             wrong.append("message")
+        if loader.sha256(body["messages"][0]["content"]) != approved[job]:
+            wrong.append("prompt")
         if body["model"] != r["model"]:
             wrong.append("model")
         if body["think"] is not r["think_sent"]:
@@ -104,8 +137,9 @@ def check(records: list[dict], cases: list[Case], door: Door) -> dict:
         if list(body["options"].items()) != list(options.items()):
             wrong.append("options")
         as_v1 = {k: v for k, v in body.items() if k != "truncate"}
+        as_v1["messages"] = [{**body["messages"][0], "content": v1_prompts[job]}, *body["messages"][1:]]
         if hashlib.sha256(encode(as_v1)).hexdigest() != r["request_sha256"]:
-            wrong.append("whole request (prompt, form or any part)")
+            wrong.append("whole request with v1's prompt in place (form or any part)")
         label = (r["workload"], job)
         if wrong:
             mismatches.append({"where": [key, chain, point], "job": job, "differs_in": wrong})

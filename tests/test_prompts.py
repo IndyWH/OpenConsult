@@ -1,16 +1,18 @@
-"""The prompts as files: v1's words exactly, and the checks of R13 and
-R21 over every prompt file (spec 5.1, 15.7; stage 3 rule 7)."""
+"""The prompts as files: the spec's approved wording exactly (15.8,
+rulings 41 to 43), and the checks of R13 and R21 over every prompt file
+(spec 5.1, 15.7; stage 3 rule 7)."""
 
 import re
 from pathlib import Path
 
 from openconsult.prompts import loader
 
-# v1's recorded hashes of the two prompts (stage 3 prompt, rule 7). A
-# changed prompt is a bench of its own (V1_LESSONS 3.7): this fails first.
-V1_HASHES = {
-    "assessment": "6cc315afcf2c8570a7486bb8adb84885a8c043612e54bd2da158fa7814ad9308",
-    "alarm": "c98ef427c4e26609e5e6f88c4401e2b3fd851d33ded3f1a03d32b5f2dc533d41",
+# The hashes the spec gives for its approved wording of the two prompts
+# (15.8, rulings 41 and 42), of the text as the loader reads it. A changed
+# prompt is a bench of its own (V1_LESSONS 3.7): this fails first.
+APPROVED_HASHES = {
+    "assessment": "437d7f32b3b020f8757ce96fdcf31ae4b85aef0b949e56f81546b3e200e1c6bb",
+    "alarm": "1e05ffc8634b4093897ec53cd590111fbb2bdeac0abbd4462c8298f5582c9451",
 }
 
 # R21 check, as HANDOVER (stage 3) records it: no publisher's name is listed
@@ -24,13 +26,23 @@ KNOWN_CAPITALS = {
 GUIDELINE_WORDS = ("guideline", "guidance")
 
 
-def test_15_7_the_prompt_sent_is_v1s_word_for_word():
-    for name, expected in V1_HASHES.items():
+def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
+    for name, expected in APPROVED_HASHES.items():
         assert loader.sha256(loader.prompt(name)) == expected, name
+        assert loader.APPROVED[name] == expected, name   # the one table the word check reads
     # The forms and frames load, and a frame fills without touching braces in the words.
     assert loader.form("assessment")["required"] and loader.form("alarm")["required"]
     filled = loader.fill(loader.frame("alarm"), transcript="a {brace} stays")
     assert filled.endswith("\na {brace} stays") and "{transcript}" not in filled
+
+
+def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
+    # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
+    words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
+    assert len(words) == 5
+    for path in words:
+        assert '"' not in _words(path), path.name
+    assert '"' in 'a "quoted" word'   # the twin
 
 
 def _words(path: Path) -> str:
