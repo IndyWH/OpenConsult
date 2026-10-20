@@ -41,17 +41,47 @@ def running(request: Request, consultation_id: int):
     return consultation
 
 
+def model_line(request: Request, consultation) -> str:
+    p = parts(request)
+    return words.MODEL_LINE.format(speech=consultation.speech_door.choice.title, model=p.door.profile.tag,
+                                   engine=words.ENGINE_NAMES.get(p.engine.name, p.engine.name),
+                                   version=p.door.identity()[0] or "")
+
+
 @router.get("/consultations/{consultation_id}")
 async def consultation_page(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """The page by the consultation's state: live, stopping or final."""
     consultation = running(request, consultation_id)
-    p = parts(request)
+    if consultation.state == LIVE:
+        return live_page(request, user, consultation)
+    return stopping_page(request, user, consultation)
+
+
+def live_page(request: Request, user, consultation, refused=None):
     state = consultation.page_state()
-    model_line = words.MODEL_LINE.format(speech=consultation.speech_door.choice.title, model=p.door.profile.tag,
-                                         engine=words.ENGINE_NAMES.get(p.engine.name, p.engine.name),
-                                         version=p.door.identity()[0] or "")
     return render(request, "live.html", user=user, active="new_patient", consultation=consultation, state=state,
-                  state_json=json.dumps(state), words_json=json.dumps(script_words()), model_line=model_line,
-                  patient=consultation.patient, piece_s=PIECE_S)
+                  state_json=json.dumps(state), words_json=json.dumps(script_words()),
+                  model_line=model_line(request, consultation), patient=consultation.patient, piece_s=PIECE_S)
+
+
+def stopping_page(request: Request, user, consultation):
+    """While Stop runs: the named stage, with a quiet refresh each second
+    (a spinner only for a named in-progress state, V1_LESSONS 5.3)."""
+    state = consultation.page_state()
+    return render(request, "stopping.html", user=user, active="new_patient", consultation=consultation, state=state,
+                  stage_line=words.STAGE_LINES.get(state["stop_stage"] or "", ""), patient=consultation.patient,
+                  page_path=f"/consultations/{consultation.id}",
+                  refresh_every=None if state["stop_stage"] == "who_spoke" else 1)
+
+
+@router.post("/consultations/{consultation_id}/stop")
+async def stop(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """Stop: the first press stops the consultation; a second press while
+    one is finalising waits for it and is answered with the page as it
+    stands (V1_LESSONS 1.12; R15: never swallowed)."""
+    consultation = running(request, consultation_id)
+    consultation.stop()
+    raise Redirect(f"/consultations/{consultation.id}")
 
 
 # ------------------------------------------------------------- the socket

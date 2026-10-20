@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% set title = words.STOPPING_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.STOPPING_TITLE }}</h1>
+{% if state.stop_stage == "who_spoke" %}
+{% include "who_spoke.html" %}
+{% else %}
+<div class="pane"><div class="pane-body">
+  <p class="statement"><b>{{ patient.name }}</b></p>
+  <p id="stage"><span class="spinner" {% if not state.spinning %}hidden{% endif %}></span> {{ stage_line }}</p>
+</div></div>
+{% endif %}
+{% endblock %}

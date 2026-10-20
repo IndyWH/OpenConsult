@@ -154,6 +154,17 @@ MIC_REFUSED = "The microphone could not be opened: {reason}"
 SOCKET_LOST = "The connection to OpenConsult was lost. Trying again."
 SOCKET_BACK = "Connected again."
 
+# Stop, in order (spec 15.10, Stop in order; ruling 7; V1_LESSONS 1.12, 2.2). Drafts.
+STOPPING_TITLE = "Stopping"
+STAGE_LINES = {
+    "speech": "Finishing the transcript.",
+    "who_spoke": "Waiting for your answer.",
+    "label_check": "Checking who spoke each line.",
+    "checks": "Checking for missing speech.",
+    "gate": "Checking the transcript.",
+}
+STOP_ALREADY = "Stop was pressed. The transcript is being finished."
+
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
 FIRST_RUN_MACHINE_TITLE = "This machine"

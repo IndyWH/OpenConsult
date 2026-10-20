@@ -36,6 +36,10 @@
     socket.onclose = function () { if (stopped) return; say(WORDS.SOCKET_LOST); setTimeout(connect, 1000); };
   }
 
+  window.liveSend = function (message) {
+    if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify(message));
+  };
+
   function sendCapture(capture) {
     if (socket && socket.readyState === WebSocket.OPEN) socket.send(JSON.stringify({type: 'capture', ...capture}));
   }

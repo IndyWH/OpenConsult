@@ -38,17 +38,19 @@ async def form_fields(request: Request) -> dict[str, str]:
 
 
 def render(request: Request, template: str, status: int = 200,
-           page_path: str | None = None, timed_by_script: bool = False, **context) -> HTMLResponse:
+           page_path: str | None = None, timed_by_script: bool = False, refresh_every: int | None = None,
+           **context) -> HTMLResponse:
     """page_path is the address the page's own timed move goes to. A page
     sent back from a form post gives its own GET address, so the move
     never lands on an address that takes no GET. A page timed by its own
     script (typing as use, ruling 12) gets the seconds and no meta tag."""
     seconds_left = getattr(request.state, "seconds_left", None)
+    refresh = None if seconds_left is None or timed_by_script else seconds_left + 1
     page = _env.get_template(template).render(
         words=words,
         statement=words.STATEMENT,
         path=page_path or request.url.path,
-        refresh=None if seconds_left is None or timed_by_script else seconds_left + 1,
+        refresh=refresh_every if refresh_every is not None else refresh,
         seconds_left=seconds_left,
         **context,
     )
