@@ -35,6 +35,7 @@ class NotThisComputer(Exception):
 def install(app: FastAPI, port: int, address: str) -> None:
     hosts = {f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}"}
     origins = {f"http://{host}" for host in hosts}
+    app.state.hosts, app.state.origins = hosts, origins
 
     @app.middleware("http")
     async def door(request: Request, call_next):
@@ -70,6 +71,25 @@ def this_computer(request: Request) -> None:
     come from this computer, even if the first guard were ever opened."""
     if request.client is None or request.client.host not in LOOPBACK:
         raise NotThisComputer()
+
+
+def socket_allowed(websocket) -> bool:
+    """The two guards at the door, for a socket: the middleware of install
+    sees HTTP only, so a socket checks its host and its origin itself
+    (15.6: other web pages cannot drive the app)."""
+    hosts, origins = websocket.app.state.hosts, websocket.app.state.origins
+    return websocket.headers.get("host", "") in hosts and websocket.headers.get("origin") in origins
+
+
+def socket_user(websocket):
+    """The user behind a socket's cookie, or None. A socket is not use: a
+    live consultation holds the lock off by itself (15.6 ruling 5)."""
+    p = websocket.app.state.parts
+    user = p.users.get()
+    if user is None or p.first_run.next_step() is not None:
+        return None
+    found = p.logins.find(websocket.cookies.get(COOKIE), user.generation, touch=False)
+    return user if found.login is not None else None
 
 
 def logged_in(request: Request):

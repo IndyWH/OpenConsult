@@ -1,0 +1,122 @@
+"""The live page and its socket (spec 15.10, The live page, The
+recording; R15, R18; 11.5 rule 3). The page is rendered by the
+consultation's state; the socket carries the sound in and the page's
+state out. Nothing waits on a model call here: the sound goes to the
+consultation on a thread, and the state is sent whenever it has changed.
+Stop is a form post, so it acts with or without the socket."""
+
+from __future__ import annotations
+
+import asyncio
+import json
+
+from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
+
+from openconsult import words
+from openconsult.consult.live import LIVE, Capture
+from openconsult.web import guards
+from openconsult.web.guards import Redirect, parts
+from openconsult.web.pages import render
+
+router = APIRouter()
+PIECE_S = 0.25           # the size the page sends, as the self-test and the bench send it
+
+# The sentences the page script renders, handed to it as data so that no
+# sentence lives in a script (15.6: every sentence in one file).
+SCRIPT_WORDS = ("LISTENING", "WAITING_FOR_WORDS", "PASS_RUNNING", "FROM_EARLIER_PASS", "PASS_FAILED", "ALARM_NONE",
+                "ALARM_FIRED", "ALARM_NO_ACTION", "ALARM_NOT_JUDGED", "ALARM_ARRANGED", "SHOW_REASONING",
+                "EARLIER_ALARMS", "ACKNOWLEDGE", "ACKNOWLEDGED", "CLOCK_USED", "CLOCK_OVER", "SPEECH_STOPPED",
+                "SPEECH_STARTING", "MIC_REFUSED", "SOCKET_LOST", "SOCKET_BACK", "QUESTIONS", "SIGNS", "DIFFERENTIALS",
+                "SPEAKER_WORD")
+
+
+def script_words() -> dict:
+    return {name: getattr(words, name) for name in SCRIPT_WORDS}
+
+
+def running(request: Request, consultation_id: int):
+    consultation = parts(request).running.get(consultation_id)
+    if consultation is None:
+        raise Redirect("/")
+    return consultation
+
+
+@router.get("/consultations/{consultation_id}")
+async def consultation_page(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    consultation = running(request, consultation_id)
+    p = parts(request)
+    state = consultation.page_state()
+    model_line = words.MODEL_LINE.format(speech=consultation.speech_door.choice.title, model=p.door.profile.tag,
+                                         engine=words.ENGINE_NAMES.get(p.engine.name, p.engine.name),
+                                         version=p.door.identity()[0] or "")
+    return render(request, "live.html", user=user, active="new_patient", consultation=consultation, state=state,
+                  state_json=json.dumps(state), words_json=json.dumps(script_words()), model_line=model_line,
+                  patient=consultation.patient, piece_s=PIECE_S)
+
+
+# ------------------------------------------------------------- the socket
+
+def capture_from(message: dict) -> Capture | None:
+    """The page's first message: the three values as the browser applied
+    them (true, false or null when it could not say) and the rate."""
+    try:
+        rate = int(message["rate"])
+    except (KeyError, TypeError, ValueError):
+        return None
+    if rate <= 0:
+        return None
+    return Capture(_three(message.get("echo_cancellation")), _three(message.get("noise_suppression")),
+                   _three(message.get("auto_gain")), rate)
+
+
+def _three(value) -> bool | None:
+    return None if value is None else bool(value)
+
+
+@router.websocket("/consultations/{consultation_id}/sound")
+async def sound(websocket: WebSocket, consultation_id: int):
+    if not guards.socket_allowed(websocket) or guards.socket_user(websocket) is None:
+        await websocket.close(code=1008)
+        return
+    consultation = websocket.app.state.parts.running.get(consultation_id)
+    if consultation is None:
+        await websocket.close(code=1008)
+        return
+    await websocket.accept()
+    sent = -1
+    try:
+        sent = await _send_state(websocket, consultation, sent)
+        while True:
+            message = await websocket.receive()
+            if message["type"] == "websocket.disconnect":
+                break
+            await _handle(consultation, message)
+            sent = await _send_state(websocket, consultation, sent)
+    except WebSocketDisconnect:
+        pass
+
+
+async def _handle(consultation, message: dict) -> None:
+    if message.get("bytes"):
+        await asyncio.to_thread(consultation.sound, message["bytes"])
+        return
+    try:
+        data = json.loads(message.get("text") or "")
+    except ValueError:
+        return
+    if not isinstance(data, dict):
+        return
+    if data.get("type") == "capture":
+        capture = capture_from(data)
+        if capture is not None:
+            await asyncio.to_thread(consultation.begin_sound, capture)
+    elif data.get("type") == "acknowledge":
+        consultation.acknowledge(str(data.get("key", "")))
+
+
+async def _send_state(websocket: WebSocket, consultation, sent: int) -> int:
+    if consultation.version == sent and consultation.state == LIVE:
+        return sent
+    state = consultation.page_state()
+    await websocket.send_text(json.dumps({"type": "state", "state": state}))
+    return state["version"]

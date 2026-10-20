@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% set title = words.LIVE_TITLE %}
+{% block main %}
+<div id="live" data-consultation="{{ consultation.id }}" data-piece-seconds="{{ piece_s }}" data-stopping="{{ words.STOPPING }}">
+<script id="state" type="application/json">{{ state_json|safe }}</script>
+<script id="words" type="application/json">{{ words_json|safe }}</script>
+
+<div class="fixed-zone">
+  <div class="who"><b>{{ patient.name }}</b> <span class="clock" id="clock" data-started="{{ state.started_at }}" data-intended="{{ state.intended_minutes }}"></span></div>
+  <div id="acknowledge"></div>
+  <form method="post" action="/consultations/{{ consultation.id }}/stop" id="stop-form">
+    <button class="primary stop" id="stop" aria-describedby="stop-refusal">{{ words.STOP }}</button>
+    <p class="refusal" id="stop-refusal" role="alert">{% if refused and refused.control == "stop" %}{{ refused.message }}{% endif %}</p>
+  </form>
+</div>
+
+<p class="connection" id="connection"></p>
+<p class="connection" id="speech-line"></p>
+
+<div class="panels">
+  <section class="pane transcript">
+    <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2><span class="spinner" id="spinner" hidden></span></div>
+    <div class="pane-body" id="transcript"></div>
+  </section>
+  <div class="side">
+    <section class="pane">
+      <div class="pane-head"><h2>{{ words.PANEL_ALARM }}</h2></div>
+      <div class="pane-body" id="alarm"></div>
+    </section>
+    <section class="pane">
+      <div class="pane-head"><h2>{{ words.PANEL_ASSESSMENT }}</h2></div>
+      <div class="pane-body" id="assessment"></div>
+    </section>
+  </div>
+</div>
+<p class="model-line">{{ model_line }}</p>
+</div>
+<script src="/static/panels.js"></script>
+<script src="/static/live.js"></script>
+{% endblock %}
