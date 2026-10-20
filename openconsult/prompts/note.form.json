@@ -2,7 +2,7 @@
  "type": "object",
  "properties": {
   "reasoning": {"type": "string"},
-  "subjective": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "turns": {"type": "array", "items": {"type": "integer"}}}, "required": ["text", "turns"]}},
+  "subjective": {"type": "array", "minItems": 1, "items": {"type": "object", "properties": {"text": {"type": "string"}, "turns": {"type": "array", "items": {"type": "integer"}}}, "required": ["text", "turns"]}},
   "objective": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "turns": {"type": "array", "items": {"type": "integer"}}}, "required": ["text", "turns"]}},
   "assessment": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "turns": {"type": "array", "items": {"type": "integer"}}}, "required": ["text", "turns"]}},
   "plan": {"type": "array", "items": {"type": "object", "properties": {"text": {"type": "string"}, "turns": {"type": "array", "items": {"type": "integer"}}}, "required": ["text", "turns"]}}

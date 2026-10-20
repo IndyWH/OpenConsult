@@ -19,9 +19,10 @@ APPROVED_HASHES = {
 # here. Instead a prompt may hold no guideline words, and every capitalised
 # word in a prompt must be on this list, so a new one fails and is looked at.
 KNOWN_CAPITALS = {
-    "GP", "JSON", "ECG", "ACS", "TIA", "GI",                        # clinical and technical
+    "GP", "JSON", "ECG", "ACS", "TIA", "GI", "SOAP", "ICE", "HTN", "SOB", "BP",   # clinical and technical
     "LIVE", "TRANSCRIPT", "SO", "FAR", "FIRST", "NOT", "ANY", "DO",   # emphasis
     "NEVER", "NEW", "ONE", "TO", "COMMITTED", "SUSPICION", "TODAY",
+    "IF", "END", "THE", "DOCTOR", "PATIENT",                          # the note prompt's emphasis (6b)
 }
 GUIDELINE_WORDS = ("guideline", "guidance")
 
@@ -39,7 +40,7 @@ def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
 def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
     # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
     words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
-    assert len(words) == 7      # two prompts and three frames of stage 3; the label check's prompt and frame of 6a
+    assert len(words) == 9      # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b)
     for path in words:
         assert '"' not in _words(path), path.name
     assert '"' in 'a "quoted" word'   # the twin
@@ -49,11 +50,38 @@ def _words(path: Path) -> str:
     return path.read_text(encoding="utf-8")
 
 
+def test_ruling_3_the_note_prompt_file_is_the_approved_bytes():
+    # 15.10 ruling 3: the block of the spec byte for byte, one line break after its last line.
+    import hashlib
+    assert hashlib.sha256(loader.prompt_bytes("note")).hexdigest() == loader.APPROVED_BYTES["note"]
+    assert loader.APPROVED_BYTES["note"] == "0666c026d5ac8fa74f99434396709381214ee43cb70fe763a02c2bde2a284207"
+    text = loader.prompt("note")
+    assert text.endswith("The subjective section must hold at least one entry. Output JSON only.")
+    assert not text.endswith("\n") and '"' not in text
+    # The frame of ruling 5: the bench's words, the heading and the slot, nothing else.
+    assert loader.frame("note") == "TRANSCRIPT:\n{transcript}"
+    assert hashlib.sha256((loader.FOLDER / "note.frame.txt").read_bytes()).hexdigest() == (
+        "44f10e089af2ab4b4df272002604d35b0a678df6472949b193ba183bac1e0637")
+
+
+def test_ruling_3_3_5_the_form_needs_at_least_one_subjective_entry():
+    from openconsult.llm import forms
+    form = loader.form("note")
+    empty = {"reasoning": "made up.", "subjective": [], "objective": [], "assessment": [], "plan": []}
+    assert forms.misfit(empty, form) == "answer.subjective has fewer than 1 items"
+    one = {**empty, "subjective": [{"text": "made up", "turns": [0]}]}
+    assert forms.misfit(one, form) is None
+    # The entry holds text and turns and nothing else: no field for a name the model thinks was meant (ruling 6).
+    for section in ("subjective", "objective", "assessment", "plan"):
+        assert sorted(form["properties"][section]["items"]["properties"]) == ["text", "turns"]
+    assert form["properties"]["subjective"]["items"]["properties"]["turns"]["items"] == {"type": "integer"}
+
+
 def test_R13_no_prompt_file_names_a_country():
     countries = [c.strip() for c in _words(Path(__file__).parent / "countries.txt").splitlines() if c.strip()]
     assert len(countries) > 150
     files = loader.every_prompt_file()
-    assert len(files) == 10     # stage 3's seven, and the label check's prompt, frame and form of 6a
+    assert len(files) == 13     # stage 3's seven, and the label check's and the note's prompt, frame and form (6a, 6b)
     for path in files:
         text = _words(path).lower()
         for country in countries:

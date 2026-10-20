@@ -23,10 +23,12 @@ APPROVED = {
     "assessment": "437d7f32b3b020f8757ce96fdcf31ae4b85aef0b949e56f81546b3e200e1c6bb",
     "alarm": "1e05ffc8634b4093897ec53cd590111fbb2bdeac0abbd4462c8298f5582c9451",
 }
-# The label check's prompt is hashed as its file's bytes, with the one line
-# break after its last line, as 15.9 ruling 17 gives it (the bench's way).
+# The label check's prompt and the note's are hashed as their file's bytes,
+# with the one line break after the last line, as 15.9 ruling 17 and 15.10
+# ruling 3 give them (the bench's way).
 APPROVED_BYTES = {
     "label_check": "262d1ef805d4b7a27a1823a71dd649b78d2cdb84da5ce570c8d7cd3d91de557a",
+    "note": "0666c026d5ac8fa74f99434396709381214ee43cb70fe763a02c2bde2a284207",
 }
 
 

@@ -75,3 +75,27 @@ def test_R31_the_bench_command_names_the_commands_of_part_two_and_the_two_option
     assert cli.main(["speech-score", "--out", "o", "--recordings", "r", "--scripts", "a", "--marks", "m", "--write", "w",
                      "--key-facts", "k.json", "--drug-list", "d.json"]) == 0
     assert seen[1][1]["key_facts_path"].name == "k.json" and seen[1][1]["drug_list_path"].name == "d.json"
+
+
+def test_6b_speech_calls_takes_the_kind_of_engine_and_names_the_model_for_it(tmp_path, monkeypatch):
+    # The note bench of 6b runs on vLLM, the app's engine (15.10, The bench of the note prompt): speech-calls
+    # builds the engine of its --kind, with the profile's name for that engine, as the engine bench's run does.
+    from openconsult.bench.llamacpp import LlamaCppEngine
+    from openconsult.llm.ollama import OllamaEngine
+    from openconsult.llm.vllm import VllmEngine
+    assert commands2.KINDS == {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
+    assert commands2.KINDS["vllm"]("http://127.0.0.1:1").name == "vllm"
+    assert GEMMA_4_QAT.for_engine("vllm").tag != GEMMA_4_QAT.for_engine("ollama").tag
+    seen = {}
+
+    def fake(out, recordings_folder, script_folders, job, round_n, data_folder=None, names=None, arms=None,
+             engine_address="", say=print, make_door=None, now=None, engine_kind="ollama"):
+        seen.update(kind=engine_kind, address=engine_address)
+        return 0
+    monkeypatch.setattr(commands2, "speech_calls", fake)
+    assert cli.main(["speech-calls", "--out", str(tmp_path), "--recordings", str(tmp_path), "--scripts", str(tmp_path),
+                     "--job", "note", "--round", "1", "--engine", "http://127.0.0.1:8172", "--kind", "vllm"]) == 0
+    assert seen == {"kind": "vllm", "address": "http://127.0.0.1:8172"}
+    with pytest.raises(SystemExit):
+        cli.main(["speech-calls", "--out", str(tmp_path), "--recordings", str(tmp_path), "--scripts", str(tmp_path),
+                  "--job", "note", "--kind", "made-up"])

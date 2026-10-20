@@ -23,6 +23,12 @@ from openconsult.db import open_database
 from openconsult.llm.door import Door
 from openconsult.llm.ollama import DEFAULT_ADDRESS, OllamaEngine
 from openconsult.llm.profile import GEMMA_4_QAT
+from openconsult.llm.vllm import VllmEngine
+from openconsult.bench.llamacpp import LlamaCppEngine
+
+# The kinds of engine speech-calls can be pointed at, as the engine bench's
+# run names them (15.8); the note bench of 6b runs on vLLM, the app's engine.
+KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
 from openconsult.llm.record import ModelCalls
 from openconsult.speech import environment
 from openconsult.speech.choices import WHISPERX_PYANNOTE
@@ -128,9 +134,12 @@ def csv_error():
 def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path], job: str, round_n: int | None,
                  data_folder: Path | None = None, names: list[str] | None = None, arms: list[str] | None = None,
                  engine_address: str = DEFAULT_ADDRESS, say: Callable = print,
-                 make_door: Callable[[Path], Door] | None = None, now: Callable = dt.datetime.now) -> int:
+                 make_door: Callable[[Path], Door] | None = None, now: Callable = dt.datetime.now,
+                 engine_kind: str = "ollama") -> int:
     """The calls of one job (and round) on the stored pages under out/results;
-    the results under out/calls, the record in out/calls/calls.db."""
+    the results under out/calls, the record in out/calls/calls.db. The
+    engine at the address is of engine_kind; the model is the profile's
+    name for that engine."""
     if job not in calls.JOB_KINDS:
         say(words.BENCH_BAD_JOB.format(job=job, jobs=", ".join(calls.JOB_KINDS)))
         return 2
@@ -147,8 +156,12 @@ def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path],
         return 6
     results = ResultWriter(out).read_all()
     (out / "calls").mkdir(parents=True, exist_ok=True)
-    door = make_door(out / "calls") if make_door else Door(OllamaEngine(engine_address),
-                                                          ModelCalls(open_database(out / "calls" / "calls.db")), GEMMA_4_QAT)
+    if make_door:
+        door = make_door(out / "calls")
+    else:
+        engine = KINDS[engine_kind](engine_address)
+        profile = GEMMA_4_QAT.for_engine(engine.name) if engine.name in GEMMA_4_QAT.tags else GEMMA_4_QAT
+        door = Door(engine, ModelCalls(open_database(out / "calls" / "calls.db")), profile)
     version, digest = door.identity()
     if version is None or digest is None:
         say(words.BENCH_ENGINE_ABSENT.format(address=engine_address, model=door.profile.tag))

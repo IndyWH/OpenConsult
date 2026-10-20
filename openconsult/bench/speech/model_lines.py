@@ -11,14 +11,15 @@ role words."""
 from __future__ import annotations
 
 from openconsult.bench.speech.reference import Reference
+# v1's two role words and the word for a turn with no speaker (ruling 22,
+# the owner's word) live in the app's note module since 6b, where the app
+# sends them too (spec 5.1; 15.10 ruling 5).
+from openconsult.consult.note import DOCTOR, PATIENT, UNKNOWN
 
 SENTENCE_END = (".", "?", "!")
 # Two neighbouring pieces are joined when less than this lies between them.
 JOIN_GAP_S = 1.0
 HEADING = "TRANSCRIPT:"
-# v1's two role words (V1/app/finalize.py), and the word for a turn with no
-# speaker (ruling 22, the owner's word).
-DOCTOR, PATIENT, UNKNOWN = "Doctor", "Patient", "Unknown"
 ROLE_OF = {"DOCTOR": DOCTOR, "PATIENT": PATIENT}
 
 

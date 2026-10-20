@@ -1,9 +1,10 @@
 """The three jobs of the speech bench (spec 15.9, rulings 17, 18 and 19;
 15.8 ruling 1): the label check, the doubtful drug names and the note.
 Each prompt is a file, the owner's approved text byte for byte, checked by
-its sha256 before it is read: the label check's in the app's prompts
-folder, where the app reads the same file (spec 5.1; stage 6a), the other
-two in the prompts folder beside this one; each
+its sha256 before it is read: the label check's and the note's in the
+app's prompts folder, where the app reads the same files (spec 5.1;
+stages 6a and 6b), the drug name's in the prompts folder beside this
+one; each
 has a form that code holds and a limit on its length and on its time. A
 call goes through the one door to language models with the door's own
 record, and never enters the app's table of jobs. The checks on a reply
@@ -19,19 +20,20 @@ from pathlib import Path
 
 from openconsult.consult.labels import check_labels  # noqa: F401 - the app's check, kept under its bench name
 from openconsult.llm.door import Door, Result
-from openconsult.llm.jobs import Job
+from openconsult.llm.jobs import NOTE_MAX_TOKENS, NOTE_TIMEOUT_S, Job
 from openconsult.prompts import loader
 from openconsult.speech.matching import normalise
 
 PROMPTS = Path(__file__).resolve().parent / "prompts"
-# The one file of each prompt: the label check's is the app's (spec 5.1).
-FOLDER_OF = {"label_check": loader.FOLDER}
+# The one file of each prompt: the label check's and the note's are the app's (spec 5.1).
+FOLDER_OF = {"label_check": loader.FOLDER, "note": loader.FOLDER}
 # The sha256 of each prompt file's bytes, with one line break after its last
-# line, as the spec gives it under rulings 17, 18 and 19.
+# line, as the spec gives it under 15.9 rulings 17 and 18 and 15.10 ruling 3
+# (the note prompt of v2; v1's of ruling 19 was the bench's until 6b).
 PROMPT_SHA256 = {
     "label_check": "262d1ef805d4b7a27a1823a71dd649b78d2cdb84da5ce570c8d7cd3d91de557a",
     "drug_name": "89fcdc35d7a6ea4ddf7cd9e1b7e96c3118fd7810013e857bd83f6bc7c3939963",
-    "note": "adf0b5e73963ae198b1d4df55aedbfd92aec0c0f69117c459e78a9d3ec31f2e8",
+    "note": loader.APPROVED_BYTES["note"],
 }
 LABELS = ("doctor", "patient", "unsure")
 
@@ -39,9 +41,9 @@ LABELS = ("doctor", "patient", "unsure")
 # rehearsal has 124 lines and a line of the label check's reply is about
 # 13 tokens, so about 1,600; the longest of the 390 notes of Task 5d was
 # 1,286 tokens and took 7.3 s. Both checked from the files in the plan.
+# The note's two are the app's own since 6b (llm/jobs.py).
 LABEL_CHECK_MAX_TOKENS, LABEL_CHECK_TIMEOUT_S = 3000, 120.0
 DRUG_NAME_MAX_TOKENS, DRUG_NAME_TIMEOUT_S = 1500, 90.0
-NOTE_MAX_TOKENS, NOTE_TIMEOUT_S = 3000, 120.0
 ON_FAILURE = "The call is kept as failed and counted; nothing is asked a second time."
 
 JOBS = {

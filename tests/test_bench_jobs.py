@@ -14,6 +14,7 @@ from openconsult.llm import jobs as app_jobs
 from openconsult.llm.door import Door
 from openconsult.llm.engine import EngineTimeout
 from openconsult.llm.record import ModelCalls
+from openconsult.prompts import loader
 from openconsult.settings import store
 from openconsult.speech.choices import CHOICES
 from tests.fakes import FakeEngine, reply
@@ -88,16 +89,29 @@ def test_R20_R30_a_bench_call_is_recorded_under_its_own_job_with_the_prompts_has
         assert (call.context, call.think, call.temperature, call.seed) == (16384, False, 0.0, 42)   # the app's own settings
 
 
+def test_5_1_the_bench_note_job_reads_the_apps_prompt_frame_form_and_limits():
+    # One prompt in one file: the note's three files are the app's, read by the bench; its own copies are gone (6b).
+    assert jobs.FOLDER_OF["note"] is loader.FOLDER
+    assert jobs.PROMPT_SHA256["note"] == loader.APPROVED_BYTES["note"]
+    assert jobs.prompt_bytes("note") == loader.prompt_bytes("note") and jobs.prompt_text("note") == loader.prompt("note")
+    assert jobs.form_of("note") == loader.form("note")
+    assert not (jobs.PROMPTS / "note.prompt.txt").exists() and not (jobs.PROMPTS / "note.form.json").exists()
+    assert (jobs.PROMPTS / "drug_name.prompt.txt").exists() and (jobs.PROMPTS / "drug_name.form.json").exists()
+    job = app_jobs.job("note")
+    assert (jobs.JOBS["note"].max_tokens, jobs.JOBS["note"].timeout_s) == (job.max_tokens, job.timeout_s) == (3000, 120.0)
+
+
 def test_R31_the_three_jobs_are_not_in_the_apps_table(record):
     # Stage 6a built the label check in the app's table under its own name
     # (15.10 ruling 7); the bench's three names stay out of it.
-    for name in ("bench_label_check", "bench_drug_name", "bench_note", "drug_name", "note"):
+    # Stage 6b built the note there too (15.10 ruling 3); the drug name stays the bench's.
+    for name in ("bench_label_check", "bench_drug_name", "bench_note", "drug_name"):
         with pytest.raises(KeyError):
             app_jobs.job(name)
     door, engine = door_with(record, [])
     with pytest.raises(KeyError):
         door.ask("bench_note", "words")
-    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "label_check"] and engine.calls == []
+    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "label_check", "note"] and engine.calls == []
 
 
 def test_R31_nothing_of_the_app_names_part_two():
@@ -126,7 +140,7 @@ def test_the_exact_text_sent_for_a_small_made_up_page_for_each_of_the_three_jobs
     assert label.system == jobs.prompt_bytes("label_check").decode("utf-8")[:-1]
     assert drug.system == jobs.prompt_bytes("drug_name").decode("utf-8")[:-1]
     assert note.system == jobs.prompt_bytes("note").decode("utf-8")[:-1]
-    assert note.form == json.loads((jobs.PROMPTS / "note.form.json").read_text(encoding="utf-8"))
+    assert note.form == json.loads((loader.FOLDER / "note.form.json").read_text(encoding="utf-8"))   # the app's file (6b)
 
 
 def test_ruling_17_a_label_check_that_misses_repeats_or_invents_a_line_is_refused_whole():

@@ -243,7 +243,7 @@ def cmd_speech_drugs(args) -> int:
 def cmd_speech_calls(args) -> int:
     return speech_commands2.speech_calls(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts], args.job,
                                          args.round, Path(args.data_folder) if args.data_folder else None, args.recording,
-                                         args.arm, engine_address=args.engine, say=say)
+                                         args.arm, engine_address=args.engine, say=say, engine_kind=args.kind)
 
 
 def cmd_shared(args) -> int:
@@ -315,6 +315,8 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--round", type=int, help="the round of the notes, 1 or 2")
     p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
     p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
+    p.add_argument("--kind", choices=sorted(speech_commands2.KINDS), default="ollama",
+                   help="the kind of engine at that address: ollama, llamacpp or vllm")
     p.add_argument("--recording", nargs="*", help="only these recordings, by name")
     p.add_argument("--arm", nargs="*", help="only these arms")
     p = sub.add_parser("speech-drugs")

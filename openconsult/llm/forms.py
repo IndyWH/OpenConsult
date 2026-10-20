@@ -1,6 +1,8 @@
 """Does an answer fit its form? The small part of JSON schema the forms
 use: object, array, string, boolean, number, required, properties,
-items, enum, maxItems. Gives the first reason it does not, or None."""
+items, enum, maxItems, minItems. Gives the first reason it does not, or
+None. minItems is what makes the note's subjective section hold at least
+one entry (spec 15.10 ruling 3; V1_LESSONS 3.5)."""
 
 from __future__ import annotations
 
@@ -30,6 +32,8 @@ def misfit(value, form: dict, where: str = "answer") -> str | None:
     if kind == "array":
         if "maxItems" in form and len(value) > form["maxItems"]:
             return f"{where} has more than {form['maxItems']} items"
+        if "minItems" in form and len(value) < form["minItems"]:
+            return f"{where} has fewer than {form['minItems']} items"
         for i, item in enumerate(value):
             reason = misfit(item, form.get("items", {}), f"{where}[{i}]")
             if reason:
