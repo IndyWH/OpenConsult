@@ -10,6 +10,7 @@
     {% else %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
   </div>
 </section>
+<div class="panels">
 <section class="pane transcript">
   <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2></div>
   <div class="pane-body" id="final-transcript">
@@ -23,5 +24,39 @@
     {% endfor %}
   </div>
 </section>
+<div class="side">
+  <section class="pane">
+    <div class="pane-head"><h2>{{ words.PANEL_ALARM }}</h2></div>
+    <div class="pane-body">
+      {% set alarm = passes.alarm %}
+      {% if not alarm %}<p class="mark">{{ words.ALARM_NONE }}</p>
+      {% elif alarm.state == "fired" %}<p class="alarm-fired">{{ words.ALARM_FIRED }}</p>
+        <ul class="panel-list">{% for a in alarm.actions %}<li>{{ a.action }}: {{ a.reason }}</li>{% endfor %}</ul>
+      {% elif alarm.state == "no_action" %}<p class="alarm-no-action">{{ words.ALARM_NO_ACTION }}</p>
+      {% elif alarm.state == "not_judged" %}<p class="alarm-not-judged">{{ words.ALARM_NOT_JUDGED.format(reason=alarm.reason) }}</p>
+      {% else %}<p class="mark">{{ words.ALARM_ARRANGED if alarm.arranged else words.ALARM_NONE }}</p>{% endif %}
+      {% if alarm and alarm.reasoning and alarm.state != "quiet" %}<details><summary>{{ words.SHOW_REASONING }}</summary><p>{{ alarm.reasoning }}</p></details>{% endif %}
+      {% if passes.earlier_alarms %}<div class="earlier"><h3 class="mark">{{ words.EARLIER_ALARMS }}</h3>
+        {% for a in passes.earlier_alarms %}<p>{{ words.ALARM_FIRED if a.state == "fired" else words.ALARM_NO_ACTION }}{% if a.acknowledged %} <span class="acknowledged">{{ words.ACKNOWLEDGED }}</span>{% endif %}</p>
+        <ul class="panel-list">{% for x in a.actions %}<li>{{ x.action }}: {{ x.reason }}</li>{% endfor %}</ul>{% endfor %}
+      </div>{% endif %}
+    </div>
+  </section>
+  <section class="pane">
+    <div class="pane-head"><h2>{{ words.PANEL_ASSESSMENT }}</h2></div>
+    <div class="pane-body">
+      {% set panel = passes.assessment %}
+      {% if panel.failure %}<p class="failed">{{ words.PASS_FAILED.format(reason=panel.failure) }}</p>{% endif %}
+      {% if panel.from_earlier %}<p class="mark">{{ words.FROM_EARLIER_PASS }}</p>{% endif %}
+      <h3 class="mark">{{ words.DIFFERENTIALS }}</h3>
+      <ul class="panel-list">{% for d in panel.differentials %}<li>{{ d.condition }} ({{ d.likelihood }}): {{ d.rationale }}</li>{% else %}<li class="mark">&mdash;</li>{% endfor %}</ul>
+      <h3 class="mark">{{ words.QUESTIONS }}</h3>
+      <ul class="panel-list">{% for q in panel.questions %}<li>{{ q }}</li>{% else %}<li class="mark">&mdash;</li>{% endfor %}</ul>
+      <h3 class="mark">{{ words.SIGNS }}</h3>
+      <ul class="panel-list">{% for x in panel.signs %}<li>{{ x }}</li>{% else %}<li class="mark">&mdash;</li>{% endfor %}</ul>
+    </div>
+  </section>
+</div>
+</div>
 <p class="model-line">{{ model_line }}</p>
 {% endblock %}

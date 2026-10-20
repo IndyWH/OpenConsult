@@ -107,7 +107,7 @@ def final_page(request: Request, user, consultation):
                                   if score is not None and score < LOW_CONFIDENCE else None)
     return render(request, "final.html", user=user, active="new_patient", consultation=consultation,
                   patient=consultation.patient, lines=lines, warnings=warning_lines(consultation),
-                  model_line=model_line(request, consultation))
+                  passes=consultation.passes.state(), model_line=model_line(request, consultation))
 
 
 def warning_lines(consultation) -> list[str]:
