@@ -10,6 +10,7 @@ import pytest
 
 from openconsult.consult.consultations import Consultations
 from openconsult.consult.live import FINAL, LIVE, OVER, STOPPING, WITHIN, Capture, Consultation, clock_state
+from openconsult.consult.note_rows import Notes
 from openconsult.db import open_database
 from openconsult.llm.door import Door
 from openconsult.llm.engine import EngineUnreachable
@@ -43,8 +44,9 @@ class Room:
         self.speech = SpeechDoor(NEMOTRON, make_worker=lambda: self.worker, installed=lambda: True)
         self.llm = Door(self.engine, ModelCalls(self.db, clock))
         cid = self.rows.start(patient.id, intended, "nemotron", "made-up", "0.0", "made-up/tag", "d", 2)
+        self.notes = Notes(self.db, clock)
         self.consultation = Consultation(cid, patient, intended, clock(), self.speech, self.llm, self.rows, self.audit,
-                                         tmp_path / "data", clock)
+                                         tmp_path / "data", clock, notes=self.notes)
 
     def close(self):
         self.consultation.close()

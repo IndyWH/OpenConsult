@@ -14,8 +14,9 @@ from openconsult.app import build_app
 from openconsult.bench.speech import jobs as bench_jobs
 from openconsult.bench.speech import model_lines
 from openconsult.consult import labels, speakers, stop
-from openconsult.consult.live import FINAL, STOPPING
+from openconsult.consult.live import FINAL, SPINNING, STOPPING
 from openconsult.llm import jobs as app_jobs
+from openconsult.llm.engine import EngineTimeout
 from openconsult.prompts import loader
 from openconsult.settings import store
 from openconsult.speech.choices import NEMOTRON
@@ -251,3 +252,61 @@ def test_1_12_a_consultation_left_live_or_stopping_at_a_restart_is_carried_on(tm
     assert not app2.state.parts.logins.consultation_running
 
 
+
+
+NOTE = {"reasoning": "made up.", "subjective": [{"text": "made up history", "turns": [1]}], "objective": [],
+        "assessment": [{"text": "made up impression", "turns": [0, 3]}], "plan": [{"text": "uncited plan", "turns": [9]}]}
+
+
+LONG_LINES = [live_seg(1, 0.0, 0.5, "What brings you in today?", "S1"), live_seg(2, 0.6, 1.2, "A pain in my chest. " + "word " * 60, "S2"),
+              live_seg(3, 1.3, 1.5, "Yes.", None), live_seg(4, 1.6, 2.0, "Tell me more.", "S1")]
+
+
+def test_the_note_is_drafted_at_the_end_of_stop_after_the_gate_with_its_stamp_and_a_fourth_figure(tmp_path, clock):
+    r, c = room_stopped(tmp_path, clock, worker=MadeUpWorker(live=[LONG_LINES, [], [], []]),
+                        engine=FakeEngine({"label_check": [CHECK], "note": [NOTE]}))
+    try:
+        stop.answer(c, "S1")
+        assert until(lambda: c.state == FINAL)
+        assert stop.STAGES[-1] == "note" and stop.NEXT["gate"] == "note" and "note" in SPINNING
+        draft = r.notes.current_draft(c.id)
+        assert (draft["n"], draft["asked_by"], draft["entries_total"], draft["entries_cited"], draft["refused"], draft["failure"]) == (
+            1, "stop", 3, 2, 0, None)
+        assert (draft["engine"], draft["model_tag"], draft["model_digest"]) == ("made-up", "made-up/tag", "d")     # the row's stamp (R20)
+        assert draft["prompt_sha256"] == loader.APPROVED_BYTES["note"] and draft["call_id"] == r.rows.model_calls(c.id)[-1]["id"]
+        assert draft["transcript"].startswith("TRANSCRIPT:\n[0] Doctor: What brings you in today?\n[1] Patient: A pain in my chest. word")
+        assert draft["transcript"].endswith("Yes.\n[2] Doctor: Tell me more.")   # the check said unsure: the label as it stood (6a)
+        entries = r.notes.entries(draft["id"])
+        assert [(e["section"], e["lines"], e["uncited"]) for e in entries] == [
+            ("subjective", [2, 3], 0), ("assessment", [1], 0), ("plan", [], 1)]      # turn 3 does not exist: three turns
+        assert "note" in [row["job"] for row in r.rows.model_calls(c.id)] and "The patient is" not in r.engine.calls_for("note")[0].user
+        assert c.final.figures["note_s"] is not None and "Note" in r.audit.lines()[0].detail
+        assert any(line.event == "note.drafted" for line in r.audit.lines())
+    finally:
+        r.close()
+
+
+def test_R3_ruling_8_the_gates_refusal_drafts_no_note(tmp_path, clock):
+    short = MadeUpWorker(live=[[live_seg(1, 0.0, 0.5, "Hello.", "S1")], [], [], []])
+    r, c = room_stopped(tmp_path, clock, worker=short, check={"lines": [{"line": 1, "label": "doctor"}]},
+                        engine=FakeEngine({"label_check": [{"lines": [{"line": 1, "label": "doctor"}]}], "note": [NOTE]}))
+    try:
+        stop.answer(c, "S1")
+        assert until(lambda: c.state == FINAL)
+        assert c.final.refused and r.notes.drafts(c.id) == [] and r.engine.calls_for("note") == []
+        assert c.final.figures.get("note_s") is None
+    finally:
+        r.close()
+
+
+def test_R30_10_4_a_failed_note_call_is_said_plainly_and_nothing_is_asked_a_second_time_by_itself(tmp_path, clock):
+    r, c = room_stopped(tmp_path, clock, worker=MadeUpWorker(live=[LONG_LINES, [], [], []]),
+                        engine=FakeEngine({"label_check": [CHECK], "note": [EngineTimeout("no answer")]}))
+    try:
+        stop.answer(c, "S1")
+        assert until(lambda: c.state == FINAL)
+        draft = r.notes.current_draft(c.id)
+        assert draft["failure"].startswith("too_slow") and draft["entries_total"] == 0 and r.notes.entries(draft["id"]) == []
+        assert len(r.engine.calls_for("note")) == 1 and r.audit.lines()[1].event == "note.failed"
+    finally:
+        r.close()

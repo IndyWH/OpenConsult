@@ -5,7 +5,8 @@ gives the final lines, written as the choice gave them. Three: the app
 asks which speaker was you and waits, with no limit. Four: the label
 check runs and its changes are marked. Five: the two checks for missing
 speech run on the stored lines and the stored loudness. Six: the gate.
-Seven: the final transcript is shown. Each step reads the rows, so a
+Seven: the note is drafted unless the gate refused (6b; rulings 3 and
+8), and the review page is shown. Each step reads the rows, so a
 consultation left stopping at a restart goes on from its stage
 (review point 3). A worker that has died is reported plainly."""
 
@@ -16,14 +17,14 @@ import math
 import statistics
 from datetime import datetime
 
-from openconsult.consult import gate, labels, speakers
+from openconsult.consult import gate, labels, note, speakers
 from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
 from openconsult.patients.patients import PatientRow
 from openconsult.speech.lines import Line
 
-STAGES = ("speech", "who_spoke", "label_check", "checks", "gate")
+STAGES = ("speech", "who_spoke", "label_check", "checks", "gate", "note")
 
 
 def finalise(c: Consultation) -> None:
@@ -65,8 +66,20 @@ def judge(c: Consultation) -> None:
     c.final.refused = verdict.refused
 
 
-STEPS_AFTER = {"checks": checks, "gate": judge}
-NEXT = {"checks": "gate", "gate": None}
+def draft_note(c: Consultation) -> None:
+    """Seven: the note, the last stage before final, unless the gate
+    refused (ruling 8; R3). The three figures of 6a are taken first, so
+    Stop to final keeps its meaning; the note's seconds are a fourth."""
+    c.final.figures = figures(c)
+    if c.final.refused or c.notes is None:
+        return
+    started = c.timer()
+    note.draft(c.llm, c.rows, c.notes, c.audit, c.id, "stop")
+    c.final.figures["note_s"] = round(c.timer() - started, 2)
+
+
+STEPS_AFTER = {"checks": checks, "gate": judge, "note": draft_note}
+NEXT = {"checks": "gate", "gate": "note", "note": None}
 
 
 # ------------------------------------------------------- two: the lines
@@ -155,7 +168,7 @@ def show_final(c: Consultation) -> None:
     with c.lock:
         c.final.lines = c.rows.transcript_lines(c.id)
         c.final.warnings = c.rows.warnings(c.id)
-        c.final.figures = figures(c)
+        c.final.figures = c.final.figures or figures(c)
         c.state = FINAL
         c.stop_stage = None
         final_at = c.clock()
@@ -179,7 +192,8 @@ def figures(c: Consultation) -> dict:
 
 def figures_line(found: dict) -> str:
     from openconsult import words
-    return words.FIGURES_LINE.format(wait=found["wait_s"], pass_s=found["pass_s"], stop_s=found["stop_s"])
+    line = words.FIGURES_LINE.format(wait=found["wait_s"], pass_s=found["pass_s"], stop_s=found["stop_s"])
+    return line + (words.FIGURE_NOTE.format(note_s=found["note_s"]) if found.get("note_s") is not None else "")
 
 
 # ------------------------------------------------------- after a restart
@@ -230,7 +244,7 @@ def resume(p, row: dict) -> Consultation:
     patient = p.patients.get(row["patient_id"])
     door = p.doors[row["speech_choice"]]
     c = Consultation(row["id"], patient, row["intended_minutes"], datetime.fromisoformat(row["started_at"]), door,
-                     p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser)
+                     p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes)
     c.state = STOPPING
     c.stop_stage = row["stop_stage"] if row["stop_stage"] in STAGES[1:] else "who_spoke"
     c.stopped_at = datetime.fromisoformat(row["stopped_at"]) if row["stopped_at"] else p.clock()

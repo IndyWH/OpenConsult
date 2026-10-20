@@ -23,6 +23,7 @@ from openconsult.consult import recording as recording_module
 from openconsult.consult.cds_pass import run_pass
 from openconsult.consult.consultations import Consultations
 from openconsult.consult.messages import Patient
+from openconsult.consult.note_rows import Notes
 from openconsult.consult.passes import Passes
 from openconsult.consult.recording import Recording
 from openconsult.consult.transcript import Transcript
@@ -35,7 +36,7 @@ SPEAKERS = 2          # the doctor and the patient (ruling 9)
 WITHIN, OVER = "within", "over"
 LIVE, STOPPING, FINAL = "live", "stopping", "final"
 # The named in-progress states a spinner may show (V1_LESSONS 5.3).
-SPINNING = ("speech_starting", "pass_running", "speech", "label_check", "checks", "gate")
+SPINNING = ("speech_starting", "pass_running", "speech", "label_check", "checks", "gate", "note")
 
 
 def clock_state(used_s: float, intended_minutes: int) -> str:
@@ -74,8 +75,9 @@ class Consultation:
     def __init__(self, consultation_id: int, patient: PatientRow, intended_minutes: int, started_at: datetime,
                  speech: SpeechDoor, llm: Door, rows: Consultations, audit: Audit, data_folder: Path,
                  clock: Clock = now_local, timer: Callable[[], float] = time.perf_counter,
-                 on_stop: Callable | None = None):
+                 on_stop: Callable | None = None, notes: Notes | None = None):
         self.id = consultation_id
+        self.notes = notes                # the note's rows (6b), given by the app
         self.patient = patient
         self.intended_minutes = int(intended_minutes)
         self.started_at = started_at

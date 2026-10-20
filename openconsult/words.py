@@ -162,6 +162,7 @@ STAGE_LINES = {
     "label_check": "Checking who spoke each line.",
     "checks": "Checking for missing speech.",
     "gate": "Checking the transcript.",
+    "note": "Drafting the note.",
 }
 STOP_ALREADY = "Stop was pressed. The transcript is being finished."
 WHO_SPOKE_TITLE = "Which speaker was you?"
@@ -172,6 +173,7 @@ ANSWER = "Continue"
 PICK_ONE = "Pick one."
 APP_RESTARTED = "OpenConsult was restarted while this consultation ran, so it was stopped as it stood."
 FIGURES_LINE = "Word to page {wait} s typical; pass {pass_s} s typical; Stop to final {stop_s} s."
+FIGURE_NOTE = " Note {note_s} s."
 
 # The final transcript page (spec 15.10, 6a; ruling 8). Drafts.
 FINAL_TITLE = "Final transcript"
@@ -200,6 +202,9 @@ WARNING_SENTENCES = {
     "low_confidence": WARN_LOW_CONFIDENCE, "confidence_not_measured": WARN_CONFIDENCE_NOT_MEASURED,
     "too_short": "{detail}", "empty": WARN_EMPTY,
 }
+
+# The note (spec 15.10, rulings 4 and 8). The headings of the copy text, the four sections. Drafts.
+SECTION_WORDS = {"subjective": "Subjective", "objective": "Objective", "assessment": "Assessment", "plan": "Plan"}
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
@@ -302,6 +307,9 @@ EVENTS = {
     "speakers.answered": "Which speaker was you: answered",
     "consultation.final": "Consultation final",
     "alarm.acknowledged": "Alarm seen",
+    "note.drafted": "Note drafted",
+    "note.refused_by_check": "Note refused by the citation check: fewer than half the entries cite a line",
+    "note.failed": "Note could not be drafted",
 }
 
 # The command. Plain ASCII, for every terminal.

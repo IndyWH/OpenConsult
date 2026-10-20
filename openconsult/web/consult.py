@@ -139,7 +139,7 @@ def begin(p, patient, minutes: int) -> Consultation:
     cid = p.consultations.start(patient.id, minutes, door.choice.name, p.engine.name, version, p.door.profile.tag,
                                 digest, SPEAKERS)
     consultation = Consultation(cid, patient, minutes, p.clock(), door, p.door, p.consultations, p.audit,
-                                p.settings.data_folder, p.clock, on_stop=p.finaliser)
+                                p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes)
     consultation.on_final = _on_final(p)
     p.running[cid] = consultation
     p.audit.record("consultation.started", f"consultation {cid}, patient {patient.id}, {minutes} minutes")

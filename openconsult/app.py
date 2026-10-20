@@ -13,6 +13,7 @@ from fastapi.staticfiles import StaticFiles
 
 from openconsult.consult import stop
 from openconsult.consult.consultations import Consultations
+from openconsult.consult.note_rows import Notes
 from openconsult.db import Database, open_database
 from openconsult.llm.choose import NoEngine, choose
 from openconsult.llm.door import Door
@@ -55,6 +56,7 @@ class Parts:
     doors: dict = field(default_factory=dict)      # one door for each choice, by name (15.9)
     patients: Patients = None
     consultations: Consultations = None            # the rows (15.10)
+    notes: Notes = None                            # the note's rows (6b)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
@@ -104,6 +106,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         doors=doors,
         patients=Patients(db, audit, clock),
         consultations=Consultations(db, clock),
+        notes=Notes(db, clock),
         clock=clock,
         finaliser=_finalise,
     )
