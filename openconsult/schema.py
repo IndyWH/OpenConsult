@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 4
+VERSION = 5
 
 MIGRATIONS = {
     1: """
@@ -186,5 +186,81 @@ CREATE TABLE warning (
 );
 
 ALTER TABLE model_call ADD COLUMN consultation_id INTEGER REFERENCES consultation(id);
+""",
+    # Stage 6b (spec 15.10, The record; rulings 8 and 11; R2, R20): the note
+    # drafts, each with its stamp, its prompt hash, its entries with their
+    # line numbers, its citation count and whether it was refused; the
+    # doctor's edits to entries, words and labels; the approval and the
+    # refusal; the earlier draft kept at draft again (the latest n is the
+    # page's). A line's label set by the doctor is marked.
+    5: """
+CREATE TABLE note_draft (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    n INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    asked_by TEXT NOT NULL CHECK (asked_by IN ('stop', 'draft', 'again')),
+    call_id INTEGER REFERENCES model_call(id),
+    engine TEXT NOT NULL,
+    engine_version TEXT,
+    model_tag TEXT NOT NULL,
+    model_digest TEXT,
+    prompt_sha256 TEXT NOT NULL,
+    transcript TEXT NOT NULL,
+    last_edit_id INTEGER,
+    reasoning TEXT,
+    entries_total INTEGER NOT NULL,
+    entries_cited INTEGER NOT NULL,
+    refused INTEGER NOT NULL,
+    failure TEXT,
+    wall_ms INTEGER NOT NULL
+);
+
+CREATE TABLE note_entry (
+    id INTEGER PRIMARY KEY,
+    draft_id INTEGER NOT NULL REFERENCES note_draft(id),
+    section TEXT NOT NULL CHECK (section IN ('subjective', 'objective', 'assessment', 'plan')),
+    position INTEGER NOT NULL,
+    model_text TEXT NOT NULL,
+    text TEXT NOT NULL,
+    turns TEXT NOT NULL,
+    lines TEXT NOT NULL,
+    uncited INTEGER NOT NULL
+);
+
+CREATE TABLE note_edit (
+    id INTEGER PRIMARY KEY,
+    entry_id INTEGER NOT NULL REFERENCES note_entry(id),
+    at TEXT NOT NULL,
+    text_before TEXT NOT NULL,
+    text_after TEXT NOT NULL
+);
+
+CREATE TABLE transcript_edit (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    at TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('words', 'label', 'undo', 'swap')),
+    line_n INTEGER,
+    before TEXT,
+    after TEXT
+);
+
+CREATE TABLE note_approval (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL UNIQUE REFERENCES consultation(id),
+    draft_id INTEGER NOT NULL REFERENCES note_draft(id),
+    at TEXT NOT NULL,
+    text TEXT NOT NULL
+);
+
+CREATE TABLE note_refusal (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    draft_id INTEGER NOT NULL REFERENCES note_draft(id),
+    at TEXT NOT NULL
+);
+
+ALTER TABLE transcript_line ADD COLUMN set_by_doctor INTEGER NOT NULL DEFAULT 0;
 """,
 }

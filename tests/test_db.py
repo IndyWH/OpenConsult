@@ -86,7 +86,7 @@ def test_6_5_a_version_3_database_with_its_user_and_self_tests_comes_forward_to_
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 4
+    assert new.version() >= 4          # 6b's version 5 comes with it, as the version 2 test allows for 3
     assert {"patient", "consultation", "live_line", "transcript_line", "cds_pass", "warning"} <= set(new.tables())
     assert Users(new, Audit(new)).verify("example-password")
     assert new.query_one("SELECT choice FROM speech_self_test")["choice"] == "nemotron"
@@ -95,4 +95,36 @@ def test_6_5_a_version_3_database_with_its_user_and_self_tests_comes_forward_to_
                   "ok", None)
     calls = ModelCalls(new)
     assert calls.get(calls.add(row))["consultation_id"] is None
+    new.close()
+
+
+def test_6_5_a_version_4_database_with_its_consultations_comes_forward_to_5(tmp_path, monkeypatch):
+    # The owner's real database and stage6a-data are at version 4 with their
+    # consultations in them (stage 6a). Stage 6b's note tables arrive,
+    # transcript_line gains set_by_doctor, and nothing of theirs is lost.
+    from openconsult.patients.audit import Audit
+    from openconsult.patients.users import Users
+
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 4)
+    old = open_database(path)
+    assert old.version() == 4 and "note_draft" not in old.tables()
+    Users(old, Audit(old)).set_up("Dr", "Example", "example-password")
+    old.execute("INSERT INTO patient (name, date_of_birth, sex, created_at) VALUES ('Made-up', '1990-01-01', 'F', 't')")
+    old.execute("INSERT INTO consultation (patient_id, started_at, intended_minutes, speech_choice, engine, model_tag, "
+                "speakers_given, state) VALUES (1, 't', 15, 'nemotron', 'vllm', 'tag', 2, 'final')")
+    old.execute("INSERT INTO transcript_line (consultation_id, n, start_s, end_s, text, label, changed_by_check, "
+                "revised_by_service, unsure, refused) VALUES (1, 1, 0.0, 1.0, 'made up', 'doctor', 1, 0, 0, 0)")
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 5
+    assert {"note_draft", "note_entry", "note_edit", "transcript_edit", "note_approval", "note_refusal"} <= set(new.tables())
+    assert Users(new, Audit(new)).verify("example-password")
+    line = new.query_one("SELECT * FROM transcript_line")
+    assert (line["text"], line["changed_by_check"], line["set_by_doctor"]) == ("made up", 1, 0)
+    assert new.query_one("SELECT state FROM consultation")["state"] == "final"
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO note_draft (consultation_id, n, at, asked_by, engine, model_tag, prompt_sha256, transcript, "
+                    "entries_total, entries_cited, refused, wall_ms) VALUES (1, 1, 't', 'nobody', 'e', 't', 'h', 'x', 0, 0, 0, 1)")
     new.close()

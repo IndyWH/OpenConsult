@@ -1,9 +1,11 @@
 """The rows of a consultation (spec 15.10, The record; 6.3): the
 consultation itself with its stamps (R20), the live lines as shown, the
 lines at Stop as the choice gave them and as they stand after the label
-check, each pass as settled, and every warning the gate raised. Adds and
-reads; the few columns that change as a consultation moves on are set
-by name. Nothing here reads a setting or talks to a model."""
+check, each pass as settled, and every warning the gate raised; since
+6b the doctor's edits to words and labels, each kept with what stood
+before (rulings 7 and 11). Adds and reads; the few columns that change
+as a consultation moves on are set by name. Nothing here reads a setting
+or talks to a model."""
 
 from __future__ import annotations
 
@@ -15,7 +17,9 @@ from openconsult.patients.audit import Clock, now_local
 from openconsult.speech.lines import Line
 
 STATES = ("live", "stopping", "final")
-STOP_STAGES = ("who_spoke", "label_check", "checks", "gate")
+STOP_STAGES = ("who_spoke", "label_check", "checks", "gate", "note")
+EDIT_KINDS = ("words", "label", "undo", "swap")
+SWAPPED = {"doctor": "patient", "patient": "doctor"}
 LABELS = ("doctor", "patient", "unsure")
 SETTABLE = ("stopped_at", "final_at", "speech_stamp", "echo_cancellation", "noise_suppression", "auto_gain",
             "sample_rate", "doctor_speaker", "recording_file", "loudness", "stop_raw", "state", "stop_stage",
@@ -107,6 +111,65 @@ class Consultations:
             self._db.execute(
                 "UPDATE transcript_line SET label = ?, changed_by_check = ?, unsure = ? WHERE consultation_id = ? AND n = ?",
                 (row["label"], int(bool(row.get("changed_by_check"))), int(bool(row.get("unsure"))), consultation_id, n))
+
+    # ------------------------------------------------- the doctor's edits (6b)
+
+    def add_transcript_edit(self, consultation_id: int, kind: str, line_n: int | None, before: str | None,
+                            after: str | None) -> int:
+        if kind not in EDIT_KINDS:
+            raise ValueError(f"not a kind of edit: {kind}")
+        cursor = self._db.execute(
+            "INSERT INTO transcript_edit (consultation_id, at, kind, line_n, before, after) VALUES (?, ?, ?, ?, ?, ?)",
+            (consultation_id, self._now(), kind, line_n, before, after))
+        return int(cursor.lastrowid)
+
+    def transcript_edits(self, consultation_id: int) -> list[dict]:
+        rows = self._db.query("SELECT * FROM transcript_edit WHERE consultation_id = ? ORDER BY id", (consultation_id,))
+        return [dict(r) for r in rows]
+
+    def last_edit_id(self, consultation_id: int) -> int | None:
+        found = self._db.query_one("SELECT MAX(id) AS last FROM transcript_edit WHERE consultation_id = ?", (consultation_id,))
+        return int(found["last"]) if found and found["last"] is not None else None
+
+    def line(self, consultation_id: int, n: int) -> dict | None:
+        found = self._db.query_one("SELECT * FROM transcript_line WHERE consultation_id = ? AND n = ?", (consultation_id, n))
+        return dict(found) if found else None
+
+    def set_line_words(self, consultation_id: int, n: int, text: str) -> int:
+        """The doctor's edit of a line's words: the words before are kept
+        in the edit row; the line's own text changes (the plan, CHOICE)."""
+        before = self.line(consultation_id, n)["text"]
+        self._db.execute("UPDATE transcript_line SET text = ? WHERE consultation_id = ? AND n = ?", (text, consultation_id, n))
+        return self.add_transcript_edit(consultation_id, "words", n, before, text)
+
+    def set_line_label(self, consultation_id: int, n: int, label: str, kind: str = "label") -> int:
+        """The doctor sets a line's label, or undoes the check's change
+        (kind undo): the mark of the check is cleared, the line is marked
+        set by the doctor, and unsure follows the label."""
+        if label not in LABELS:
+            raise ValueError(f"not a label: {label}")
+        before = self.line(consultation_id, n)["label"]
+        self._db.execute("UPDATE transcript_line SET label = ?, changed_by_check = 0, unsure = ?, set_by_doctor = 1 "
+                         "WHERE consultation_id = ? AND n = ?", (label, int(label == "unsure"), consultation_id, n))
+        return self.add_transcript_edit(consultation_id, kind, n, before, label)
+
+    def swap_labels(self, consultation_id: int) -> int:
+        """v1's Swap: every doctor line becomes patient and every patient
+        line doctor; unsure lines stay. One edit row for the whole swap."""
+        for row in self.transcript_lines(consultation_id):
+            if row["n"] is not None and row["label"] in SWAPPED:
+                self._db.execute("UPDATE transcript_line SET label = ?, set_by_doctor = 1 WHERE id = ?",
+                                 (SWAPPED[row["label"]], row["id"]))
+        return self.add_transcript_edit(consultation_id, "swap", None, None, None)
+
+    def waiting_for_review(self) -> list[dict]:
+        """Each final consultation with no approved note, once, newest
+        first (R15: the home page's list)."""
+        rows = self._db.query(
+            "SELECT c.id, c.started_at, p.name AS patient_name FROM consultation c JOIN patient p ON p.id = c.patient_id "
+            "WHERE c.state = 'final' AND NOT EXISTS (SELECT 1 FROM note_approval a WHERE a.consultation_id = c.id) "
+            "ORDER BY c.id DESC")
+        return [dict(r) for r in rows]
 
     # ------------------------------------------------------------ the passes
 
