@@ -240,6 +240,15 @@ EARLIER_DRAFTS_MANY = "{count} earlier drafts are kept in the record."
 WARN_LABEL_CHANGED = "Line {n}: the check changed the speaker to {label}."
 HOME_REVIEW = "Waiting for review"
 REVIEW = "Review"
+SAVE_ENTRY = "Save"
+SAVE_LINE = "Save"
+UNDO_LABEL = "Undo"
+SWAP = "Swap doctor and patient"
+LABEL_SET_BY_YOU = "set by you"
+PICK_LABEL = "Pick Doctor, Patient or Unsure."
+ENTRY_EMPTY = "An entry cannot be empty. Edit its words instead."
+NOTE_NOT_EDITABLE = "This draft is refused, so its entries cannot be edited. Edit the transcript and draft the note again."
+NOT_CHANGED_BY_CHECK = "The check did not change this line's speaker, so there is nothing to undo."
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
@@ -347,6 +356,11 @@ EVENTS = {
     "note.failed": "Note could not be drafted",
     "note.approved": "Note approved",
     "note.refused": "Note refused by the doctor",
+    "entry.edited": "Note entry edited by the doctor",
+    "transcript.edited": "Transcript words edited by the doctor",
+    "label.set": "Speaker label set by the doctor",
+    "label.undone": "The check's change of a speaker label undone by the doctor",
+    "labels.swapped": "Doctor and patient swapped on every line",
 }
 
 # The command. Plain ASCII, for every terminal.

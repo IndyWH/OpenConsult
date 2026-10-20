@@ -147,3 +147,12 @@ button.cite:hover { text-decoration: underline; }
 .reason { max-width: 22rem; }
 .line.marked { background: #F3EDE6; border-radius: 6px; }
 .approved { color: var(--green); }
+.entry-form, .line-form, .undo-form, .swap { display: inline-flex; gap: .4rem; align-items: center; margin: 0; flex-wrap: wrap; }
+.entry-form input, .line-form input.line-text { width: auto; flex: 1; min-width: 18rem; margin-top: 0; }
+.line-form select { margin-top: 0; }
+.line-form .speaker { margin-right: 0; }
+.entry-form button, .line-form button, .undo-form button { padding: .3rem .8rem; font-size: .8rem; }
+.entry-form .refusal, .line-form .refusal, .undo-form .refusal, .swap .refusal { flex-basis: 100%; margin: 0; }
+.transcript .line { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
+.print-only { display: none; }
+.transcript .line .refusal:empty, .entry .refusal:empty { display: none; }

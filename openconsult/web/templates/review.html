@@ -32,10 +32,15 @@
     <div class="section" id="section-{{ section }}">
       <h3 class="section-head">{{ words.SECTION_WORDS[section] }}</h3>
       {% for entry in sections[section] %}
-      <div class="entry" id="entry-{{ entry.id }}">
-        <span class="entry-text">{{ entry.text }}</span>
-        {% for n in entry.lines %}<button type="button" class="cite" data-line="{{ n }}" aria-label="{{ words.SHOW_LINE.format(n=n) }}">[{{ n }}]</button>{% endfor %}
-        {% if entry.uncited %}<span class="mark uncited">({{ words.ENTRY_UNCITED }})</span>{% endif %}
+      <div class="entry" id="entry-{{ entry.id }}-block">
+        {% if entries_read_only %}<span class="entry-text">{{ entry.text }}</span>{{ refusal("entry-" ~ entry.id) }}
+        {% else %}<form method="post" action="/consultations/{{ cid }}/entries/{{ entry.id }}" class="entry-form no-print">
+          <input name="text" value="{{ entry.text }}" class="entry-text" aria-label="{{ words.SECTION_WORDS[entry.section] }}">
+          <button id="entry-{{ entry.id }}" aria-describedby="entry-{{ entry.id }}-refusal">{{ words.SAVE_ENTRY }}</button>
+          {{ refusal("entry-" ~ entry.id) }}
+        </form><span class="entry-text print-only">{{ entry.text }}</span>{% endif %}
+        {% for n in entry.lines %}<button type="button" class="cite no-print" data-line="{{ n }}" aria-label="{{ words.SHOW_LINE.format(n=n) }}">[{{ n }}]</button>{% endfor %}
+        {% if entry.uncited %}<span class="mark uncited no-print">({{ words.ENTRY_UNCITED }})</span>{% endif %}
       </div>
       {% endfor %}
       {% if section == "assessment" %}{{ differentials_aside() }}{% endif %}
@@ -84,15 +89,32 @@
 
 {# Four: the transcript with the player. #}
 <section class="pane transcript no-print" id="transcript">
-  <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2></div>
+  <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2>
+    {% if not transcript_read_only %}<form method="post" action="/consultations/{{ cid }}/lines/swap" id="swap-form" class="swap">
+      <button id="swap" aria-describedby="swap-refusal">{{ words.SWAP }}</button>{{ refusal("swap") }}</form>
+    {% else %}{{ refusal("swap") }}{% endif %}
+  </div>
   <div class="pane-body" id="final-transcript">
     {% for line in lines %}
-    <p class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}"><span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span><span class="line-text">{{ line.text }}</span>
+    <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}">
+      <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
+      {% if transcript_read_only %}<span class="line-text">{{ line.text }}</span>{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
+      {% else %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}" class="line-form">
+        <select name="label" aria-label="{{ words.SPEAKER_WORD.format(n=line.n) }}">{% for value, word in words.LABEL_WORDS.items() %}<option value="{{ value }}"{% if value == line.label %} selected{% endif %}>{{ word }}</option>{% endfor %}</select>
+        <input name="text" value="{{ line.text }}" class="line-text">
+        <button id="save-line-{{ line.n }}" aria-describedby="save-line-{{ line.n }}-refusal">{{ words.SAVE_LINE }}</button>
+        {{ refusal("save-line-" ~ line.n) }}
+      </form>
+      {% if line.changed_by_check %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form">
+        <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
+      {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
+      {% endif %}
       {% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}
       {% if line.changed_by_check %}<span class="mark"> ({{ words.LABEL_CHANGED }})</span>{% endif %}
+      {% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}
       {% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}
       {% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}
-    </p>
+    </div>
     {% endfor %}
   </div>
 </section>

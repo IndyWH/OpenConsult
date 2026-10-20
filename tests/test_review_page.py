@@ -109,6 +109,16 @@ def test_11_5_rule_2_missing_speech_is_shown_at_its_place_and_the_gate_refuses_s
     assert answer.status_code == 400 and words.NOTE_GATE_REFUSED.split(":")[0] in refusal_on(text_of(answer), "draft")
 
 
+def slot_text(page: str, control: str) -> str:
+    """The refusal in a control's slot when the control itself is absent by
+    design (a read-only page, or an Undo that no longer applies): the slot
+    stays, so a post anyway is never swallowed (R15)."""
+    from tests.conftest import _RefusalFinder
+    finder = _RefusalFinder(control)
+    finder.feed(page)
+    return finder.text.strip()
+
+
 def positions(page: str, *marks: str) -> list[int]:
     found = [page.find(mark) for mark in marks]
     assert all(p >= 0 for p in found), [m for m, p in zip(marks, found) if p < 0]
@@ -124,7 +134,7 @@ def test_ruling_11_the_review_page_is_in_the_busy_gps_order(tmp_path, clock, mac
     # The entries by section; a line number is a press that shows the line; an uncited entry is marked.
     assert positions(raw, 'id="section-subjective"', 'id="section-objective"', 'id="section-assessment"', 'id="section-plan"') == \
         sorted(positions(raw, 'id="section-subjective"', 'id="section-objective"', 'id="section-assessment"', 'id="section-plan"'))
-    assert 'class="cite" data-line="2"' in raw and "made up history [1]" in page
+    assert 'class="cite no-print" data-line="2"' in raw and "made up history [1]" in page
     assert words.ENTRY_UNCITED in page and page.count(words.ENTRY_UNCITED) == 1                    # the plan's entry cites turn 8
     # The differentials beside the assessment, under the heading that they are the model's, inside that section.
     import html
@@ -250,3 +260,91 @@ def test_R15_the_home_page_lists_each_consultation_waiting_for_review_once(tmp_p
     client.post("/consultations/1/note/refuse")
     home = text_of(client.get("/"))
     assert home.count(words.REVIEW + "</a>") == 1 and words.HOME_REVIEW in home
+
+
+def test_ruling_11_draft_again_is_offered_only_after_an_edit_and_keeps_the_earlier_draft(tmp_path, clock, machine):
+    app, client, c = reviewed(tmp_path, clock, machine, engine_with(note=[NOTE, {**NOTE, "plan": []}]))
+    p = app.state.parts
+    raw = client.get("/consultations/1").text
+    assert 'id="draft" aria-describedby="draft-refusal" disabled' in raw and words.DRAFT_AGAIN_NEEDS_EDIT in text_of(client.get("/consultations/1"))
+    assert refusal_on(text_of(client.post("/consultations/1/note/draft")), "draft") == words.DRAFT_AGAIN_NEEDS_EDIT
+    # A word edit: recorded with the words before; then draft again acts, and the next draft reads the new words.
+    assert client.post("/consultations/1/lines/2", data={"label": "patient", "text": "Yes, doctor."}).status_code == 303
+    edits = p.consultations.transcript_edits(1)
+    assert [(e["kind"], e["line_n"], e["before"], e["after"]) for e in edits] == [("words", 2, "Yes.", "Yes, doctor.")]
+    assert p.audit.lines()[0].event == "transcript.edited"
+    raw = client.get("/consultations/1").text
+    assert 'id="draft" aria-describedby="draft-refusal" disabled' not in raw and words.DRAFT_AGAIN in text_of(client.get("/consultations/1"))
+    first = p.notes.current_draft(1)
+    assert client.post("/consultations/1/note/draft").status_code == 303
+    second = p.notes.current_draft(1)
+    assert (second["n"], second["asked_by"], second["last_edit_id"]) == (2, "again", edits[0]["id"]) and second["id"] != first["id"]
+    assert p.notes.entries(first["id"])[2]["text"] == "made up plan" and len(p.notes.entries(second["id"])) == 2   # the earlier draft is kept
+    sent = app.state.parts.door._engine.calls_for("note")[-1].user
+    assert "Yes, doctor." in sent and "[1] Patient: Yes, doctor." in sent
+    page = text_of(client.get("/consultations/1"))
+    assert words.EARLIER_DRAFTS.format(count=1) in page and "made up plan" not in page.split('id="warnings"')[0]
+    assert refusal_on(text_of(client.post("/consultations/1/note/draft")), "draft") == words.DRAFT_AGAIN_NEEDS_EDIT   # never by itself
+
+
+def test_ruling_7_a_label_the_check_changed_is_undone_with_one_press_and_a_line_label_can_be_set(tmp_path, clock, machine):
+    swapped = {"lines": [{"line": 1, "label": "patient"}, {"line": 2, "label": "doctor"}]}
+    app, client, c = reviewed(tmp_path, clock, machine, engine_with(label_check=[swapped]))
+    p = app.state.parts
+    lines = p.consultations.transcript_lines(1)
+    assert [(l["label"], l["changed_by_check"]) for l in lines] == [("patient", 1), ("doctor", 0)]   # line 2 had no first reading (ruling 14)
+    page = text_of(client.get("/consultations/1"))
+    assert words.WARN_LABEL_CHANGED.format(n=1, label="Patient") in page and words.UNDO_LABEL in page
+    assert words.WARNINGS_COUNT.format(count=3) in page                                   # the changed label among the warnings
+    assert client.post("/consultations/1/lines/1/undo").status_code == 303
+    line = p.consultations.line(1, 1)
+    assert (line["label"], line["changed_by_check"], line["set_by_doctor"], line["unsure"]) == ("doctor", 0, 1, 0)   # the answer's label
+    assert p.audit.lines()[0].event == "label.undone" and p.consultations.transcript_edits(1)[-1]["kind"] == "undo"
+    page = text_of(client.get("/consultations/1"))
+    assert words.LABEL_SET_BY_YOU in page and words.WARN_LABEL_CHANGED.format(n=1, label="Patient") not in page
+    assert slot_text(text_of(client.post("/consultations/1/lines/1/undo")), "undo-1") == words.NOT_CHANGED_BY_CHECK
+    # The per-line label.
+    assert client.post("/consultations/1/lines/2", data={"label": "unsure", "text": "Yes."}).status_code == 303
+    line = p.consultations.line(1, 2)
+    assert (line["label"], line["unsure"], line["set_by_doctor"]) == ("unsure", 1, 1) and p.audit.lines()[0].event == "label.set"
+    assert refusal_on(text_of(client.post("/consultations/1/lines/2", data={"label": "nurse", "text": "Yes."})), "save-line-2") == words.PICK_LABEL
+    assert client.post("/consultations/1/lines/9", data={"label": "doctor", "text": "x"}).status_code == 303   # no such line: no such control
+    assert [l["text"] for l in p.consultations.transcript_lines(1)] == [l["text"] for l in lines]       # the words untouched
+
+
+def test_swap_swaps_doctor_and_patient_on_every_line_and_leaves_unsure(tmp_path, clock, machine):
+    app, client, c = reviewed(tmp_path, clock, machine)
+    p = app.state.parts
+    client.post("/consultations/1/lines/2", data={"label": "unsure", "text": "Yes."})
+    assert client.post("/consultations/1/lines/swap").status_code == 303
+    assert [l["label"] for l in p.consultations.transcript_lines(1)] == ["patient", "unsure"]
+    assert p.consultations.transcript_edits(1)[-1]["kind"] == "swap" and p.audit.lines()[0].event == "labels.swapped"
+    assert words.DRAFT_AGAIN in text_of(client.get("/consultations/1"))
+
+
+def test_R2_an_entry_edit_is_kept_with_the_words_before_and_the_page_is_read_only_after_approve(tmp_path, clock, machine):
+    app, client, c = reviewed(tmp_path, clock, machine)
+    p = app.state.parts
+    entry = p.notes.entries(p.notes.current_draft(1)["id"])[0]
+    assert client.post(f"/consultations/1/entries/{entry['id']}", data={"text": "the doctor's words [1]"}).status_code == 303
+    changed = p.notes.entry(entry["id"])
+    assert (changed["text"], changed["model_text"]) == ("the doctor's words [1]", "made up history [1]")
+    assert p.audit.lines()[0].event == "entry.edited"
+    assert refusal_on(text_of(client.post(f"/consultations/1/entries/{entry['id']}", data={"text": " "})), f"entry-{entry['id']}") == words.ENTRY_EMPTY
+    assert "the doctor's words [1]" in text_of(client.get("/consultations/1"))          # the page keeps the words as they stand
+    assert client.get("/consultations/1/note.txt").text.startswith("Subjective\nthe doctor's words\n")   # the copy strips the citation
+    client.post("/consultations/1/note/approve")
+    assert p.notes.approval(1)["text"].startswith("Subjective\nthe doctor's words\n")
+    # Read-only after Approve: the entries, the lines, Undo and Swap are each refused on the control pressed (R15).
+    assert slot_text(text_of(client.post(f"/consultations/1/entries/{entry['id']}", data={"text": "x"})), f"entry-{entry['id']}") == words.NOTE_READ_ONLY
+    assert slot_text(text_of(client.post("/consultations/1/lines/1", data={"label": "doctor", "text": "x"})), "save-line-1") == words.NOTE_READ_ONLY
+    assert slot_text(text_of(client.post("/consultations/1/lines/swap")), "swap") == words.NOTE_READ_ONLY
+    assert slot_text(text_of(client.post("/consultations/1/lines/1/undo")), "undo-1") == words.NOTE_READ_ONLY
+    raw = client.get("/consultations/1").text
+    assert "entry-form" not in raw and "line-form" not in raw and 'id="swap"' not in raw
+    # After Refuse instead, the entries are read-only and the transcript is not.
+    app2, client2, c2 = reviewed(tmp_path / "two", clock, machine)
+    client2.post("/consultations/1/note/refuse")
+    entry2 = app2.state.parts.notes.entries(app2.state.parts.notes.current_draft(1)["id"])[0]
+    assert slot_text(text_of(client2.post(f"/consultations/1/entries/{entry2['id']}", data={"text": "x"})), f"entry-{entry2['id']}") == words.NOTE_NOT_EDITABLE
+    assert client2.post("/consultations/1/lines/2", data={"label": "doctor", "text": "Yes."}).status_code == 303

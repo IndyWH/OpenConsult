@@ -17,12 +17,13 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import note
+from openconsult.consult import note, speakers
+from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
 from openconsult.speech.choices import CHOICES
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
-from openconsult.web.pages import refuse, render
+from openconsult.web.pages import form_fields, refuse, render
 
 router = APIRouter()
 GATE_REFUSALS = ("too_short", "empty")
@@ -107,7 +108,10 @@ def note_state(p, row: dict, gate_refused: bool) -> dict:
                      else words.NOTHING_TO_APPROVE if not has_note else None)
     return {"draft": draft, "entries": entries, "sections": {s: [e for e in entries if e["section"] == s] for s in note.SECTIONS},
             "approval": approval, "refused_by_doctor": refused_by_doctor, "has_note": has_note,
-            "earlier": len(drafts) - 1 if drafts else 0, "read_only": bool(approval or refused_by_doctor),
+            "earlier": len(drafts) - 1 if drafts else 0,
+            # After Approve the whole page is read-only; after Refuse the entries are, the transcript is not.
+            "entries_read_only": bool(approval or refused_by_doctor), "transcript_read_only": bool(approval),
+            "entries_reason": words.NOTE_READ_ONLY if approval else words.NOTE_NOT_EDITABLE if refused_by_doctor else None,
             "draft_control": words.DRAFT_AGAIN if has_note else words.DRAFT_THE_NOTE, "draft_reason": draft_reason,
             "approve_reason": approve_reason, "refuse_reason": refuse_reason, "asked_by": "again" if draft is not None else "draft"}
 
@@ -198,6 +202,90 @@ async def refuse_note(request: Request, consultation_id: int, user=Depends(guard
         return review_page(request, user, consultation_id, refused=("refuse", data["refuse_reason"]))
     p.notes.refuse(consultation_id, data["draft"]["id"])
     p.audit.record("note.refused", f"consultation {consultation_id}: draft {data['draft']['n']}")
+    raise Redirect(f"/consultations/{consultation_id}")
+
+
+# ---------------------------------------------- the edits (rulings 7 and 11)
+
+@router.post("/consultations/{consultation_id}/entries/{entry_id}")
+async def edit_entry(request: Request, consultation_id: int, entry_id: int, user=Depends(guards.logged_in)):
+    """The doctor's edit of an entry's words; what stood before is kept."""
+    p = parts(request)
+    final_row(request, consultation_id)
+    data = page_data(p, p.consultations.get(consultation_id))
+    control = f"entry-{entry_id}"
+    entry = p.notes.entry(entry_id)
+    if entry is None or not data["draft"] or entry["draft_id"] != data["draft"]["id"]:
+        raise Redirect(f"/consultations/{consultation_id}")
+    if data["entries_read_only"]:
+        return review_page(request, user, consultation_id, refused=(control, data["entries_reason"]))
+    text = (await form_fields(request)).get("text", "").strip()
+    if not text:
+        return review_page(request, user, consultation_id, refused=(control, words.ENTRY_EMPTY))
+    if text != entry["text"]:
+        p.notes.set_entry_text(entry_id, text)
+        p.audit.record("entry.edited", f"consultation {consultation_id}: entry {entry_id}")
+    raise Redirect(f"/consultations/{consultation_id}")
+
+
+@router.post("/consultations/{consultation_id}/lines/swap")
+async def swap_lines(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """v1's Swap: doctor and patient exchanged on every line; unsure stays."""
+    p = parts(request)
+    final_row(request, consultation_id)
+    data = page_data(p, p.consultations.get(consultation_id))
+    if data["transcript_read_only"]:
+        return review_page(request, user, consultation_id, refused=("swap", words.NOTE_READ_ONLY))
+    p.consultations.swap_labels(consultation_id)
+    p.audit.record("labels.swapped", f"consultation {consultation_id}")
+    raise Redirect(f"/consultations/{consultation_id}")
+
+
+@router.post("/consultations/{consultation_id}/lines/{n}")
+async def edit_line(request: Request, consultation_id: int, n: int, user=Depends(guards.logged_in)):
+    """The per-line label and the words, from one form; each change is
+    recorded with what stood before, and draft again is then offered."""
+    p = parts(request)
+    row = final_row(request, consultation_id)
+    data = page_data(p, row)
+    control = f"save-line-{n}"
+    line = p.consultations.line(consultation_id, n)
+    if line is None:
+        raise Redirect(f"/consultations/{consultation_id}")      # no such control on the page
+    if data["transcript_read_only"]:
+        return review_page(request, user, consultation_id, refused=(control, words.NOTE_READ_ONLY))
+    fields = await form_fields(request)
+    label, text = fields.get("label", ""), fields.get("text", "").strip()
+    if label not in LABELS:
+        return review_page(request, user, consultation_id, refused=(control, words.PICK_LABEL))
+    if not text:
+        return review_page(request, user, consultation_id, refused=(control, words.ENTRY_EMPTY))
+    if text != line["text"]:
+        p.consultations.set_line_words(consultation_id, n, text)
+        p.audit.record("transcript.edited", f"consultation {consultation_id}: line {n}")
+    if label != line["label"]:
+        p.consultations.set_line_label(consultation_id, n, label)
+        p.audit.record("label.set", f"consultation {consultation_id}: line {n} to {label}")
+    raise Redirect(f"/consultations/{consultation_id}")
+
+
+@router.post("/consultations/{consultation_id}/lines/{n}/undo")
+async def undo_label(request: Request, consultation_id: int, n: int, user=Depends(guards.logged_in)):
+    """One press puts back the label the who-spoke answer gave (ruling 7)."""
+    p = parts(request)
+    row = final_row(request, consultation_id)
+    data = page_data(p, row)
+    control = f"undo-{n}"
+    line = p.consultations.line(consultation_id, n)
+    if line is None:
+        raise Redirect(f"/consultations/{consultation_id}")      # no such control on the page
+    if data["transcript_read_only"]:
+        return review_page(request, user, consultation_id, refused=(control, words.NOTE_READ_ONLY))
+    if not line["changed_by_check"]:
+        return review_page(request, user, consultation_id, refused=(control, words.NOT_CHANGED_BY_CHECK))
+    answered = speakers.labels_from_answer([line], row["doctor_speaker"] or speakers.CANNOT_TELL)[n]["label"]
+    p.consultations.set_line_label(consultation_id, n, answered, kind="undo")
+    p.audit.record("label.undone", f"consultation {consultation_id}: line {n} back to {answered}")
     raise Redirect(f"/consultations/{consultation_id}")
 
 
