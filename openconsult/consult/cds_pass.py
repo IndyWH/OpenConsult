@@ -84,13 +84,14 @@ def settle(alarm_result: Result, assessment_result: Result, carried: Carried) ->
 
 
 def run_pass(door: Door, transcript: str, patient: Patient, carried: Carried | None = None,
-             sampling: Sampling | None = None) -> PassResult:
-    """The alarm and the assessment at the same moment, the alarm first (R30, ruling 31)."""
+             sampling: Sampling | None = None, consultation_id: int | None = None) -> PassResult:
+    """The alarm and the assessment at the same moment, the alarm first (R30, ruling 31).
+    consultation_id ties both rows of the record to their consultation (15.10)."""
     carried = carried or Carried()
     alarm_text, assessment_text = messages(transcript, patient, carried)
     with ThreadPoolExecutor(max_workers=2) as pool:
-        alarm = pool.submit(door.ask, "alarm", alarm_text, sampling)
-        assessment = pool.submit(door.ask, "assessment", assessment_text, sampling)
+        alarm = pool.submit(door.ask, "alarm", alarm_text, sampling, consultation_id)
+        assessment = pool.submit(door.ask, "assessment", assessment_text, sampling, consultation_id)
     return settle(alarm.result(), assessment.result(), carried)
 
 

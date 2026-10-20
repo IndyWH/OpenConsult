@@ -55,10 +55,14 @@ class Door:
                     seed=sampling.seed, context=self.profile.context, max_tokens=job.max_tokens,
                     think=self.profile.think, timeout_s=job.timeout_s)
 
-    def ask(self, job_name: str, user: str, sampling: Sampling | None = None) -> Result:
-        return self._run(job_named(job_name), self.call_for(job_name, user, sampling))
+    def ask(self, job_name: str, user: str, sampling: Sampling | None = None,
+            consultation_id: int | None = None) -> Result:
+        """consultation_id ties the row of the record to its consultation
+        (spec 15.10, The record); the bench passes none."""
+        return self._run(job_named(job_name), self.call_for(job_name, user, sampling), consultation_id)
 
-    def ask_own(self, job: Job, system: str, form: dict, user: str, sampling: Sampling | None = None) -> Result:
+    def ask_own(self, job: Job, system: str, form: dict, user: str, sampling: Sampling | None = None,
+                consultation_id: int | None = None) -> Result:
         """A job that is not in the app's table, with its own prompt text
         and form: the speech bench's three (spec 15.9, the details of part
         two). The same limits, the same form check and the same record as
@@ -67,21 +71,21 @@ class Door:
         call = Call(job=job.name, tag=self.profile.tag, system=system, user=user, form=form,
                     temperature=sampling.temperature, seed=sampling.seed, context=self.profile.context,
                     max_tokens=job.max_tokens, think=self.profile.think, timeout_s=job.timeout_s)
-        return self._run(job, call)
+        return self._run(job, call, consultation_id)
 
-    def _run(self, job: Job, call: Call) -> Result:
+    def _run(self, job: Job, call: Call, consultation_id: int | None = None) -> Result:
         started = self._timer()
         try:
             reply = self._engine.chat(call)
         except EngineTimeout as slow:
             return self._failed(call, job, started, slow, "too_slow",
-                                f"no answer within {job.timeout_s:.0f} s: {slow}")
+                                f"no answer within {job.timeout_s:.0f} s: {slow}", consultation_id)
         except EngineUnreachable as gone:
             self._identity = None  # read it again when the engine is back
-            return self._failed(call, job, started, gone, "unreachable", str(gone))
+            return self._failed(call, job, started, gone, "unreachable", str(gone), consultation_id)
         wall_ms = round(1000 * (self._timer() - started))
         outcome, detail, answer = self._judge(reply, call, job, wall_ms)
-        call_id = self._write(call, reply.request, reply.raw, reply, wall_ms, outcome, detail)
+        call_id = self._write(call, reply.request, reply.raw, reply, wall_ms, outcome, detail, consultation_id)
         return Result(job.name, outcome == "ok", answer, None if outcome == "ok" else outcome,
                       detail, call_id, wall_ms, reply.prompt_tokens, reply.output_tokens)
 
@@ -105,13 +109,13 @@ class Door:
         return "ok", None, answer
 
     def _failed(self, call: Call, job: Job, started: float, failure: EngineFailure,
-                outcome: str, detail: str) -> Result:
+                outcome: str, detail: str, consultation_id: int | None = None) -> Result:
         """A call the engine could not complete still leaves its row: the
         request as the engine tried to send it, or the parts if it never
         got that far."""
         wall_ms = round(1000 * (self._timer() - started))
         sent = failure.request or json.dumps(asdict(call), ensure_ascii=False)
-        call_id = self._write(call, sent, None, None, wall_ms, outcome, detail)
+        call_id = self._write(call, sent, None, None, wall_ms, outcome, detail, consultation_id)
         return Result(job.name, False, None, outcome, detail, call_id, wall_ms, None, None)
 
     def identity(self) -> tuple[str | None, str | None]:
@@ -122,7 +126,7 @@ class Door:
         return self._identity
 
     def _write(self, call: Call, request: str, raw: str | None, reply: Reply | None,
-               wall_ms: int, outcome: str, detail: str | None) -> int:
+               wall_ms: int, outcome: str, detail: str | None, consultation_id: int | None = None) -> int:
         version, digest = self.identity()
         return self._record.add(CallRow(
             job=call.job, engine=self._engine.name, engine_version=version, model_tag=call.tag,
@@ -131,4 +135,4 @@ class Door:
             output_tokens=reply.output_tokens if reply else None, wall_ms=wall_ms,
             total_ms=reply.total_ms if reply else None, load_ms=reply.load_ms if reply else None,
             read_ms=reply.read_ms if reply else None, write_ms=reply.write_ms if reply else None,
-            outcome=outcome, detail=detail))
+            outcome=outcome, detail=detail, consultation_id=consultation_id))

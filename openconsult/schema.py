@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 3
+VERSION = 4
 
 MIGRATIONS = {
     1: """
@@ -89,5 +89,102 @@ CREATE TABLE speech_self_test (
     passed INTEGER NOT NULL,
     detail TEXT NOT NULL
 );
+""",
+    # Stage 6a (spec 15.10, The record; 6.3): the patient, the consultation,
+    # the live lines as shown, the lines at Stop as the choice gave them and
+    # as they stand after the label check, each pass as settled, and every
+    # warning the gate raised. model_call rows are tied to their
+    # consultation. Every row holds what the patient said, so the tables
+    # live in the data folder only.
+    4: """
+CREATE TABLE patient (
+    id INTEGER PRIMARY KEY,
+    name TEXT NOT NULL,
+    date_of_birth TEXT NOT NULL,
+    sex TEXT NOT NULL CHECK (sex IN ('F', 'M')),
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE consultation (
+    id INTEGER PRIMARY KEY,
+    patient_id INTEGER NOT NULL REFERENCES patient(id),
+    started_at TEXT NOT NULL,
+    stopped_at TEXT,
+    final_at TEXT,
+    intended_minutes INTEGER NOT NULL,
+    speech_choice TEXT NOT NULL,
+    speech_stamp TEXT,
+    engine TEXT NOT NULL,
+    engine_version TEXT,
+    model_tag TEXT NOT NULL,
+    model_digest TEXT,
+    echo_cancellation INTEGER,
+    noise_suppression INTEGER,
+    auto_gain INTEGER,
+    sample_rate INTEGER,
+    speakers_given INTEGER NOT NULL,
+    doctor_speaker TEXT,
+    recording_file TEXT,
+    loudness TEXT,
+    stop_raw TEXT,
+    state TEXT NOT NULL CHECK (state IN ('live', 'stopping', 'final')),
+    stop_stage TEXT,
+    speech_failure TEXT
+);
+
+CREATE TABLE live_line (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    n INTEGER NOT NULL,
+    line_id INTEGER,
+    speaker TEXT,
+    start_s REAL NOT NULL,
+    end_s REAL NOT NULL,
+    text TEXT NOT NULL,
+    confidence REAL,
+    refused INTEGER NOT NULL,
+    shown_at_s REAL NOT NULL
+);
+
+CREATE TABLE transcript_line (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    n INTEGER,
+    line_id INTEGER,
+    start_s REAL NOT NULL,
+    end_s REAL NOT NULL,
+    text TEXT NOT NULL,
+    confidence REAL,
+    raw_speaker TEXT,
+    label TEXT NOT NULL CHECK (label IN ('doctor', 'patient', 'unsure')),
+    changed_by_check INTEGER NOT NULL,
+    revised_by_service INTEGER NOT NULL,
+    unsure INTEGER NOT NULL,
+    refused INTEGER NOT NULL
+);
+
+CREATE TABLE cds_pass (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    n INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    transcript TEXT NOT NULL,
+    alarm_call_id INTEGER REFERENCES model_call(id),
+    assessment_call_id INTEGER REFERENCES model_call(id),
+    result TEXT NOT NULL,
+    shown INTEGER NOT NULL
+);
+
+CREATE TABLE warning (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    kind TEXT NOT NULL,
+    start_s REAL,
+    end_s REAL,
+    line_n INTEGER,
+    detail TEXT
+);
+
+ALTER TABLE model_call ADD COLUMN consultation_id INTEGER REFERENCES consultation(id);
 """,
 }

@@ -30,6 +30,7 @@ class CallRow:
     write_ms: int | None
     outcome: str
     detail: str | None
+    consultation_id: int | None = None   # the consultation the call belongs to (spec 15.10, The record)
 
 
 COLUMNS = tuple(f.name for f in fields(CallRow))

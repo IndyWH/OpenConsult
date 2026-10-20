@@ -63,7 +63,36 @@ def test_6_5_a_version_2_database_with_its_user_comes_forward_to_3(tmp_path, mon
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 3 and "speech_self_test" in new.tables()
+    assert new.version() >= 3 and "speech_self_test" in new.tables()
     users = Users(new, Audit(new))
     assert users.exists() and users.verify("example-password") and users.get().name == "Example"
+    new.close()
+
+
+def test_6_5_a_version_3_database_with_its_user_and_self_tests_comes_forward_to_4(tmp_path, monkeypatch):
+    # The owner's real database is at version 3 with his user and his
+    # self-tests in it (stage 5b to 5d). Stage 6a's tables arrive, model_call
+    # gains its tie, and nothing of his is lost (spec 15.10, The record).
+    from openconsult.llm.record import CallRow, ModelCalls
+    from openconsult.patients.audit import Audit
+    from openconsult.patients.users import Users
+
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 3)
+    old = open_database(path)
+    assert old.version() == 3 and "consultation" not in old.tables()
+    Users(old, Audit(old)).set_up("Dr", "Example", "example-password")
+    old.execute("INSERT INTO speech_self_test (at, choice, passed, detail) VALUES ('t', 'nemotron', 1, '{}')")
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 4
+    assert {"patient", "consultation", "live_line", "transcript_line", "cds_pass", "warning"} <= set(new.tables())
+    assert Users(new, Audit(new)).verify("example-password")
+    assert new.query_one("SELECT choice FROM speech_self_test")["choice"] == "nemotron"
+    # The old rows of the record have no consultation; a new row may carry one.
+    row = CallRow("alarm", "made-up", None, "tag", None, "0" * 64, "{}", None, None, None, 1, None, None, None, None,
+                  "ok", None)
+    calls = ModelCalls(new)
+    assert calls.get(calls.add(row))["consultation_id"] is None
     new.close()
