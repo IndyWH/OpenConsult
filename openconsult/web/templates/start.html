@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.START_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.START_TITLE }}</h1>
+<form method="post" action="/consultations/start/{{ patient.id }}" class="pane">
+  <div class="pane-body">
+    <p class="large"><span class="name">{{ patient.name }}</span><br>{{ born }}, {{ age }}<br>{{ sex }}</p>
+    <label class="tick"><input type="checkbox" name="right_patient" value="yes">{{ words.TICK_RIGHT_PATIENT }}</label>
+    <label class="tick"><input type="checkbox" name="acted" value="yes">{{ words.TICK_ACTED }}</label>
+    <label>{{ words.FIELD_INTENDED }}
+      <select name="intended">
+        {% for m in minutes %}<option value="{{ m }}" {% if m == chosen %}selected{% endif %}>{{ words.MINUTES.format(minutes=m) }}</option>{% endfor %}
+      </select>
+    </label>
+    <table class="plain facts"><tr><th>{{ words.ROW_SPEECH_IN_USE }}</th><td>{{ speech or problem }}</td></tr></table>
+    <button class="primary" id="start" aria-describedby="start-refusal" {% if problem %}disabled{% endif %}>{{ words.START }}</button>
+    <p class="refusal" id="start-refusal" role="alert">{% if refused and refused.control == "start" %}{{ refused.message }}{% elif problem %}{{ problem }}{% endif %}</p>
+  </div>
+</form>
+{% endblock %}

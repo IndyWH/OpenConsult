@@ -11,6 +11,7 @@ from typing import Callable
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from openconsult.consult.consultations import Consultations
 from openconsult.db import Database, open_database
 from openconsult.llm.choose import NoEngine, choose
 from openconsult.llm.door import Door
@@ -21,6 +22,7 @@ from openconsult.llm.record import ModelCalls
 from openconsult.llm.vllm import VllmEngine
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.patients.logins import Logins
+from openconsult.patients.patients import Patients
 from openconsult.patients.users import Users
 from openconsult.settings import room
 from openconsult.settings.decisions import Decisions, language_model_element
@@ -29,7 +31,7 @@ from openconsult.settings.store import Settings
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import guards, routes
+from openconsult.web import consult, guards, routes
 from openconsult.web.first_run import FirstRun
 
 STATIC = Path(__file__).parent / "web" / "static"
@@ -50,6 +52,11 @@ class Parts:
     speech: SpeechDoor             # the WhisperX with pyannote door, as 5a built it
     self_tests: SelfTests
     doors: dict = field(default_factory=dict)      # one door for each choice, by name (15.9)
+    patients: Patients = None
+    consultations: Consultations = None            # the rows (15.10)
+    running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
+    clock: Clock = now_local
+    finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
 
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
@@ -94,12 +101,16 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         speech=doors[WHISPERX_PYANNOTE.name],
         self_tests=SelfTests(db, clock),
         doors=doors,
+        patients=Patients(db, audit, clock),
+        consultations=Consultations(db, clock),
+        clock=clock,
     )
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
     app.include_router(routes.router)
+    app.include_router(consult.router)
     return app
 
 
@@ -107,5 +118,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
 async def _lifespan(app: FastAPI):
     """Every speech worker that was started ends with the app."""
     yield
+    for consultation in app.state.parts.running.values():
+        consultation.close()
     for door in app.state.parts.doors.values():
         door.close()

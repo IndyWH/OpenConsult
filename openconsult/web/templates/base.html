@@ -13,6 +13,7 @@
   <a class="brand" href="/">{{ words.APP_NAME }}</a>
   <nav class="tabs">
     <a href="/" class="{{ 'active' if active == 'home' else '' }}">{{ words.NAV_HOME }}</a>
+    <a href="/patients/new" class="{{ 'active' if active == 'new_patient' else '' }}">{{ words.NAV_NEW_PATIENT }}</a>
     <a href="/settings" class="{{ 'active' if active == 'settings' else '' }}">{{ words.NAV_SETTINGS }}</a>
     <a href="/log" class="{{ 'active' if active == 'log' else '' }}">{{ words.NAV_LOG }}</a>
   </nav>

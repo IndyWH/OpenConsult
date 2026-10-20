@@ -18,6 +18,8 @@ def test_R11_a_patient_cannot_be_saved_without_a_date_of_birth_and_a_sex():
     assert problem("Made-up", "", "F", TODAY) == "date_missing"
     assert problem("Made-up", "not a date", "F", TODAY) == "date_bad"
     assert problem("Made-up", "2027-01-01", "F", TODAY) == "date_bad"     # in the future
+    assert problem("Made-up", "1905-12-31", "F", TODAY) == "date_bad"     # more than 120 years ago (R11's line stops at 120)
+    assert problem("Made-up", "1906-01-01", "F", TODAY) is None
     assert problem("Made-up", "1990-01-01", "", TODAY) == "sex"
     assert problem("Made-up", "1990-01-01", "female", TODAY) == "sex"
     assert problem("Made-up", "1990-01-01", "F", TODAY) is None           # the twin

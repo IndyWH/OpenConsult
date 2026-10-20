@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.PATIENT_NEW_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.PATIENT_NEW_TITLE }}</h1>
+<form method="post" action="/patients" class="pane" data-use data-seconds-left="{{ seconds_left }}" data-path="/patients/new">
+  <div class="pane-body">
+    <p class="statement">{{ words.PATIENT_ACTED_LINE }}</p>
+    <label>{{ words.FIELD_PATIENT_NAME }}<input name="name" value="{{ fields.name if fields else '' }}" autocomplete="off" autofocus></label>
+    <label>{{ words.FIELD_DATE_OF_BIRTH }}<input name="date_of_birth" type="date" value="{{ fields.date_of_birth if fields else '' }}"></label>
+    <fieldset class="choice"><legend>{{ words.FIELD_SEX }}</legend>
+      {% for code, word in words.SEX_WORDS.items() %}
+      <label class="tick"><input type="radio" name="sex" value="{{ code }}" {% if fields and fields.sex == code %}checked{% endif %}>{{ word }}</label>
+      {% endfor %}
+    </fieldset>
+    <button class="primary" id="save-patient" aria-describedby="save-patient-refusal">{{ words.SAVE_PATIENT }}</button>
+    {{ refusal("save-patient") }}
+  </div>
+</form>
+<script src="/static/use.js"></script>
+{% endblock %}

@@ -11,6 +11,9 @@ from openconsult.db import Database
 from openconsult.patients.audit import Audit, Clock, now_local
 
 SEXES = ("F", "M")
+# A date of birth further back than this is a slip, not a patient: the
+# patient line of R11 takes an age of 120 at most (consult/messages.py).
+OLDEST_YEARS = 120
 
 
 @dataclass(frozen=True)
@@ -41,7 +44,7 @@ def problem(name: str, date_of_birth: str, sex: str, today: date) -> str | None:
     if not (date_of_birth or "").strip():
         return "date_missing"
     born = parse_date(date_of_birth)
-    if born is None or born > today:
+    if born is None or born > today or born.year < today.year - OLDEST_YEARS:
         return "date_bad"
     if sex not in SEXES:
         return "sex"

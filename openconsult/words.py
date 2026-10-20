@@ -70,14 +70,55 @@ NAV_HOME = "Home"
 NAV_SETTINGS = "Settings"
 NAV_LOG = "Log"
 NAV_LOGOUT = "Log out"
+NAV_NEW_PATIENT = "New patient"
 HOME_TITLE = "Home"
 HOME_SO_FAR = (
-    "So far this version starts, sets up its one user, describes the machine it runs on, "
-    "chooses its language model engine once at start and sends the two calls of a pass together, "
-    "reads the room on the graphics card once, and can turn speech into text in four ways: "
-    "WhisperX with pyannote, Nemotron, Speechmatics and AssemblyAI. "
-    "It cannot run a consultation yet."
+    "So far this version runs one acted consultation from Start to a final transcript: the name, "
+    "date of birth and sex of an acted patient go in, you confirm the consultation is acted, press Start and talk; "
+    "the words appear live with the differentials, the alarm and a quiet clock; at Stop it asks which "
+    "speaker was you, checks who spoke each line, checks for missing speech and shows the final "
+    "transcript with its warnings. The note and the review page come next."
 )
+HOME_WAITING = "Waiting at Stop"
+HOME_WAITING_LINE = "{name}, started {when}"
+CONTINUE_CONSULTATION = "Continue"
+
+# The new-patient form and the Start screen (spec 8.2; 15.10 ruling 9; R1, R11, R17; D38). Drafts.
+PATIENT_NEW_TITLE = "New patient"
+PATIENT_ACTED_LINE = "Every patient here is acted. Never enter a real patient or real patient data."
+FIELD_PATIENT_NAME = "Name"
+FIELD_DATE_OF_BIRTH = "Date of birth"
+FIELD_SEX = "Sex"
+SEX_WORDS = {"F": "Female", "M": "Male"}
+PATIENT_NAME_MISSING = "Enter the patient's name."
+DATE_OF_BIRTH_MISSING = "Enter the date of birth."
+DATE_OF_BIRTH_BAD = "The date of birth is not a date, is in the future, or is more than 120 years ago."
+SEX_MISSING = "Choose the sex."
+SAVE_PATIENT = "Save and go to Start"
+START_TITLE = "Start a consultation"
+AGE_LINE = "{age} years old"
+AGE_ONE = "1 year old"
+AGE_BABY = "under 1 year old"
+TICK_RIGHT_PATIENT = "This is the right patient."
+TICK_ACTED = "This consultation is acted. Nobody in it is a real patient."
+FIELD_INTENDED = "Intended time"
+MINUTES = "{minutes} minutes"
+ROW_SPEECH_IN_USE = "Speech"
+START = "Start"
+TICK_BOTH = "Tick both boxes to start."
+START_NO_MODEL = "Start is not offered: {reason}"
+START_MODEL_UNREACHABLE = "Start is not offered: the language model does not answer on {engine}."
+START_NO_SPEECH = (
+    "Start is not offered: a local speech choice is needed, and none can be used. {reason} "
+    "The cloud choices come with stage 9."
+)
+SPEECH_REASONS = {
+    "nemotron_not_installed": "Nemotron is not installed.",
+    "whisperx_not_installed": "WhisperX with pyannote is not installed.",
+    "whisperx_no_room": "The WhisperX with pyannote choice is not available on this card.",
+    "no_card": "This computer has no suitable graphics card for a local speech choice.",
+}
+NO_SUCH_PATIENT = "There is no patient with that number."
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
@@ -119,6 +160,17 @@ WRONG_HOST = "OpenConsult answers only when addressed as this computer: {address
 WRONG_ORIGIN = "This request did not come from OpenConsult's own pages, so it was not done."
 
 
+def plain_age(age: int) -> str:
+    if age == 0:
+        return AGE_BABY
+    return AGE_ONE if age == 1 else AGE_LINE.format(age=age)
+
+
+def plain_date(day) -> str:
+    """21 Oct 1990."""
+    return f"{day.day} {day:%b %Y}"
+
+
 def plain_time(seconds: int) -> str:
     """"1 second", "8 seconds", "5 minutes"."""
     if seconds >= 60 and seconds % 60 == 0:
@@ -141,6 +193,8 @@ WRONG_PASSWORD_NOTHING_CHANGED = "Wrong password. Nothing was changed. Try again
 NEW_PASSWORD_SHORT = "The new password needs at least {least} characters."
 NEW_PASSWORDS_DIFFER = "The two new passwords do not match."
 
+# Typing as use (15.10 ruling 12): the page asks for the time left; nothing is shown.
+
 # The log page.
 LOG_TITLE = "Log"
 COL_WHEN = "When"
@@ -161,6 +215,12 @@ EVENTS = {
     "decision.language_model": "Language model chosen at start",
     "decision.guideline_search": "Guideline search placed at start",
     "decision.whisperx_choice": "WhisperX choice judged at start",
+    "patient.saved": "Patient saved",
+    "consultation.started": "Consultation started: the right patient and an acted consultation confirmed",
+    "consultation.stopped": "Consultation stopped",
+    "speakers.answered": "Which speaker was you: answered",
+    "consultation.final": "Consultation final",
+    "alarm.acknowledged": "Alarm seen",
 }
 
 # The command. Plain ASCII, for every terminal.

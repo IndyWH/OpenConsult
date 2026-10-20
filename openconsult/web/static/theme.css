@@ -89,3 +89,12 @@ table.facts td { border-top: none; }
 /* The standing statement, on every page */
 footer.disclaimer { text-align: center; font-size: .72rem; color: var(--ink-faint); padding: .6rem 1rem 1.2rem; }
 td.when { white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--ink-soft); }
+
+/* The Start screen (spec 8.2): the three in large type */
+p.large { font-size: 1.3rem; line-height: 1.5; margin: 0 0 .8rem; }
+p.large .name { font-family: var(--serif); font-size: 1.7rem; font-weight: 600; }
+fieldset.choice { border: none; padding: 0; margin: .6rem 0 0; }
+fieldset.choice legend { font-size: .85rem; color: var(--ink-soft); padding: 0; }
+fieldset.choice label.tick { display: inline-flex; margin: .3rem 1.4rem .2rem 0; }
+select { font-family: var(--sans); font-size: .92rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .7rem; margin-top: .2rem; }
+button[disabled] { opacity: .5; cursor: not-allowed; }
