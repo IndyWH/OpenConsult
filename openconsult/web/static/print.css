@@ -1,0 +1,9 @@
+/* Printing the review page gives the note alone (spec 15.10 ruling 4; the
+   plan review, point 3): the name and the date, the four sections and the
+   entries' words as they stand; nothing of the model's differentials, the
+   warnings, the transcript, the player, the controls or the model line. */
+header.app, footer.disclaimer, .no-print, .entry-form, button.cite, .uncited, .differentials, #controls, #warnings,
+#transcript, #model-line, .refusal, .reason { display: none !important; }
+.print-only { display: inline !important; }
+.print-keep { display: block; }
+.pane { border: none; }

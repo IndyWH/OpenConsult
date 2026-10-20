@@ -249,6 +249,13 @@ PICK_LABEL = "Pick Doctor, Patient or Unsure."
 ENTRY_EMPTY = "An entry cannot be empty. Edit its words instead."
 NOTE_NOT_EDITABLE = "This draft is refused, so its entries cannot be edited. Edit the transcript and draft the note again."
 NOT_CHANGED_BY_CHECK = "The check did not change this line's speaker, so there is nothing to undo."
+# The player (spec 8.8; D51). Drafts.
+PLAYER = "The recording"
+PLAY_FROM_LINE = "Play from here"
+PLAY_STRETCH = "Play this stretch"
+LOUDNESS = "Loudness along the recording. Press to go there."
+AUDIO_GONE = "The recording from {date} is no longer on this computer."
+AUDIO_NOT_SUPPORTED = "This browser cannot play the recording."
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"

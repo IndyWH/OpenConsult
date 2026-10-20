@@ -156,3 +156,8 @@ button.cite:hover { text-decoration: underline; }
 .transcript .line { display: flex; flex-wrap: wrap; gap: .4rem; align-items: center; }
 .print-only { display: none; }
 .transcript .line .refusal:empty, .entry .refusal:empty { display: none; }
+.player { display: flex; flex-direction: column; gap: .5rem; border-bottom: 1px solid var(--line); }
+.player audio { width: 100%; }
+.player canvas { width: 100%; height: 48px; cursor: pointer; background: var(--paper); border-radius: 6px; }
+.line.playing { background: #EFE7DE; }
+button.play-stretch { padding: .2rem .7rem; font-size: .78rem; margin-left: .5rem; }

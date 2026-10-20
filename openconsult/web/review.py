@@ -13,14 +13,18 @@ from __future__ import annotations
 
 from datetime import datetime
 
+import json
+
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
 from openconsult.consult import note, speakers
+from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
 from openconsult.speech.choices import CHOICES
+from openconsult.speech.loudness import WINDOW_S
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -28,7 +32,36 @@ from openconsult.web.pages import form_fields, refuse, render
 router = APIRouter()
 GATE_REFUSALS = ("too_short", "empty")
 # The sentences the page scripts render, handed as data (15.6).
-SCRIPT_WORDS = ("COPIED", "COPY_FAILED")
+SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED")
+# The loudness strip is drawn in this many columns, each the loudest of its windows.
+STRIP_COLUMNS = 400
+
+
+def strip_of(windows: list, columns: int = STRIP_COLUMNS) -> list:
+    """The loudness strip (8.8): the stored windows folded into columns,
+    each the loudest window in it, None where every window is silence."""
+    if not windows:
+        return []
+    columns = min(columns, len(windows))
+    found = []
+    for k in range(columns):
+        first, last = k * len(windows) // columns, max((k + 1) * len(windows) // columns, k * len(windows) // columns + 1)
+        levels = [w for w in windows[first:last] if w is not None]
+        found.append(max(levels) if levels else None)
+    return found
+
+
+def player_data(row: dict, lines: list[dict], warnings: list[dict], data_folder) -> dict:
+    """What the player script reads (D51; V1_LESSONS 5.2): whether the file
+    is there, the length, each line's times, the strip, and the warnings'
+    stretches, all computed here and run by tests."""
+    windows = json.loads(row["loudness"] or "[]")
+    file_there = bool(row["recording_file"]) and (folder_of(data_folder) / row["recording_file"]).is_file()
+    return {"available": file_there, "length_s": round(len(windows) * WINDOW_S, 1),
+            "lines": [{"n": line["n"], "start_s": line["start_s"], "end_s": line["end_s"]} for line in lines],
+            "strip": strip_of(windows), "window_s": WINDOW_S,
+            "stretches": [{"kind": w["kind"], "start_s": w["start_s"], "end_s": w["end_s"]} for w in warnings
+                          if w["start_s"] is not None and w["end_s"] is not None]}
 
 
 def script_words() -> dict:
@@ -131,7 +164,11 @@ def page_data(p, row: dict) -> dict:
     state = note_state(p, row, gate_refused)
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
+    player = player_data(row, lines, warnings, p.settings.data_folder)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "lines": lines, "warnings": warnings,
+            "player": player, "player_json": json.dumps(player),
+            "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
+                date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
             "warning_count": words.WARNING_ONE if len(warnings) == 1 else words.WARNINGS_COUNT.format(count=len(warnings)),
             "differentials": note.last_shown_differentials(p.consultations.passes(cid)),
             "gate_refused": gate_refused, "gate_reason": gate_reason, "model_line": model_line_of(row),
@@ -287,6 +324,20 @@ async def undo_label(request: Request, consultation_id: int, n: int, user=Depend
     p.consultations.set_line_label(consultation_id, n, answered, kind="undo")
     p.audit.record("label.undone", f"consultation {consultation_id}: line {n} back to {answered}")
     raise Redirect(f"/consultations/{consultation_id}")
+
+
+@router.get("/consultations/{consultation_id}/recording", dependencies=[Depends(guards.this_computer)])
+async def recording(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """The recording, played only to the logged-in user from this
+    computer (8.8; D51; 15.6 ruling 6): the file is read and never
+    written (R18); one that is not there is 404."""
+    p = parts(request)
+    row = final_row(request, consultation_id)
+    path = folder_of(p.settings.data_folder) / (row["recording_file"] or "")
+    if not row["recording_file"] or not path.is_file():
+        return PlainTextResponse(words.AUDIO_GONE.format(date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
+                                 status_code=404)
+    return FileResponse(path, media_type="audio/wav")
 
 
 @router.get("/consultations/{consultation_id}/note.txt")

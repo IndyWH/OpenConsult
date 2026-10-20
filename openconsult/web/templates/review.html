@@ -8,9 +8,11 @@
   <ul class="panel-list">{% for d in differentials %}<li>{{ d.condition }} ({{ d.likelihood }}): {{ d.rationale }}</li>{% else %}<li class="mark">{{ words.NO_DIFFERENTIALS }}</li>{% endfor %}</ul>
 </aside>
 {%- endmacro %}
+{% block head %}<link rel="stylesheet" href="/static/print.css" media="print">{% endblock %}
 {% block main %}
 <div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}">
 <script id="words" type="application/json">{{ words_json|safe }}</script>
+<script id="player-data" type="application/json">{{ player_json|safe }}</script>
 <h1 class="page print-keep">{{ words.REVIEW_TITLE }}</h1>
 <p class="statement print-keep"><b>{{ patient.name }}</b> <span class="mark">{{ date }}</span></p>
 
@@ -82,7 +84,9 @@
 <section class="pane no-print" id="warnings">
   <div class="pane-head"><h2>{{ words.WARNINGS }}</h2></div>
   <div class="pane-body">
-    {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}"{% if w.line_n %} data-line="{{ w.line_n }}"{% endif %}{% if w.start_s is not none %} data-start="{{ w.start_s }}" data-end="{{ w.end_s }}"{% endif %}>{{ w.text }}</li>{% endfor %}</ul>
+    {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
+      {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
+      {% elif player.available and w.line_n %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}">{{ words.PLAY_FROM_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
     {% else %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
   </div>
 </section>
@@ -94,10 +98,17 @@
       <button id="swap" aria-describedby="swap-refusal">{{ words.SWAP }}</button>{{ refusal("swap") }}</form>
     {% else %}{{ refusal("swap") }}{% endif %}
   </div>
+  <div class="pane-body player" id="player">
+    {% if player.available %}
+    <audio id="audio" controls preload="metadata" src="/consultations/{{ cid }}/recording">{{ words.AUDIO_NOT_SUPPORTED }}</audio>
+    <canvas id="strip" width="800" height="48" title="{{ words.LOUDNESS }}" aria-label="{{ words.LOUDNESS }}"></canvas>
+    {% else %}<p class="mark" id="audio-gone">{{ audio_gone }}</p>{% endif %}
+  </div>
   <div class="pane-body" id="final-transcript">
     {% for line in lines %}
     <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}">
       <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
+      {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" aria-label="{{ words.PLAY_FROM_LINE }}">&#9654;</button>{% endif %}
       {% if transcript_read_only %}<span class="line-text">{{ line.text }}</span>{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
       {% else %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}" class="line-form">
         <select name="label" aria-label="{{ words.SPEAKER_WORD.format(n=line.n) }}">{% for value, word in words.LABEL_WORDS.items() %}<option value="{{ value }}"{% if value == line.label %} selected{% endif %}>{{ word }}</option>{% endfor %}</select>
@@ -124,4 +135,5 @@
 </div>
 <script src="/static/use.js"></script>
 <script src="/static/review.js"></script>
+<script src="/static/player.js"></script>
 {% endblock %}

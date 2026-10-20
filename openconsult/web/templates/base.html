@@ -6,6 +6,7 @@
 <title>{{ title }} - {{ words.APP_NAME }}</title>
 <link rel="stylesheet" href="/static/theme.css">
 {% if refresh %}<meta http-equiv="refresh" content="{{ refresh }};url={{ path }}?quiet">{% endif %}
+{% block head %}{% endblock %}
 </head>
 <body>
 {% if user %}
