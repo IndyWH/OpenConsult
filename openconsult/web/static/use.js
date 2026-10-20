@@ -1,9 +1,10 @@
-// Typing counts as use (spec 15.10, ruling 12). Every keystroke marks the
-// page edited and, not more than once in 30 s, tells the app it is in use;
-// the page's own timed move runs from the seconds the app gives and never
-// while an edit is unsaved. No state logic beyond that lives here.
+// Typing counts as use (spec 15.10, ruling 12). Every keystroke in the
+// element marked data-use (a form, or the whole review page) marks the page
+// edited and, not more than once in 30 s, tells the app it is in use; the
+// page's own timed move runs from the seconds the app gives and never while
+// an edit is unsaved. No state logic beyond that lives here.
 (function () {
-  const form = document.querySelector('form[data-use]');
+  const form = document.querySelector('[data-use]');
   if (!form) return;
   let secondsLeft = Number(form.dataset.secondsLeft);
   let edited = false;

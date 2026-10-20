@@ -14,9 +14,8 @@ from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 
 from openconsult import words
 from openconsult.consult import speakers, stop as stop_module
-from openconsult.consult.gate import LOW_CONFIDENCE
 from openconsult.consult.live import FINAL, LIVE, Capture
-from openconsult.web import guards
+from openconsult.web import guards, review
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -52,14 +51,16 @@ def model_line(request: Request, consultation) -> str:
 
 @router.get("/consultations/{consultation_id}")
 async def consultation_page(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
-    """The page by the consultation's state: live, stopping or final."""
-    consultation = running(request, consultation_id)
-    if consultation.state == LIVE:
+    """The page by the consultation's state: live, stopping, or final,
+    when the review page is built from the tables (6b), the same for a
+    consultation of this run and one opened after a restart."""
+    consultation = parts(request).running.get(consultation_id)
+    if consultation is not None and consultation.state == LIVE:
         return live_page(request, user, consultation)
-    stop_module.continue_resumed(consultation)     # a consultation found stopping at a restart goes on when opened
-    if consultation.state == FINAL:
-        return final_page(request, user, consultation)
-    return stopping_page(request, user, consultation)
+    if consultation is not None and consultation.state != FINAL:
+        stop_module.continue_resumed(consultation)     # a consultation found stopping at a restart goes on when opened
+        return stopping_page(request, user, consultation)
+    return review.review_page(request, user, consultation_id)
 
 
 def live_page(request: Request, user, consultation, refused=None):
@@ -97,35 +98,6 @@ async def answer(request: Request, consultation_id: int, user=Depends(guards.log
     if not picked or not stop_module.answer(consultation, picked):
         return stopping_page(request, user, consultation, refused=("answer", words.PICK_ONE))
     raise Redirect(f"/consultations/{consultation.id}")
-
-
-def final_page(request: Request, user, consultation):
-    lines = [dict(row) for row in consultation.final.lines if row["n"] is not None]
-    for line in lines:
-        score = line.get("confidence")
-        line["low_confidence"] = (words.LOW_CONFIDENCE_MARK.format(score=f"{score:.2f}")
-                                  if score is not None and score < LOW_CONFIDENCE else None)
-    return render(request, "final.html", user=user, active="new_patient", consultation=consultation,
-                  patient=consultation.patient, lines=lines, warnings=warning_lines(consultation),
-                  passes=consultation.passes.state(), model_line=model_line(request, consultation))
-
-
-def warning_lines(consultation) -> list[str]:
-    """Each stored warning as its sentence (ruling 8)."""
-    found = []
-    for w in consultation.final.warnings:
-        kind, detail = w["kind"], w["detail"] or ""
-        if kind == "speech_failed":
-            found.append(words.WARN_SPEECH_FAILED.format(reason=detail) if detail != words.APP_RESTARTED else detail)
-        elif kind == "label_check_refused":
-            found.append(words.WARN_LABEL_CHECK_REFUSED.format(reason=detail))
-        elif kind == "label_check_failed":
-            found.append(words.WARN_LABEL_CHECK_FAILED.format(reason=detail))
-        else:
-            found.append(words.WARNING_SENTENCES.get(kind, "{detail}").format(
-                start=w["start_s"], end=w["end_s"], n=w["line_n"], detail=detail, words=detail, score=detail,
-                choice=consultation.speech_door.choice.title))
-    return found
 
 
 @router.post("/consultations/{consultation_id}/stop")

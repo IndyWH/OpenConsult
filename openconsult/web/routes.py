@@ -113,7 +113,11 @@ async def home(request: Request, user=Depends(guards.logged_in)):
     waiting = [{"id": row["id"], "line": words.HOME_WAITING_LINE.format(
         name=row["patient_name"], when=row["started_at"][:16].replace("T", " "))}
         for row in p.consultations.in_state("stopping")]
-    return render(request, "home.html", user=user, active="home", waiting=waiting)
+    # And each final consultation with no approved note, once, with one control, Review (6b; R15).
+    review = [{"id": row["id"], "line": words.HOME_WAITING_LINE.format(
+        name=row["patient_name"], when=row["started_at"][:16].replace("T", " "))}
+        for row in p.consultations.waiting_for_review()]
+    return render(request, "home.html", user=user, active="home", waiting=waiting, review=review)
 
 
 # ------------------------------------------------------------ the first run

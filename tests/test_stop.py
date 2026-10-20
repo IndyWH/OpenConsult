@@ -202,7 +202,7 @@ def test_R2_R15_the_who_spoke_page_asks_once_and_the_answer_is_audited(tmp_path,
     assert events.index("consultation.final") < events.index("speakers.answered") < events.index("consultation.stopped")
     assert "Stop to final" in app.state.parts.audit.lines()[0].detail
     final = text_of(client.get("/consultations/1"))
-    assert words.FINAL_TITLE in final and "[1] Doctor" in final and "[3] Patient" in final and words.LABEL_UNSURE in final
+    assert words.REVIEW_TITLE in final and "[1] Doctor" in final and "[3] Patient" in final and words.LABEL_UNSURE in final
     assert not app.state.parts.logins.consultation_running
 
 
@@ -246,7 +246,7 @@ def test_1_12_a_consultation_left_live_or_stopping_at_a_restart_is_carried_on(tm
         assert words.WHO_SPOKE_TITLE in page
         assert client2.post(f"/consultations/{cid}/speakers", data={"speaker": "S2"}).status_code == 303
         assert until(lambda: app2.state.parts.running[cid].state == FINAL)
-        assert words.FINAL_TITLE in text_of(client2.get(f"/consultations/{cid}"))
+        assert words.REVIEW_TITLE in text_of(client2.get(f"/consultations/{cid}"))    # the review page from the tables (6b)
     assert rows.get(1)["final_at"] and rows.get(2)["final_at"] and rows.in_state("stopping") == []
     assert words.HOME_WAITING not in text_of(client2.get("/"))
     assert not app2.state.parts.logins.consultation_running

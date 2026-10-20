@@ -131,3 +131,19 @@ details summary { cursor: pointer; color: var(--ink-soft); font-size: .85rem; }
 a.button { display: inline-block; text-decoration: none; background: var(--plum); color: #FBF6F1; font-weight: 600; border-radius: 999px; padding: .5rem 1.2rem; font-size: .9rem; margin-top: .4rem; }
 h2.question { font-family: var(--serif); font-size: 1.3rem; margin: .4rem 0; }
 li.warning { color: var(--red); }
+
+/* The review page (spec 15.10 ruling 11) */
+.section-head { font-family: var(--serif); font-size: 1.02rem; margin: .9rem 0 .3rem; }
+.entry { margin: 0 0 .35rem; line-height: 1.5; font-size: .95rem; }
+button.cite { border: none; background: none; padding: 0 .15rem; color: var(--plum); font-size: .8rem; cursor: pointer; }
+button.cite:hover { text-decoration: underline; }
+.uncited { color: var(--red); }
+.differentials { margin: .4rem 0 .6rem; padding: .5rem .8rem; border-left: 3px solid var(--line); background: var(--paper); font-size: .9rem; }
+.differentials h4 { margin: 0 0 .2rem; font-weight: 600; }
+.control-row { display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }
+.control-row form { margin: 0; }
+.control-row button.primary { margin-top: 0; }
+.warning-count { margin-left: .6rem; font-size: .85rem; color: var(--red); }
+.reason { max-width: 22rem; }
+.line.marked { background: #F3EDE6; border-radius: 6px; }
+.approved { color: var(--green); }

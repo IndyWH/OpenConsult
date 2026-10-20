@@ -203,8 +203,43 @@ WARNING_SENTENCES = {
     "too_short": "{detail}", "empty": WARN_EMPTY,
 }
 
-# The note (spec 15.10, rulings 4 and 8). The headings of the copy text, the four sections. Drafts.
+# The note and the review page (spec 15.10, rulings 4, 6, 8, 11 and 12; R2, R15, R20; 8.8). Drafts.
 SECTION_WORDS = {"subjective": "Subjective", "objective": "Objective", "assessment": "Assessment", "plan": "Plan"}
+REVIEW_TITLE = "Review"
+NOTE_HEADING = "Draft note"
+NOTE_DRAFT_LINE = "A draft. Nothing is final until you approve it."
+MODELS_DIFFERENTIALS = "The model's last differentials. Not part of the note."
+NO_DIFFERENTIALS = "The model gave none."
+APPROVE = "Approve"
+REFUSE = "Refuse"
+WARNINGS_COUNT = "{count} warnings"
+WARNING_ONE = "1 warning"
+COPY_NOTE = "Copy the note"
+COPIED = "Copied."
+COPY_FAILED = "Could not copy: {reason}"
+DRAFT_THE_NOTE = "Draft the note"
+DRAFT_AGAIN = "Draft the note again from the corrected transcript"
+DRAFT_AGAIN_NEEDS_EDIT = "Nothing has been edited, so there is nothing to draft again."
+NO_NOTE_YET = "No note has been drafted for this consultation."
+NOTE_GATE_REFUSED = "No note was drafted: {reason}"
+NOTE_CALL_FAILED = "The note could not be drafted: {reason}"
+NOTE_REFUSED_CITATIONS = (
+    "The draft was refused: only {cited} of {total} entries cite a line of the transcript, fewer than half. "
+    "The draft was discarded."
+)
+ENTRY_UNCITED = "cites no line of the transcript"
+SHOW_LINE = "Show line {n}"
+APPROVED_LINE = "Approved on {date} at {time}. The note is read-only."
+REFUSED_LINE = "You refused this draft on {date} at {time}."
+NOTE_READ_ONLY = "The note is approved and read-only."
+ALREADY_APPROVED = "The note is already approved."
+NOTHING_TO_APPROVE = "There is no note to approve."
+ALREADY_REFUSED = "This draft is already refused."
+EARLIER_DRAFTS = "{count} earlier draft is kept in the record."
+EARLIER_DRAFTS_MANY = "{count} earlier drafts are kept in the record."
+WARN_LABEL_CHANGED = "Line {n}: the check changed the speaker to {label}."
+HOME_REVIEW = "Waiting for review"
+REVIEW = "Review"
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
@@ -310,6 +345,8 @@ EVENTS = {
     "note.drafted": "Note drafted",
     "note.refused_by_check": "Note refused by the citation check: fewer than half the entries cite a line",
     "note.failed": "Note could not be drafted",
+    "note.approved": "Note approved",
+    "note.refused": "Note refused by the doctor",
 }
 
 # The command. Plain ASCII, for every terminal.

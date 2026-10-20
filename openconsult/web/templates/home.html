@@ -17,4 +17,14 @@
   </div>
 </section>
 {% endif %}
+{% if review %}
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.HOME_REVIEW }}</h2></div>
+  <div class="pane-body">
+    {% for row in review %}
+    <p>{{ row.line }} <a class="button" href="/consultations/{{ row.id }}">{{ words.REVIEW }}</a></p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 {% endblock %}

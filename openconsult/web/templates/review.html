@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.REVIEW_TITLE %}
+{# The model's last differentials, beside the assessment (ruling 4), or alone where no note stands yet. #}
+{% macro differentials_aside() -%}
+<aside class="differentials no-print" id="differentials">
+  <h4 class="mark">{{ words.MODELS_DIFFERENTIALS }}</h4>
+  <ul class="panel-list">{% for d in differentials %}<li>{{ d.condition }} ({{ d.likelihood }}): {{ d.rationale }}</li>{% else %}<li class="mark">{{ words.NO_DIFFERENTIALS }}</li>{% endfor %}</ul>
+</aside>
+{%- endmacro %}
+{% block main %}
+<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}">
+<script id="words" type="application/json">{{ words_json|safe }}</script>
+<h1 class="page print-keep">{{ words.REVIEW_TITLE }}</h1>
+<p class="statement print-keep"><b>{{ patient.name }}</b> <span class="mark">{{ date }}</span></p>
+
+{# One: the draft note (ruling 11). #}
+<section class="pane note print-keep" id="note">
+  <div class="pane-head"><h2>{{ words.NOTE_HEADING }}</h2>
+    {% if approval %}<span class="mark approved">{{ approved_line }}</span>
+    {% elif refused_line %}<span class="mark">{{ refused_line }}</span>
+    {% else %}<span class="mark">{{ words.NOTE_DRAFT_LINE }}</span>{% endif %}
+  </div>
+  <div class="pane-body">
+    {% if gate_refused %}<p class="failed" id="note-state">{{ words.NOTE_GATE_REFUSED.format(reason=gate_reason) }}</p>
+    {% elif not draft %}<p class="mark" id="note-state">{{ words.NO_NOTE_YET }}</p>
+    {% elif draft.failure %}<p class="failed" id="note-state">{{ words.NOTE_CALL_FAILED.format(reason=draft.failure) }}</p>
+    {% elif draft.refused %}<p class="failed" id="note-state">{{ words.NOTE_REFUSED_CITATIONS.format(cited=draft.entries_cited, total=draft.entries_total) }}</p>
+    {% endif %}
+    {% if has_note %}
+    {% for section in ("subjective", "objective", "assessment", "plan") %}
+    <div class="section" id="section-{{ section }}">
+      <h3 class="section-head">{{ words.SECTION_WORDS[section] }}</h3>
+      {% for entry in sections[section] %}
+      <div class="entry" id="entry-{{ entry.id }}">
+        <span class="entry-text">{{ entry.text }}</span>
+        {% for n in entry.lines %}<button type="button" class="cite" data-line="{{ n }}" aria-label="{{ words.SHOW_LINE.format(n=n) }}">[{{ n }}]</button>{% endfor %}
+        {% if entry.uncited %}<span class="mark uncited">({{ words.ENTRY_UNCITED }})</span>{% endif %}
+      </div>
+      {% endfor %}
+      {% if section == "assessment" %}{{ differentials_aside() }}{% endif %}
+    </div>
+    {% endfor %}
+    {% else %}{{ differentials_aside() }}{% endif %}
+    {% if earlier %}<p class="mark" id="earlier-drafts">{{ (words.EARLIER_DRAFTS if earlier == 1 else words.EARLIER_DRAFTS_MANY).format(count=earlier) }}</p>{% endif %}
+  </div>
+</section>
+
+{# Two: Approve and Refuse, the count of warnings on the Approve control (R15). #}
+<section class="pane controls no-print" id="controls">
+  <div class="pane-body control-row">
+    <form method="post" action="/consultations/{{ cid }}/note/approve" id="approve-form">
+      <button class="primary" id="approve" aria-describedby="approve-refusal" {% if approve_reason %}disabled{% endif %}>{{ words.APPROVE }}</button>
+      <a href="#warnings" id="warning-count" class="warning-count">{{ warning_count }}</a>
+      {{ refusal("approve") }}
+      {% if approve_reason and not (refused and refused.control == "approve") %}<p class="mark reason">{{ approve_reason }}</p>{% endif %}
+    </form>
+    <form method="post" action="/consultations/{{ cid }}/note/refuse" id="refuse-form">
+      <button id="refuse" aria-describedby="refuse-refusal" {% if refuse_reason %}disabled{% endif %}>{{ words.REFUSE }}</button>
+      {{ refusal("refuse") }}
+    </form>
+    <form method="post" action="/consultations/{{ cid }}/note/draft" id="draft-form">
+      <button id="draft" aria-describedby="draft-refusal" {% if draft_reason %}disabled{% endif %}>{{ draft_control }}</button>
+      {{ refusal("draft") }}
+      {% if draft_reason and not (refused and refused.control == "draft") %}<p class="mark reason">{{ draft_reason }}</p>{% endif %}
+    </form>
+    {% if has_note %}
+    <div class="copy">
+      <button type="button" id="copy-note">{{ words.COPY_NOTE }}</button>
+      <p class="notice" id="copy-note-result"></p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+{# Three: the warnings, each one press from the sound. #}
+<section class="pane no-print" id="warnings">
+  <div class="pane-head"><h2>{{ words.WARNINGS }}</h2></div>
+  <div class="pane-body">
+    {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}"{% if w.line_n %} data-line="{{ w.line_n }}"{% endif %}{% if w.start_s is not none %} data-start="{{ w.start_s }}" data-end="{{ w.end_s }}"{% endif %}>{{ w.text }}</li>{% endfor %}</ul>
+    {% else %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
+  </div>
+</section>
+
+{# Four: the transcript with the player. #}
+<section class="pane transcript no-print" id="transcript">
+  <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2></div>
+  <div class="pane-body" id="final-transcript">
+    {% for line in lines %}
+    <p class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}"><span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span><span class="line-text">{{ line.text }}</span>
+      {% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}
+      {% if line.changed_by_check %}<span class="mark"> ({{ words.LABEL_CHANGED }})</span>{% endif %}
+      {% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}
+      {% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}
+    </p>
+    {% endfor %}
+  </div>
+</section>
+
+{# Five: the model line (R20). #}
+<p class="model-line no-print" id="model-line">{{ model_line }}</p>
+</div>
+<script src="/static/use.js"></script>
+<script src="/static/review.js"></script>
+{% endblock %}
