@@ -5,5 +5,16 @@
 <div class="pane"><div class="pane-body">
   <p class="statement">{{ statement }}</p>
   <p>{{ words.HOME_SO_FAR }}</p>
+  <p><a class="button" href="/patients/new">{{ words.NAV_NEW_PATIENT }}</a></p>
 </div></div>
+{% if waiting %}
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.HOME_WAITING }}</h2></div>
+  <div class="pane-body">
+    {% for row in waiting %}
+    <p>{{ row.line }} <a class="button" href="/consultations/{{ row.id }}">{{ words.CONTINUE_CONSULTATION }}</a></p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
 {% endblock %}

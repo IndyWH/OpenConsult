@@ -128,3 +128,6 @@ details summary { cursor: pointer; color: var(--ink-soft); font-size: .85rem; }
 .panel-list { margin: .2rem 0 .6rem; padding-left: 1.1rem; }
 .panel-list li { margin: .15rem 0; }
 .failed { color: var(--red); font-size: .88rem; }
+a.button { display: inline-block; text-decoration: none; background: var(--plum); color: #FBF6F1; font-weight: 600; border-radius: 999px; padding: .5rem 1.2rem; font-size: .9rem; margin-top: .4rem; }
+h2.question { font-family: var(--serif); font-size: 1.3rem; margin: .4rem 0; }
+li.warning { color: var(--red); }

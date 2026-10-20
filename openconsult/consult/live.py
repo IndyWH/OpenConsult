@@ -87,6 +87,10 @@ class Consultation:
         self.clock = clock
         self.timer = timer
         self.on_stop = on_stop            # the finaliser (stop.py), given by the app
+        self.on_final: Callable | None = None   # the app's hook once the final transcript is ready
+        self.speakers_given = SPEAKERS
+        self.resume_pending = False       # built again after a restart, not yet carried on
+        self.closed = False
         self.state = LIVE
         self.stop_stage: str | None = None
         self.capture: Capture | None = None
@@ -135,7 +139,7 @@ class Consultation:
             self.speech = Speech("starting")
             self._changed()
         self._open_recording(capture.rate)
-        opened = self.speech_door.open(capture.rate, speakers=SPEAKERS)
+        opened = self.speech_door.open(capture.rate, speakers=self.speakers_given)
         with self.lock:
             if not opened.ok:
                 self._speech_failed(opened.detail or opened.failure)
@@ -244,8 +248,14 @@ class Consultation:
             self.audit.record("consultation.stopped", f"consultation {self.id}")
             self._changed()
         if self.on_stop is not None:
-            self._pool.submit(self.on_stop, self)
+            self.run_stop_thread(self.on_stop)
         return True
+
+    def run_stop_thread(self, step: Callable) -> None:
+        """The Stop thread: one of its own, marked so that it never holds
+        the process open; it waits on the doctor with no limit (2.2) and
+        ends with the app."""
+        threading.Thread(target=step, args=(self,), name=f"stop-{self.id}", daemon=True).start()
 
     def set_stage(self, stage: str | None) -> None:
         with self.lock:
@@ -254,6 +264,8 @@ class Consultation:
             self._changed()
 
     def close(self) -> None:
+        self.closed = True
+        self.answer_event.set()
         self._pool.shutdown(wait=False)
 
     # -------------------------------------------------------------- state

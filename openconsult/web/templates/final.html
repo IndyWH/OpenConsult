@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% set title = words.FINAL_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.FINAL_TITLE }}</h1>
+<p class="statement"><b>{{ patient.name }}</b></p>
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.WARNINGS }}</h2></div>
+  <div class="pane-body" id="warnings">
+    {% if warnings %}<ul class="panel-list">{% for line in warnings %}<li class="warning">{{ line }}</li>{% endfor %}</ul>
+    {% else %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
+  </div>
+</section>
+<section class="pane transcript">
+  <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2></div>
+  <div class="pane-body" id="final-transcript">
+    {% for line in lines %}
+    <p class="line" id="line-{{ line.n }}"><span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>{{ line.text }}
+      {% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}
+      {% if line.changed_by_check %}<span class="mark"> ({{ words.LABEL_CHANGED }})</span>{% endif %}
+      {% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}
+      {% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}
+    </p>
+    {% endfor %}
+  </div>
+</section>
+<p class="model-line">{{ model_line }}</p>
+{% endblock %}

@@ -140,10 +140,17 @@ def begin(p, patient, minutes: int) -> Consultation:
                                 digest, SPEAKERS)
     consultation = Consultation(cid, patient, minutes, p.clock(), door, p.door, p.consultations, p.audit,
                                 p.settings.data_folder, p.clock, on_stop=p.finaliser)
+    consultation.on_final = _on_final(p)
     p.running[cid] = consultation
     p.audit.record("consultation.started", f"consultation {cid}, patient {patient.id}, {minutes} minutes")
     p.logins.consultation_running = True
     return consultation
+
+
+def _on_final(p):
+    def done(consultation) -> None:
+        p.logins.consultation_running = any(c.state != "final" for c in p.running.values())
+    return done
 
 
 # ---------------------------------------------------------- typing as use

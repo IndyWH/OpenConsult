@@ -89,13 +89,15 @@ def test_R20_R30_a_bench_call_is_recorded_under_its_own_job_with_the_prompts_has
 
 
 def test_R31_the_three_jobs_are_not_in_the_apps_table(record):
-    for name in ("bench_label_check", "bench_drug_name", "bench_note", "label_check", "note"):
+    # Stage 6a built the label check in the app's table under its own name
+    # (15.10 ruling 7); the bench's three names stay out of it.
+    for name in ("bench_label_check", "bench_drug_name", "bench_note", "drug_name", "note"):
         with pytest.raises(KeyError):
             app_jobs.job(name)
     door, engine = door_with(record, [])
     with pytest.raises(KeyError):
         door.ask("bench_note", "words")
-    assert sorted(app_jobs.JOBS) == ["alarm", "assessment"] and engine.calls == []
+    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "label_check"] and engine.calls == []
 
 
 def test_R31_nothing_of_the_app_names_part_two():

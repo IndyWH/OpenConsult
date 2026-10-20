@@ -1,7 +1,8 @@
 """The table of jobs (spec 15.7; V1_LESSONS 3.11). Each job names its
 prompt file, its answer form, the frames around the transcript, its
 limit on length, its limit on time, and what happens when it fails.
-Stage 3 fills two; the others of spec 10.2 arrive with their stages."""
+Stage 3 filled two; stage 6a adds the label check (15.9 ruling 17;
+15.10 ruling 7); the others of spec 10.2 arrive with their stages."""
 
 from __future__ import annotations
 
@@ -35,6 +36,15 @@ JOBS = {
         max_tokens=1500, timeout_s=60.0,
         on_failure="The alarm's result stands; the earlier differential names stay the stale "
                    "list for the next pass.",
+    ),
+    # The limits are the bench's named figures (15.9, the details of part
+    # two): the longest page of the rehearsal had 124 lines and a line of
+    # the reply is about 13 tokens.
+    "label_check": Job(
+        name="label_check", prompt="label_check", form="label_check", frames=("label_check",),
+        max_tokens=3000, timeout_s=120.0,
+        on_failure="The labels stand as the who-spoke answer set them; the final page says the check "
+                   "did not run and why. Nothing is asked a second time.",
     ),
 }
 

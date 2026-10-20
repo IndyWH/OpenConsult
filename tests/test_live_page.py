@@ -10,6 +10,7 @@ from tests.test_sound import started  # noqa: F401 - the fixture
 
 def test_R15_1_12_stop_moves_to_the_stopping_page_and_a_second_stop_waits(started):
     app, client, worker = started
+    app.state.parts.running[1].on_stop = None           # hold the finaliser, so the first stage stays on the page
     first = client.post("/consultations/1/stop")
     assert first.status_code == 303 and first.headers["location"] == "/consultations/1"
     page = client.get("/consultations/1")

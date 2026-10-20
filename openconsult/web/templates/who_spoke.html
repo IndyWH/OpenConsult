@@ -1,4 +1,13 @@
-<div class="pane"><div class="pane-body">
-  <p class="statement"><b>{{ patient.name }}</b></p>
-  <p>{{ words.STAGE_LINES["who_spoke"] }}</p>
-</div></div>
+<form method="post" action="/consultations/{{ consultation.id }}/speakers" class="pane">
+  <div class="pane-body">
+    <p class="statement"><b>{{ patient.name }}</b></p>
+    <h2 class="question">{{ words.WHO_SPOKE_TITLE }}</h2>
+    <p>{{ words.WHO_SPOKE_INTRO }}</p>
+    {% for option in options %}
+    <label class="tick"><input type="radio" name="speaker" value="{{ option.speaker }}">{{ words.SPEAKER_OPTION.format(n=option.n, words=option.words) }}</label>
+    {% endfor %}
+    <label class="tick"><input type="radio" name="speaker" value="none">{{ words.CANNOT_TELL }}</label>
+    <button class="primary" id="answer" aria-describedby="answer-refusal">{{ words.ANSWER }}</button>
+    <p class="refusal" id="answer-refusal" role="alert">{% if refused and refused.control == "answer" %}{{ refused.message }}{% endif %}</p>
+  </div>
+</form>

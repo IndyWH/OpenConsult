@@ -107,7 +107,13 @@ def choice_lines(request: Request) -> list[tuple[str, str]]:
 
 @router.get("/")
 async def home(request: Request, user=Depends(guards.logged_in)):
-    return render(request, "home.html", user=user, active="home")
+    """The home page lists each consultation waiting at Stop with one
+    control, Continue (review point 3; R15)."""
+    p = parts(request)
+    waiting = [{"id": row["id"], "line": words.HOME_WAITING_LINE.format(
+        name=row["patient_name"], when=row["started_at"][:16].replace("T", " "))}
+        for row in p.consultations.in_state("stopping")]
+    return render(request, "home.html", user=user, active="home", waiting=waiting)
 
 
 # ------------------------------------------------------------ the first run

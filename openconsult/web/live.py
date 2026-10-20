@@ -13,10 +13,11 @@ import json
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 
 from openconsult import words
-from openconsult.consult.live import LIVE, Capture
+from openconsult.consult import speakers, stop as stop_module
+from openconsult.consult.live import FINAL, LIVE, Capture
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
-from openconsult.web.pages import render
+from openconsult.web.pages import form_fields, refuse, render
 
 router = APIRouter()
 PIECE_S = 0.25           # the size the page sends, as the self-test and the bench send it
@@ -54,6 +55,9 @@ async def consultation_page(request: Request, consultation_id: int, user=Depends
     consultation = running(request, consultation_id)
     if consultation.state == LIVE:
         return live_page(request, user, consultation)
+    stop_module.continue_resumed(consultation)     # a consultation found stopping at a restart goes on when opened
+    if consultation.state == FINAL:
+        return final_page(request, user, consultation)
     return stopping_page(request, user, consultation)
 
 
@@ -64,14 +68,59 @@ def live_page(request: Request, user, consultation, refused=None):
                   model_line=model_line(request, consultation), patient=consultation.patient, piece_s=PIECE_S)
 
 
-def stopping_page(request: Request, user, consultation):
+def stopping_page(request: Request, user, consultation, refused=None):
     """While Stop runs: the named stage, with a quiet refresh each second
-    (a spinner only for a named in-progress state, V1_LESSONS 5.3)."""
+    (a spinner only for a named in-progress state, V1_LESSONS 5.3); at the
+    who-spoke stage the question, which waits (ruling 7)."""
     state = consultation.page_state()
-    return render(request, "stopping.html", user=user, active="new_patient", consultation=consultation, state=state,
-                  stage_line=words.STAGE_LINES.get(state["stop_stage"] or "", ""), patient=consultation.patient,
-                  page_path=f"/consultations/{consultation.id}",
-                  refresh_every=None if state["stop_stage"] == "who_spoke" else 1)
+    asking = state["stop_stage"] == "who_spoke"
+    context = dict(user=user, active="new_patient", consultation=consultation, state=state,
+                   stage_line=words.STAGE_LINES.get(state["stop_stage"] or "", ""), patient=consultation.patient,
+                   page_path=f"/consultations/{consultation.id}", refresh_every=0 if asking else 1,
+                   options=speakers.options(consultation.rows.transcript_lines(consultation.id)) if asking else [])
+    if refused:
+        return refuse(request, "stopping.html", refused[0], refused[1], **context)
+    return render(request, "stopping.html", **context)
+
+
+@router.post("/consultations/{consultation_id}/speakers")
+async def answer(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """Which speaker was you (ruling 7): the answer sets the labels and the
+    finaliser goes on. A second answer, or none picked, is refused on the
+    control (R15)."""
+    consultation = running(request, consultation_id)
+    fields = await form_fields(request)
+    picked = fields.get("speaker", "")
+    if consultation.stop_stage != "who_spoke" or consultation.doctor_speaker is not None:
+        raise Redirect(f"/consultations/{consultation.id}")     # answered already: the page has moved on
+    if not picked or not stop_module.answer(consultation, picked):
+        return stopping_page(request, user, consultation, refused=("answer", words.PICK_ONE))
+    raise Redirect(f"/consultations/{consultation.id}")
+
+
+def final_page(request: Request, user, consultation):
+    lines = [dict(row) for row in consultation.final.lines if row["n"] is not None]
+    return render(request, "final.html", user=user, active="new_patient", consultation=consultation,
+                  patient=consultation.patient, lines=lines, warnings=warning_lines(consultation),
+                  model_line=model_line(request, consultation))
+
+
+def warning_lines(consultation) -> list[str]:
+    """Each stored warning as its sentence (ruling 8)."""
+    found = []
+    for w in consultation.final.warnings:
+        kind, detail = w["kind"], w["detail"] or ""
+        if kind == "speech_failed":
+            found.append(words.WARN_SPEECH_FAILED.format(reason=detail) if detail != words.APP_RESTARTED else detail)
+        elif kind == "label_check_refused":
+            found.append(words.WARN_LABEL_CHECK_REFUSED.format(reason=detail))
+        elif kind == "label_check_failed":
+            found.append(words.WARN_LABEL_CHECK_FAILED.format(reason=detail))
+        else:
+            found.append(words.WARNING_SENTENCES.get(kind, "{detail}").format(
+                start=w["start_s"], end=w["end_s"], n=w["line_n"], detail=detail, words=detail,
+                choice=consultation.speech_door.choice.title))
+    return found
 
 
 @router.post("/consultations/{consultation_id}/stop")

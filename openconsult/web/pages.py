@@ -50,7 +50,8 @@ def render(request: Request, template: str, status: int = 200,
         words=words,
         statement=words.STATEMENT,
         path=page_path or request.url.path,
-        refresh=refresh_every if refresh_every is not None else refresh,
+        # refresh_every 0 means none: a page that waits on the doctor never moves by itself.
+        refresh=(refresh_every or None) if refresh_every is not None else refresh,
         seconds_left=seconds_left,
         **context,
     )

@@ -11,6 +11,7 @@ from typing import Callable
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from openconsult.consult import stop
 from openconsult.consult.consultations import Consultations
 from openconsult.db import Database, open_database
 from openconsult.llm.choose import NoEngine, choose
@@ -104,7 +105,11 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         patients=Patients(db, audit, clock),
         consultations=Consultations(db, clock),
         clock=clock,
+        finaliser=_finalise,
     )
+    # A consultation left live or stopping by the last run goes on (review point 3).
+    for consultation in stop.sweep(parts):
+        consultation.on_final = consult._on_final(parts)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
@@ -113,6 +118,10 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.include_router(consult.router)
     app.include_router(live.router)
     return app
+
+
+def _finalise(consultation) -> None:
+    stop.finalise(consultation)
 
 
 @asynccontextmanager

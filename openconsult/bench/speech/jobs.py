@@ -1,7 +1,9 @@
 """The three jobs of the speech bench (spec 15.9, rulings 17, 18 and 19;
 15.8 ruling 1): the label check, the doubtful drug names and the note.
-Each prompt is a file in the prompts folder beside this one, the owner's
-approved text byte for byte, checked by its sha256 before it is read; each
+Each prompt is a file, the owner's approved text byte for byte, checked by
+its sha256 before it is read: the label check's in the app's prompts
+folder, where the app reads the same file (spec 5.1; stage 6a), the other
+two in the prompts folder beside this one; each
 has a form that code holds and a limit on its length and on its time. A
 call goes through the one door to language models with the door's own
 record, and never enters the app's table of jobs. The checks on a reply
@@ -15,11 +17,15 @@ import hashlib
 import json
 from pathlib import Path
 
+from openconsult.consult.labels import check_labels  # noqa: F401 - the app's check, kept under its bench name
 from openconsult.llm.door import Door, Result
 from openconsult.llm.jobs import Job
+from openconsult.prompts import loader
 from openconsult.speech.matching import normalise
 
 PROMPTS = Path(__file__).resolve().parent / "prompts"
+# The one file of each prompt: the label check's is the app's (spec 5.1).
+FOLDER_OF = {"label_check": loader.FOLDER}
 # The sha256 of each prompt file's bytes, with one line break after its last
 # line, as the spec gives it under rulings 17, 18 and 19.
 PROMPT_SHA256 = {
@@ -53,7 +59,7 @@ class PromptChanged(Exception):
 
 
 def prompt_bytes(name: str) -> bytes:
-    return (PROMPTS / f"{name}.prompt.txt").read_bytes()
+    return (FOLDER_OF.get(name, PROMPTS) / f"{name}.prompt.txt").read_bytes()
 
 
 def prompt_text(name: str) -> str:
@@ -69,7 +75,7 @@ def prompt_text(name: str) -> str:
 
 
 def form_of(name: str) -> dict:
-    return json.loads((PROMPTS / f"{name}.form.json").read_text(encoding="utf-8"))
+    return json.loads((FOLDER_OF.get(name, PROMPTS) / f"{name}.form.json").read_text(encoding="utf-8"))
 
 
 def ask(door: Door, job_key: str, user: str) -> dict:
@@ -84,28 +90,8 @@ def ask(door: Door, job_key: str, user: str) -> dict:
             "prompt_file_sha256": PROMPT_SHA256[job_key], "max_tokens": job.max_tokens, "timeout_s": job.timeout_s}
 
 
-# ------------------------------------------------------- the label check
-
-def check_labels(answer: dict | None, n_lines: int) -> tuple[dict[int, str] | None, dict | None]:
-    """The labels by line number, or None with the reason the reply was
-    refused: a line missed, repeated or not there (ruling 17). From a
-    refused reply no label is taken."""
-    if answer is None:
-        return None, {"reason": "no answer"}
-    seen: dict[int, str] = {}
-    repeated, unknown = [], []
-    for entry in answer.get("lines", []):
-        number = entry["line"]
-        if not isinstance(number, int) or number < 1 or number > n_lines:
-            unknown.append(number)
-        elif number in seen:
-            repeated.append(number)
-        else:
-            seen[number] = str(entry["label"])
-    missing = [n for n in range(1, n_lines + 1) if n not in seen]
-    if missing or repeated or unknown:
-        return None, {"reason": "refused", "missing": missing, "repeated": repeated, "unknown": unknown}
-    return seen, None
+# The label check's reply is checked by the app's own function, check_labels
+# (consult/labels.py), imported above under the name the bench has used.
 
 
 # -------------------------------------------------- the doubtful names

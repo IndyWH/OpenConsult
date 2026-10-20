@@ -6,8 +6,10 @@ tests/*.txt text eol=lf
 engine-bench/** -text
 # The line of the bench arm is hashed byte for byte (ruling 3): Git never changes a byte of it.
 openconsult/bench/speech/v1line/v1_live_line.txt -text
-# The three prompts of the speech bench are hashed byte for byte (rulings 17 to 19): Git never changes a byte of them.
+# The prompts of the speech bench are hashed byte for byte (rulings 17 to 19): Git never changes a byte of them.
+# The label check's prompt moved to the app's folder in stage 6a (spec 5.1: one file, read by the app and the bench).
 openconsult/bench/speech/prompts/*.prompt.txt -text
+openconsult/prompts/label_check.prompt.txt -text
 openconsult/bench/speech/prompts/*.form.json text eol=lf
 # The lists of the searches of 5d are hashed by a test: Git never changes a byte of them.
 openconsult/bench/shared/searches.json -text

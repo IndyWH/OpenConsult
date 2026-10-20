@@ -39,7 +39,7 @@ def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
 def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
     # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
     words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
-    assert len(words) == 5
+    assert len(words) == 7      # two prompts and three frames of stage 3; the label check's prompt and frame of 6a
     for path in words:
         assert '"' not in _words(path), path.name
     assert '"' in 'a "quoted" word'   # the twin
@@ -53,7 +53,7 @@ def test_R13_no_prompt_file_names_a_country():
     countries = [c.strip() for c in _words(Path(__file__).parent / "countries.txt").splitlines() if c.strip()]
     assert len(countries) > 150
     files = loader.every_prompt_file()
-    assert len(files) == 7
+    assert len(files) == 10     # stage 3's seven, and the label check's prompt, frame and form of 6a
     for path in files:
         text = _words(path).lower()
         for country in countries:

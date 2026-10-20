@@ -164,6 +164,41 @@ STAGE_LINES = {
     "gate": "Checking the transcript.",
 }
 STOP_ALREADY = "Stop was pressed. The transcript is being finished."
+WHO_SPOKE_TITLE = "Which speaker was you?"
+WHO_SPOKE_INTRO = "Pick the speaker that was you. The other was the patient."
+SPEAKER_OPTION = "Speaker {n}: {words}"
+CANNOT_TELL = "I cannot tell"
+ANSWER = "Continue"
+PICK_ONE = "Pick one."
+APP_RESTARTED = "OpenConsult was restarted while this consultation ran, so it was stopped as it stood."
+FIGURES_LINE = "Word to page {wait} s typical; pass {pass_s} s typical; Stop to final {stop_s} s."
+
+# The final transcript page (spec 15.10, 6a; ruling 8). Drafts.
+FINAL_TITLE = "Final transcript"
+WARNINGS = "Warnings"
+NO_WARNINGS = "No warnings."
+LABEL_CHANGED = "changed by the check"
+LABEL_UNSURE = "unsure"
+LABEL_REVISED = "label revised by the service"
+LABEL_WORDS = {"doctor": "Doctor", "patient": "Patient", "unsure": "Unsure"}
+WARN_MISSING_PASSAGE = "Heard live and missing from the final transcript, at {start} to {end} s: {words}"
+WARN_UNCOVERED = "Speech with no words written, from {start} to {end} s."
+WARN_NO_SPEAKER = "Line {n} has no speaker."
+WARN_LOW_CONFIDENCE = "Line {n} is low confidence ({score})."
+WARN_CONFIDENCE_NOT_MEASURED = "Confidence was not measured: {choice} gives no score."
+WARN_LABEL_CHECK_REFUSED = "The check of who spoke was refused: {reason}. No label was changed by it."
+WARN_LABEL_CHECK_FAILED = "The check of who spoke did not run: {reason} No label was changed by it."
+WARN_SPEECH_FAILED = "The speech choice failed at Stop: {reason} The transcript is what was heard live."
+WARN_TOO_SHORT = (
+    "The transcript holds {words} words, fewer than {least}: too short to hold a consultation. "
+    "No note will be drafted."
+)
+WARN_EMPTY = "Nothing was heard. No note will be drafted."
+WARNING_SENTENCES = {
+    "missing_passage": WARN_MISSING_PASSAGE, "uncovered_speech": WARN_UNCOVERED, "no_speaker": WARN_NO_SPEAKER,
+    "low_confidence": WARN_LOW_CONFIDENCE, "confidence_not_measured": WARN_CONFIDENCE_NOT_MEASURED,
+    "too_short": "{detail}", "empty": WARN_EMPTY,
+}
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
