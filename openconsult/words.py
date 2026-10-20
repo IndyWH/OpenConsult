@@ -181,6 +181,7 @@ LABEL_CHANGED = "changed by the check"
 LABEL_UNSURE = "unsure"
 LABEL_REVISED = "label revised by the service"
 LABEL_WORDS = {"doctor": "Doctor", "patient": "Patient", "unsure": "Unsure"}
+LOW_CONFIDENCE_MARK = "low confidence {score}"
 WARN_MISSING_PASSAGE = "Heard live and missing from the final transcript, at {start} to {end} s: {words}"
 WARN_UNCOVERED = "Speech with no words written, from {start} to {end} s."
 WARN_NO_SPEAKER = "Line {n} has no speaker."

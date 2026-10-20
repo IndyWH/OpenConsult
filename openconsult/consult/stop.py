@@ -16,7 +16,7 @@ import math
 import statistics
 from datetime import datetime
 
-from openconsult.consult import labels, speakers
+from openconsult.consult import gate, labels, speakers
 from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
@@ -45,9 +45,27 @@ def finalise(c: Consultation) -> None:
     show_final(c)
 
 
-# The checks and the gate (stages checks and gate) are added by the next
-# commit; until then the stages pass straight through.
-STEPS_AFTER: dict = {}
+def checks(c: Consultation) -> None:
+    """Five: the two checks for missing speech on the stored lines and the
+    stored loudness (11.5 rule 2)."""
+    row = c.rows.get(c.id)
+    final = [row_as_line(r) for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
+    live = [row_as_line({**r, "raw_speaker": r["speaker"]}) for r in c.rows.live_lines(c.id) if not r["refused"]]
+    windows = json.loads(row["loudness"] or "[]")
+    for warning in gate.missing_speech(live, final, windows, c.speech_door.declares.second_transcript):
+        c.rows.add_warning(c.id, **warning)
+
+
+def judge(c: Consultation) -> None:
+    """Six: the gate (ruling 8)."""
+    rows = [r for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
+    verdict = gate.judge(rows, c.speech_door.declares, c.speech_door.choice.title)
+    for warning in verdict.warnings:
+        c.rows.add_warning(c.id, **warning)
+    c.final.refused = verdict.refused
+
+
+STEPS_AFTER = {"checks": checks, "gate": judge}
 NEXT = {"checks": "gate", "gate": None}
 
 

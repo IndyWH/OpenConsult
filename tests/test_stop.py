@@ -101,7 +101,7 @@ def test_ruling_7_a_changed_label_is_marked_and_a_refused_or_failed_check_change
         final = r.rows.transcript_lines(c.id)
         assert [(x["label"], x["changed_by_check"], x["unsure"]) for x in final] == [
             ("patient", 1, 0), ("doctor", 1, 0), ("unsure", 0, 1), ("patient", 1, 0)]
-        assert r.rows.warnings(c.id) == []
+        assert not [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")]
     finally:
         r.close()
     # The twin: a reply that misses a line, repeats one or names one that is not there is refused whole.
@@ -114,7 +114,7 @@ def test_ruling_7_a_changed_label_is_marked_and_a_refused_or_failed_check_change
             assert until(lambda: c.state == FINAL)
             final = r.rows.transcript_lines(c.id)
             assert [(x["label"], x["changed_by_check"]) for x in final] == [("patient", 0), ("doctor", 0), ("unsure", 0), ("patient", 0)]
-            warning = r.rows.warnings(c.id)[0]
+            warning = [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")][0]
             assert warning["kind"] == "label_check_refused" and detail in warning["detail"]
         finally:
             r.close()
@@ -125,7 +125,8 @@ def test_ruling_7_a_changed_label_is_marked_and_a_refused_or_failed_check_change
         stop.answer(c, speakers.CANNOT_TELL)
         assert until(lambda: c.state == FINAL)
         assert all(x["label"] == "unsure" and x["unsure"] for x in r.rows.transcript_lines(c.id))
-        assert r.rows.warnings(c.id)[0]["kind"] == "label_check_failed" and len(r.engine.calls_for("label_check")) == 1
+        assert [w["kind"] for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")] == ["label_check_failed"]
+        assert len(r.engine.calls_for("label_check")) == 1
     finally:
         r.close()
 

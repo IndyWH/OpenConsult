@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 
 from openconsult import words
 from openconsult.consult import speakers, stop as stop_module
+from openconsult.consult.gate import LOW_CONFIDENCE
 from openconsult.consult.live import FINAL, LIVE, Capture
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
@@ -100,6 +101,10 @@ async def answer(request: Request, consultation_id: int, user=Depends(guards.log
 
 def final_page(request: Request, user, consultation):
     lines = [dict(row) for row in consultation.final.lines if row["n"] is not None]
+    for line in lines:
+        score = line.get("confidence")
+        line["low_confidence"] = (words.LOW_CONFIDENCE_MARK.format(score=f"{score:.2f}")
+                                  if score is not None and score < LOW_CONFIDENCE else None)
     return render(request, "final.html", user=user, active="new_patient", consultation=consultation,
                   patient=consultation.patient, lines=lines, warnings=warning_lines(consultation),
                   model_line=model_line(request, consultation))
@@ -118,7 +123,7 @@ def warning_lines(consultation) -> list[str]:
             found.append(words.WARN_LABEL_CHECK_FAILED.format(reason=detail))
         else:
             found.append(words.WARNING_SENTENCES.get(kind, "{detail}").format(
-                start=w["start_s"], end=w["end_s"], n=w["line_n"], detail=detail, words=detail,
+                start=w["start_s"], end=w["end_s"], n=w["line_n"], detail=detail, words=detail, score=detail,
                 choice=consultation.speech_door.choice.title))
     return found
 
