@@ -3,6 +3,142 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-10-13. Stage 3c: the engine setting
+
+Built and run on 13 Oct 2026. The plan was reviewed by Cowork the same
+day (three changes and five answers); all are in. The proof ran on the
+one machine with the v1 service off and Funnel off. The report is
+STAGE3C_REPORT.md in the private log folder.
+
+The rulings it builds, one line each (spec 15.8):
+- 30: on Linux with a suitable card the engine is vLLM first, Ollama the
+  fallback everywhere; vLLM is asked on Linux only, and its room is set
+  where it is started (1,400,000,000 bytes of cache for 16,384 tokens).
+- 31: the two calls of a pass are sent together on every engine, as the
+  pass's own way; the bench keeps one after another for its arms.
+- 32: EmbeddingGemma 2 sits on the card when the first sum fits, else on
+  the processor; nothing is loaded for it yet.
+- 33: Nemotron is the speech choice on a shared card; the WhisperX choice
+  is offered only when the second sum fits, else shown as not available.
+- 35: all of it in one session, before 5e; the engine bench not run again.
+- 36: three things read once at start, never during a consultation; one
+  plain sentence for each decision on This machine, the figures in the
+  audit log.
+- 37: vLLM asked once with the short wait, then Ollama; the choice held
+  for the run; a failed call fails and says so with no switch; both
+  missing means Start is not offered (the element records it) and the
+  app still runs; the app starts no engine.
+- 38: each decision is a named element with a state, a reason and its
+  figures; nothing is drawn.
+- 39: Ollama stays at 0.33.3; nothing of the service changed.
+- 40: the suite needs no card, no engine and no model; made-up ones stand in.
+
+What was built (the app without the bench 7,062 lines, from 6,491; the
+tests 10,004, from 9,537):
+- llm/chat_engine.py and llm/vllm.py, moved from the bench: the vLLM
+  engine behind the joint with the request of 7 Oct; the compact answer
+  form is set where vLLM is started, so nothing travels in a request.
+  The shared engine refuses a call only when the server's context is
+  smaller than the call's; the bench's run command refuses an arm unless
+  the server runs at exactly 16,384 (the plan review).
+- llm/profile.py names the model for each engine in its one place:
+  Ollama's own tag, the default, and the repack of ruling 7 on vLLM.
+- llm/choose.py: the order of trying, the fit rule (answers, holds the
+  model, context at least 16,384), and the stand-in engine when none is fit.
+- settings/store.py: ollama_address and vllm_address (127.0.0.1:8172),
+  fixed at start; no setting to pick an engine by hand.
+- settings/decisions.py and settings/room.py: the three elements, the
+  constants with their 5d sources (the language model 18,316 MiB on vLLM
+  and 16,568 on the service, Nemotron 3,384, the WhisperX choice 2,452
+  live and 9,464 at Stop, EmbeddingGemma 2 1,010, a margin of 1,000),
+  the two sums, the programs on the card read with nvidia-smi, the app's
+  own engines told apart by name (vllm, ollama, as 5d's sampler recorded
+  them), one audit line for each element with the card's total and free.
+- consult/cds_pass.py: run_pass sends the two calls at the same moment,
+  the alarm first; bench/one_after_another.py keeps the other way.
+- web: the language model row, the guideline search row and the speech
+  choice row, from the held decisions, on a suitable card only (the
+  Ollama lines of 15.7 became the one line); no engine asked at a view.
+- bench/cli.py: run and repeat take --data-folder, refused as a result
+  folder (R18), and the refusal exits 6.
+- words.py: 20 new sentences and 2 changed (the language model row, the home page), drafts for the owner.
+
+Decided in the plan review (Cowork, 13 Oct), as decisions of this stage:
+the two context rules kept apart (at least for the app, exactly for an
+arm); on a Mac, a small card or no card the three rows are not shown and
+the elements are held in state; the audit log's lines at start are the
+decisions, and three tests compare against them; the alarm is submitted
+first and both calls are in flight at once; the test user's password of
+the proof is a throwaway kept in the log folder only.
+
+Measurements, 13 Oct 2026, RTX 4090, v1 off:
+- 556 tests, 19.6 to 19.8 s, none skipped; green under Cowork's Windows
+  tool (20.95 s). No file over 600 lines (the largest bench/shared/
+  judge.py 527, unchanged), no function over 80 (the longest 64). CLAUDE.md
+  99 lines. The word check of stage 3: 1,898 of 1,898 for each call
+  (143 + 182 + 598 + 975), mismatches 0; the 121 calls a call of task 5's
+  own script run also matched, 4,038 of 4,038 in all.
+- A fresh Python with the base app alone (18 packages, no torch) starts,
+  answers and stops; the GitHub start step as it is passed.
+- On vLLM (started by the script copy with its room; 23.3 s to answer;
+  18,212 MiB on the card, 18,912 in all): This machine said the language
+  model runs on vLLM 0.31.0 with Gemma 4 QAT present, the guideline
+  search on the graphics card, and the WhisperX choice not available
+  because the card has no room for its pass at Stop. The sums on this machine:
+  70 + 18,316 + 3,384 + 1,010 + 1,000 = 23,780 of 24,564 (784 to spare);
+  70 + 18,316 + 1,010 + 9,464 + 1,000 = 29,860 (5,296 over).
+- The three chains of 495 at temperature 0 through the app's pass,
+  together, on vLLM: 33 passes, no call failed, H1 and H2 met in every
+  chain (both first at pass 2); the typical pass 2.78 s (chains 2.79,
+  2.81, 2.75), the slowest 3.08 s; beside 5d's 2.73 and the app's 5.11
+  before 3c. The record carries vllm 0.31.0, the repack's name and the
+  revision 2096d38d.
+- With vLLM stopped: This machine said the language model runs on Ollama
+  0.33.3, because vLLM did not answer at its address, Gemma 4 QAT
+  present; the same two room sentences (sums 22,040 and 28,120). One
+  chain of 495 on the service, together: 11 passes, no call failed, H1
+  at pass 2 and H2 at pass 3; the typical pass 4.99 s, the slowest 5.34:
+  the service queues the two calls, so nothing is gained there until it
+  is set for two at once (OLLAMA_NUM_PARALLEL), the install advice of
+  stage 15.
+- The run command refused a result folder inside the repo and inside
+  the test data folder, exit 6, nothing written.
+- Nothing left the machine: vLLM ran with its usage reports and its reach
+  to the hub off; no key and no token was read; the Ollama service is
+  as it was, model for model and digest for digest; no model file or
+  engine file in the engine folder changed. The private word check
+  printed nothing before every commit.
+
+Made untrue by this stage: CLAUDE.md's running lines (the engine order,
+the room check, --data-folder on run), fixed in this commit; the
+README's line and the home page's sentence, fixed in this commit; the
+Ollama lines of 15.7 and the settings store's line about stage 3b, which
+3c replaced as the details say. The 5d entry's one wrong sentence is
+corrected above (2.77 to 3.29 s alone; 0.89 s on vLLM together with the
+first EmbeddingGemma on the processor; at most 0.07 s between halves),
+and the same in the 5d report. The two 5c entries moved to the archive.
+
+Departures from the plan: the engine sentences went into words.py with
+commit 3 and the room sentences with commit 5, not in one commit; the
+language model's row on This machine came with commit 3, the two room
+rows with commit 6.
+
+For stage 15: the app does not start vLLM, so until the installer the
+owner starts it by hand with the block in the report; on the Ollama
+service as installed the two calls queue, so the gain of ruling 31 on
+Ollama needs the service set for two calls at once; a vLLM whose process
+name on the card held neither "vllm" nor "ollama" would be counted as
+another program and as its own need, and the sums would put the
+guideline search on the processor. For 5e and stage 6: the WhisperX
+decision is parts.decisions.whisperx_choice; Start is offered only when
+parts.decisions.start_offered. For stage 8: the guideline search's place
+is parts.decisions.guideline_search. For stage 9: the three elements are
+the data of the control panel of ruling 38.
+
+Next: the owner's check at port 8001 (the steps are in the report), then
+push; the GitHub check must be green on all three systems. Then Cowork
+checks the report from the raw files.
+
 ## 2026-10-13. Stage 5d: the three models together on one graphics card
 
 Built and run on 13 Oct 2026. The plan was reviewed by Cowork the same day

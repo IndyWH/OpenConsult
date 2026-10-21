@@ -4,6 +4,141 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-21. Stage 7a: patients and earlier consultations, the patient side
+
+Built and proven on 21 Oct 2026 in one session. The plan was reviewed by
+Cowork the same day (six points; all are in). The report is
+STAGE7A_REPORT.md in the private log folder. The room run is the owner's,
+still to come: the steps are in the report. 7b, the background to the
+model after its bench, is not built here.
+
+The rulings it builds, one line each (spec 15.11):
+- 1: the home page is the Patients page: the rows waiting at Stop and
+  for review at the top, the one search box (part of a name with case
+  and accents folded; digits as the number exactly and, failing that, as
+  part of a name; a date of birth typed as a date), the list last seen
+  first with the five columns; the number is the row's id.
+- 2: the patient's page corrects each of the three on its own control,
+  patient_change keeping before, after, when and by whom, audited; every
+  consultation keeps the three as copied at its Start, shown on its own
+  page from its own row with one dated line when they were corrected
+  after it; the live consultation holds the row it started with (R11).
+- 3: the Start screen of a patient with an approved note lists the notes
+  (number, date, assessment or first plan entry) and the switch, on by
+  default, labelled as showing the earlier notes on your screen; the
+  setting and the numbers listed are stored with the consultation; no
+  list and no switch without an approved note.
+- 4: the earlier-notes pane in the live page's side column, below the
+  assessment, never the fixed zone: the last three approved before the
+  consultation started, folded, the approved text of note_approval
+  opened in place with citations stripped; hidden when the switch is
+  off; earlier.js only shows and hides.
+- 5: openconsult/prompts/background.frame.txt (sha256 48875847...2fe3),
+  background.note.txt (79b41aaf...08b7) and background.cut.txt
+  (c00401b4...2b4e, the plan review's point 1), together every word a
+  model reads for the background; the block built by
+  consult/background.py from earlier.panel_notes, cut on the laid-out
+  text after the last whole entry that fits; no call carries it, and a
+  test proves it over a whole consultation (8.4).
+- 7: audio_retention_days in the setting table, default 90, 0 keeps, on
+  the Thresholds section, audited from what to what; the sweep at
+  start-up and every 24 hours in the lifespan's own task, deferred 60 s
+  while a consultation is stopping; one audio_deletion row and one audit
+  line per sweep that deleted; after Stop's final step the WAV becomes
+  Ogg Opus (mono, 32 kbps, voip), decoded back and checked within
+  DURATION_TOLERANCE_S, the WAV removed only then; a failure leaves the
+  WAV with its reason on the page; with no converter at all nothing is
+  attempted, the row says why and the start's decision line stands.
+- 8: consult/deletion.py, the rows in one transaction children first,
+  then the file, one audit line of counts and no words; refused when not
+  final or already gone; Delete patient only when no consultation is
+  left; both ask once on the page; the orphan sweep reports at start-up.
+- 9: consult/alarms.py matches an alarm's reasoning and actions to the
+  differential names with matching.normalise and a contiguous whole-word
+  run; marked in the live state and on the review page beside the
+  assessment with the alarm in a dialog; one alarm line per alarm key at
+  its first firing with its state then, acknowledged from the audit
+  log, a press playing from the last line the pass had read; two counts
+  on Approve.
+- 10: 7a the patient side; 7b after the bench.
+
+What was built (the app without the bench 11,254 lines of Python, from
+10,019 at 6b, and 1,243 of pages and scripts; the tests 13,135 lines):
+- schema version 6: patient_change; on the consultation the three
+  details it ran with, earlier_notes_shown, earlier_notes,
+  recording_format, conversion_failure, audio_deleted_at;
+  audio_deletion; setting. A version 5 folder comes forward with every
+  row, the details filled from the patient as it stands. The database
+  gains a transaction context.
+- patients/patients.py (the list, the fold, the search, the
+  corrections); web/patients.py and patient.html; patients.html as the
+  home page; consult/earlier.py, background.py, opus.py, retention.py,
+  deletion.py, alarms.py; settings/stored.py; earlier.js and
+  alarmdialog.js; the converter as a decision element with its row on
+  This machine on every machine.
+- imageio-ffmpeg 0.6.0 is a dependency: a static ffmpeg 7.0.2 with
+  libopus for Linux (x86_64, aarch64), macOS (x86_64, arm64) and Windows
+  (x86_64), found by uv; the computer's own ffmpeg on the path is the
+  fallback. On this machine the room check found the package's.
+
+The constants, each with its source:
+- BACKGROUND_NOTE_MAX_WORDS 400: the longest note of 5c part two held 228
+  words of entries, the longest of the 6b bench 317; a margin over both.
+  A design choice; the room may move it.
+- DURATION_TOLERANCE_S 0.1: a made 1 s and 7.37 s WAV decoded back from
+  Opus to the sample on this machine; five Opus frames of 20 ms.
+- SWEEP_EVERY_S 86,400 and RETRY_S 60 (ruling 7); DEFAULT_RETENTION_DAYS
+  90 (v1's).
+
+My proof, 21 Oct 2026, on a copy of 6b's throwaway database and
+recordings brought forward to version 6, the made doors of the suite,
+the package's converter: the Patients page listed the four patients last
+seen first and found patient 3 by part of the name, by the number and by
+the date of birth; the Start screen for patient 3 listed consultation
+3's approved note with the switch on; consultation 5 started with the
+switch's setting and the three details stored; the live page showed the
+pane with note 3 below the assessment; a made pass whose alarm named
+Made-up condition A marked it red; no call carried the block (alarm,
+assessment, label check, note); after Stop the 192,044-byte WAV became a
+10,511-byte Opus file that decoded to 2.00 s against 2.00 s fed, served
+as audio/ogg, with three press-a-line controls; the review page showed
+the red mark, one alarm line and the two counts (2 warnings, 1 alarm);
+a correction of patient 3's date of birth left consultations 3 and 5
+showing 21 Oct 1990 with the dated line; Delete on consultation 4
+removed 5 lines, 4 live lines, 1 pass, 3 model calls, 7 warnings and the
+352,044-byte file, with the audit line of counts; the sweep at 0 deleted
+nothing and at 1 day deleted the three recordings of 20 Oct (10,456,132
+bytes) and left the new Opus file; the Log page showed each line. 682
+tests, green three times before the last commit, none skipped. No file
+over 600 lines but words.py at 648 (accepted under 5.4 by the plan
+review, point 2); no function over 80. CLAUDE.md under 100 lines. The
+private word check printed nothing before every commit. Nothing of any
+recording entered the repo.
+
+Made untrue by this stage: the home page's Waiting for review list as
+its own page (home.html is gone; the rows sit at the top of the Patients
+page); 6b's lines that the audio-gone line becomes true in stage 7, now
+true; 6a's line that the retention clock and deletion are stage 7, now
+built; the home sentence, README's so far and CLAUDE.md's running lines,
+fixed in this commit; the 3c entry of 13 Oct moves to the archive.
+
+Seen in passing, not touched: the approved text of 6b's proof holds an
+entry whose citation was stripped to leave a space before its full stop
+(the copy text of 6b), which the Start screen's line and the block show
+as it stands; the block's reading of an approved text is byte-faithful
+to what was approved.
+
+For 7b: cds_pass places the block between with_patient's line and each
+frame, a blank line each side, for both calls, with the stored request
+holding it; background.block_for(notes, patient_id, started_at,
+consultation_id) gives the block or None; the switch's setting is stored
+with the consultation, so 7b reads consultation.earlier_notes_shown to
+decide whether the block is sent (ruling 3); the second label goes in
+words.py beside SWITCH_SHOWS_ON_SCREEN and the Start screen picks it
+once the bench's pass is recorded; the mark of 8.5 goes on the
+assessment pane of the live page; earlier.panel_notes is the one reader
+of the approved notes for the pane and the block alike.
+
 ## 2026-10-20. Stage 6b: the live consultation, from Stop to approve
 
 Built and proven on 20 Oct 2026 in two sessions (the first cut by the
@@ -323,139 +458,3 @@ words exactly is history: from this commit they are the spec's approved
 wording. The public engine-bench folder records 7 Oct's prompt hashes in
 its arm.json files, which is right as the record of that bench; it is not
 touched and not run again (ruling 43).
-
-## 2026-10-13. Stage 3c: the engine setting
-
-Built and run on 13 Oct 2026. The plan was reviewed by Cowork the same
-day (three changes and five answers); all are in. The proof ran on the
-one machine with the v1 service off and Funnel off. The report is
-STAGE3C_REPORT.md in the private log folder.
-
-The rulings it builds, one line each (spec 15.8):
-- 30: on Linux with a suitable card the engine is vLLM first, Ollama the
-  fallback everywhere; vLLM is asked on Linux only, and its room is set
-  where it is started (1,400,000,000 bytes of cache for 16,384 tokens).
-- 31: the two calls of a pass are sent together on every engine, as the
-  pass's own way; the bench keeps one after another for its arms.
-- 32: EmbeddingGemma 2 sits on the card when the first sum fits, else on
-  the processor; nothing is loaded for it yet.
-- 33: Nemotron is the speech choice on a shared card; the WhisperX choice
-  is offered only when the second sum fits, else shown as not available.
-- 35: all of it in one session, before 5e; the engine bench not run again.
-- 36: three things read once at start, never during a consultation; one
-  plain sentence for each decision on This machine, the figures in the
-  audit log.
-- 37: vLLM asked once with the short wait, then Ollama; the choice held
-  for the run; a failed call fails and says so with no switch; both
-  missing means Start is not offered (the element records it) and the
-  app still runs; the app starts no engine.
-- 38: each decision is a named element with a state, a reason and its
-  figures; nothing is drawn.
-- 39: Ollama stays at 0.33.3; nothing of the service changed.
-- 40: the suite needs no card, no engine and no model; made-up ones stand in.
-
-What was built (the app without the bench 7,062 lines, from 6,491; the
-tests 10,004, from 9,537):
-- llm/chat_engine.py and llm/vllm.py, moved from the bench: the vLLM
-  engine behind the joint with the request of 7 Oct; the compact answer
-  form is set where vLLM is started, so nothing travels in a request.
-  The shared engine refuses a call only when the server's context is
-  smaller than the call's; the bench's run command refuses an arm unless
-  the server runs at exactly 16,384 (the plan review).
-- llm/profile.py names the model for each engine in its one place:
-  Ollama's own tag, the default, and the repack of ruling 7 on vLLM.
-- llm/choose.py: the order of trying, the fit rule (answers, holds the
-  model, context at least 16,384), and the stand-in engine when none is fit.
-- settings/store.py: ollama_address and vllm_address (127.0.0.1:8172),
-  fixed at start; no setting to pick an engine by hand.
-- settings/decisions.py and settings/room.py: the three elements, the
-  constants with their 5d sources (the language model 18,316 MiB on vLLM
-  and 16,568 on the service, Nemotron 3,384, the WhisperX choice 2,452
-  live and 9,464 at Stop, EmbeddingGemma 2 1,010, a margin of 1,000),
-  the two sums, the programs on the card read with nvidia-smi, the app's
-  own engines told apart by name (vllm, ollama, as 5d's sampler recorded
-  them), one audit line for each element with the card's total and free.
-- consult/cds_pass.py: run_pass sends the two calls at the same moment,
-  the alarm first; bench/one_after_another.py keeps the other way.
-- web: the language model row, the guideline search row and the speech
-  choice row, from the held decisions, on a suitable card only (the
-  Ollama lines of 15.7 became the one line); no engine asked at a view.
-- bench/cli.py: run and repeat take --data-folder, refused as a result
-  folder (R18), and the refusal exits 6.
-- words.py: 20 new sentences and 2 changed (the language model row, the home page), drafts for the owner.
-
-Decided in the plan review (Cowork, 13 Oct), as decisions of this stage:
-the two context rules kept apart (at least for the app, exactly for an
-arm); on a Mac, a small card or no card the three rows are not shown and
-the elements are held in state; the audit log's lines at start are the
-decisions, and three tests compare against them; the alarm is submitted
-first and both calls are in flight at once; the test user's password of
-the proof is a throwaway kept in the log folder only.
-
-Measurements, 13 Oct 2026, RTX 4090, v1 off:
-- 556 tests, 19.6 to 19.8 s, none skipped; green under Cowork's Windows
-  tool (20.95 s). No file over 600 lines (the largest bench/shared/
-  judge.py 527, unchanged), no function over 80 (the longest 64). CLAUDE.md
-  99 lines. The word check of stage 3: 1,898 of 1,898 for each call
-  (143 + 182 + 598 + 975), mismatches 0; the 121 calls a call of task 5's
-  own script run also matched, 4,038 of 4,038 in all.
-- A fresh Python with the base app alone (18 packages, no torch) starts,
-  answers and stops; the GitHub start step as it is passed.
-- On vLLM (started by the script copy with its room; 23.3 s to answer;
-  18,212 MiB on the card, 18,912 in all): This machine said the language
-  model runs on vLLM 0.31.0 with Gemma 4 QAT present, the guideline
-  search on the graphics card, and the WhisperX choice not available
-  because the card has no room for its pass at Stop. The sums on this machine:
-  70 + 18,316 + 3,384 + 1,010 + 1,000 = 23,780 of 24,564 (784 to spare);
-  70 + 18,316 + 1,010 + 9,464 + 1,000 = 29,860 (5,296 over).
-- The three chains of 495 at temperature 0 through the app's pass,
-  together, on vLLM: 33 passes, no call failed, H1 and H2 met in every
-  chain (both first at pass 2); the typical pass 2.78 s (chains 2.79,
-  2.81, 2.75), the slowest 3.08 s; beside 5d's 2.73 and the app's 5.11
-  before 3c. The record carries vllm 0.31.0, the repack's name and the
-  revision 2096d38d.
-- With vLLM stopped: This machine said the language model runs on Ollama
-  0.33.3, because vLLM did not answer at its address, Gemma 4 QAT
-  present; the same two room sentences (sums 22,040 and 28,120). One
-  chain of 495 on the service, together: 11 passes, no call failed, H1
-  at pass 2 and H2 at pass 3; the typical pass 4.99 s, the slowest 5.34:
-  the service queues the two calls, so nothing is gained there until it
-  is set for two at once (OLLAMA_NUM_PARALLEL), the install advice of
-  stage 15.
-- The run command refused a result folder inside the repo and inside
-  the test data folder, exit 6, nothing written.
-- Nothing left the machine: vLLM ran with its usage reports and its reach
-  to the hub off; no key and no token was read; the Ollama service is
-  as it was, model for model and digest for digest; no model file or
-  engine file in the engine folder changed. The private word check
-  printed nothing before every commit.
-
-Made untrue by this stage: CLAUDE.md's running lines (the engine order,
-the room check, --data-folder on run), fixed in this commit; the
-README's line and the home page's sentence, fixed in this commit; the
-Ollama lines of 15.7 and the settings store's line about stage 3b, which
-3c replaced as the details say. The 5d entry's one wrong sentence is
-corrected above (2.77 to 3.29 s alone; 0.89 s on vLLM together with the
-first EmbeddingGemma on the processor; at most 0.07 s between halves),
-and the same in the 5d report. The two 5c entries moved to the archive.
-
-Departures from the plan: the engine sentences went into words.py with
-commit 3 and the room sentences with commit 5, not in one commit; the
-language model's row on This machine came with commit 3, the two room
-rows with commit 6.
-
-For stage 15: the app does not start vLLM, so until the installer the
-owner starts it by hand with the block in the report; on the Ollama
-service as installed the two calls queue, so the gain of ruling 31 on
-Ollama needs the service set for two calls at once; a vLLM whose process
-name on the card held neither "vllm" nor "ollama" would be counted as
-another program and as its own need, and the sums would put the
-guideline search on the processor. For 5e and stage 6: the WhisperX
-decision is parts.decisions.whisperx_choice; Start is offered only when
-parts.decisions.start_offered. For stage 8: the guideline search's place
-is parts.decisions.guideline_search. For stage 9: the three elements are
-the data of the control panel of ruling 38.
-
-Next: the owner's check at port 8001 (the steps are in the report), then
-push; the GitHub check must be green on all three systems. Then Cowork
-checks the report from the raw files.
