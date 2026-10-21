@@ -72,6 +72,8 @@ def r18_guard(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "OllamaEngine", Absent)
     # And the card's programs are never read from the real card: an empty list stands in.
     monkeypatch.setattr(app_module.room, "read_programs", lambda: [])
+    # And no real ffmpeg is looked for or run: a test that wants a converter passes a made one (7a).
+    monkeypatch.setattr(app_module, "find_converter_at_start", lambda: None)
 
 
 # ------------------------------------------------------------ the fake clock

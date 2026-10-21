@@ -11,6 +11,7 @@ from fastapi.responses import RedirectResponse
 from openconsult import words
 from openconsult.patients import patients as patients_module
 from openconsult.patients.users import MIN_PASSWORD, name_problem, password_problem
+from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -31,15 +32,17 @@ def model_line(request: Request) -> str | None:
 
 
 def room_lines(request: Request) -> list[tuple[str, str]]:
-    """The two rows of the room check, from the decisions held since
-    start: where the guideline search sits, and whether the WhisperX
-    choice is offered (rulings 32, 33, 36). On a suitable card only, as
-    the speech rows of 15.9 are; the elements are held everywhere."""
+    """The rows of the room check, from the decisions held since start:
+    where the guideline search sits, and whether the WhisperX choice is
+    offered (rulings 32, 33, 36), on a suitable card only, as the speech
+    rows of 15.9 are; and the recording converter (15.11 ruling 7), on
+    every machine. The elements are held everywhere."""
     p = parts(request)
-    if p.machine.case != "suitable":
-        return []
-    return [(words.ROW_GUIDELINE_SEARCH, p.decisions.guideline_search.sentence),
-            (words.ROW_SPEECH_CHOICE, p.decisions.whisperx_choice.sentence)]
+    found = []
+    if p.machine.case == "suitable":
+        found += [(words.ROW_GUIDELINE_SEARCH, p.decisions.guideline_search.sentence),
+                  (words.ROW_SPEECH_CHOICE, p.decisions.whisperx_choice.sentence)]
+    return found + [(words.ROW_CONVERTER, p.decisions.converter.sentence)]
 
 
 @dataclass(frozen=True)
@@ -247,7 +250,7 @@ async def logout(request: Request):
 
 # ---------------------------------------------------------------- settings
 
-NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED}
+NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED, "retention": words.RETENTION_SAVED}
 
 
 def _settings_page(request: Request, user, refused=None):
@@ -255,6 +258,7 @@ def _settings_page(request: Request, user, refused=None):
                    room=room_lines(request),
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
+                   retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
                    page_path="/settings")
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)
@@ -311,6 +315,19 @@ async def change_password(request: Request, user=Depends(guards.logged_in)):
     changed = p.users.change_password(fields["new_password"])
     p.logins.renew(request.cookies.get(guards.COOKIE), changed.generation)
     raise Redirect("/settings?done=password")
+
+
+@router.post("/settings/retention")
+async def change_retention(request: Request, user=Depends(guards.logged_in)):
+    """The retention days (15.11 ruling 7; 7.3): a whole number from 0 up,
+    0 keeps; audited from what to what; read by the next sweep."""
+    p = parts(request)
+    fields = await form_fields(request)
+    days = retention_problem(fields.get("days", ""))
+    if days is None:
+        return _settings_page(request, user, ("save-retention", words.RETENTION_BAD))
+    p.stored.set_audio_retention_days(days)
+    raise Redirect("/settings?done=retention")
 
 
 # --------------------------------------------------------------------- log

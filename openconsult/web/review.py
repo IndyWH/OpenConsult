@@ -181,6 +181,7 @@ def page_data(p, row: dict) -> dict:
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
+            "conversion_failed": words.CONVERSION_FAILED.format(reason=row["conversion_failure"]) if row.get("conversion_failure") else None,
             "warning_count": words.WARNING_ONE if len(warnings) == 1 else words.WARNINGS_COUNT.format(count=len(warnings)),
             "differentials": note.last_shown_differentials(p.consultations.passes(cid)),
             "gate_refused": gate_refused, "gate_reason": gate_reason, "model_line": model_line_of(row),
@@ -349,7 +350,7 @@ async def recording(request: Request, consultation_id: int, user=Depends(guards.
     if not row["recording_file"] or not path.is_file():
         return PlainTextResponse(words.AUDIO_GONE.format(date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
                                  status_code=404)
-    return FileResponse(path, media_type="audio/wav")
+    return FileResponse(path, media_type="audio/ogg" if path.suffix == ".ogg" else "audio/wav")
 
 
 @router.get("/consultations/{consultation_id}/note.txt")

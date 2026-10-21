@@ -17,7 +17,7 @@ import math
 import statistics
 from datetime import datetime
 
-from openconsult.consult import gate, labels, note, speakers
+from openconsult.consult import gate, labels, note, opus, speakers
 from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
@@ -44,6 +44,8 @@ def finalise(c: Consultation) -> None:
             step(c)
             c.set_stage(NEXT[stage])
     show_final(c)
+    # After Stop's final step (15.11 ruling 7): the WAV to Opus, on this thread, with the page already shown.
+    opus.convert_consultation(c)
 
 
 def checks(c: Consultation) -> None:
@@ -244,7 +246,8 @@ def resume(p, row: dict) -> Consultation:
     patient = p.patients.get(row["patient_id"])
     door = p.doors[row["speech_choice"]]
     c = Consultation(row["id"], patient, row["intended_minutes"], datetime.fromisoformat(row["started_at"]), door,
-                     p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes)
+                     p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes,
+                     converter=p.converter)
     c.state = STOPPING
     c.stop_stage = row["stop_stage"] if row["stop_stage"] in STAGES[1:] else "who_spoke"
     c.stopped_at = datetime.fromisoformat(row["stopped_at"]) if row["stopped_at"] else p.clock()

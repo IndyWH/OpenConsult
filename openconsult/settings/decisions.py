@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from openconsult import words
 from openconsult.llm.choose import Choice
 
-LANGUAGE_MODEL, GUIDELINE_SEARCH, WHISPERX_CHOICE = "language_model", "guideline_search", "whisperx_choice"
+LANGUAGE_MODEL, GUIDELINE_SEARCH, WHISPERX_CHOICE, CONVERTER = "language_model", "guideline_search", "whisperx_choice", "converter"
 
 
 @dataclass(frozen=True)
@@ -49,6 +49,10 @@ class Decisions:
     @property
     def whisperx_choice(self) -> Element:
         return self.elements[WHISPERX_CHOICE]
+
+    @property
+    def converter(self) -> Element:
+        return self.elements[CONVERTER]
 
     @property
     def start_offered(self) -> bool:
@@ -89,3 +93,14 @@ def _said(tried) -> str:
         return "did not answer"
     model = "model present" if s.model_present else "model absent"
     return f"version {s.version}, {model}, context {s.context if s.context is not None else 'set by the call'}"
+
+
+def converter_element(converter) -> Element:
+    """The recording converter (15.11 ruling 7): the package's ffmpeg, the
+    computer's own, or none; on every machine. Start is never held by it,
+    since the WAV is kept when conversion cannot run."""
+    if converter is None:
+        return Element(CONVERTER, False, "converter_none", {}, {"converter": "none"})
+    reason = "converter_package" if converter.source == "package" else "converter_system"
+    return Element(CONVERTER, True, reason, {"version": converter.version, "path": converter.path},
+                   {"converter": converter.source, "version": converter.version, "path": converter.path})

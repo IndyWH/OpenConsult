@@ -9,6 +9,18 @@
   <div class="pane-body">{{ machine_rows(machine, models, room, speech, choices) }}</div>
 </section>
 
+<section class="pane" id="thresholds">
+  <div class="pane-head"><h2>{{ words.SECTION_THRESHOLDS }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/settings/retention">
+      <label>{{ words.FIELD_RETENTION_DAYS.format(default=retention_default) }}<input name="days" value="{{ retention_days }}" inputmode="numeric" autocomplete="off"></label>
+      <button class="primary" id="save-retention" aria-describedby="save-retention-refusal">{{ words.SAVE }}</button>
+      {{ refusal("save-retention") }}
+      {% if notice == words.RETENTION_SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
+    </form>
+  </div>
+</section>
+
 <section class="pane">
   <div class="pane-head"><h2>{{ words.SECTION_YOU }}</h2></div>
   <div class="pane-body">

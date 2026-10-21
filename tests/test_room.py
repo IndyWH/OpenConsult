@@ -12,7 +12,7 @@ import pytest
 from openconsult import words
 from openconsult.app import build_app
 from openconsult.settings import room
-from openconsult.settings.decisions import GUIDELINE_SEARCH, LANGUAGE_MODEL, WHISPERX_CHOICE
+from openconsult.settings.decisions import CONVERTER, GUIDELINE_SEARCH, LANGUAGE_MODEL, WHISPERX_CHOICE
 from openconsult.settings.machine import Card, describe
 from openconsult.settings.room import Program, check, others_mib, parse_programs, read_programs
 from openconsult.settings import store
@@ -129,7 +129,7 @@ def test_ruling_38_each_element_has_a_name_a_state_a_reason_and_its_figures(tmp_
                     engines={"vllm": FakeEngine(version="0.31-made-up", context=16384), "ollama": FakeEngine()},
                     card_programs=lambda: DESKTOP)
     decisions = app.state.parts.decisions
-    assert sorted(decisions.elements) == sorted([LANGUAGE_MODEL, GUIDELINE_SEARCH, WHISPERX_CHOICE])
+    assert sorted(decisions.elements) == sorted([LANGUAGE_MODEL, GUIDELINE_SEARCH, WHISPERX_CHOICE, CONVERTER])   # the converter joins in 7a
     for element in decisions.elements.values():
         assert element.name in decisions.elements and isinstance(element.green, bool)
         assert element.reason in words.REASONS and element.sentence and element.figures
@@ -140,7 +140,7 @@ def test_ruling_38_each_element_has_a_name_a_state_a_reason_and_its_figures(tmp_
     assert decisions.start_offered
     # One audit line for each, with the figures.
     lines = {line.event: line.detail for line in app.state.parts.audit.lines() if line.event.startswith("decision.")}
-    assert sorted(lines) == ["decision.guideline_search", "decision.language_model", "decision.whisperx_choice"]
+    assert sorted(lines) == ["decision.converter", "decision.guideline_search", "decision.language_model", "decision.whisperx_choice"]
     assert "sum 24539" in lines["decision.guideline_search"] and "free 23735" in lines["decision.guideline_search"]
     assert "WhisperX at Stop 9464" in lines["decision.whisperx_choice"]
     assert all(words.EVENTS[event] for event in lines)

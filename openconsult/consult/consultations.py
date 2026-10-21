@@ -79,6 +79,10 @@ class Consultations:
         found = self._db.query_one("SELECT intended_minutes FROM consultation ORDER BY id DESC LIMIT 1")
         return int(found["intended_minutes"]) if found else None
 
+    def all_rows(self) -> list[dict]:
+        rows = self._db.query("SELECT * FROM consultation ORDER BY id")
+        return [dict(r) for r in rows]
+
     def of_patient(self, patient_id: int) -> list[dict]:
         """Every consultation of a patient, newest first (15.11 ruling 2)."""
         rows = self._db.query("SELECT * FROM consultation WHERE patient_id = ? ORDER BY id DESC", (patient_id,))

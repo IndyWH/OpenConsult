@@ -153,7 +153,7 @@ def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, ear
     cid = p.consultations.start(patient.id, minutes, door.choice.name, p.engine.name, version, p.door.profile.tag,
                                 digest, SPEAKERS, earlier_notes_shown, earlier_notes)
     consultation = Consultation(cid, patient, minutes, p.clock(), door, p.door, p.consultations, p.audit,
-                                p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes)
+                                p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes, converter=p.converter)
     consultation.on_final = _on_final(p)
     p.running[cid] = consultation
     p.audit.record("consultation.started", f"consultation {cid}, patient {patient.id}, {minutes} minutes")

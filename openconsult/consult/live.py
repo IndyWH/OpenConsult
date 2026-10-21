@@ -75,9 +75,10 @@ class Consultation:
     def __init__(self, consultation_id: int, patient: PatientRow, intended_minutes: int, started_at: datetime,
                  speech: SpeechDoor, llm: Door, rows: Consultations, audit: Audit, data_folder: Path,
                  clock: Clock = now_local, timer: Callable[[], float] = time.perf_counter,
-                 on_stop: Callable | None = None, notes: Notes | None = None):
+                 on_stop: Callable | None = None, notes: Notes | None = None, converter=None):
         self.id = consultation_id
         self.notes = notes                # the note's rows (6b), given by the app
+        self.converter = converter        # the recording converter (7a), given by the app; None keeps the WAV
         self.patient = patient
         self.intended_minutes = int(intended_minutes)
         self.started_at = started_at

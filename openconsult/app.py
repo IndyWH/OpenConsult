@@ -11,7 +11,9 @@ from typing import Callable
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from openconsult.consult import stop
+import asyncio
+
+from openconsult.consult import opus, retention, stop
 from openconsult.consult.consultations import Consultations
 from openconsult.consult.note_rows import Notes
 from openconsult.db import Database, open_database
@@ -27,7 +29,7 @@ from openconsult.patients.logins import Logins
 from openconsult.patients.patients import Patients
 from openconsult.patients.users import Users
 from openconsult.settings import room
-from openconsult.settings.decisions import Decisions, language_model_element
+from openconsult.settings.decisions import Decisions, converter_element, language_model_element
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.store import Settings
 from openconsult.settings.stored import Stored
@@ -38,6 +40,8 @@ from openconsult.web import consult, guards, live, patients as patients_web, rev
 from openconsult.web.first_run import FirstRun
 
 STATIC = Path(__file__).parent / "web" / "static"
+# The finder the app uses at start; tests stand a quiet one in its place.
+find_converter_at_start = opus.find_converter
 
 
 @dataclass
@@ -59,6 +63,7 @@ class Parts:
     consultations: Consultations = None            # the rows (15.10)
     notes: Notes = None                            # the note's rows (6b)
     stored: Stored = None                          # the settings a page can change (7a)
+    converter: object = None                       # the recording converter found at start, or None (7a)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
@@ -66,13 +71,15 @@ class Parts:
 
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
               engines: dict | None = None, speech: SpeechDoor | None = None,
-              doors: dict | None = None, card_programs: Callable | None = None) -> FastAPI:
-    """engines, speech, doors and card_programs are passed in by tests, so
-    the suite needs no vLLM, no Ollama, no speech worker and no card (spec
-    15.7, 15.8, 15.9). Building a door starts nothing and reads nothing
-    but a path. The engine is chosen here, once, the room on the card is
-    read once, and the decisions are written to the audit log once
-    (rulings 36 to 38)."""
+              doors: dict | None = None, card_programs: Callable | None = None,
+              find_converter: Callable | None = None) -> FastAPI:
+    """engines, speech, doors, card_programs and find_converter are passed
+    in by tests, so the suite needs no vLLM, no Ollama, no speech worker,
+    no card and no converter (spec 15.7, 15.8, 15.9, 15.11). Building a
+    door starts nothing and reads nothing but a path. The engine is chosen
+    here, once, the room on the card is read once, the converter is found
+    once, and the decisions are written to the audit log once (rulings 36
+    to 38)."""
     db = open_database(settings.database_path)
     audit = Audit(db, clock)
     users = Users(db, audit, clock)
@@ -83,8 +90,9 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     engine = engines[choice.name] if choice.name else NoEngine()
     profile = GEMMA_4_QAT.for_engine(choice.name) if choice.name else GEMMA_4_QAT
     programs = (card_programs or room.read_programs)() if machine.card else None   # no tool is run on a Mac or with no card
+    converter = (find_converter or find_converter_at_start)()
     decisions = Decisions({"language_model": language_model_element(choice, profile.tag if choice.name else None),
-                           **room.check(machine, choice.name, programs)})
+                           **room.check(machine, choice.name, programs), "converter": converter_element(converter)})
     for element in decisions.elements.values():
         audit.record(f"decision.{element.name}", element.audit_detail)
     doors = dict(doors or {})
@@ -110,12 +118,16 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         consultations=Consultations(db, clock),
         notes=Notes(db, clock),
         stored=Stored(db, audit, clock),
+        converter=converter,
         clock=clock,
         finaliser=_finalise,
     )
     # A consultation left live or stopping by the last run goes on (review point 3).
     for consultation in stop.sweep(parts):
         consultation.on_final = consult._on_final(parts)
+    # The sweeps of 7a: orphan files reported, old recordings deleted (ruling 7; ruling 8).
+    retention.orphans(parts)
+    retention.sweep(parts)
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
@@ -134,8 +146,11 @@ def _finalise(consultation) -> None:
 
 @asynccontextmanager
 async def _lifespan(app: FastAPI):
-    """Every speech worker that was started ends with the app."""
+    """The retention sweep runs in the app's own loop while it runs
+    (ruling 7); every speech worker that was started ends with the app."""
+    sweeping = asyncio.create_task(retention.loop(app.state.parts))
     yield
+    sweeping.cancel()
     for consultation in app.state.parts.running.values():
         consultation.close()
     for door in app.state.parts.doors.values():

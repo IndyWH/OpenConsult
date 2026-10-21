@@ -234,3 +234,28 @@ class MadeUpWorker:
 
     def requested(self, kind):
         return [(h, p) for h, p in self.requests if h["type"] == kind]
+
+
+class MadeUpConverter:
+    """Stands where ffmpeg stands (15.11 ruling 7; R18): writes a made Ogg
+    beside the WAV and answers a decoded length, the WAV's own unless the
+    test sets one; or fails to encode with a reason."""
+
+    source, version, path = "package", "0.0-made-up", "made-up-ffmpeg"
+
+    def __init__(self, decoded_s=None, fail=None):
+        self.decoded_s, self.fail = decoded_s, fail
+        self.encoded: list = []
+        self._wav_s = 0.0
+
+    def encode(self, wav, ogg, run=None):
+        from openconsult.consult.opus import wav_seconds
+        self.encoded.append((str(wav), str(ogg)))
+        if self.fail:
+            return self.fail
+        self._wav_s = wav_seconds(wav)
+        ogg.write_bytes(b"OggS made up")
+        return None
+
+    def decoded_seconds(self, ogg, run=None):
+        return self._wav_s if self.decoded_s is None else self.decoded_s

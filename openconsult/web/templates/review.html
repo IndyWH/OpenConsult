@@ -104,6 +104,7 @@
     <audio id="audio" controls preload="metadata" src="/consultations/{{ cid }}/recording">{{ words.AUDIO_NOT_SUPPORTED }}</audio>
     <canvas id="strip" width="800" height="48" title="{{ words.LOUDNESS }}" aria-label="{{ words.LOUDNESS }}"></canvas>
     {% else %}<p class="mark" id="audio-gone">{{ audio_gone }}</p>{% endif %}
+    {% if conversion_failed %}<p class="mark" id="conversion-failed">{{ conversion_failed }}</p>{% endif %}
   </div>
   <div class="pane-body" id="final-transcript">
     {% for line in lines %}

@@ -60,7 +60,12 @@ REASONS = {
                          "because the card has no room for its pass at Stop beside the language model."),
     "whisperx_no_card": ("Nemotron is the speech choice. The WhisperX with pyannote choice is not available, "
                          "because this computer has no suitable graphics card."),
+    # The recording converter (15.11 ruling 7), on every machine.
+    "converter_package": "Recordings are kept as Opus with ffmpeg {version}, which comes with OpenConsult.",
+    "converter_system": "Recordings are kept as Opus with this computer's own ffmpeg, {path}.",
+    "converter_none": "No converter was found, so recordings stay as WAV. Start is still offered.",
 }
+ROW_CONVERTER = "Recording converter"
 CARD_NONE = "None found"
 CARD_UNREADABLE = "Could not be read"
 
@@ -293,6 +298,12 @@ PLAY_STRETCH = "Play this stretch"
 LOUDNESS = "Loudness along the recording. Press to go there."
 AUDIO_GONE = "The recording from {date} is no longer on this computer."
 AUDIO_NOT_SUPPORTED = "This browser cannot play the recording."
+# The conversion to Opus after Stop (15.11 ruling 7; R30). Drafts.
+CONVERSION_FAILED = "The recording was kept as WAV: {reason}"
+CONVERSION_NO_CONVERTER = "no converter was found on this computer."
+CONVERSION_NO_WAV = "the WAV file was not there."
+CONVERSION_NOT_PLAYABLE = "the Opus file could not be played back."
+CONVERSION_LENGTH_DIFFERS = "the Opus file plays for {opus} s and the WAV for {wav} s."
 
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
@@ -355,6 +366,12 @@ def plain_time(seconds: int) -> str:
 # The settings page.
 SETTINGS_TITLE = "Settings"
 SECTION_MACHINE = "This machine"
+SECTION_THRESHOLDS = "Thresholds"
+# The retention setting (15.11 ruling 7; 7.3). Drafts.
+FIELD_RETENTION_DAYS = ("Days a recording is kept after its consultation, then deleted by the app. "
+                        "0 keeps every recording until its consultation is deleted. The default is {default}.")
+RETENTION_SAVED = "Saved. The next sweep uses it."
+RETENTION_BAD = "Enter a whole number of days, 0 or more."
 SECTION_YOU = "You"
 SECTION_PASSWORD = "Change password"
 FIELD_CURRENT_PASSWORD = "Current password"
@@ -389,6 +406,12 @@ EVENTS = {
     "decision.language_model": "Language model chosen at start",
     "decision.guideline_search": "Guideline search placed at start",
     "decision.whisperx_choice": "WhisperX choice judged at start",
+    "decision.converter": "Recording converter found at start",
+    "setting.changed": "Setting changed",
+    "audio.deleted": "Recordings deleted by the retention sweep",
+    "recording.converted": "Recording converted to Opus",
+    "recording.conversion_failed": "Recording kept as WAV: conversion failed",
+    "recording.orphan": "A recording file with no consultation was found",
     "patient.saved": "Patient saved",
     "patient.changed": "Patient's details corrected",
     "consultation.started": "Consultation started: the right patient and an acted consultation confirmed",
