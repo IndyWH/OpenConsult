@@ -13,9 +13,9 @@ from openconsult.llm.profile import Sampling
 
 
 def run_pass_one_after_another(door: Door, transcript: str, patient: Patient, carried: Carried | None = None,
-                               sampling: Sampling | None = None) -> PassResult:
+                               sampling: Sampling | None = None, background: str | None = None) -> PassResult:
     carried = carried or Carried()
-    alarm_text, assessment_text = messages(transcript, patient, carried)
+    alarm_text, assessment_text = messages(transcript, patient, carried, background)
     alarm_result = door.ask("alarm", alarm_text, sampling)
     assessment_result = door.ask("assessment", assessment_text, sampling)
     return settle(alarm_result, assessment_result, carried)

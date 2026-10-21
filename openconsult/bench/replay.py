@@ -7,6 +7,7 @@ have no result yet, on the same engine and model only (spec 15.8)."""
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 from dataclasses import asdict, dataclass
@@ -35,13 +36,19 @@ CHAINS = ([Chain(f"A{i}", 0.0, 42) for i in (1, 2, 3)]
 UNREACHABLE_IN_A_ROW = 2
 
 
-def stamp(door: Door) -> dict:
+BACKGROUND_FILES = ("background.frame", "background.note", "background.cut")
+
+
+def stamp(door: Door, background: bool = False) -> dict:
     """Every result carries the model's tag and digest, the engine's
-    version and the prompt hashes (V1_LESSONS 9.6)."""
+    version and the prompt hashes (V1_LESSONS 9.6); an arm with the block
+    of 15.11 ruling 5 says so and carries its three files' hashes too."""
     version, digest = door.identity()
+    prompts = {name: loader.sha256(loader.prompt(name)) for name in ("alarm", "assessment")}
+    if background:
+        prompts.update({name: hashlib.sha256(loader.file_bytes(name)).hexdigest() for name in BACKGROUND_FILES})
     return {"engine": door.profile.engine, "engine_version": version, "model_tag": door.profile.tag,
-            "model_digest": digest,
-            "prompts": {name: loader.sha256(loader.prompt(name)) for name in ("alarm", "assessment")}}
+            "model_digest": digest, "prompts": prompts, "background": background}
 
 
 STEADY = Sampling(0.0, 42)
@@ -68,17 +75,18 @@ def first_call(door: Door, case: Case) -> Result:
     return door.ask("alarm", with_patient(alarm_message(transcript), case.patient), STEADY)
 
 
-def arm_differs(held: dict, door: Door, together: bool) -> str | None:
+def arm_differs(held: dict, door: Door, together: bool, background: bool = False) -> str | None:
     """Why a folder's results cannot be carried on by this engine: an arm
-    is never finished on another engine, another model, other prompts or
-    another way of sending (stage 3b, rule 19)."""
-    now = {**stamp(door), "together": together}
-    then = {key: held.get(key, False if key == "together" else None) for key in now}
+    is never finished on another engine, another model, other prompts,
+    another way of sending (stage 3b, rule 19) or the other arm of 7b."""
+    now = {**stamp(door, background), "together": together}
+    then = {key: held.get(key, False if key in ("together", "background") else None) for key in now}
     if then == now:
         return None
 
     def said(s: dict) -> str:
         how = "sent together" if s["together"] else "one after another"
+        how += ", with the background block" if s["background"] else ""
         prompts = ", ".join(f"{name} {str(sha)[:12]}" for name, sha in sorted((s["prompts"] or {}).items()))
         return (f"{s['engine']} {s['engine_version']}, model {s['model_tag']} {s['model_digest']}, "
                 f"{how}, prompts {prompts}")
@@ -102,18 +110,23 @@ def why_failed(group: str, point: int, failures: list, unreachable: int) -> str 
     return None
 
 
-def run_chain(door: Door, case: Case, chain: Chain, log: Callable = print, together: bool = False) -> dict:
+def run_chain(door: Door, case: Case, chain: Chain, log: Callable = print, together: bool = False,
+              background: bool = False) -> dict:
     """One chain of one case. Sent together, the app's own pass, the
     pass's time runs from sending until both calls are back; otherwise
-    the bench's one-after-another way."""
+    the bench's one-after-another way. With background, every pass takes
+    the case's block, placed as the app places it (15.11 ruling 5)."""
     a_pass = run_pass if together else run_pass_one_after_another
+    block = case.background() if background else None
+    if background and block is None:
+        raise ValueError(f"{case.name} has no earlier note, so it cannot run with the background block")
     sampling = Sampling(chain.temperature, chain.seed)
     carried = Carried()
     passes, failed, unreachable = [], None, 0
     started = time.perf_counter()
     for point, transcript in case.points():
         t0 = time.perf_counter()
-        result = a_pass(door, transcript, case.patient, carried, sampling)
+        result = a_pass(door, transcript, case.patient, carried, sampling, background=block)
         wall_ms = round(1000 * (time.perf_counter() - t0))
         carried = result.carried
         passes.append(pass_row(point, wall_ms, result))
@@ -128,20 +141,22 @@ def run_chain(door: Door, case: Case, chain: Chain, log: Callable = print, toget
             "temperature": chain.temperature, "seed": chain.seed,
             "patient": asdict(case.patient), "case_sha256": case.sha256,
             "wall_s": round(time.perf_counter() - started, 1), "failed": failed,
-            "passes": passes, "together": together, **stamp(door)}
+            "passes": passes, "together": together, **stamp(door, background)}
 
 
 def run(door: Door, cases: list[Case], writer: ResultWriter, chains: list[Chain] = CHAINS,
-        log: Callable = print, together: bool = False) -> dict:
+        log: Callable = print, together: bool = False, background: bool = False) -> dict:
     """Every chain of every case that has no result yet, in order."""
     done, skipped, failed = 0, 0, []
     for case in cases:
+        if background and case.background() is None:
+            raise ValueError(f"{case.name} has no earlier note, so it cannot run with the background block")
         for chain in chains:
             if writer.exists(case.name, chain.name):
                 skipped += 1
                 continue
             log(f"=== {case.name} {chain.name} T={chain.temperature} seed={chain.seed}")
-            result = run_chain(door, case, chain, log, together)
+            result = run_chain(door, case, chain, log, together, background)
             writer.write(case.name, chain.name, result)
             done += 1
             if result["failed"]:

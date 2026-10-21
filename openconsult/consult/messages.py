@@ -43,6 +43,16 @@ def with_patient(message: str, patient: Patient | None) -> str:
     return f"{line}\n\n{message}"
 
 
+def with_background(message: str, block: str | None) -> str:
+    """Ruling 5 of 15.11: the block between the patient line and the frame,
+    a blank line each side; the frame is untouched and the transcript is
+    still read last (R12). None sends the message as it is."""
+    if block is None:
+        return message
+    line, rest = message.split("\n\n", 1)
+    return f"{line}\n\n{block}\n\n{rest}"
+
+
 def assessment_message(transcript: str, previous_names) -> str:
     """The transcript alone on the first pass, or when the earlier list
     was empty. Later, the earlier differentials' names, as a stale list

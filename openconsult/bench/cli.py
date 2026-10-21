@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import openconsult
-from openconsult.bench import export, figures, score, wordcheck
+from openconsult.bench import background, export, figures, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
@@ -41,7 +41,7 @@ def say(line: str) -> None:
     print(f"[{dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}] {line}", flush=True)
 
 
-def open_arm(args, together: bool = False):
+def open_arm(args, together: bool = False, with_background: bool = False):
     """The door, its record and the writer of an arm; or the code to stop
     with, when the engine or the model is not the one this arm needs.
     The door gets the one profile as this engine knows the model, or with
@@ -74,7 +74,7 @@ def open_arm(args, together: bool = False):
         say(f"STOP: the engine runs at a context of {context}, not {profile.context}; an arm is measured at the profile's")
         return 8
     held = writer.read_all()
-    differs = arm_differs(next(iter(held.values())), door, together) if held else None
+    differs = arm_differs(next(iter(held.values())), door, together, with_background) if held else None
     if differs:
         say(f"STOP: {differs}")
         return 5
@@ -90,18 +90,22 @@ def warm(door: Door, case) -> bool:
 
 
 def cmd_run(args) -> int:
-    opened = open_arm(args, args.together)
+    opened = open_arm(args, args.together, args.background)
     if isinstance(opened, int):
         return opened
     door, _, writer = opened
     cases = load_cases(Path(args.cases))
     if args.case:
         cases = [c for c in cases if c.name in args.case]
+    without = [c.name for c in cases if c.background() is None]
+    if args.background and without:
+        say(f"STOP: no earlier note for {', '.join(without)}, so the arm with the background block cannot run")
+        return 9
     chains = [c for c in CHAINS if not args.chains or c.name in args.chains]
     if any(not writer.exists(case.name, chain.name) for case in cases for chain in chains):
         if not warm(door, cases[0]):
             return 4
-    summary = run(door, cases, writer, chains, log=say, together=args.together)
+    summary = run(door, cases, writer, chains, log=say, together=args.together, background=args.background)
     say(f"done: ran {summary['run']} chains, kept {summary['kept']}, failed {len(summary['failed'])}")
     for case, chain, why in summary["failed"]:
         say(f"  failed chain {case}/{chain}: {why}")
@@ -142,6 +146,21 @@ def cmd_score(args) -> int:
     (out / "scores.md").write_text(text, encoding="utf-8")
     print(text)
     return 0 if scored["hard_met"] else 1
+
+
+def cmd_background_score(args) -> int:
+    """The marks of 15.11 ruling 6 from the two arms' stored results alone
+    (spec 8.6): the table to the write folder, never over a file that
+    exists; 0 when every mark holds."""
+    try:
+        marked = background.score(ResultWriter(Path(getattr(args, "with"))).read_all(),
+                                  ResultWriter(Path(args.without)).read_all())
+        background.write(Path(args.write), marked)
+    except (Refused, background.MarksRefused) as refused:
+        say(f"STOP: {refused}")
+        return 6
+    print(background.as_markdown(marked), end="")
+    return 0 if marked["held"] else 1
 
 
 def cmd_export(args) -> int:
@@ -383,6 +402,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--case", nargs="*", help="only these cases")
     p.add_argument("--chains", nargs="*", help="only these chains, for a check")
     p.add_argument("--together", action="store_true", help="send the two calls of a pass at the same moment")
+    p.add_argument("--background", action="store_true",
+                   help="7b: every pass takes the case's earlier note as the background block, placed as the app places it")
     sub.choices["repeat"].add_argument("--stale-from", required=True,
                                        help="a finished run whose chain A1 gives the earlier lists")
     p = sub.choices["wordcheck"]
@@ -392,6 +413,11 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--workload", nargs="*", help="only these v1 workloads")
     p = command("score", cmd_score, out=False)
     p.add_argument("--replies", help="score a published replies file")
+    p = sub.add_parser("background-score")
+    p.set_defaults(fn=cmd_background_score)
+    p.add_argument("--with", required=True, help="the result folder of the arm with the background block")
+    p.add_argument("--without", required=True, help="the result folder of the arm without it")
+    p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
     p = command("figures", cmd_figures, out=False)
     p.add_argument("--public", help="the public folder: its rounds.json and the replies of its arms")
     p.add_argument("--rounds", help="the rounds file, when the arms are private result folders")

@@ -192,3 +192,43 @@ def test_ruling_5_two_empty_replies_in_a_row_keep_the_list_twice(door_of):
         assert result.assessment.kept is True
         assert result.assessment.differentials == ASSESSMENT["differentials"]
         assert carried.names == NAMES
+
+
+# ------------------------------------------------ the background block (7b)
+
+BLOCK = ("BACKGROUND FROM EARLIER CONSULTATIONS, approved by the doctor:\nConsultation of 12 March 2026:\n"
+         "Subjective: made up history\nObjective: none\nAssessment: made up impression\nPlan: none\n\n"
+         "This is background only. Today's problem may be new and unrelated to it.")
+
+
+def test_ruling_5_R25_the_block_sits_between_the_patient_line_and_the_frame_a_blank_line_each_side(door_of):
+    from openconsult.consult.cds_pass import messages
+    from openconsult.consult.messages import alarm_message, assessment_message, with_background, with_patient
+    assert with_background("line\n\nframe", "block") == "line\n\nblock\n\nframe"
+    assert with_background("line\n\nframe", None) == "line\n\nframe"
+    carried = Carried(names=("Made-up condition A", "Made-up condition B"))
+    alarm, assessment = messages(TRANSCRIPT, WOMAN, carried, BLOCK)
+    assert alarm == f"{LINE}\n\n{BLOCK}\n\n" + loader.fill(loader.frame("alarm"), transcript=TRANSCRIPT)
+    assert assessment == f"{LINE}\n\n{BLOCK}\n\n" + loader.fill(loader.frame("assessment.later"),
+                                                              stale="Made-up condition A\nMade-up condition B", transcript=TRANSCRIPT)
+    # Without a block the messages are stage 6's, byte for byte; the frames after the block are untouched.
+    assert messages(TRANSCRIPT, WOMAN, carried) == (with_patient(alarm_message(TRANSCRIPT), WOMAN),
+                                                    with_patient(assessment_message(TRANSCRIPT, carried.names), WOMAN))
+    assert alarm.split(f"{BLOCK}\n\n", 1)[1] == alarm_message(TRANSCRIPT)
+    door, engine = door_of()
+    run_pass(door, TRANSCRIPT, WOMAN, background=BLOCK)
+    assert all(BLOCK in call.user for call in engine.calls) and len(engine.calls) == 2
+    run_pass(door, TRANSCRIPT, WOMAN)
+    assert not any("BACKGROUND" in call.user for call in engine.calls[2:])
+
+
+def test_R11_R12_3_2_with_the_block_both_calls_still_open_with_the_patient_line_and_read_the_transcript_last(door_of):
+    door, engine = door_of()
+    run_pass(door, TRANSCRIPT, WOMAN, Carried(names=("Made-up condition A",)), background=BLOCK)
+    for call in engine.calls:
+        assert call.user.startswith(f"{LINE}\n\n") and call.user.count("The patient is") == 1
+        assert call.user.endswith(TRANSCRIPT)
+        assert call.user.index(BLOCK) < call.user.rindex(TRANSCRIPT)
+    assessment = [c for c in engine.calls if c.job == "assessment"][0].user
+    assert assessment.index(BLOCK) < assessment.index("Made-up condition A") < assessment.rindex(TRANSCRIPT)
+    assert "Made-up condition A" not in [c for c in engine.calls if c.job == "alarm"][0].user

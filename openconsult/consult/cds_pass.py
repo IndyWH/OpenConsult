@@ -17,7 +17,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 
 from openconsult.consult.messages import (Patient, alarm_message, assessment_message, names_of,
-                                          with_patient)
+                                          with_background, with_patient)
 from openconsult.llm.door import Door, Result
 from openconsult.llm.profile import Sampling
 
@@ -65,11 +65,12 @@ class PassResult:
     carried: Carried   # for the next pass
 
 
-def messages(transcript: str, patient: Patient, carried: Carried) -> tuple[str, str]:
+def messages(transcript: str, patient: Patient, carried: Carried, background: str | None = None) -> tuple[str, str]:
     """The two messages of a pass: the alarm's, and the assessment's with
-    the earlier names. Both open with the patient line (R11)."""
-    return (with_patient(alarm_message(transcript), patient),
-            with_patient(assessment_message(transcript, carried.names), patient))
+    the earlier names. Both open with the patient line (R11); with a
+    background block (15.11 ruling 5), both carry it after that line."""
+    return (with_background(with_patient(alarm_message(transcript), patient), background),
+            with_background(with_patient(assessment_message(transcript, carried.names), patient), background))
 
 
 def settle(alarm_result: Result, assessment_result: Result, carried: Carried) -> PassResult:
@@ -84,11 +85,13 @@ def settle(alarm_result: Result, assessment_result: Result, carried: Carried) ->
 
 
 def run_pass(door: Door, transcript: str, patient: Patient, carried: Carried | None = None,
-             sampling: Sampling | None = None, consultation_id: int | None = None) -> PassResult:
+             sampling: Sampling | None = None, consultation_id: int | None = None,
+             background: str | None = None) -> PassResult:
     """The alarm and the assessment at the same moment, the alarm first (R30, ruling 31).
-    consultation_id ties both rows of the record to their consultation (15.10)."""
+    consultation_id ties both rows of the record to their consultation (15.10);
+    background is the block of 15.11 ruling 5, or None."""
     carried = carried or Carried()
-    alarm_text, assessment_text = messages(transcript, patient, carried)
+    alarm_text, assessment_text = messages(transcript, patient, carried, background)
     with ThreadPoolExecutor(max_workers=2) as pool:
         alarm = pool.submit(door.ask, "alarm", alarm_text, sampling, consultation_id)
         assessment = pool.submit(door.ask, "assessment", assessment_text, sampling, consultation_id)
