@@ -112,6 +112,17 @@ NEW_CONSULTATION = "New consultation"
 RAN_WITH = "Seen as"
 PATIENTS_PAGE_LINK = "The patient's page"
 DETAILS_CORRECTED = "The patient's details were corrected on {date}. This consultation keeps the details it ran with."
+# Deleting (15.11 ruling 8; D44; R15). Drafts.
+DELETE = "Delete"
+DELETE_CONSULTATION = "Delete this consultation"
+DELETE_CONSULTATION_QUESTION = ("Delete the consultation of {name} on {date}? The recording, the transcript and the note "
+                                "will be gone. This cannot be undone.")
+YES_DELETE = "Yes, delete"
+KEEP = "Keep"
+DELETE_PATIENT = "Delete patient"
+DELETE_PATIENT_BLOCKED = "Cannot delete while a consultation remains. Delete each consultation first."
+DELETE_PATIENT_QUESTION = "Delete {name}, number {id}? This cannot be undone."
+PATIENT_DELETED = "Patient {id} was deleted."
 HOME_WAITING_LINE = "{name}, started {when}"
 CONTINUE_CONSULTATION = "Continue"
 
@@ -414,6 +425,8 @@ EVENTS = {
     "recording.orphan": "A recording file with no consultation was found",
     "patient.saved": "Patient saved",
     "patient.changed": "Patient's details corrected",
+    "patient.deleted": "Patient deleted",
+    "consultation.deleted": "Consultation deleted: the recording, the transcript and the note",
     "consultation.started": "Consultation started: the right patient and an acted consultation confirmed",
     "consultation.stopped": "Consultation stopped",
     "speakers.answered": "Which speaker was you: answered",

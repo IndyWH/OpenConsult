@@ -33,5 +33,21 @@
     <p><a class="button" href="/consultations/start/{{ patient.id }}" id="new-consultation">{{ words.NEW_CONSULTATION }}</a></p>
   </div>
 </section>
-{% block delete %}{% endblock %}
+<section class="pane" id="delete-pane">
+  <div class="pane-head"><h2>{{ words.DELETE_PATIENT }}</h2></div>
+  <div class="pane-body">
+    {% if asking_delete %}
+    <p class="statement" id="delete-question">{{ delete_question }}</p>
+    <form method="post" action="/patients/{{ patient.id }}/delete" class="control-row"><input type="hidden" name="confirm" value="yes">
+      <button class="primary danger" id="confirm-delete" aria-describedby="confirm-delete-refusal">{{ words.YES_DELETE }}</button>
+      <a class="button" href="/patients/{{ patient.id }}">{{ words.KEEP }}</a>{{ refusal("confirm-delete") }}
+    </form>
+    {% else %}
+    <form method="post" action="/patients/{{ patient.id }}/delete">
+      <button id="delete-patient" aria-describedby="delete-patient-refusal" {% if delete_reason %}disabled{% endif %}>{{ words.DELETE_PATIENT }}</button>
+      <p class="refusal" id="delete-patient-refusal" role="alert">{% if refused and refused.control == "delete-patient" %}{{ refused.message }}{% elif delete_reason %}{{ delete_reason }}{% endif %}</p>
+    </form>
+    {% endif %}
+  </div>
+</section>
 {% endblock %}

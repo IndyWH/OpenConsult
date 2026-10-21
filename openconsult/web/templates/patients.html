@@ -3,6 +3,7 @@
 {% block main %}
 <h1 class="page">{{ words.PATIENTS_TITLE }}</h1>
 <p class="statement">{{ statement }}</p>
+{% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
 {% if waiting %}
 <section class="pane">
   <div class="pane-head"><h2>{{ words.HOME_WAITING }}</h2></div>

@@ -134,6 +134,24 @@
 
 {# Five: the model line (R20). #}
 <p class="model-line no-print" id="model-line">{{ model_line }}</p>
+
+{# Delete, at the foot, away from Approve (15.11 ruling 8; R15): the question once, then the deletion. #}
+<section class="pane no-print" id="delete-pane">
+  <div class="pane-head"><h2>{{ words.DELETE_CONSULTATION }}</h2></div>
+  <div class="pane-body">
+    {% if asking_delete %}
+    <p class="statement" id="delete-question">{{ delete_question }}</p>
+    <form method="post" action="/consultations/{{ cid }}/delete" class="control-row"><input type="hidden" name="confirm" value="yes">
+      <button class="primary danger" id="confirm-delete" aria-describedby="confirm-delete-refusal">{{ words.YES_DELETE }}</button>
+      <a class="button" href="/consultations/{{ cid }}">{{ words.KEEP }}</a>{{ refusal("confirm-delete") }}
+    </form>
+    {% else %}
+    <form method="post" action="/consultations/{{ cid }}/delete">
+      <button id="delete" aria-describedby="delete-refusal">{{ words.DELETE }}</button>{{ refusal("delete") }}
+    </form>
+    {% endif %}
+  </div>
+</section>
 </div>
 <script src="/static/use.js"></script>
 <script src="/static/review.js"></script>

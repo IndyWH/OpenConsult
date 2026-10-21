@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import note, speakers
+from openconsult.consult import deletion, note, speakers
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -190,10 +190,12 @@ def page_data(p, row: dict) -> dict:
             if state["approval"] else None}
 
 
-def review_page(request: Request, user, consultation_id: int, refused: tuple | None = None):
+def review_page(request: Request, user, consultation_id: int, refused: tuple | None = None, asking_delete: bool = False):
     p = parts(request)
     row = final_row(request, consultation_id)
     data = page_data(p, row)
+    data["asking_delete"] = asking_delete
+    data["delete_question"] = words.DELETE_CONSULTATION_QUESTION.format(name=data["ran_with"]["name"], date=data["date"])
     draft = data["draft"]
     if draft and data["refused_by_doctor"]:
         when = [r["at"] for r in p.notes.refusals(consultation_id) if r["draft_id"] == draft["id"]][-1]
@@ -337,6 +339,26 @@ async def undo_label(request: Request, consultation_id: int, n: int, user=Depend
     p.consultations.set_line_label(consultation_id, n, answered, kind="undo")
     p.audit.record("label.undone", f"consultation {consultation_id}: line {n} back to {answered}")
     raise Redirect(f"/consultations/{consultation_id}")
+
+
+@router.post("/consultations/{consultation_id}/delete")
+async def delete(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """Delete (15.11 ruling 8; D44): the first press shows the question
+    once, with the patient's name and the date; the press with the
+    confirmation calls the one function and goes to the patient's page. A
+    consultation that is not final has no control and goes back to its
+    page; one that is gone goes to the Patients page."""
+    p = parts(request)
+    row = p.consultations.get(consultation_id)
+    if row is None:
+        raise Redirect("/")
+    if row["state"] != "final":
+        raise Redirect(f"/consultations/{consultation_id}")
+    fields = await form_fields(request)
+    if fields.get("confirm") != "yes":
+        return review_page(request, user, consultation_id, asking_delete=True)
+    deletion.delete_consultation(p, consultation_id)
+    raise Redirect(f"/patients/{row['patient_id']}")
 
 
 @router.get("/consultations/{consultation_id}/recording", dependencies=[Depends(guards.this_computer)])

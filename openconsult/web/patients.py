@@ -12,6 +12,7 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Request
 
 from openconsult import words
+from openconsult.consult import deletion
 from openconsult.patients.patients import FIELDS, parse_date, problem
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
@@ -46,13 +47,17 @@ def consultation_rows(p, patient_id: int) -> list[dict]:
     return found
 
 
-def _page(request: Request, user, patient_id: int, refused: tuple | None = None):
+def _page(request: Request, user, patient_id: int, refused: tuple | None = None, asking_delete: bool = False):
     p = parts(request)
     patient = p.patients.get(patient_id)
     if patient is None:
         raise Redirect("/")
+    consultations = consultation_rows(p, patient_id)
     context = dict(user=user, active="home", patient=patient, born=patient.date_of_birth.isoformat(),
-                   number=words.NUMBER_LINE.format(id=patient.id), consultations=consultation_rows(p, patient_id),
+                   number=words.NUMBER_LINE.format(id=patient.id), consultations=consultations,
+                   # Delete patient is disabled with its reason while a consultation remains (ruling 8; R15).
+                   delete_reason=words.DELETE_PATIENT_BLOCKED if consultations else None, asking_delete=asking_delete,
+                   delete_question=words.DELETE_PATIENT_QUESTION.format(name=patient.name, id=patient.id),
                    page_path=f"/patients/{patient_id}")
     if refused:
         return refuse(request, "patient.html", refused[0], refused[1], **context)
@@ -70,6 +75,8 @@ async def correct(request: Request, patient_id: int, field: str, user=Depends(gu
     new-patient form checks it (R11), then written with what stood
     before (R2). An earlier consultation keeps the details it ran with."""
     p = parts(request)
+    if field == "delete":
+        return await delete(request, patient_id, user)
     if field not in FIELDS or p.patients.get(patient_id) is None:
         raise Redirect(f"/patients/{patient_id}")
     value = (await form_fields(request)).get("value", "").strip()
@@ -83,3 +90,20 @@ async def correct(request: Request, patient_id: int, field: str, user=Depends(gu
     if not p.patients.correct(patient_id, field, stored, user.full_name):
         return _page(request, user, patient_id, refused=(CONTROLS[field], words.DETAIL_UNCHANGED))
     raise Redirect(f"/patients/{patient_id}")
+
+
+@router.post("/patients/{patient_id}/delete")
+async def delete(request: Request, patient_id: int, user=Depends(guards.logged_in)):
+    """Delete patient (ruling 8): refused on the control while a
+    consultation remains; otherwise the question once, with the name and
+    the number, then the deletion and the Patients page."""
+    p = parts(request)
+    if p.patients.get(patient_id) is None:
+        raise Redirect("/")
+    if p.consultations.of_patient(patient_id):
+        return _page(request, user, patient_id, refused=("delete-patient", words.DELETE_PATIENT_BLOCKED))
+    fields = await form_fields(request)
+    if fields.get("confirm") != "yes":
+        return _page(request, user, patient_id, asking_delete=True)
+    deletion.delete_patient(p, patient_id)
+    raise Redirect("/?deleted=" + str(patient_id))

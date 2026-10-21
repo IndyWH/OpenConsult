@@ -173,3 +173,5 @@ h1.page .number { font-size: .85rem; font-weight: 400; }
 .earlier-note button.note-line { display: block; width: 100%; text-align: left; border: none; background: none; padding: .3rem 0; color: var(--ink); font-size: .9rem; }
 .earlier-note button.note-line:hover { text-decoration: underline; }
 .earlier-note .note-body h4 { margin: .5rem 0 .1rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
+button.danger { background: var(--red); }
+button.danger:hover { background: #A33425; }

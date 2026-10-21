@@ -128,8 +128,10 @@ async def home(request: Request, user=Depends(guards.logged_in)):
     rows = [{"id": r.patient.id, "name": r.patient.name, "born": words.plain_date(r.patient.date_of_birth),
              "sex": words.SEX_WORDS[r.patient.sex],
              "seen": words.plain_date(r.last_seen) if r.last_seen else words.NEVER_SEEN} for r in found]
+    deleted = request.query_params.get("deleted", "")
     return render(request, "patients.html", user=user, active="home", waiting=waiting, review=review,
-                  query=query, rows=rows, none_found=words.SEARCH_NONE.format(query=query) if query and not rows else None)
+                  query=query, rows=rows, none_found=words.SEARCH_NONE.format(query=query) if query and not rows else None,
+                  notice=words.PATIENT_DELETED.format(id=deleted) if deleted.isdigit() else None)
 
 
 # ------------------------------------------------------------ the first run
