@@ -31,10 +31,27 @@
       <div class="pane-head"><h2>{{ words.PANEL_ASSESSMENT }}</h2></div>
       <div class="pane-body" id="assessment"></div>
     </section>
+    {% if earlier is not none %}
+    <section class="pane" id="earlier-notes" data-open="{{ words.OPEN_NOTE }}" data-fold="{{ words.FOLD_NOTE }}">
+      <div class="pane-head"><h2>{{ words.PANEL_EARLIER_NOTES }}</h2></div>
+      <div class="pane-body">
+        {% for note in earlier %}
+        <div class="earlier-note" data-note="{{ note.id }}">
+          <button type="button" class="note-line" aria-expanded="false" aria-controls="earlier-{{ note.id }}"><b>{{ note.date }}</b>: {{ note.headline }}</button>
+          <div class="note-body" id="earlier-{{ note.id }}" hidden>
+            {% for heading, entries in note.sections %}<h4 class="section-head">{{ heading }}</h4>
+            <ul class="panel-list">{% for entry in entries %}<li>{{ entry }}</li>{% endfor %}</ul>{% endfor %}
+          </div>
+        </div>
+        {% else %}<p class="mark">{{ words.NO_EARLIER_NOTES }}</p>{% endfor %}
+      </div>
+    </section>
+    {% endif %}
   </div>
 </div>
 <p class="model-line">{{ model_line }}</p>
 </div>
 <script src="/static/panels.js"></script>
+<script src="/static/earlier.js"></script>
 <script src="/static/live.js"></script>
 {% endblock %}

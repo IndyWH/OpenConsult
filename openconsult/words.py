@@ -146,6 +146,11 @@ SPEECH_REASONS = {
     "no_card": "This computer has no suitable graphics card for a local speech choice.",
 }
 NO_SUCH_PATIENT = "There is no patient with that number."
+# The Start screen for a patient seen before (15.11 ruling 3; 8.2; D25). Drafts.
+EARLIER_NOTES = "Earlier notes, approved"
+EARLIER_NOTE_LINE = "{number}, {date}: {line}"
+# The switch's label in 7a: the notes reach the doctor's screen and no model. 7b adds the second label.
+SWITCH_SHOWS_ON_SCREEN = "Show the earlier notes on your screen during this consultation."
 
 # The live page (spec 15.10, The live page; rulings 1, 2 and 10; R9, R15, R20, R29). Drafts.
 LIVE_TITLE = "Consultation"
@@ -180,6 +185,11 @@ SPEECH_STOPPED = "The speech choice has stopped: {reason} The recording goes on.
 MIC_REFUSED = "The microphone could not be opened: {reason}"
 SOCKET_LOST = "The connection to OpenConsult was lost. Trying again."
 SOCKET_BACK = "Connected again."
+# The earlier-notes panel (15.11 ruling 4). Drafts.
+PANEL_EARLIER_NOTES = "Earlier notes, approved"
+OPEN_NOTE = "Open"
+FOLD_NOTE = "Fold"
+NO_EARLIER_NOTES = "No earlier approved note."
 
 # Stop, in order (spec 15.10, Stop in order; ruling 7; V1_LESSONS 1.12, 2.2). Drafts.
 STOPPING_TITLE = "Stopping"

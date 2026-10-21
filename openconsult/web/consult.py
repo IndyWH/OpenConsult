@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from openconsult import words
+from openconsult.consult import earlier
 from openconsult.consult.live import SPEAKERS, Consultation
 from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.patients.patients import parse_date, problem
@@ -97,13 +98,24 @@ def _patient_or_404(request: Request, patient_id: int):
     return patient
 
 
+def earlier_lines(notes: list) -> list[dict]:
+    """The Start screen's list of a patient's approved notes (ruling 3;
+    8.2): the consultation's number, its date, the assessment or the
+    first plan entry."""
+    return [{"id": note.consultation_id, "line": words.EARLIER_NOTE_LINE.format(
+        number=note.consultation_id, date=words.plain_date(note.started_at), line=note.headline())} for note in notes]
+
+
 def _start_context(request: Request, user, patient, ask_engine: bool = True) -> dict:
     p = parts(request)
     choice = speech_choice_for(p)
+    notes = earlier.approved_notes(p.notes, patient.id)
     return dict(user=user, active="new_patient", patient=patient, age=words.plain_age(patient.age_on(p.patients.today())),
                 born=words.plain_date(patient.date_of_birth), sex=words.SEX_WORDS[patient.sex],
                 minutes=INTENDED_MINUTES, chosen=p.consultations.last_intended() or DEFAULT_MINUTES,
                 speech=choice.door.choice.title if choice.door else None,
+                # A patient with an approved note gets the list and the switch, on by default (ruling 3; D25).
+                earlier=earlier_lines(notes), switch=bool(notes),
                 problem=start_problem(p, ask_engine), page_path=f"/consultations/start/{patient.id}")
 
 
@@ -129,15 +141,17 @@ async def start(request: Request, patient_id: int, user=Depends(guards.logged_in
     minutes = int(fields.get("intended", 0) or 0)
     if minutes not in INTENDED_MINUTES:
         return refuse(request, "start.html", "start", words.TICK_BOTH, **context)
-    consultation = begin(p, patient, minutes)
+    # The switch's setting is stored with the consultation (ruling 3): on, off, or none where no switch was offered.
+    shown = (fields.get("earlier_notes") == "yes") if context["switch"] else None
+    consultation = begin(p, patient, minutes, shown, [row["id"] for row in context["earlier"]])
     raise Redirect(f"/consultations/{consultation.id}")
 
 
-def begin(p, patient, minutes: int) -> Consultation:
+def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, earlier_notes: list[int] | None = None) -> Consultation:
     version, digest = p.door.identity()
     door = speech_choice_for(p).door
     cid = p.consultations.start(patient.id, minutes, door.choice.name, p.engine.name, version, p.door.profile.tag,
-                                digest, SPEAKERS)
+                                digest, SPEAKERS, earlier_notes_shown, earlier_notes)
     consultation = Consultation(cid, patient, minutes, p.clock(), door, p.door, p.consultations, p.audit,
                                 p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes)
     consultation.on_final = _on_final(p)

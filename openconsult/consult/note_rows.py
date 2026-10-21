@@ -125,6 +125,16 @@ class Notes:
         found = self._db.query_one("SELECT * FROM note_approval WHERE consultation_id = ?", (consultation_id,))
         return dict(found) if found else None
 
+    def approvals_of_patient(self, patient_id: int) -> list[dict]:
+        """Every approved note of a patient, newest consultation first, with
+        the consultation's start and the approval's time (15.11 rulings 3
+        and 4; R25). A deleted consultation has no rows here."""
+        rows = self._db.query(
+            "SELECT a.consultation_id, c.started_at, a.at AS approved_at, a.text FROM note_approval a "
+            "JOIN consultation c ON c.id = a.consultation_id WHERE c.patient_id = ? ORDER BY c.started_at DESC, c.id DESC",
+            (patient_id,))
+        return [dict(r) for r in rows]
+
     def refuse(self, consultation_id: int, draft_id: int) -> int:
         cursor = self._db.execute("INSERT INTO note_refusal (consultation_id, draft_id, at) VALUES (?, ?, ?)",
                                   (consultation_id, draft_id, self._now()))

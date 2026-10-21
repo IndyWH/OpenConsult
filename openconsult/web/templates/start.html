@@ -8,6 +8,13 @@
     <p class="large"><span class="name">{{ patient.name }}</span><br>{{ born }}, {{ age }}<br>{{ sex }}</p>
     <label class="tick"><input type="checkbox" name="right_patient" value="yes">{{ words.TICK_RIGHT_PATIENT }}</label>
     <label class="tick"><input type="checkbox" name="acted" value="yes">{{ words.TICK_ACTED }}</label>
+    {% if switch %}
+    <div class="earlier" id="earlier-notes">
+      <h3 class="mark">{{ words.EARLIER_NOTES }}</h3>
+      <ul class="panel-list">{% for note in earlier %}<li data-note="{{ note.id }}">{{ note.line }}</li>{% endfor %}</ul>
+      <label class="tick"><input type="checkbox" name="earlier_notes" value="yes" id="earlier-switch" checked>{{ words.SWITCH_SHOWS_ON_SCREEN }}</label>
+    </div>
+    {% endif %}
     <label>{{ words.FIELD_INTENDED }}
       <select name="intended">
         {% for m in minutes %}<option value="{{ m }}" {% if m == chosen %}selected{% endif %}>{{ words.MINUTES.format(minutes=m) }}</option>{% endfor %}

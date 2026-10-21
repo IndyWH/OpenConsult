@@ -13,7 +13,7 @@ import json
 from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 
 from openconsult import words
-from openconsult.consult import speakers, stop as stop_module
+from openconsult.consult import earlier, speakers, stop as stop_module
 from openconsult.consult.live import FINAL, LIVE, Capture
 from openconsult.web import guards, review
 from openconsult.web.guards import Redirect, parts
@@ -63,11 +63,26 @@ async def consultation_page(request: Request, consultation_id: int, user=Depends
     return review.review_page(request, user, consultation_id)
 
 
+def earlier_panel(p, consultation) -> list[dict] | None:
+    """The earlier-notes panel (ruling 4): the last three notes approved
+    before this consultation started, each with its line and its four
+    sections; None when the switch is off for this consultation, or no
+    switch was offered."""
+    row = p.consultations.get(consultation.id)
+    if not row or not row["earlier_notes_shown"]:
+        return None
+    notes = earlier.panel_notes(p.notes, consultation.patient.id, consultation.started_at, consultation.id)
+    return [{"id": note.consultation_id, "date": words.plain_date(note.started_at), "headline": note.headline(),
+             "sections": [(words.SECTION_WORDS[s], note.sections[s]) for s in words.SECTION_WORDS]} for note in notes]
+
+
 def live_page(request: Request, user, consultation, refused=None):
     state = consultation.page_state()
+    p = parts(request)
     return render(request, "live.html", user=user, active="new_patient", consultation=consultation, state=state,
                   state_json=json.dumps(state), words_json=json.dumps(script_words()),
-                  model_line=model_line(request, consultation), patient=consultation.patient, piece_s=PIECE_S)
+                  model_line=model_line(request, consultation), patient=consultation.patient, piece_s=PIECE_S,
+                  earlier=earlier_panel(p, consultation))
 
 
 def stopping_page(request: Request, user, consultation, refused=None):
