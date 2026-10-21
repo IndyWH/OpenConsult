@@ -30,6 +30,7 @@ from openconsult.settings import room
 from openconsult.settings.decisions import Decisions, language_model_element
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.store import Settings
+from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
@@ -57,6 +58,7 @@ class Parts:
     patients: Patients = None
     consultations: Consultations = None            # the rows (15.10)
     notes: Notes = None                            # the note's rows (6b)
+    stored: Stored = None                          # the settings a page can change (7a)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
@@ -107,6 +109,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         patients=Patients(db, audit, clock),
         consultations=Consultations(db, clock),
         notes=Notes(db, clock),
+        stored=Stored(db, audit, clock),
         clock=clock,
         finaliser=_finalise,
     )

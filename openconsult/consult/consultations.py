@@ -23,7 +23,8 @@ SWAPPED = {"doctor": "patient", "patient": "doctor"}
 LABELS = ("doctor", "patient", "unsure")
 SETTABLE = ("stopped_at", "final_at", "speech_stamp", "echo_cancellation", "noise_suppression", "auto_gain",
             "sample_rate", "doctor_speaker", "recording_file", "loudness", "stop_raw", "state", "stop_stage",
-            "speech_failure")
+            "speech_failure", "recording_format", "conversion_failure", "audio_deleted_at")
+FORMATS = ("wav", "opus")
 
 
 class Consultations:
@@ -37,12 +38,24 @@ class Consultations:
     # ------------------------------------------------------ the consultation
 
     def start(self, patient_id: int, intended_minutes: int, speech_choice: str, engine: str,
-              engine_version: str | None, model_tag: str, model_digest: str | None, speakers_given: int) -> int:
+              engine_version: str | None, model_tag: str, model_digest: str | None, speakers_given: int,
+              earlier_notes_shown: bool | None = None, earlier_notes: list[int] | None = None) -> int:
+        """The row at Start. The patient's three details are copied as they
+        stand at this moment, so the consultation keeps what the doctor saw
+        and the model read whatever is corrected later (15.11 ruling 2;
+        R11; R17). earlier_notes_shown is the switch of ruling 3: None where
+        no switch was offered; earlier_notes the numbers listed at Start."""
+        patient = self._db.query_one("SELECT name, date_of_birth, sex FROM patient WHERE id = ?", (patient_id,))
+        if patient is None:
+            raise ValueError(f"no patient {patient_id}")
         cursor = self._db.execute(
             "INSERT INTO consultation (patient_id, started_at, intended_minutes, speech_choice, engine, "
-            "engine_version, model_tag, model_digest, speakers_given, state) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'live')",
+            "engine_version, model_tag, model_digest, speakers_given, state, patient_name, patient_date_of_birth, "
+            "patient_sex, earlier_notes_shown, earlier_notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'live', ?, ?, ?, ?, ?)",
             (patient_id, self._now(), int(intended_minutes), speech_choice, engine, engine_version, model_tag,
-             model_digest, int(speakers_given)))
+             model_digest, int(speakers_given), patient["name"], patient["date_of_birth"], patient["sex"],
+             None if earlier_notes_shown is None else int(bool(earlier_notes_shown)),
+             json.dumps(list(earlier_notes or []))))
         return int(cursor.lastrowid)
 
     def get(self, consultation_id: int) -> dict | None:
@@ -55,6 +68,8 @@ class Consultations:
                 raise KeyError(f"not a column that is set: {name}")
         if "state" in columns and columns["state"] not in STATES:
             raise ValueError(f"not a state: {columns['state']}")
+        if "recording_format" in columns and columns["recording_format"] not in FORMATS:
+            raise ValueError(f"not a format: {columns['recording_format']}")
         assignment = ", ".join(f"{name} = ?" for name in columns)
         self._db.execute(f"UPDATE consultation SET {assignment} WHERE id = ?", (*columns.values(), consultation_id))
 
@@ -63,6 +78,11 @@ class Consultations:
         that opens on the time used last (D38)."""
         found = self._db.query_one("SELECT intended_minutes FROM consultation ORDER BY id DESC LIMIT 1")
         return int(found["intended_minutes"]) if found else None
+
+    def of_patient(self, patient_id: int) -> list[dict]:
+        """Every consultation of a patient, newest first (15.11 ruling 2)."""
+        rows = self._db.query("SELECT * FROM consultation WHERE patient_id = ? ORDER BY id DESC", (patient_id,))
+        return [dict(r) for r in rows]
 
     def in_state(self, state: str) -> list[dict]:
         rows = self._db.query("SELECT c.*, p.name AS patient_name FROM consultation c JOIN patient p ON p.id = c.patient_id "

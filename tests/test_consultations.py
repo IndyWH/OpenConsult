@@ -147,3 +147,22 @@ def test_rulings_7_11_the_doctors_edits_to_words_and_labels_keep_what_stood_befo
         table.set_line_label(cid, 1, "nurse")
     with pytest.raises(ValueError):
         table.add_transcript_edit(cid, "made-up", None, None, None)
+
+
+def test_ruling_2_R11_R17_start_copies_the_three_details_as_they_stand_and_a_later_correction_leaves_them(rows):
+    db, table, patient = rows
+    cid = table.start(patient.id, 15, "nemotron", "vllm", "0", "tag", None, 2, earlier_notes_shown=True, earlier_notes=[3, 1])
+    row = table.get(cid)
+    assert (row["patient_name"], row["patient_date_of_birth"], row["patient_sex"]) == ("Made-up", "1990-01-01", "F")
+    assert row["earlier_notes_shown"] == 1 and row["earlier_notes"] == "[3, 1]" and row["recording_format"] is None
+    db.execute("UPDATE patient SET name = 'Corrected' WHERE id = ?", (patient.id,))
+    assert table.get(cid)["patient_name"] == "Made-up"                 # the earlier consultation is never rewritten
+    later = table.start(patient.id, 15, "nemotron", "vllm", "0", "tag", None, 2)
+    assert table.get(later)["patient_name"] == "Corrected" and table.get(later)["earlier_notes_shown"] is None
+    assert [r["id"] for r in table.of_patient(patient.id)] == [later, cid]  # newest first
+    table.set(cid, recording_format="opus", audio_deleted_at="2026-10-21")
+    assert table.get(cid)["recording_format"] == "opus"
+    with pytest.raises(ValueError):
+        table.set(cid, recording_format="mp3")
+    with pytest.raises(ValueError):
+        table.start(99, 15, "nemotron", "vllm", "0", "tag", None, 2)

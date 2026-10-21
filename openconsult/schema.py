@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 5
+VERSION = 6
 
 MIGRATIONS = {
     1: """
@@ -262,5 +262,53 @@ CREATE TABLE note_refusal (
 );
 
 ALTER TABLE transcript_line ADD COLUMN set_by_doctor INTEGER NOT NULL DEFAULT 0;
+""",
+    # Stage 7a (spec 15.11, The record; rulings 2, 3, 7 and 8; 7.3 rule 4):
+    # every change to a patient's details with what stood before; on the
+    # consultation the three details it ran with (copied at Start, so an
+    # earlier consultation is never rewritten), the switch's setting, the
+    # numbers of the earlier notes shown at Start, the recording's format,
+    # a failed conversion's reason and the date the audio went; the sweep's
+    # deletions; and the first setting a page can change. A version 5
+    # folder comes forward with every row, the details filled from the
+    # patient as it stands.
+    6: """
+CREATE TABLE patient_change (
+    id INTEGER PRIMARY KEY,
+    patient_id INTEGER NOT NULL REFERENCES patient(id),
+    field TEXT NOT NULL CHECK (field IN ('name', 'date_of_birth', 'sex')),
+    before TEXT NOT NULL,
+    after TEXT NOT NULL,
+    at TEXT NOT NULL,
+    by_whom TEXT NOT NULL
+);
+
+ALTER TABLE consultation ADD COLUMN patient_name TEXT;
+ALTER TABLE consultation ADD COLUMN patient_date_of_birth TEXT;
+ALTER TABLE consultation ADD COLUMN patient_sex TEXT;
+ALTER TABLE consultation ADD COLUMN earlier_notes_shown INTEGER;
+ALTER TABLE consultation ADD COLUMN earlier_notes TEXT;
+ALTER TABLE consultation ADD COLUMN recording_format TEXT CHECK (recording_format IN ('wav', 'opus'));
+ALTER TABLE consultation ADD COLUMN conversion_failure TEXT;
+ALTER TABLE consultation ADD COLUMN audio_deleted_at TEXT;
+UPDATE consultation SET
+    patient_name = (SELECT name FROM patient WHERE patient.id = consultation.patient_id),
+    patient_date_of_birth = (SELECT date_of_birth FROM patient WHERE patient.id = consultation.patient_id),
+    patient_sex = (SELECT sex FROM patient WHERE patient.id = consultation.patient_id);
+UPDATE consultation SET recording_format = 'wav' WHERE recording_file IS NOT NULL;
+
+CREATE TABLE audio_deletion (
+    id INTEGER PRIMARY KEY,
+    at TEXT NOT NULL,
+    consultation_ids TEXT NOT NULL,
+    files INTEGER NOT NULL,
+    bytes INTEGER NOT NULL
+);
+
+CREATE TABLE setting (
+    name TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    changed_at TEXT NOT NULL
+);
 """,
 }

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sqlite3
 import threading
+from contextlib import contextmanager
 from pathlib import Path
 
 from openconsult import schema
@@ -44,6 +45,20 @@ class Database:
     def tables(self) -> list[str]:
         rows = self.query("SELECT name FROM sqlite_master WHERE type = 'table' ORDER BY name")
         return [row["name"] for row in rows]
+
+    @contextmanager
+    def transaction(self):
+        """One transaction over several statements, the lock held
+        throughout: the statements land together or not at all (ruling 8
+        of 15.11: the rows of a deletion go in one transaction)."""
+        with self._lock:
+            self._connection.execute("BEGIN")
+            try:
+                yield self._connection
+            except BaseException:
+                self._connection.execute("ROLLBACK")
+                raise
+            self._connection.execute("COMMIT")
 
     def close(self) -> None:
         with self._lock:
