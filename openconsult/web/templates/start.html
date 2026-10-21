@@ -12,7 +12,7 @@
     <div class="earlier" id="earlier-notes">
       <h3 class="mark">{{ words.EARLIER_NOTES }}</h3>
       <ul class="panel-list">{% for note in earlier %}<li data-note="{{ note.id }}">{{ note.line }}</li>{% endfor %}</ul>
-      <label class="tick"><input type="checkbox" name="earlier_notes" value="yes" id="earlier-switch" checked>{{ words.SWITCH_SHOWS_ON_SCREEN }}</label>
+      <label class="tick"><input type="checkbox" name="earlier_notes" value="yes" id="earlier-switch" checked>{{ words.SWITCH_USES_AS_BACKGROUND }}</label>
     </div>
     {% endif %}
     <label>{{ words.FIELD_INTENDED }}

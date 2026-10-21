@@ -23,7 +23,8 @@ def test_ruling_3_D25_the_start_screen_for_a_patient_seen_before_lists_the_appro
     clock.advance(minutes=1)
     raw = client.get("/consultations/start/1").text
     page = text_of(client.get("/consultations/start/1"))
-    assert words.EARLIER_NOTES in page and words.SWITCH_SHOWS_ON_SCREEN in page
+    assert words.EARLIER_NOTES in page and words.SWITCH_USES_AS_BACKGROUND in page      # 7b: the label says the model reads them too
+    assert words.SWITCH_SHOWS_ON_SCREEN not in page and "background" in words.SWITCH_USES_AS_BACKGROUND
     assert words.EARLIER_NOTE_LINE.format(number=1, date="4 Oct 2026", line="made up impression") in page
     assert 'name="earlier_notes" value="yes" id="earlier-switch" checked' in raw            # on by default
     assert "background" not in words.SWITCH_SHOWS_ON_SCREEN                                   # 7a: the doctor's screen only

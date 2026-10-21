@@ -1,10 +1,14 @@
-"""The background block (spec 15.11 ruling 5; 8.3; 8.4; R25; D23): built
-and tested on made notes in 7a, and carried by no call. What a model
-would say is never asserted; what it would read is."""
+"""The background block (spec 15.11 rulings 5 and 10; 8.3; 8.4; 8.5; R4,
+R25; D23, D24): built and tested on made notes in 7a; since 7b carried
+by the two calls of the pass while the switch is on, never by the note
+or the label check, with the mark of 8.5 on the panel and at review.
+What a model would say is never asserted; what it would read is."""
 
+import json
 from datetime import datetime, timezone
 
-from openconsult.consult import cds_pass, messages
+from openconsult import words
+from openconsult.consult import messages
 from openconsult.consult.background import BACKGROUND_NOTE_MAX_WORDS, block_for, build_block, date_in_words, lay_out
 from openconsult.consult.earlier import ApprovedNote, sections_of
 from openconsult.consult.live import FINAL
@@ -12,6 +16,7 @@ from openconsult.prompts import loader
 from openconsult.speech.choices import NEMOTRON
 from openconsult.speech.door import Door as SpeechDoor
 from openconsult.web.live import capture_from
+from tests.conftest import text_of
 from tests.fakes import MadeUpWorker
 from tests.test_review_page import CAPTURE, LINES, LOUD, engine_with, run_through
 from tests.test_start import TICKS
@@ -79,33 +84,70 @@ def test_ruling_5_8_3_only_notes_approved_before_the_consultation_started_reach_
     assert block_for(p.notes, 1, clock(), 2) is None
 
 
-def test_8_4_the_note_call_never_gets_the_block_and_in_7a_no_call_does(tmp_path, clock, machine):
-    app, client, c = run_through(tmp_path, clock, machine, _doors(), engine_with(note=[_NOTE, _NOTE]))
+def _three_consultations(tmp_path, clock, machine):
+    """Consultation 1 approved; 2 under the same patient with the switch on;
+    3 with it off; each fed eight pieces and stopped to final."""
+    app, client, c = run_through(tmp_path, clock, machine, _doors(), engine_with(note=[_NOTE, _NOTE, _NOTE]))
     p = app.state.parts
     _approve_rows(p, 1)
-    clock.advance(minutes=1)
-    client.post("/consultations/start/1", data={**TICKS, "earlier_notes": "yes"})
-    assert p.consultations.get(2)["earlier_notes_shown"] == 1
-    second = p.running[2]
-    second.begin_sound(capture_from(CAPTURE))
-    for _ in range(8):
-        second.sound(LOUD)
-        second.wait_for_pass()
-    client.post("/consultations/2/stop")
-    assert until(lambda: second.stop_stage == "who_spoke")
-    client.post("/consultations/2/speakers", data={"speaker": "S1"})
-    assert until(lambda: second.state == FINAL)
+    for cid, data in ((2, {**TICKS, "earlier_notes": "yes"}), (3, TICKS)):
+        clock.advance(minutes=1)
+        client.post("/consultations/start/1", data=data)
+        c = p.running[cid]
+        c.begin_sound(capture_from(CAPTURE))
+        for _ in range(8):
+            c.sound(LOUD)
+            c.wait_for_pass()
+        client.post(f"/consultations/{cid}/stop")
+        assert until(lambda: c.stop_stage == "who_spoke")
+        client.post(f"/consultations/{cid}/speakers", data={"speaker": "S1"})
+        assert until(lambda: c.state == FINAL)
+    return app, client, p
+
+
+def test_8_4_D24_R4_the_two_calls_get_the_block_only_while_the_switch_is_on_and_the_note_and_the_label_check_never_do(tmp_path, clock, machine):
+    app, client, p = _three_consultations(tmp_path, clock, machine)
+    on, off = p.running[2], p.running[3]
+    assert p.consultations.get(2)["earlier_notes_shown"] == 1 and p.consultations.get(3)["earlier_notes_shown"] == 0
+    block = block_for(p.notes, 1, on.started_at, 2)
+    assert block.startswith(HEADING) and on.background == block and off.background is None
     calls = p.consultations.model_calls(2)
     assert sorted({call["job"] for call in calls}) == ["alarm", "assessment", "label_check", "note"]
     for call in calls:
-        assert HEADING not in call["request"] and "This is background only" not in call["request"], call["job"]
-    # The pass's messages are stage 6's, byte for byte: the patient line, a blank line, the frame around the transcript.
+        user = json.loads(call["request"])["user"]
+        if call["job"] in ("alarm", "assessment"):
+            assert user.count(HEADING) == 1 and "This is background only" in user, call["job"]
+        else:
+            assert HEADING not in user and "This is background only" not in user, call["job"]
+    # The stored request holds the message as sent: the patient line, the block, the frame around the transcript (ruling 5).
     stored = p.consultations.passes(2)[0]
-    alarm, assessment = cds_pass.messages(stored["transcript"], second.model_patient, cds_pass.Carried())
-    assert alarm == messages.with_patient(messages.alarm_message(stored["transcript"]), second.model_patient)
-    assert alarm.split("\n\n", 1)[1] == loader.fill(loader.frame("alarm"), transcript=stored["transcript"])
-    assert HEADING not in alarm and HEADING not in assessment
-    assert block_for(p.notes, 1, second.started_at, 2) is not None             # the block exists; nothing carried it
+    alarm_call = [c for c in calls if c["job"] == "alarm" and c["id"] == stored["alarm_call_id"]][0]
+    assert json.loads(alarm_call["request"])["user"] == messages.with_background(
+        messages.with_patient(messages.alarm_message(stored["transcript"]), on.model_patient), block)
+    assert json.loads(alarm_call["request"])["user"].split(f"{block}\n\n", 1)[1] == loader.fill(loader.frame("alarm"), transcript=stored["transcript"])
+    # With the switch off no request holds it, and the note's call reads today's turns alone (R4; D24).
+    for call in p.consultations.model_calls(3):
+        assert HEADING not in json.loads(call["request"])["user"], call["job"]
+    note_call = [c for c in p.consultations.model_calls(2) if c["job"] == "note"][0]
+    assert json.loads(note_call["request"])["user"].startswith("TRANSCRIPT:\n[0]")
+
+
+def test_ruling_10_8_5_the_mark_shows_on_the_decision_support_panel_while_the_block_is_sent_and_at_review(tmp_path, clock, machine):
+    from openconsult.web.live import script_words
+    app, client, p = _three_consultations(tmp_path, clock, machine)
+    assert p.running[2].page_state()["background"] is True and p.running[3].page_state()["background"] is False
+    assert p.running[1].page_state()["background"] is False                                      # no note before it
+    assert script_words()["EARLIER_NOTES_IN_USE"] == words.EARLIER_NOTES_IN_USE == "Earlier notes in use."
+    # At review the same words beside the model's differentials, only where the row says the model read them.
+    assert 'id="background-read"' in client.get("/consultations/2").text and words.EARLIER_NOTES_IN_USE in text_of(client.get("/consultations/2"))
+    for cid in (1, 3):
+        assert 'id="background-read"' not in client.get(f"/consultations/{cid}").text
+    assert words.EARLIER_NOTES_IN_USE not in client.get("/consultations/2/note.txt").text    # the copy text carries no mark
+    # A fourth consultation with the switch on but no mark line until a pass; its live page's state carries the flag.
+    clock.advance(minutes=1)
+    client.post("/consultations/start/1", data={**TICKS, "earlier_notes": "yes"})
+    raw = client.get("/consultations/4").text
+    assert '"background": true' in raw and words.EARLIER_NOTES_IN_USE in raw
 
 
 _NOTE = {"reasoning": "made up.", "subjective": [{"text": "made up history", "turns": [0]}], "objective": [],
@@ -114,7 +156,7 @@ _NOTE = {"reasoning": "made up.", "subjective": [{"text": "made up history", "tu
 
 def _doors():
     # One worker serves both consultations (the door keeps it): lines for the first's eight pieces, then the second's.
-    return {NEMOTRON.name: SpeechDoor(NEMOTRON, make_worker=lambda: MadeUpWorker(live=LINES + [[]] * 6 + LINES), installed=lambda: True)}
+    return {NEMOTRON.name: SpeechDoor(NEMOTRON, make_worker=lambda: MadeUpWorker(live=LINES + ([[]] * 6 + LINES) * 2), installed=lambda: True)}
 
 
 def _approve_rows(p, cid):

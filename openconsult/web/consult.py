@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import JSONResponse
 
 from openconsult import words
-from openconsult.consult import earlier
+from openconsult.consult import background, earlier
 from openconsult.consult.live import SPEAKERS, Consultation
 from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.patients.patients import parse_date, problem
@@ -152,8 +152,12 @@ def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, ear
     door = speech_choice_for(p).door
     cid = p.consultations.start(patient.id, minutes, door.choice.name, p.engine.name, version, p.door.profile.tag,
                                 digest, SPEAKERS, earlier_notes_shown, earlier_notes)
-    consultation = Consultation(cid, patient, minutes, p.clock(), door, p.door, p.consultations, p.audit,
-                                p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes, converter=p.converter)
+    started_at = p.clock()
+    # The block of 15.11 ruling 5 goes to the two calls of every pass while the switch is on (8.4); off or none sends nothing.
+    block = background.block_for(p.notes, patient.id, started_at, cid) if earlier_notes_shown else None
+    consultation = Consultation(cid, patient, minutes, started_at, door, p.door, p.consultations, p.audit,
+                                p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes, converter=p.converter,
+                                background=block)
     consultation.on_final = _on_final(p)
     p.running[cid] = consultation
     p.audit.record("consultation.started", f"consultation {cid}, patient {patient.id}, {minutes} minutes")

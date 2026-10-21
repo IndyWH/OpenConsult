@@ -44,6 +44,7 @@
       const node = document.getElementById('assessment');
       clear(node);
       const panel = state.passes.assessment;
+      if (state.background) node.appendChild(el('p', 'mark background', words.EARLIER_NOTES_IN_USE));   // 8.5
       if (panel.failure) node.appendChild(el('p', 'failed', fill(words.PASS_FAILED, {reason: panel.failure})));
       if (panel.from_earlier) node.appendChild(el('p', 'mark', words.FROM_EARLIER_PASS));
       if (!panel.n && !panel.failure) { node.appendChild(el('p', 'mark', state.passes.running ? words.PASS_RUNNING : words.LISTENING)); return; }

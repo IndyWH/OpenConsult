@@ -5,6 +5,7 @@
 {% macro differentials_aside() -%}
 <aside class="differentials no-print" id="differentials">
   <h4 class="mark">{{ words.MODELS_DIFFERENTIALS }}</h4>
+  {% if background_read %}<p class="mark" id="background-read">{{ words.EARLIER_NOTES_IN_USE }}</p>{% endif %}
   <ul class="panel-list">{% for d in differentials %}<li{% if d.condition in marks %} class="red"{% endif %}>{{ d.condition }} ({{ d.likelihood }}): {{ d.rationale }}{% if d.condition in marks %} <button type="button" class="red-name" data-name="{{ d.condition }}">{{ words.ALARM_NAMED }}</button>{% endif %}</li>{% else %}<li class="mark">{{ words.NO_DIFFERENTIALS }}</li>{% endfor %}</ul>
 </aside>
 {%- endmacro %}

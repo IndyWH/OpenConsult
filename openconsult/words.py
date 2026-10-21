@@ -167,8 +167,10 @@ NO_SUCH_PATIENT = "There is no patient with that number."
 # The Start screen for a patient seen before (15.11 ruling 3; 8.2; D25). Drafts.
 EARLIER_NOTES = "Earlier notes, approved"
 EARLIER_NOTE_LINE = "{number}, {date}: {line}"
-# The switch's label in 7a: the notes reach the doctor's screen and no model. 7b adds the second label.
+# The switch's labels (ruling 3): 7a's, when the notes reached the doctor's screen and no model, kept as its
+# record; 7b's, shown since the bench of 8.6 and ruling 11, when the same switch also sends them to the two calls.
 SWITCH_SHOWS_ON_SCREEN = "Show the earlier notes on your screen during this consultation."
+SWITCH_USES_AS_BACKGROUND = "Use the earlier notes as background for the model and show them on your screen."
 
 # The live page (spec 15.10, The live page; rulings 1, 2 and 10; R9, R15, R20, R29). Drafts.
 LIVE_TITLE = "Consultation"
@@ -208,6 +210,8 @@ PANEL_EARLIER_NOTES = "Earlier notes, approved"
 OPEN_NOTE = "Open"
 FOLD_NOTE = "Fold"
 NO_EARLIER_NOTES = "No earlier approved note."
+# The mark of 8.5, on the decision support panel while the block is sent, and at review beside the model's differentials.
+EARLIER_NOTES_IN_USE = "Earlier notes in use."
 # The red mark (15.11 ruling 9). Drafts.
 ALARM_NAMED = "Named in the alarm. Press to see why."
 CLOSE = "Close"

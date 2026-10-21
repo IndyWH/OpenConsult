@@ -75,10 +75,12 @@ class Consultation:
     def __init__(self, consultation_id: int, patient: PatientRow, intended_minutes: int, started_at: datetime,
                  speech: SpeechDoor, llm: Door, rows: Consultations, audit: Audit, data_folder: Path,
                  clock: Clock = now_local, timer: Callable[[], float] = time.perf_counter,
-                 on_stop: Callable | None = None, notes: Notes | None = None, converter=None):
+                 on_stop: Callable | None = None, notes: Notes | None = None, converter=None,
+                 background: str | None = None):
         self.id = consultation_id
         self.notes = notes                # the note's rows (6b), given by the app
         self.converter = converter        # the recording converter (7a), given by the app; None keeps the WAV
+        self.background = background      # the block of 15.11 ruling 5 for the two calls, or None (7b)
         self.patient = patient
         self.intended_minutes = int(intended_minutes)
         self.started_at = started_at
@@ -210,7 +212,8 @@ class Consultation:
 
     def _run_pass(self, n: int, text: str, carried) -> None:
         started = self.timer()
-        result = run_pass(self.llm, text, self.model_patient, carried, consultation_id=self.id)
+        result = run_pass(self.llm, text, self.model_patient, carried, consultation_id=self.id,
+                          background=self.background)
         wall_ms = round(1000 * (self.timer() - started))
         with self.lock:
             shown = self.state == LIVE
@@ -303,6 +306,7 @@ class Consultation:
                 "used_s": round(used, 1),
                 "clock": clock_state(used, self.intended_minutes),
                 "speech": {"state": self.speech.state, "reason": self.speech.reason, "failure": self.speech_failure},
+                "background": self.background is not None,     # the mark of 8.5
                 "transcript": {
                     "lines": [{"n": s.n, "speaker": s.line.speaker, "text": s.line.text, "start": s.line.start,
                                "end": s.line.end, "confidence": s.line.confidence} for s in self.transcript.heard],

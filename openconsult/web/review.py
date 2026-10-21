@@ -99,6 +99,12 @@ def warning_lines(rows: list[dict], lines: list[dict], choice_title: str) -> lis
     return found
 
 
+def background_read(row: dict) -> bool:
+    """The mark of 8.5 at review: the switch was on and notes were listed
+    at Start, so the two calls of every pass read them (15.11 ruling 3)."""
+    return bool(row["earlier_notes_shown"]) and json.loads(row["earlier_notes"] or "[]") != []
+
+
 def model_line_of(row: dict) -> str:
     """R20: from the row's stamps, not the running engine, so it is true after a restart."""
     choice = CHOICES.get(row["speech_choice"])
@@ -182,6 +188,7 @@ def page_data(p, row: dict) -> dict:
     alarm_rows = alarms.alarm_lines(pass_rows, p.consultations.live_lines(cid), datetime.fromisoformat(row["started_at"]),
                                     alarms.acknowledged_keys(p.audit.lines(), cid), words)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
+            "background_read": background_read(row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
             "lines": lines, "warnings": warnings,
