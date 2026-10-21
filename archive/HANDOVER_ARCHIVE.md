@@ -3,6 +3,197 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-10-20. Stage 6a: the live consultation, from Start to Stop
+
+Built and proven on 20 Oct 2026 in one session. The plan was reviewed by
+Cowork the same day (six points; all are in). The report is
+STAGE6A_REPORT.md in the private log folder. The room run is the owner's,
+still to come: the steps are in the report.
+
+The rulings it builds, one line each (spec 15.10):
+- 1: an alarm that says time critical and names no action is shown with
+  one plain line, the reasoning one tap away, kept as an earlier alarm and
+  recorded as its own state.
+- 2: a failed assessment call keeps the earlier lists on screen, marked
+  from the earlier pass, with the failure line; the first pass shows the
+  line alone; the next pass gets the same stale names.
+- 7: at Stop the app asks which speaker was you, waits with no limit, then
+  runs the label check, proves no word changed and marks each changed
+  label; a line the check calls unsure is shown unsure.
+- 8: the two checks of 5c unchanged, each a warning at its place; the gate
+  refuses only an empty or too short transcript, flags a missing passage,
+  a line with no speaker and a low-confidence line, and says plainly when
+  confidence was not measured.
+- 9: the new-patient form (name, date of birth, sex, all required, under
+  the line that every patient is acted), the Start screen as 8.2 with the
+  two ticks and the intended time opening on the time used last, Start
+  disabled with its reason on the control, two speakers told at open, no
+  box for the reason for the visit.
+- 10: the quiet clock changes colour at the intended time and nothing
+  else happens; the intended time is stored.
+- 12: typing counts as use on the new-patient form, by a page script, and
+  a page with an unsaved edit never refreshes itself.
+- 14: a line the choice gave no speaker takes the check's label and stays
+  shown unsure.
+- 16: 6a from Start to Stop; nothing of 6b is built.
+
+What was built (the app without the bench 9,130 lines, from 7,062 at 3c;
+the tests 11,351 lines):
+- schema version 4: patient, consultation, live_line, transcript_line,
+  cds_pass, warning; model_call gains consultation_id, written by the
+  door when a call is asked for a consultation.
+- consult/live.py, the consultation as a class with named fields; one
+  module each for the recording (a WAV written as the sound arrives, its
+  header patched after every piece, opened for exclusive creation, R18),
+  the transcript as shown, the passes, Stop in order, who spoke, the label
+  check and the gate; patients/patients.py; consult/consultations.py (the
+  rows).
+- the pages: the new-patient form, the Start screen, the live page with a
+  socket for the sound and the state, the stopping page with the
+  who-spoke question, the final transcript page; three page scripts in
+  their own files (live.js the connection and the sound, panels.js the
+  table of handlers, use.js typing as use) and the worklet; every sentence
+  in words.py, handed to the scripts as data.
+- the label check's prompt is one file, openconsult/prompts/label_check.
+  prompt.txt, sha256 of its bytes 262d1ef8...de557a as ruling 17 gives it;
+  the bench reads that file now and its own copy is gone (spec 5.1); the
+  frame around the lines, label_check.frame.txt, holds the bench's words
+  (TRANSCRIPT:, then [n] and the words), sha256 44f10e08...1e0637, and a
+  test pins the text sent against the bench's own builder.
+- a consultation left live or stopping by the last run is carried on at
+  the next start: nothing deleted, no row left live, Continue on the home
+  page (review point 3).
+
+The constants, each with its source:
+- NEW_CHARS_FOR_PASS 150: v1's CDS_MIN_NEW_CHARS, characters of new final
+  text, with the first pass on the first line; no clock interval.
+- TOO_SHORT_WORDS 60: a design choice, a tenth of the shortest banked
+  script (01, 667 words by the bench's parser).
+- LOW_CONFIDENCE 0.60: v1's.
+- The label check: 3,000 tokens and 120 s, the bench's figures.
+- The alarm sameness rule: the same alarm while its actions' words are the
+  same after the matching's normalise; the no-action state is one alarm
+  while it holds. It decides only what the screen shows and which
+  acknowledgement holds here. Stage 12 must look at it again before it
+  decides what pauses Alba (R8, R29): a model that rewords an action
+  would otherwise pause her again.
+
+The speech choice of a consultation: Nemotron where installed, else the
+WhisperX choice where the room check offers it and it is installed; no
+cloud choice is chosen by the app before stage 9 (the statement of 7.3 and
+the cloud mark do not exist yet).
+
+Measurements, 20 Oct 2026, RTX 4090, v1 off, vLLM 0.31.0 started by hand
+with the room of 3c, the Nemotron worker started by the app from a
+throwaway data folder, the sound fed through the page's own path (the
+socket, the capture message, pieces of 0.25 s at the speed spoken):
+- The self-test clip (11 s, one speaker, two told): the worker ready in
+  15.9 s on a warm cache (21.7 s cold); the first line on the page 2.5 s
+  after the feed began; the three figures from the app's own audit line: word to page 2.14 s typical, pass 0.57 s typical, Stop to final 1.3 s. The label check answered in 0.44 s
+  and called the lines unsure; the gate refused the transcript as too
+  short (22 words) and said confidence was not measured.
+- Recording 462 (script 01, 305 s, two readers; consent covers tests on
+  this computer): word to page 2.23 s typical, pass 2.98 s typical (19 passes, 18 shown; one landed after Stop and was recorded, not shown; the walls 0.53 to 3.20 s), Stop to final 11.0 s, of which the label check on 94 lines took 7.0 s; the alarm fired on passes 2 to 15 and was quiet before and after; the check changed 23 labels; 22 lines shown unsure; one uncovered stretch of 2.2 s at 13.9 s; the speaker model gave one label only (S1), so the other reader's lines came through the answer as unsure and through the check as patient: the Nemotron finding of 5c, seen live.
+- 613 tests, green three times before the last commit, 22.7 to 22.9 s,
+  none skipped; the GitHub start check passed. No file over 600 lines, no
+  function over 80. CLAUDE.md 98 lines. The private word check printed
+  nothing before every commit. Nothing left the machine: the models were
+  found in the hub's cache, nothing fetched; no key and no token was read;
+  the engine folder and the Ollama service were not touched.
+
+Made untrue by this stage: the home sentence, README's so far and
+CLAUDE.md's running lines, fixed in this commit; 15.6's line that stage 2
+has no page script is history, as it said it would be; the note of stage 3
+that model_call rows are tied in stage 6 is now done; the bench's prompts
+folder holds two prompts, not three, and the bench reads the label check's
+from the app. One thing seen in passing, not touched: the Ollama service
+on this machine answers as version 0.40.6 today, not the 0.33.3 of 15.8
+ruling 39; the app chose vLLM, so nothing of 6a ran on it.
+
+Departures from the plan: the proof ran before the documents commit, so
+that the figures in this entry are real; the plan's test 36 (the lock
+held off from Start to final) is pinned inside the R1 test of the Start
+screen and the who-spoke page test, not as its own; the who-spoke stage
+is not a spinning state, because it waits on the doctor.
+
+For 6b: the final transcript rows are transcript_line with n, label,
+unsure, changed_by_check and revised_by_service; the gate's refusal is
+Consultation.final.refused and the warning rows; the stored loudness
+(consultation.loudness) and the recording file are there for the player;
+the last pass's lists are in cds_pass with shown = 1; the model line is
+built by web/live.py; a label the doctor undoes is set with
+Consultations.set_labels. The note prompt of ruling 3 is not written.
+
+## 2026-10-15. The two carried prompts: the double quotes out, benched on vLLM
+
+Built and run on 15 Oct 2026 in one session, after the owner and Cowork
+read the two prompts word for word (spec 15.8, rulings 41 to 43). The plan
+was reviewed by Cowork the same day (three points; all are in). The report
+is PROMPTS_BENCH_REPORT.md in the private log folder.
+
+What changed: every double quote came out of both prompts (two in the
+assessment, fourteen in the alarm) and one sentence was added to each,
+asking the model never to write one. The files are the spec's two blocks
+byte for byte. sha256 of each as the loader reads it, less the final line
+break: assessment 437d7f32b3b020f8757ce96fdcf31ae4b85aef0b949e56f81546b3e200e1c6bb,
+alarm 1e05ffc8634b4093897ec53cd590111fbb2bdeac0abbd4462c8298f5582c9451.
+The three frames and the two forms are untouched (ruling 43). The test
+pins each file to its ruling's hash, prompts/loader.py holds the same two
+in APPROVED, and a test pins that no prompt or frame holds a double quote.
+
+The word check of stage 3 (15.7, ruling 3) now matches the prompt sent
+against the approved hash, not v1's. The whole request is still compared
+against v1's recorded hash, with v1's own prompt put back in its slot,
+which is what still proves the form and every other part call for call.
+v1's two texts are given with --v1-prompts and proven first against the
+arm-start records of the v1 file; the approved texts given in their place
+are refused with both hashes named. The counts are unchanged: 892 of 892
+for task 5 and 3,146 of 3,146 for task 5b, 1,898 of 1,898 for each call
+(143 + 182 + 598 + 975), mismatches 0.
+
+The bench of ruling 43: vLLM 0.31.0 started as 3c starts it (the repack
+at revision 2096d38d, context 16,384, the compact form of ruling 22 at
+start, the room 1,400,000,000 bytes), all 16 cases, the 13 chains, the
+two calls of a pass sent together; 3,796 calls, none failed, no chain
+failed; thinking off in every request and no thinking text in any reply;
+87 minutes. The marks by the repo's score tool, and the same by a private
+count from the raw files that imports nothing of the bench:
+- Temperature 0, which decides (ruling 18): H1 to H6 3 of 3 each; H7
+  none. Candidate: yes. The typical pass of 495 2.72 s (chains 2.78,
+  2.71, 2.72), the slowest 2.91, beside 5d's 2.73 and 3c's 2.78.
+- Temperature 0.5, apart: H1 to H6 10 of 10 each; H7 missed on one chain
+  of ten, script 10 B6, where one differential at one update named an
+  ovarian torsion while saying the patient is male. Over all 13 chains the
+  soft marks are 8 of 9: S12 missed on script 05, which fired in 9 chains
+  against the mark of 4; the time marks met (2.94 s typical, 4.07 slowest).
+- The three counts, beside the vLLM arms of 7 Oct (the together arm for
+  the chains at 0, the thirteen-chain arm for 0.5 and the totals):
+  replies cut by a stray quote 0 at 0 (7 Oct 0) and 0 at 0.5 (7 Oct 21 of
+  2,920); no reasoning holds a double quote, and 384 of 3,796 hold a
+  single one. Empty lists 0 at 0 (7 Oct 0) and 1 at 0.5 (7 Oct 0): script
+  13 chain B2 at its last update, a whole reply with a full reasoning and
+  every list empty, so the earlier list was kept (ruling 5). Alarms time
+  critical with no action 12 at 0 (7 Oct 8 together, 10 one after another)
+  and 57 at 0.5 (7 Oct 63): 69 in all against 73, every one in a whole
+  reply.
+- Kept by ruling 43's rule: yes. Every hard mark met at 0 with no failed
+  chain, the cut replies fewer at 0.5 (0 against 21) and still none at 0.
+  The form pattern held in reserve is not needed on this showing.
+
+Measurements, 15 Oct 2026, RTX 4090, v1 off: 558 tests, green three times
+before the last commit. CLAUDE.md 99 lines. The private word check printed
+nothing before every commit. Nothing left the machine: vLLM ran with its
+reach to the hub and its usage reports off; no key and no token was read;
+the engine folder is unchanged but for the script's own run files, whose
+13 Oct copies are kept in the log folder; the Ollama service is as it was.
+
+Made untrue by this stage: CLAUDE.md's wordcheck line, fixed in this
+commit. The line of the stage 3 entry below that the prompts are v1's
+words exactly is history: from this commit they are the spec's approved
+wording. The public engine-bench folder records 7 Oct's prompt hashes in
+its arm.json files, which is right as the record of that bench; it is not
+touched and not run again (ruling 43).
+
 ## 2026-10-13. Stage 3c: the engine setting
 
 Built and run on 13 Oct 2026. The plan was reviewed by Cowork the same

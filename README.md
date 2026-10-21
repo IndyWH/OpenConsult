@@ -10,8 +10,10 @@ This branch is where OpenConsult v2.0 is being built.
   date of birth or the number; the patient's page corrects a name, a date
   of birth or a sex with every change audited, and an earlier consultation
   keeps the details it ran with. A consultation starts under a patient seen
-  before with their earlier approved notes listed and a switch that shows
-  them, folded, on the live page; the words appear live beside the model's
+  before with their earlier approved notes listed and a switch, on by
+  default, that sends the last three to the two calls of every pass as
+  background, marked on the panel and at review, and shows them, folded,
+  on the live page; the words appear live beside the model's
   differentials, questions and signs, the alarm in its three states with
   the differential it names marked red, and a quiet clock; the sound is
   recorded as the microphone gives it and kept as Opus after Stop; at Stop
@@ -28,8 +30,8 @@ This branch is where OpenConsult v2.0 is being built.
   audited; the copy gives the note alone. Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line
-  of counts. The earlier notes reach the doctor's screen only: the
-  background to the model waits for its bench (7b). Alba, the guideline
+  of counts. The background to the model was measured before it was kept,
+  on two made follow-up cases with the marks set first. Alba, the guideline
   search and the teaching mode come later. Underneath: one user and a
   login, This machine, the language model engine chosen once at start
   (vLLM first on Linux with a suitable graphics card, Ollama otherwise)
