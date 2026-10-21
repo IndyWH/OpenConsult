@@ -23,6 +23,7 @@ KNOWN_CAPITALS = {
     "LIVE", "TRANSCRIPT", "SO", "FAR", "FIRST", "NOT", "ANY", "DO",   # emphasis
     "NEVER", "NEW", "ONE", "TO", "COMMITTED", "SUSPICION", "TODAY",
     "IF", "END", "THE", "DOCTOR", "PATIENT",                          # the note prompt's emphasis (6b)
+    "BACKGROUND", "FROM", "EARLIER", "CONSULTATIONS",                 # the background frame's heading (7a)
 }
 GUIDELINE_WORDS = ("guideline", "guidance")
 
@@ -40,7 +41,7 @@ def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
 def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
     # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
     words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
-    assert len(words) == 9      # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b)
+    assert len(words) == 12     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a)
     for path in words:
         assert '"' not in _words(path), path.name
     assert '"' in 'a "quoted" word'   # the twin
@@ -81,7 +82,7 @@ def test_R13_no_prompt_file_names_a_country():
     countries = [c.strip() for c in _words(Path(__file__).parent / "countries.txt").splitlines() if c.strip()]
     assert len(countries) > 150
     files = loader.every_prompt_file()
-    assert len(files) == 13     # stage 3's seven, and the label check's and the note's prompt, frame and form (6a, 6b)
+    assert len(files) == 16     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a)
     for path in files:
         text = _words(path).lower()
         for country in countries:
@@ -97,3 +98,19 @@ def test_R21_no_prompt_file_names_a_guideline_publisher():
         assert not unknown, f"{path.name} has a capitalised word not on the list: {unknown}"
     # The twin: the check can fail.
     assert set(re.findall(r"\b[A-Z][A-Z]+\b", "as the ZZZZ advice says")) - KNOWN_CAPITALS
+
+
+def test_ruling_5_15_8_ruling_1_the_three_background_files_are_the_approved_bytes_and_hold_no_double_quote():
+    # 15.11 ruling 5: each block followed by one line break, nothing else; the cut line the same (the plan review, point 1).
+    import hashlib
+    expected = {"background.frame": "48875847e78d1830e69a7bd4afccf0a975502af86dc4196189709470cdcf2fe3",
+                "background.note": "79b41aaff3a95d4ae0b8c0d00e4e82f9fd6a9ce26f47ed711cf1d487dbfc08b7",
+                "background.cut": "c00401b4a0a993c4f639ea9261517ac448106c6b84838e0711a98f26ae7c2b4e"}
+    for name, digest in expected.items():
+        assert hashlib.sha256(loader.file_bytes(name)).hexdigest() == digest == loader.APPROVED_BYTES[name], name
+        assert loader.file_bytes(name).endswith(b"\n") and not loader.file_bytes(name).endswith(b"\n\n")
+        assert '"' not in loader.file_text(name)
+    assert loader.file_text("background.frame").startswith("BACKGROUND FROM EARLIER CONSULTATIONS, approved by the doctor:\n{notes}")
+    assert loader.file_text("background.note").split("\n") == [
+        "Consultation of {date}:", "Subjective: {subjective}", "Objective: {objective}", "Assessment: {assessment}", "Plan: {plan}"]
+    assert loader.file_text("background.cut") == "The note is cut here"

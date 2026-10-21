@@ -25,10 +25,17 @@ APPROVED = {
 }
 # The label check's prompt and the note's are hashed as their file's bytes,
 # with the one line break after the last line, as 15.9 ruling 17 and 15.10
-# ruling 3 give them (the bench's way).
+# ruling 3 give them (the bench's way). The three files of the background
+# (15.11 ruling 5; the plan review of 7a, point 1) the same way: the frame,
+# the layout of one note, and the one line that marks a cut note. Together
+# they are every word a model reads for the background; in 7a no call
+# carries them.
 APPROVED_BYTES = {
     "label_check": "262d1ef805d4b7a27a1823a71dd649b78d2cdb84da5ce570c8d7cd3d91de557a",
     "note": "0666c026d5ac8fa74f99434396709381214ee43cb70fe763a02c2bde2a284207",
+    "background.frame": "48875847e78d1830e69a7bd4afccf0a975502af86dc4196189709470cdcf2fe3",
+    "background.note": "79b41aaff3a95d4ae0b8c0d00e4e82f9fd6a9ce26f47ed711cf1d487dbfc08b7",
+    "background.cut": "c00401b4a0a993c4f639ea9261517ac448106c6b84838e0711a98f26ae7c2b4e",
 }
 
 
@@ -51,6 +58,15 @@ def form(name: str) -> dict:
 
 def frame(name: str) -> str:
     return _text(FOLDER / f"{name}.frame.txt")
+
+
+def file_text(name: str) -> str:
+    """A prompt-folder file by its whole name less .txt (background.note)."""
+    return _text(FOLDER / f"{name}.txt")
+
+
+def file_bytes(name: str) -> bytes:
+    return (FOLDER / f"{name}.txt").read_bytes()
 
 
 def fill(frame_text: str, **slots: str) -> str:

@@ -1,0 +1,4 @@
+BACKGROUND FROM EARLIER CONSULTATIONS, approved by the doctor:
+{notes}
+
+This is background only. Today's problem may be new and unrelated to it.

@@ -1,0 +1,5 @@
+Consultation of {date}:
+Subjective: {subjective}
+Objective: {objective}
+Assessment: {assessment}
+Plan: {plan}
