@@ -204,6 +204,7 @@ def test_R2_R15_the_who_spoke_page_asks_once_and_the_answer_is_audited(tmp_path,
     final = text_of(client.get("/consultations/1"))
     assert words.REVIEW_TITLE in final and "[1] Doctor" in final and "[3] Patient" in final and words.LABEL_UNSURE in final
     assert not app.state.parts.logins.consultation_running
+    consultation.close()                                     # the Stop thread's conversion step ends before the test does
 
 
 CAPTURE_MESSAGE = {"type": "capture", "echo_cancellation": False, "noise_suppression": False, "auto_gain": False, "rate": 48000}
@@ -250,6 +251,8 @@ def test_1_12_a_consultation_left_live_or_stopping_at_a_restart_is_carried_on(tm
     assert rows.get(1)["final_at"] and rows.get(2)["final_at"] and rows.in_state("stopping") == []
     assert words.HOME_WAITING not in text_of(client2.get("/"))
     assert not app2.state.parts.logins.consultation_running
+    for c in app2.state.parts.running.values():
+        c.close()
 
 
 
@@ -310,3 +313,43 @@ def test_R30_10_4_a_failed_note_call_is_said_plainly_and_nothing_is_asked_a_seco
         assert len(r.engine.calls_for("note")) == 1 and r.audit.lines()[1].event == "note.failed"
     finally:
         r.close()
+
+
+def test_the_small_fix_of_7b_no_thread_of_the_consultation_outlives_it(tmp_path, clock, machine):
+    """15.11, A small fix for 7b: two tests left the Stop thread converting
+    after the database was closed. close() now joins the Stop thread and
+    the pass pool, and the app's shutdown closes every consultation."""
+    import threading
+
+    def mine(cid):
+        return [t.name for t in threading.enumerate() if t.name.startswith((f"stop-{cid}", f"consultation-{cid}"))]
+
+    r, c = room_stopped(tmp_path, clock)
+    assert mine(c.id) and c._stop_thread.is_alive()                  # waiting at who-spoke
+    stop.answer(c, "S1")
+    assert until(lambda: c.state == FINAL)
+    c.close()
+    assert not mine(c.id) and not c._stop_thread.is_alive()
+    r.db.close()                                                     # nothing writes after this
+    # A consultation closed while it waits at who-spoke: the thread returns at once and the stage is kept.
+    r2, c2 = room_stopped(tmp_path / "waiting", clock)
+    c2.close()
+    assert not mine(c2.id) and c2.stop_stage == "who_spoke"
+    r2.db.close()
+    # Through the app: the lifespan's shutdown closes every running consultation.
+    app, client = app_on(tmp_path / "app", clock, machine, MadeUpWorker(live=[LINES]))
+    set_up(client)
+    log_in(client)
+    client.post("/patients", data=PATIENT)
+    client.post("/consultations/start/1", data=TICKS)
+    consultation = app.state.parts.running[1]
+    consultation.begin_sound(CAPTURE)
+    consultation.sound(LOUD)
+    consultation.wait_for_pass()
+    client.post("/consultations/1/stop")
+    assert until(lambda: consultation.stop_stage == "who_spoke")
+    client.post("/consultations/1/speakers", data={"speaker": "S1"})
+    assert until(lambda: consultation.state == FINAL)
+    with browser(app):                                               # the lifespan runs: start, then shutdown
+        pass
+    assert consultation.closed and not mine(1)

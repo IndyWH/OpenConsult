@@ -113,6 +113,7 @@ class Consultation:
         self._pending: list[bytes] = []
         self._pool = ThreadPoolExecutor(max_workers=2, thread_name_prefix=f"consultation-{consultation_id}")
         self._pass: Future | None = None
+        self._stop_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------ patient
 
@@ -260,8 +261,9 @@ class Consultation:
     def run_stop_thread(self, step: Callable) -> None:
         """The Stop thread: one of its own, marked so that it never holds
         the process open; it waits on the doctor with no limit (2.2) and
-        ends with the app."""
-        threading.Thread(target=step, args=(self,), name=f"stop-{self.id}", daemon=True).start()
+        ends with the app, which joins it at close (the small fix of 7b)."""
+        self._stop_thread = threading.Thread(target=step, args=(self,), name=f"stop-{self.id}", daemon=True)
+        self._stop_thread.start()
 
     def set_stage(self, stage: str | None) -> None:
         with self.lock:
@@ -270,9 +272,15 @@ class Consultation:
             self._changed()
 
     def close(self) -> None:
+        """At the app's shutdown, and at the end of a test: no thread of the
+        consultation outlives it. A Stop waiting at who-spoke returns at
+        once; a conversion in flight finishes (its command has a limit);
+        a pass in flight lands and is recorded."""
         self.closed = True
         self.answer_event.set()
-        self._pool.shutdown(wait=False)
+        if self._stop_thread is not None and self._stop_thread is not threading.current_thread():
+            self._stop_thread.join()
+        self._pool.shutdown(wait=True)
 
     # -------------------------------------------------------------- state
 
