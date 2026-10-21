@@ -16,6 +16,7 @@ from openconsult.db import Database
 from openconsult.patients.audit import Audit, Clock, now_local
 
 SEXES = ("F", "M")
+FIELDS = ("name", "date_of_birth", "sex")
 # A date of birth further back than this is a slip, not a patient: the
 # patient line of R11 takes an age of 120 at most (consult/messages.py).
 OLDEST_YEARS = 120
@@ -134,6 +135,40 @@ class Patients:
         if found is None:
             return None
         return PatientRow(found["id"], found["name"], date.fromisoformat(found["date_of_birth"]), found["sex"])
+
+    # ----------------------------------------------- corrections (ruling 2)
+
+    def correct(self, patient_id: int, field: str, value: str, by_whom: str) -> bool:
+        """One corrected detail: the current row changes, patient_change
+        keeps what stood before, when and by whom, and the audit log says
+        so (R2). The value is checked by the caller as the form checks it.
+        False when nothing changed. No consultation row is touched."""
+        if field not in FIELDS:
+            raise ValueError(f"not a detail: {field}")
+        current = self._db.query_one(f"SELECT {field} AS value FROM patient WHERE id = ?", (patient_id,))
+        if current is None:
+            raise ValueError(f"no patient {patient_id}")
+        before = current["value"]
+        if value == before:
+            return False
+        at = self._clock().isoformat(timespec="seconds")
+        with self._db.transaction() as con:
+            con.execute(f"UPDATE patient SET {field} = ? WHERE id = ?", (value, patient_id))
+            con.execute("INSERT INTO patient_change (patient_id, field, before, after, at, by_whom) VALUES (?, ?, ?, ?, ?, ?)",
+                        (patient_id, field, before, value, at, by_whom))
+        self._audit.record("patient.changed", f"patient {patient_id}: {field} from {before} to {value}")
+        return True
+
+    def changes(self, patient_id: int) -> list[dict]:
+        rows = self._db.query("SELECT * FROM patient_change WHERE patient_id = ? ORDER BY id", (patient_id,))
+        return [dict(r) for r in rows]
+
+    def changed_after(self, patient_id: int, moment: str) -> str | None:
+        """The time of the latest correction made after the moment given
+        (a consultation's start), or None: the one line of ruling 2."""
+        found = self._db.query_one("SELECT MAX(at) AS at FROM patient_change WHERE patient_id = ? AND at > ?",
+                                   (patient_id, moment))
+        return found["at"] if found and found["at"] else None
 
     def today(self) -> date:
         when = self._clock()

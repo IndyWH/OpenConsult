@@ -14,7 +14,8 @@
 <script id="words" type="application/json">{{ words_json|safe }}</script>
 <script id="player-data" type="application/json">{{ player_json|safe }}</script>
 <h1 class="page print-keep">{{ words.REVIEW_TITLE }}</h1>
-<p class="statement print-keep"><b>{{ patient.name }}</b> <span class="mark">{{ date }}</span></p>
+<p class="statement print-keep"><b>{{ ran_with.name }}</b> <span class="mark">{{ date }}</span></p>
+<p class="mark no-print" id="ran-with">{{ words.RAN_WITH }} {{ ran_with.name }}, {{ ran_with.born }}, {{ ran_with.sex }}. <a href="/patients/{{ patient.id }}">{{ words.PATIENTS_PAGE_LINK }}</a>{% if ran_with.corrected %}<br>{{ ran_with.corrected }}{% endif %}</p>
 
 {# One: the draft note (ruling 11). #}
 <section class="pane note print-keep" id="note">

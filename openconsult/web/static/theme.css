@@ -166,3 +166,7 @@ button.play-stretch { padding: .2rem .7rem; font-size: .78rem; margin-left: .5re
 form.search { display: flex; align-items: flex-end; gap: .6rem; margin-top: 1rem; }
 form.search label { flex: 1; margin: 0; }
 td.number { color: var(--ink-faint); font-size: .85rem; }
+form.detail-form { display: flex; align-items: flex-end; gap: .6rem; margin-bottom: .6rem; }
+form.detail-form label { flex: 1; margin: 0; }
+form.detail-form fieldset { flex: 1; }
+h1.page .number { font-size: .85rem; font-weight: 400; }

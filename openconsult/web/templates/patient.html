@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.PATIENT_TITLE %}
+{% block main %}
+<h1 class="page">{{ patient.name }} <span class="mark number">{{ number }}</span></h1>
+<section class="pane" id="details">
+  <div class="pane-head"><h2>{{ words.DETAILS }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/patients/{{ patient.id }}/name" class="detail-form">
+      <label>{{ words.FIELD_PATIENT_NAME }}<input name="value" value="{{ patient.name }}" autocomplete="off"></label>
+      <button id="save-name" aria-describedby="save-name-refusal">{{ words.SAVE_DETAIL }}</button>{{ refusal("save-name") }}
+    </form>
+    <form method="post" action="/patients/{{ patient.id }}/date_of_birth" class="detail-form">
+      <label>{{ words.FIELD_DATE_OF_BIRTH }}<input name="value" type="date" value="{{ born }}"></label>
+      <button id="save-date" aria-describedby="save-date-refusal">{{ words.SAVE_DETAIL }}</button>{{ refusal("save-date") }}
+    </form>
+    <form method="post" action="/patients/{{ patient.id }}/sex" class="detail-form">
+      <fieldset class="choice"><legend>{{ words.FIELD_SEX }}</legend>
+        {% for code, word in words.SEX_WORDS.items() %}
+        <label class="tick"><input type="radio" name="value" value="{{ code }}" {% if patient.sex == code %}checked{% endif %}>{{ word }}</label>
+        {% endfor %}
+      </fieldset>
+      <button id="save-sex" aria-describedby="save-sex-refusal">{{ words.SAVE_DETAIL }}</button>{{ refusal("save-sex") }}
+    </form>
+  </div>
+</section>
+<section class="pane" id="consultations">
+  <div class="pane-head"><h2>{{ words.CONSULTATIONS }}</h2></div>
+  <div class="pane-body">
+    {% if consultations %}<ul class="panel-list">{% for c in consultations %}
+    <li class="consultation" data-consultation="{{ c.id }}"><a href="/consultations/{{ c.id }}">{{ c.when }}</a>: {{ c.state }}</li>{% endfor %}</ul>
+    {% else %}<p class="mark">{{ words.NO_CONSULTATIONS }}</p>{% endif %}
+    <p><a class="button" href="/consultations/start/{{ patient.id }}" id="new-consultation">{{ words.NEW_CONSULTATION }}</a></p>
+  </div>
+</section>
+{% block delete %}{% endblock %}
+{% endblock %}

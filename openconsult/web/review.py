@@ -149,6 +149,17 @@ def note_state(p, row: dict, gate_refused: bool) -> dict:
             "approve_reason": approve_reason, "refuse_reason": refuse_reason, "asked_by": "again" if draft is not None else "draft"}
 
 
+def ran_with(p, row: dict) -> dict:
+    """The three details the consultation ran with, from its own row, never
+    a join back to the patient (ruling 2); and the one line, with the date,
+    when the patient's details were corrected after it started."""
+    born = datetime.fromisoformat(row["patient_date_of_birth"]).date() if row["patient_date_of_birth"] else None
+    changed = p.patients.changed_after(row["patient_id"], row["started_at"])
+    return {"name": row["patient_name"], "born": words.plain_date(born) if born else "",
+            "sex": words.SEX_WORDS.get(row["patient_sex"], ""),
+            "corrected": words.DETAILS_CORRECTED.format(date=words.plain_date(datetime.fromisoformat(changed))) if changed else None}
+
+
 def page_data(p, row: dict) -> dict:
     cid = row["id"]
     lines = [r for r in p.consultations.transcript_lines(cid) if r["n"] is not None]
@@ -165,7 +176,8 @@ def page_data(p, row: dict) -> dict:
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
     player = player_data(row, lines, warnings, p.settings.data_folder)
-    return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "lines": lines, "warnings": warnings,
+    return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
+            "lines": lines, "warnings": warnings,
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),

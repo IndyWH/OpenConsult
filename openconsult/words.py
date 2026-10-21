@@ -93,6 +93,20 @@ COL_SEX = "Sex"
 COL_LAST_SEEN = "Last seen"
 COL_NUMBER = "Number"
 NEVER_SEEN = "Not yet seen"
+# The patient's page (15.11 ruling 2; 8.1; R2, R15). Drafts.
+PATIENT_TITLE = "Patient"
+NUMBER_LINE = "number {id}"
+DETAILS = "Details"
+SAVE_DETAIL = "Save"
+DETAIL_UNCHANGED = "Nothing changed."
+CONSULTATIONS = "Consultations"
+NO_CONSULTATIONS = "No consultation yet."
+STATE_WORDS = {"approved": "approved", "review": "waiting for review", "refused": "a refused note",
+               "running": "running", "at_stop": "waiting at Stop"}
+NEW_CONSULTATION = "New consultation"
+RAN_WITH = "Seen as"
+PATIENTS_PAGE_LINK = "The patient's page"
+DETAILS_CORRECTED = "The patient's details were corrected on {date}. This consultation keeps the details it ran with."
 HOME_WAITING_LINE = "{name}, started {when}"
 CONTINUE_CONSULTATION = "Continue"
 
@@ -366,6 +380,7 @@ EVENTS = {
     "decision.guideline_search": "Guideline search placed at start",
     "decision.whisperx_choice": "WhisperX choice judged at start",
     "patient.saved": "Patient saved",
+    "patient.changed": "Patient's details corrected",
     "consultation.started": "Consultation started: the right patient and an acted consultation confirmed",
     "consultation.stopped": "Consultation stopped",
     "speakers.answered": "Which speaker was you: answered",
