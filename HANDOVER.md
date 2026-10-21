@@ -107,6 +107,19 @@ The three background files are byte for byte as ruling 5 gives them
 the wiring commit and before the last; the four prompts, their frames,
 their forms and the patient line are untouched.
 
+The Ubuntu check of run 17 (the push of 60bc652) failed the small fix's
+test once, 1 of 691: after close() the table still held consultation-1_0,
+the idle pool worker of an earlier test's consultation with the same id
+in its own database, whose app never ran its shutdown and whose pool
+waited on the garbage collector; the other machines collected it in time.
+The fix, 21 Oct: close() ends by waiting, bounded by CLOSE_WAIT_S (5 s),
+until no thread named stop-{id} or consultation-{id}_ is alive; every app
+built in a test is shut down at its end as the lifespan does it
+(conftest); and a deleted consultation is closed before it is dropped
+from the running table, the same leak in the room. Proven with the
+collector switched off: 42 such threads on the table before the test,
+then none; the test's assertion is as it was.
+
 What stage 8 should know: Alba's area and question calls take the same
 block in the same place by with_background (ruling 5, last sentence;
 D24). The three background files and with_background are the whole of

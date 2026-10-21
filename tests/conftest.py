@@ -76,6 +76,29 @@ def r18_guard(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module, "find_converter_at_start", lambda: None)
 
 
+@pytest.fixture(autouse=True)
+def every_app_shut_down(monkeypatch):
+    """A test that builds an app and never runs its lifespan leaves the
+    app's consultations open; an open consultation's pool worker then
+    waits on the garbage collector, and one with the same id turned up in a
+    later test's table (the Ubuntu failure of run 17, 7b). Every app built
+    in a test is shut down at its end as the lifespan does it: each running
+    consultation closed, so no thread of a consultation outlives its test."""
+    built = []
+    real = app_module.FastAPI
+
+    def recording(*args, **kwargs):
+        app = real(*args, **kwargs)
+        built.append(app)
+        return app
+
+    monkeypatch.setattr(app_module, "FastAPI", recording)
+    yield
+    for app in built:
+        for consultation in app.state.parts.running.values():
+            consultation.close()
+
+
 # ------------------------------------------------------------ the fake clock
 
 class FakeClock:

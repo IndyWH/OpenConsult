@@ -73,7 +73,8 @@ def delete_rows(con, consultation_id: int) -> dict:
 
 def delete_consultation(p, consultation_id: int) -> Deleted:
     """The one function. Rows first, in one transaction; then the file;
-    then the audit line; the object dropped from the running table."""
+    then the audit line; the object closed and dropped from the running
+    table, so no thread of a deleted consultation lives on in the room."""
     row = p.consultations.get(consultation_id)
     if row is None:
         raise NoSuchConsultation(consultation_id)
@@ -89,7 +90,9 @@ def delete_consultation(p, consultation_id: int) -> Deleted:
             path.unlink()
         else:
             file_name = None
-    p.running.pop(consultation_id, None)
+    dropped = p.running.pop(consultation_id, None)
+    if dropped is not None:
+        dropped.close()
     date = datetime.fromisoformat(row["started_at"]).date().isoformat()
     deleted = Deleted(consultation_id, row["patient_id"], date, counts, file_name, file_bytes)
     p.audit.record("consultation.deleted", deleted.line())

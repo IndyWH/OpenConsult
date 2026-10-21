@@ -37,6 +37,10 @@ WITHIN, OVER = "within", "over"
 LIVE, STOPPING, FINAL = "live", "stopping", "final"
 # The named in-progress states a spinner may show (V1_LESSONS 5.3).
 SPINNING = ("speech_starting", "pass_running", "speech", "label_check", "checks", "gate", "note")
+# A thread that has returned leaves the table a moment later; close waits for
+# that moment, far beyond its length on the slowest machine, and no longer, so
+# that the app's shutdown never hangs on a thread that will not end.
+CLOSE_WAIT_S = 5.0
 
 
 def clock_state(used_s: float, intended_minutes: int) -> str:
@@ -281,6 +285,24 @@ class Consultation:
         if self._stop_thread is not None and self._stop_thread is not threading.current_thread():
             self._stop_thread.join()
         self._pool.shutdown(wait=True)
+        self._wait_for_my_threads()
+
+    def _is_mine(self, thread: threading.Thread) -> bool:
+        """The Stop thread, or a worker of the pass pool (named prefix_N), of
+        this consultation and no other: consultation 1 is not 10."""
+        return thread.name == f"stop-{self.id}" or thread.name.startswith(f"consultation-{self.id}_")
+
+    def _wait_for_my_threads(self) -> None:
+        """Until no thread of the consultation is on the table, bounded by
+        CLOSE_WAIT_S: what close promises, not what a caller hopes."""
+        end = time.monotonic() + CLOSE_WAIT_S
+        while True:
+            left = [t for t in threading.enumerate() if self._is_mine(t) and t is not threading.current_thread()]
+            remaining = end - time.monotonic()
+            if not left or remaining <= 0:
+                return
+            if left[0].is_alive():
+                left[0].join(timeout=remaining)
 
     # -------------------------------------------------------------- state
 
