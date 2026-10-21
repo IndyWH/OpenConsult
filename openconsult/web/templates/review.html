@@ -5,7 +5,7 @@
 {% macro differentials_aside() -%}
 <aside class="differentials no-print" id="differentials">
   <h4 class="mark">{{ words.MODELS_DIFFERENTIALS }}</h4>
-  <ul class="panel-list">{% for d in differentials %}<li>{{ d.condition }} ({{ d.likelihood }}): {{ d.rationale }}</li>{% else %}<li class="mark">{{ words.NO_DIFFERENTIALS }}</li>{% endfor %}</ul>
+  <ul class="panel-list">{% for d in differentials %}<li{% if d.condition in marks %} class="red"{% endif %}>{{ d.condition }} ({{ d.likelihood }}): {{ d.rationale }}{% if d.condition in marks %} <button type="button" class="red-name" data-name="{{ d.condition }}">{{ words.ALARM_NAMED }}</button>{% endif %}</li>{% else %}<li class="mark">{{ words.NO_DIFFERENTIALS }}</li>{% endfor %}</ul>
 </aside>
 {%- endmacro %}
 {% block head %}<link rel="stylesheet" href="/static/print.css" media="print">{% endblock %}
@@ -13,6 +13,8 @@
 <div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}">
 <script id="words" type="application/json">{{ words_json|safe }}</script>
 <script id="player-data" type="application/json">{{ player_json|safe }}</script>
+<script id="marks" type="application/json">{{ marks_json|safe }}</script>
+<dialog id="alarm-dialog" class="alarm-dialog"></dialog>
 <h1 class="page print-keep">{{ words.REVIEW_TITLE }}</h1>
 <p class="statement print-keep"><b>{{ ran_with.name }}</b> <span class="mark">{{ date }}</span></p>
 <p class="mark no-print" id="ran-with">{{ words.RAN_WITH }} {{ ran_with.name }}, {{ ran_with.born }}, {{ ran_with.sex }}. <a href="/patients/{{ patient.id }}">{{ words.PATIENTS_PAGE_LINK }}</a>{% if ran_with.corrected %}<br>{{ ran_with.corrected }}{% endif %}</p>
@@ -60,6 +62,7 @@
     <form method="post" action="/consultations/{{ cid }}/note/approve" id="approve-form">
       <button class="primary" id="approve" aria-describedby="approve-refusal" {% if approve_reason %}disabled{% endif %}>{{ words.APPROVE }}</button>
       <a href="#warnings" id="warning-count" class="warning-count">{{ warning_count }}</a>
+      <a href="#alarms" id="alarm-count" class="warning-count">{{ alarm_count }}</a>
       {{ refusal("approve") }}
       {% if approve_reason and not (refused and refused.control == "approve") %}<p class="mark reason">{{ approve_reason }}</p>{% endif %}
     </form>
@@ -89,6 +92,10 @@
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
       {% elif player.available and w.line_n %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}">{{ words.PLAY_FROM_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
     {% else %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
+    <h3 class="mark" id="alarms">{{ words.ALARMS }}</h3>
+    {% if alarms %}<ul class="panel-list">{% for a in alarms %}<li class="alarm-line" data-key="{{ a.key }}" data-n="{{ a.n }}">{{ a.text }}
+      {% if player.available and a.start_s is not none %}<button type="button" class="play-at" data-start="{{ a.start_s }}">{{ words.PLAY_FROM_ALARM }}</button>{% endif %}</li>{% endfor %}</ul>
+    {% else %}<p class="mark">{{ words.NO_ALARMS }}</p>{% endif %}
   </div>
 </section>
 
@@ -154,6 +161,7 @@
 </section>
 </div>
 <script src="/static/use.js"></script>
+<script src="/static/alarmdialog.js"></script>
 <script src="/static/review.js"></script>
 <script src="/static/player.js"></script>
 {% endblock %}

@@ -16,6 +16,15 @@
   document.querySelectorAll('button.cite').forEach(function (button) {
     button.addEventListener('click', function () { show(button.dataset.line); });
   });
+  // The red mark beside the assessment (15.11 ruling 9): a press shows the alarm the app matched.
+  const marksNode = document.getElementById('marks');
+  const marks = marksNode ? JSON.parse(marksNode.textContent) : {};
+  document.querySelectorAll('button.red-name').forEach(function (button) {
+    button.addEventListener('click', function () {
+      const alarm = marks[button.dataset.name];
+      if (alarm && window.alarmDialog) window.alarmDialog.show(alarm.reasoning, alarm.actions, WORDS);
+    });
+  });
   const copy = document.getElementById('copy-note');
   const result = document.getElementById('copy-note-result');
   if (copy) copy.addEventListener('click', function () {

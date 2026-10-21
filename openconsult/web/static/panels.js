@@ -49,6 +49,7 @@
       if (!panel.n && !panel.failure) { node.appendChild(el('p', 'mark', state.passes.running ? words.PASS_RUNNING : words.LISTENING)); return; }
       node.appendChild(list(words.DIFFERENTIALS, panel.differentials, words, function (d) {
         return d.condition + ' (' + d.likelihood + '): ' + d.rationale; }));
+      markRed(node, panel, state.passes.alarm, words);
       node.appendChild(list(words.QUESTIONS, panel.questions, words, function (q) { return q; }));
       node.appendChild(list(words.SIGNS, panel.signs, words, function (s) { return s; }));
     },
@@ -84,6 +85,22 @@
       document.getElementById('spinner').hidden = !state.spinning;
     },
   };
+
+  // The red mark (15.11 ruling 9): the names the app matched are marked and
+  // become a press that shows the alarm's reasoning and actions.
+  function markRed(node, panel, alarm, words) {
+    const marked = panel.marked || [];
+    if (!marked.length || !alarm) return;
+    node.querySelectorAll('li').forEach(function (li) {
+      const name = marked.find(function (m) { return li.textContent.indexOf(m + ' (') === 0; });
+      if (!name) return;
+      li.classList.add('red');
+      const button = el('button', 'red-name', words.ALARM_NAMED);
+      button.type = 'button';
+      button.addEventListener('click', function () { if (window.alarmDialog) window.alarmDialog.show(alarm.reasoning, alarm.actions, words); });
+      li.appendChild(button);
+    });
+  }
 
   function alarmBlock(alarm, words, earlier) {
     const block = el('div', earlier ? 'earlier-alarm' : 'current-alarm');

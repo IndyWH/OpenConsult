@@ -175,3 +175,7 @@ h1.page .number { font-size: .85rem; font-weight: 400; }
 .earlier-note .note-body h4 { margin: .5rem 0 .1rem; font-size: .78rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); }
 button.danger { background: var(--red); }
 button.danger:hover { background: #A33425; }
+li.red { color: var(--red); font-weight: 600; }
+button.red-name { border-color: var(--red); color: var(--red); font-size: .78rem; padding: .15rem .6rem; margin-left: .4rem; }
+dialog.alarm-dialog { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.4rem; max-width: 520px; }
+dialog.alarm-dialog::backdrop { background: rgba(41, 35, 31, .35); }

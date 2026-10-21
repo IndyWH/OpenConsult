@@ -168,12 +168,21 @@ class Passes:
 
     # ------------------------------------------------------------- state
 
+    def marked(self) -> list[str]:
+        """The differentials the current alarm names (15.11 ruling 9)."""
+        from openconsult.consult.alarms import MARKED_STATES, matched_names
+        current = self.current_alarm()
+        if current is None or current.state not in MARKED_STATES:
+            return []
+        names = [d.get("condition") for d in self.panel.differentials if isinstance(d, dict) and d.get("condition")]
+        return matched_names(current.reasoning, current.actions, names)
+
     def state(self) -> dict:
         current = self.current_alarm()
         return {
             "n": self.n,
             "running": self.running,
-            "assessment": asdict(self.panel),
+            "assessment": {**asdict(self.panel), "marked": self.marked()},
             "alarm": self._alarm_dict(current) if current else None,
             "earlier_alarms": [self._alarm_dict(a) for a in self.earlier_alarms()],
         }

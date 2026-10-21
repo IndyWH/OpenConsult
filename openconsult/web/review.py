@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import deletion, note, speakers
+from openconsult.consult import alarms, deletion, note, speakers
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -32,7 +32,7 @@ from openconsult.web.pages import form_fields, refuse, render
 router = APIRouter()
 GATE_REFUSALS = ("too_short", "empty")
 # The sentences the page scripts render, handed as data (15.6).
-SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED")
+SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE")
 # The loudness strip is drawn in this many columns, each the loudest of its windows.
 STRIP_COLUMNS = 400
 
@@ -176,14 +176,21 @@ def page_data(p, row: dict) -> dict:
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
     player = player_data(row, lines, warnings, p.settings.data_folder)
+    pass_rows = p.consultations.passes(cid)
+    differentials = note.last_shown_differentials(pass_rows)
+    marks = alarms.review_marks(pass_rows, [d.get("condition") for d in differentials if isinstance(d, dict)])
+    alarm_rows = alarms.alarm_lines(pass_rows, p.consultations.live_lines(cid), datetime.fromisoformat(row["started_at"]),
+                                    alarms.acknowledged_keys(p.audit.lines(), cid), words)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
+            "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
+            "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
             "lines": lines, "warnings": warnings,
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
             "conversion_failed": words.CONVERSION_FAILED.format(reason=row["conversion_failure"]) if row.get("conversion_failure") else None,
             "warning_count": words.WARNING_ONE if len(warnings) == 1 else words.WARNINGS_COUNT.format(count=len(warnings)),
-            "differentials": note.last_shown_differentials(p.consultations.passes(cid)),
+            "differentials": differentials,
             "gate_refused": gate_refused, "gate_reason": gate_reason, "model_line": model_line_of(row),
             "date": words.plain_date(datetime.fromisoformat(row["started_at"])), **state,
             "approved_line": words.APPROVED_LINE.format(date=_when(state["approval"]["at"])[0], time=_when(state["approval"]["at"])[1])

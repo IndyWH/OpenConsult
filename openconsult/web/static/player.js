@@ -22,6 +22,9 @@
       if (line) playFrom(line.start_s);
     });
   });
+  document.querySelectorAll('button.play-at').forEach(function (button) {
+    button.addEventListener('click', function () { playFrom(Number(button.dataset.start)); });
+  });
   document.querySelectorAll('button.play-stretch').forEach(function (button) {
     button.addEventListener('click', function () { playFrom(Number(button.dataset.start), Number(button.dataset.end)); });
   });
