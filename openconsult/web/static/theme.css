@@ -161,3 +161,8 @@ button.cite:hover { text-decoration: underline; }
 .player canvas { width: 100%; height: 48px; cursor: pointer; background: var(--paper); border-radius: 6px; }
 .line.playing { background: #EFE7DE; }
 button.play-stretch { padding: .2rem .7rem; font-size: .78rem; margin-left: .5rem; }
+
+/* The Patients page (7a): the search box in one row, the number small. */
+form.search { display: flex; align-items: flex-end; gap: .6rem; margin-top: 1rem; }
+form.search label { flex: 1; margin: 0; }
+td.number { color: var(--ink-faint); font-size: .85rem; }

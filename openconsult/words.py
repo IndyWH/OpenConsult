@@ -66,7 +66,7 @@ CARD_UNREADABLE = "Could not be read"
 
 # The header and the home page.
 APP_NAME = "OpenConsult"
-NAV_HOME = "Home"
+NAV_HOME = "Patients"
 NAV_SETTINGS = "Settings"
 NAV_LOG = "Log"
 NAV_LOGOUT = "Log out"
@@ -81,6 +81,18 @@ HOME_SO_FAR = (
     "assessment, the warnings and the transcript with its player; you correct, draft again, copy and approve."
 )
 HOME_WAITING = "Waiting at Stop"
+# The Patients page (spec 15.11 ruling 1; 8.1; R1, R17): the list, last seen first, and the one search box. Drafts.
+PATIENTS_TITLE = "Patients"
+FIELD_SEARCH = "Name, date of birth or number"
+SEARCH = "Search"
+SEARCH_NONE = "No patient matches {query}."
+NO_PATIENTS = "No patient yet."
+COL_NAME = "Name"
+COL_DATE_OF_BIRTH = "Date of birth"
+COL_SEX = "Sex"
+COL_LAST_SEEN = "Last seen"
+COL_NUMBER = "Number"
+NEVER_SEEN = "Not yet seen"
 HOME_WAITING_LINE = "{name}, started {when}"
 CONTINUE_CONSULTATION = "Continue"
 

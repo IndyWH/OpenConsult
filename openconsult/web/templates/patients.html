@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% set title = words.PATIENTS_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.PATIENTS_TITLE }}</h1>
+<p class="statement">{{ statement }}</p>
+{% if waiting %}
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.HOME_WAITING }}</h2></div>
+  <div class="pane-body">
+    {% for row in waiting %}
+    <p>{{ row.line }} <a class="button" href="/consultations/{{ row.id }}">{{ words.CONTINUE_CONSULTATION }}</a></p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+{% if review %}
+<section class="pane">
+  <div class="pane-head"><h2>{{ words.HOME_REVIEW }}</h2></div>
+  <div class="pane-body">
+    {% for row in review %}
+    <p>{{ row.line }} <a class="button" href="/consultations/{{ row.id }}">{{ words.REVIEW }}</a></p>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+<form method="get" action="/" class="search" id="search-form">
+  <label>{{ words.FIELD_SEARCH }}<input name="q" value="{{ query }}" autocomplete="off" autofocus></label>
+  <button id="search">{{ words.SEARCH }}</button>
+</form>
+<section class="pane" id="patients">
+  {% if rows %}
+  <table>
+    <thead><tr><th>{{ words.COL_NAME }}</th><th>{{ words.COL_DATE_OF_BIRTH }}</th><th>{{ words.COL_SEX }}</th><th>{{ words.COL_LAST_SEEN }}</th><th>{{ words.COL_NUMBER }}</th></tr></thead>
+    <tbody>
+    {% for row in rows %}
+    <tr class="patient" data-patient="{{ row.id }}"><td><a href="/patients/{{ row.id }}">{{ row.name }}</a></td><td>{{ row.born }}</td><td>{{ row.sex }}</td><td>{{ row.seen }}</td><td class="number">{{ row.id }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  {% else %}<div class="pane-body"><p class="mark" id="none-found">{{ none_found or words.NO_PATIENTS }}</p></div>{% endif %}
+</section>
+<p><a class="button" href="/patients/new">{{ words.NAV_NEW_PATIENT }}</a></p>
+<p class="mark">{{ words.HOME_SO_FAR }}</p>
+{% endblock %}

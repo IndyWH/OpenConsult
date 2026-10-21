@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
 from openconsult import words
+from openconsult.patients import patients as patients_module
 from openconsult.patients.users import MIN_PASSWORD, name_problem, password_problem
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
@@ -107,17 +108,25 @@ def choice_lines(request: Request) -> list[tuple[str, str]]:
 
 @router.get("/")
 async def home(request: Request, user=Depends(guards.logged_in)):
-    """The home page lists each consultation waiting at Stop with one
-    control, Continue (review point 3; R15)."""
+    """The home page is the Patients page (15.11 ruling 1; 8.1; R1): at
+    the top each consultation waiting at Stop with one control, Continue
+    (review point 3; R15), and each final consultation with no approved
+    note, once, with one control, Review (6b); then the search box; then
+    the list, last seen first, read from the tables every time."""
     p = parts(request)
     waiting = [{"id": row["id"], "line": words.HOME_WAITING_LINE.format(
         name=row["patient_name"], when=row["started_at"][:16].replace("T", " "))}
         for row in p.consultations.in_state("stopping")]
-    # And each final consultation with no approved note, once, with one control, Review (6b; R15).
     review = [{"id": row["id"], "line": words.HOME_WAITING_LINE.format(
         name=row["patient_name"], when=row["started_at"][:16].replace("T", " "))}
         for row in p.consultations.waiting_for_review()]
-    return render(request, "home.html", user=user, active="home", waiting=waiting, review=review)
+    query = request.query_params.get("q", "").strip()
+    found = patients_module.search(p.patients.listed(), query)
+    rows = [{"id": r.patient.id, "name": r.patient.name, "born": words.plain_date(r.patient.date_of_birth),
+             "sex": words.SEX_WORDS[r.patient.sex],
+             "seen": words.plain_date(r.last_seen) if r.last_seen else words.NEVER_SEEN} for r in found]
+    return render(request, "patients.html", user=user, active="home", waiting=waiting, review=review,
+                  query=query, rows=rows, none_found=words.SEARCH_NONE.format(query=query) if query and not rows else None)
 
 
 # ------------------------------------------------------------ the first run
