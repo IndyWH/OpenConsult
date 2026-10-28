@@ -154,7 +154,7 @@ def test_6_5_a_version_5_database_with_its_consultations_comes_forward_to_6(tmp_
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 6
+    assert new.version() >= 6          # 8a's version 7 comes with it, as the version 4 test allows for 5
     assert {"patient_change", "audio_deletion", "setting"} <= set(new.tables())
     assert Users(new, Audit(new)).verify("example-password")
     rows = new.query("SELECT * FROM consultation ORDER BY id")
@@ -181,3 +181,50 @@ def test_ruling_8_a_transaction_lands_whole_or_not_at_all(tmp_path):
         con.execute("INSERT INTO first_run (step, done_at) VALUES ('machine', 't')")
     assert [r["step"] for r in db.query("SELECT step FROM first_run ORDER BY step")] == ["machine", "statement"]
     db.close()
+
+
+def test_6_5_a_version_6_database_with_its_approved_notes_comes_forward_to_7(tmp_path, monkeypatch):
+    # The owner's real database and stage7b-data are at version 6 (stage 7).
+    # Stage 8a's five tables arrive empty, every row stays, and the CHECKs
+    # and the UNIQUEs hold (15.12, The record; R2).
+    from openconsult.patients.audit import Audit
+    from openconsult.patients.users import Users
+
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 6)
+    old = open_database(path)
+    assert old.version() == 6 and "letter" not in old.tables()
+    Users(old, Audit(old)).set_up("Dr", "Example", "example-password")
+    old.execute("INSERT INTO patient (name, date_of_birth, sex, created_at) VALUES ('Made-up', '1990-01-01', 'F', 't')")
+    old.execute("INSERT INTO consultation (patient_id, started_at, intended_minutes, speech_choice, engine, model_tag, "
+                "speakers_given, state, patient_name, patient_date_of_birth, patient_sex) "
+                "VALUES (1, 't', 15, 'nemotron', 'vllm', 'tag', 2, 'final', 'Made-up', '1990-01-01', 'F')")
+    old.execute("INSERT INTO note_draft (consultation_id, n, at, asked_by, engine, model_tag, prompt_sha256, transcript, "
+                "entries_total, entries_cited, refused, wall_ms) VALUES (1, 1, 't', 'stop', 'e', 't', 'h', 'x', 1, 1, 0, 1)")
+    old.execute("INSERT INTO note_approval (consultation_id, draft_id, at, text) VALUES (1, 1, 't', 'made up')")
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 7
+    assert {"referral_list", "referral_item", "letter", "letter_edit", "letter_approval"} <= set(new.tables())
+    assert Users(new, Audit(new)).verify("example-password")
+    assert new.query_one("SELECT text FROM note_approval")["text"] == "made up"
+    assert new.query_one("SELECT patient_name FROM consultation")["patient_name"] == "Made-up"
+    assert new.query("SELECT * FROM letter") == [] and new.query("SELECT * FROM referral_item") == []
+    new.execute("INSERT INTO referral_list (consultation_id, approval_id, at, note_lines, wall_ms) VALUES (1, 1, 't', 'x', 1)")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO referral_list (consultation_id, approval_id, at, note_lines, wall_ms) VALUES (1, 1, 't', 'x', 1)")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO referral_item (consultation_id, kind, specialty, title, note_lines, position, created_at) "
+                    "VALUES (1, 'guessed', 's', 't', '[]', 0, 't')")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO referral_item (consultation_id, kind, specialty, title, urgency, note_lines, position, created_at) "
+                    "VALUES (1, 'stated', 's', 't', 'soon', '[]', 0, 't')")
+    new.execute("INSERT INTO referral_item (consultation_id, kind, specialty, title, note_lines, position, created_at) "
+                "VALUES (1, 'named', 's', 't', '[]', 0, 't')")
+    new.execute("INSERT INTO letter (consultation_id, item_id, n, at, engine, model_tag, prompt_sha256, note_lines, sentences_total, "
+                "sentences_grounded, placeholders, expectations_dropped, refused, wall_ms) VALUES (1, 1, 1, 't', 'e', 't', 'h', 'x', 0, 0, 0, 0, 0, 1)")
+    new.execute("INSERT INTO letter_approval (letter_id, at, text) VALUES (1, 't', 'x')")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO letter_approval (letter_id, at, text) VALUES (1, 't', 'y')")
+    new.close()

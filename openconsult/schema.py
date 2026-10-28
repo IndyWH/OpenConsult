@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 6
+VERSION = 7
 
 MIGRATIONS = {
     1: """
@@ -309,6 +309,85 @@ CREATE TABLE setting (
     name TEXT PRIMARY KEY,
     value TEXT NOT NULL,
     changed_at TEXT NOT NULL
+);
+""",
+
+    # Stage 8a (spec 15.12, The record; rulings 1, 2, 4 and 11; R2, R5,
+    # R20): the referral list made from an approved note, once; its items
+    # in three kinds; each letter with its stamp, the note lines it was
+    # sent, the body as the model gave it and as the check left it, the
+    # four counts and whether it was refused; the doctor's paragraph
+    # edits; the approval, once per letter. A version 6 folder comes
+    # forward with every row; these tables start empty.
+    7: """
+CREATE TABLE referral_list (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    approval_id INTEGER NOT NULL UNIQUE REFERENCES note_approval(id),
+    at TEXT NOT NULL,
+    call_id INTEGER REFERENCES model_call(id),
+    note_lines TEXT NOT NULL,
+    reasoning TEXT,
+    failure TEXT,
+    wall_ms INTEGER NOT NULL
+);
+
+CREATE TABLE referral_item (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    list_id INTEGER REFERENCES referral_list(id),
+    kind TEXT NOT NULL CHECK (kind IN ('stated', 'suggested', 'named')),
+    specialty TEXT NOT NULL,
+    title TEXT NOT NULL,
+    reason TEXT,
+    urgency TEXT CHECK (urgency IN ('urgent', 'routine')),
+    note_lines TEXT NOT NULL,
+    call_id INTEGER REFERENCES model_call(id),
+    position INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+
+CREATE TABLE letter (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    item_id INTEGER NOT NULL REFERENCES referral_item(id),
+    n INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    call_id INTEGER REFERENCES model_call(id),
+    engine TEXT NOT NULL,
+    engine_version TEXT,
+    model_tag TEXT NOT NULL,
+    model_digest TEXT,
+    prompt_sha256 TEXT NOT NULL,
+    note_lines TEXT NOT NULL,
+    reasoning TEXT,
+    model_body TEXT,
+    body TEXT,
+    check_detail TEXT,
+    sentences_total INTEGER NOT NULL,
+    sentences_grounded INTEGER NOT NULL,
+    placeholders INTEGER NOT NULL,
+    expectations_dropped INTEGER NOT NULL,
+    refused INTEGER NOT NULL,
+    failure TEXT,
+    wall_ms INTEGER NOT NULL,
+    doctor_refused_at TEXT
+);
+
+CREATE TABLE letter_edit (
+    id INTEGER PRIMARY KEY,
+    letter_id INTEGER NOT NULL REFERENCES letter(id),
+    paragraph INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    text_before TEXT NOT NULL,
+    text_after TEXT NOT NULL
+);
+
+CREATE TABLE letter_approval (
+    id INTEGER PRIMARY KEY,
+    letter_id INTEGER NOT NULL UNIQUE REFERENCES letter(id),
+    at TEXT NOT NULL,
+    text TEXT NOT NULL
 );
 """,
 }

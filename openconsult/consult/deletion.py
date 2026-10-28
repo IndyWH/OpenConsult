@@ -30,6 +30,12 @@ class ConsultationsRemain(Exception):
 
 # The rows of a consultation, children first, each with its count's name.
 ROW_DELETIONS = (
+    # The letters of 8a go first: they rest on the approval and the model calls.
+    ("letter_edits", "DELETE FROM letter_edit WHERE letter_id IN (SELECT id FROM letter WHERE consultation_id = ?)"),
+    ("letter_approvals", "DELETE FROM letter_approval WHERE letter_id IN (SELECT id FROM letter WHERE consultation_id = ?)"),
+    ("letters", "DELETE FROM letter WHERE consultation_id = ?"),
+    ("referral_items", "DELETE FROM referral_item WHERE consultation_id = ?"),
+    ("referral_lists", "DELETE FROM referral_list WHERE consultation_id = ?"),
     ("edits", "DELETE FROM note_edit WHERE entry_id IN (SELECT e.id FROM note_entry e JOIN note_draft d ON d.id = e.draft_id "
               "WHERE d.consultation_id = ?)"),
     ("entries", "DELETE FROM note_entry WHERE draft_id IN (SELECT id FROM note_draft WHERE consultation_id = ?)"),

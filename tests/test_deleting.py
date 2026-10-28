@@ -18,7 +18,7 @@ from tests.fakes import FakeEngine, MadeUpWorker
 from tests.test_review_page import LINES, engine_with, nemotron_doors, run_through
 from tests.test_start import PATIENT, TICKS, app_with
 
-TABLES = ("note_edit", "note_entry", "note_approval", "note_refusal", "note_draft", "transcript_edit", "transcript_line",
+TABLES = ("letter_edit", "letter_approval", "letter", "referral_item", "referral_list", "note_edit", "note_entry", "note_approval", "note_refusal", "note_draft", "transcript_edit", "transcript_line",
           "live_line", "warning", "cds_pass", "model_call", "consultation")
 
 
@@ -27,6 +27,8 @@ def rows_of(db, cid):
     for table in TABLES:
         if table == "consultation":
             found[table] = db.query_one("SELECT COUNT(*) AS n FROM consultation WHERE id = ?", (cid,))["n"]
+        elif table in ("letter_edit", "letter_approval"):
+            found[table] = db.query_one(f"SELECT COUNT(*) AS n FROM {table} WHERE letter_id IN (SELECT id FROM letter WHERE consultation_id = ?)", (cid,))["n"]
         elif table == "note_entry":
             found[table] = db.query_one("SELECT COUNT(*) AS n FROM note_entry WHERE draft_id IN (SELECT id FROM note_draft WHERE consultation_id = ?)", (cid,))["n"]
         elif table == "note_edit":
@@ -36,13 +38,30 @@ def rows_of(db, cid):
     return found
 
 
+def letters_rows(p, cid):
+    """8a: a list, two items, two letters, one edit and one approval under
+    the consultation, so the delete of ruling 8 is proven to take them too."""
+    from openconsult.consult.letter_rows import ItemRow, LetterRow, ListRow
+    letters = p.letters
+    list_id = letters.add_list(ListRow(cid, p.notes.approval(cid)["id"], None, "[1] made", None, None, 1))
+    stated = letters.add_item(ItemRow(cid, list_id, "stated", "Made-up specialty", "Physician", "made", "routine", [9], None, 0))
+    named = letters.add_item(ItemRow(cid, None, "named", "Other specialty", "Surgeon", None, None, [], None, 0))
+    row = LetterRow(cid, stated, None, "made-up", "0", "tag", "d", "h" * 64, "[1] made", None, [], "made body.", {}, 1, 1, 0, 0, False, None, 1)
+    one = letters.add_letter(row)
+    letters.add_letter(LetterRow(**{**row.__dict__, "item_id": named}))
+    letters.set_paragraph(one, 0, "edited body.")
+    letters.approve(one, "Dear Consultant Physician,\n\nedited body.")
+
+
 def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_file_and_leaves_the_audit_line_with_counts_and_no_words(tmp_path, clock, machine):
     app, client, c = run_through(tmp_path, clock, machine, nemotron_doors(MadeUpWorker(live=LINES)), engine_with())
     p = app.state.parts
     entry = p.notes.entries(p.notes.current_draft(1)["id"])[0]
     client.post(f"/consultations/1/entries/{entry['id']}", data={"text": "edited words"})
     client.post("/consultations/1/note/approve")
+    letters_rows(p, 1)
     before = rows_of(p.db, 1)
+    assert before["letter"] == 2 and before["letter_edit"] == 1 and before["letter_approval"] == 1 and before["referral_item"] == 2
     assert before["transcript_line"] == 2 and before["cds_pass"] >= 1 and before["note_approval"] == 1 and before["note_edit"] == 1
     recording = tmp_path / "recordings" / "consultation_1.wav"
     assert recording.is_file() and approved_notes(p.notes, 1) and 1 in p.running
@@ -57,7 +76,8 @@ def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_
     assert all(n == 0 for n in rows_of(p.db, 1).values()) and not recording.is_file() and 1 not in p.running
     line = p.audit.lines()[0]
     assert line.event == "consultation.deleted"
-    assert line.detail == (f"patient 1, consultation 1 of 2026-10-04: {before['note_edit']} edits, {before['note_entry']} entries, "
+    assert line.detail == (f"patient 1, consultation 1 of 2026-10-04: 1 letter edits, 1 letter approvals, 2 letters, 2 referral items, "
+                           f"1 referral lists, {before['note_edit']} edits, {before['note_entry']} entries, "
                            f"1 approvals, 0 refusals, 1 drafts, 0 transcript edits, 2 lines, 2 live lines, {before['warning']} warnings, "
                            f"{before['cds_pass']} passes, {before['model_call']} model calls, 1 recording file, {size} bytes")
     for word in ("word", "Yes", "made up", "edited"):

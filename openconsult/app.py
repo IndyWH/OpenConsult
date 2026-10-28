@@ -15,6 +15,7 @@ import asyncio
 
 from openconsult.consult import opus, retention, stop
 from openconsult.consult.consultations import Consultations
+from openconsult.consult.letter_rows import Letters
 from openconsult.consult.note_rows import Notes
 from openconsult.db import Database, open_database
 from openconsult.llm.choose import NoEngine, choose
@@ -62,6 +63,7 @@ class Parts:
     patients: Patients = None
     consultations: Consultations = None            # the rows (15.10)
     notes: Notes = None                            # the note's rows (6b)
+    letters: Letters = None                        # the referral letters' rows (8a)
     stored: Stored = None                          # the settings a page can change (7a)
     converter: object = None                       # the recording converter found at start, or None (7a)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
@@ -117,6 +119,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         patients=Patients(db, audit, clock),
         consultations=Consultations(db, clock),
         notes=Notes(db, clock),
+        letters=Letters(db, clock),
         stored=Stored(db, audit, clock),
         converter=converter,
         clock=clock,
