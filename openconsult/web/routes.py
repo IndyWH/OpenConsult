@@ -12,7 +12,7 @@ from openconsult import words
 from openconsult.patients import patients as patients_module
 from openconsult.patients.users import MIN_PASSWORD, name_problem, password_problem
 from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
-from openconsult.web import guards
+from openconsult.web import guards, guidelines as guidelines_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -261,7 +261,7 @@ def _settings_page(request: Request, user, refused=None):
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
-                   page_path="/settings")
+                   guidelines=guidelines_web.section_data(request), page_path="/settings")
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)
     return render(request, "settings.html", **context)

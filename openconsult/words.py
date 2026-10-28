@@ -392,6 +392,67 @@ CONVERSION_NO_WAV = "the WAV file was not there."
 CONVERSION_NOT_PLAYABLE = "the Opus file could not be played back."
 CONVERSION_LENGTH_DIFFERS = "the Opus file plays for {opus} s and the WAV for {wav} s."
 
+# The guideline panel and the Guidelines section of Settings (spec 15.12, rulings 5 and 6; R3, R15; 7.3 rules 1 and 4).
+# Drafts for the owner. The panel answers from the loaded documents alone and says when they have nothing.
+PANEL_GUIDELINES = "Guidelines"
+GUIDELINE_NO_CORPUS = "No guideline document is loaded. Add one in Settings, under Guidelines. Nothing was asked of the model."
+GUIDELINE_NOT_INSTALLED = "The guideline search is not installed on this computer. Run openconsult install-guidelines."
+GUIDELINE_WORKER_FAILED = "The guideline search is not running: {reason}"
+GUIDELINE_WAITING = "Waiting for the first differentials."
+GUIDELINE_SEARCHING = "Searching the loaded guidelines for {names}."
+GUIDELINE_FOR = "For {names}:"
+GUIDELINE_NOT_COVERED = "The loaded guidelines do not cover {names}."
+GUIDELINE_MODEL_SAID = "The model's reason: {sentence}"
+GUIDELINE_FAILED = "The guideline summary could not be made: {reason}"
+GUIDELINE_INDEX_MODEL = ("The loaded passages were built with another embedding model, so they were not searched. "
+                         "Remove and add the documents again.")
+GUIDELINE_FROM_EARLIER = "From an earlier pass; a new search is running."
+GUIDELINE_PROVENANCE = "From {sources} documents, {passages} passages, the latest added on {date}."
+GUIDELINE_CITED = "Cited:"
+GUIDELINE_SOURCE_LINE = "{title}, {publisher}"
+GUIDELINE_PASSAGE_TITLE = "Passage {n}"
+SECTION_GUIDELINES = "Guidelines"
+GUIDELINES_INTRO = ("The documents the guideline panel answers from. It answers from these alone, never from the model's "
+                    "memory, and says when they do not cover a topic. OpenConsult never fetches a document itself.")
+NO_GUIDELINES = "No guideline document is loaded."
+COL_TITLE = "Title"
+COL_PUBLISHER = "Publisher"
+COL_PASSAGES = "Passages"
+COL_ADDED = "Added"
+REMOVE_GUIDELINE = "Remove"
+ADD_GUIDELINE = "Add"
+FIELD_GUIDELINE_FILE = "A file on this computer: HTML, PDF or plain text"
+FIELD_GUIDELINE_TITLE = "Title"
+FIELD_GUIDELINE_PUBLISHER = "Publisher"
+GUIDELINE_STATEMENT_TICK = "I hold the right to use this document this way."
+GUIDELINE_ADDED = "Added: {passages} passages in {seconds} s."
+GUIDELINE_REMOVED = "Removed."
+GUIDELINE_FILE_MISSING = "Choose a file."
+GUIDELINE_TITLE_MISSING = "Enter the title."
+GUIDELINE_PUBLISHER_MISSING = "Enter the publisher."
+GUIDELINE_TICK_NEEDED = "Tick the statement to add the document."
+GUIDELINE_FILE_KIND = "The file must be HTML, PDF or plain text."
+GUIDELINE_FILE_TOO_BIG = "The file is over {limit} MB."
+GUIDELINE_NO_PASSAGES = "No passage of 40 words or more could be read from this file. Nothing was added."
+GUIDELINE_EMBED_FAILED = "The passages could not be embedded: {reason} Nothing was added."
+GUIDELINE_ADD_NEEDS_WORKER = "Add is not available: {reason}"
+GUIDELINE_WORKER_LINE = "The guideline search: {state}."
+WHERE_WORDS = {"card": "the graphics card", "processor": "the processor"}
+WORKER_STATES = {
+    "ready": "running on {where}, {model}",
+    "starting": "starting on {where}",
+    "not_installed": "not installed; run openconsult install-guidelines",
+    "failed": "not running: {reason}",
+    "stopped": "stopped",
+}
+# The loader command of the bench kit (ruling 18), said in the terminal. Counts only.
+LOAD_NEEDS_PUBLISHER = "guideline-load needs --publisher, the publisher's name, which is never written into OpenConsult itself."
+LOAD_NEEDS_STATEMENT = "guideline-load needs --statement-accepted: the statement of the Guidelines section, given as the owner's."
+LOAD_FOLDER_REFUSED = "guideline-load never loads into the default data folder or the repository: give a bench folder by its path."
+LOAD_FILE = "{name}: {kind}, {passages} passages ({outside} outside 40 to 350 words), {seconds} s."
+LOAD_FILE_REFUSED = "{name}: not loaded: {reason}"
+LOAD_DONE = "Loaded {files} of {given} files: {passages} passages, {outside} outside 40 to 350 words, {seconds} s."
+
 # The first run.
 FIRST_RUN_STATEMENT_TITLE = "Before you start"
 FIRST_RUN_MACHINE_TITLE = "This machine"
@@ -528,6 +589,8 @@ EVENTS = {
     "letter.edited": "Referral letter paragraph edited by the doctor",
     "letter.approved": "Referral letter approved",
     "letter.refused": "Referral letter refused by the doctor",
+    "guideline.added": "Guideline document added",
+    "guideline.removed": "Guideline document removed",
 }
 
 # The command. Plain ASCII, for every terminal.

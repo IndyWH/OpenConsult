@@ -11,6 +11,7 @@ dependencies = [
     "jinja2>=3.1.6",
     "websockets>=17.2",
     "imageio-ffmpeg>=0.6.0",
+    "pypdf>=6.21.4",
 ]
 
 [project.scripts]

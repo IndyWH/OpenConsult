@@ -225,3 +225,8 @@ packages; the direct ones are:
   nvidia-cudnn-cu13, nvidia-cublas and the other nvidia-* and cuda-* wheels
     torch requires          NVIDIA proprietary (the CUDA Toolkit end user licence)
                                              https://pypi.org/project/nvidia-cudnn-cu13/
+
+Stage 8b, 28 Oct 2026. One library the app imports (linked at run time),
+to read a PDF the doctor adds to the guideline corpus (spec 15.12, ruling 5):
+
+  pypdf 6.21.4               BSD-3-Clause     https://pypi.org/project/pypdf/

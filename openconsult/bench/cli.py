@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import openconsult
-from openconsult.bench import background, export, figures, letter_marks, letters, score, wordcheck
+from openconsult.bench import background, export, figures, guideline_load, letter_marks, letters, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
@@ -276,6 +276,12 @@ def cmd_wordcheck(args) -> int:
     return 0 if found["matched"] == found["total"] else 1
 
 
+def cmd_guideline_load(args) -> int:
+    """The loader command of 8b (15.12 ruling 18): a folder of documents into a bench data folder's corpus."""
+    return guideline_load.guideline_load(Path(args.folder), args.publisher, Path(args.data_folder), args.statement_accepted,
+                                         args.where, say=say)
+
+
 def cmd_speech_fetch(args) -> int:
     return speech_commands.speech_fetch(Path(args.data_folder), say=say)
 
@@ -469,6 +475,13 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--case", nargs="*", help="only these cases")
     p.add_argument("--chains", nargs="*", help="only these chains, for a check")
     p.add_argument("--letter", action="append", help="CASE=SPECIALTY, the specialty a case that states no referral drafts to")
+    p = sub.add_parser("guideline-load")
+    p.set_defaults(fn=cmd_guideline_load)
+    p.add_argument("--folder", required=True, help="the folder of documents, every file loaded")
+    p.add_argument("--publisher", required=True, help="the publisher's name, given here and never written into the repository")
+    p.add_argument("--data-folder", required=True, help="the bench's data folder whose corpus is loaded; never the default one")
+    p.add_argument("--statement-accepted", action="store_true", help="the statement of the Guidelines section, given as the owner's")
+    p.add_argument("--where", choices=["card", "processor"], default="card", help="where the embedding worker runs")
     p = command("letters-score", cmd_letters_score)
     p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
     p = sub.add_parser("background-score")

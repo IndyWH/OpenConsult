@@ -18,6 +18,8 @@ from openconsult.consult.consultations import Consultations
 from openconsult.consult.letter_rows import Letters
 from openconsult.consult.note_rows import Notes
 from openconsult.db import Database, open_database
+from openconsult.guidelines.embedder import make_embedder
+from openconsult.guidelines.sources import Sources
 from openconsult.llm.choose import NoEngine, choose
 from openconsult.llm.door import Door
 from openconsult.llm.engine import Engine
@@ -37,7 +39,7 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import consult, guards, letters as letters_web, live, patients as patients_web, review, routes
+from openconsult.web import consult, guards, guidelines as guidelines_web, letters as letters_web, live, patients as patients_web, review, routes
 from openconsult.web.first_run import FirstRun
 
 STATIC = Path(__file__).parent / "web" / "static"
@@ -65,6 +67,8 @@ class Parts:
     notes: Notes = None                            # the note's rows (6b)
     letters: Letters = None                        # the referral letters' rows (8a)
     stored: Stored = None                          # the settings a page can change (7a)
+    sources: Sources = None                        # the corpus's rows (8b)
+    embedder: object = None                        # the door to the embedding worker, where the room check put it (8b)
     converter: object = None                       # the recording converter found at start, or None (7a)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     clock: Clock = now_local
@@ -74,10 +78,11 @@ class Parts:
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
               engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None, card_programs: Callable | None = None,
-              find_converter: Callable | None = None) -> FastAPI:
-    """engines, speech, doors, card_programs and find_converter are passed
-    in by tests, so the suite needs no vLLM, no Ollama, no speech worker,
-    no card and no converter (spec 15.7, 15.8, 15.9, 15.11). Building a
+              find_converter: Callable | None = None, embedder=None) -> FastAPI:
+    """engines, speech, doors, card_programs, find_converter and embedder
+    are passed in by tests, so the suite needs no vLLM, no Ollama, no
+    speech worker, no card, no converter and no embedding worker (spec
+    15.7, 15.8, 15.9, 15.11, 15.12). Building a
     door starts nothing and reads nothing but a path. The engine is chosen
     here, once, the room on the card is read once, the converter is found
     once, and the decisions are written to the audit log once (rulings 36
@@ -97,6 +102,9 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
                            **room.check(machine, choice.name, programs), "converter": converter_element(converter)})
     for element in decisions.elements.values():
         audit.record(f"decision.{element.name}", element.audit_detail)
+    # The embedding worker sits where the room check put it (ruling 32); a folder with no install gets the door with nothing behind it.
+    where = "card" if decisions.guideline_search.green else "processor"
+    embedder = embedder or make_embedder(settings.data_folder, where)
     doors = dict(doors or {})
     if speech is not None:
         doors.setdefault(WHISPERX_PYANNOTE.name, speech)
@@ -121,6 +129,8 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         notes=Notes(db, clock),
         letters=Letters(db, clock),
         stored=Stored(db, audit, clock),
+        sources=Sources(db, audit, clock),
+        embedder=embedder,
         converter=converter,
         clock=clock,
         finaliser=_finalise,
@@ -141,6 +151,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.include_router(review.router)
     app.include_router(patients_web.router)
     app.include_router(letters_web.router)
+    app.include_router(guidelines_web.router)
     return app
 
 
@@ -159,3 +170,4 @@ async def _lifespan(app: FastAPI):
         consultation.close()
     for door in app.state.parts.doors.values():
         door.close()
+    app.state.parts.embedder.close()

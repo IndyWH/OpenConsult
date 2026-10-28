@@ -259,3 +259,51 @@ class MadeUpConverter:
 
     def decoded_seconds(self, ogg, run=None):
         return self._wav_s if self.decoded_s is None else self.decoded_s
+
+
+class MadeUpEmbedder:
+    """A made-up door to an embedding worker (8b): installed and ready,
+    answering made-up vectors by a rule of the test's choosing, or
+    failing every call when told to. Nothing here is what a model gave."""
+
+    def __init__(self, where="card", installed=True, vector_for=None, fail=None, model_id="made-up/embedder@0", scores_for=None):
+        self.where = where
+        self.installed = installed
+        self.state = "ready" if installed else "not_installed"
+        self.reason = None
+        self.model_id = model_id if installed else None
+        self.vector_for = vector_for or self._made
+        self.scores_for = scores_for
+        self.fail = fail
+        self.embedded: list[list[str]] = []
+        self.reranked: list[tuple[str, list[str]]] = []
+        self.closed = False
+
+    @staticmethod
+    def _made(text: str) -> list:
+        return [round(0.001 * ((i * 7 + len(text)) % 100), 3) for i in range(768)]
+
+    def ready(self):
+        from openconsult import words
+        return None if self.installed else words.GUIDELINE_NOT_INSTALLED
+
+    def embed(self, texts):
+        from openconsult.guidelines.embedder import Vectors
+        self.embedded.append(list(texts))
+        if self.fail:
+            return Vectors(False, [], 0.0, self.fail)
+        return Vectors(True, [self.vector_for(t) for t in texts], 0.001, None, {"seconds": 0.001})
+
+    def rerank(self, query, texts):
+        from openconsult.guidelines.embedder import Scores
+        self.reranked.append((query, list(texts)))
+        if self.fail:
+            return Scores(False, [], 0.0, self.fail)
+        scores = self.scores_for(query, texts) if self.scores_for else [float(len(texts) - i) for i in range(len(texts))]
+        return Scores(True, scores, 0.001, None)
+
+    def info(self):
+        return {"where_asked": self.where, "model": self.model_id, "state": self.state}
+
+    def close(self):
+        self.closed = True

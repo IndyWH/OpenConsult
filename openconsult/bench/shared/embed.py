@@ -15,10 +15,10 @@ import os
 import time
 import urllib.error
 import urllib.request
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Mapping, Protocol
 
+from openconsult.guidelines.embedder import Vectors  # noqa: F401 - the app's, since 8b
 from openconsult.llm.ollama import DEFAULT_ADDRESS, encode
 from openconsult.speech import environment
 from openconsult.speech.worker import Worker, WorkerGone
@@ -38,16 +38,6 @@ WORKER_REQUEST_S = 120.0
 
 HERE = Path(__file__).resolve().parent
 WORKER_FOLDER = HERE / "embedding2"
-
-
-@dataclass(frozen=True)
-class Vectors:
-    """What one call gave: the vectors, or a failure with its reason."""
-    ok: bool
-    vectors: list = field(default_factory=list)
-    wall_s: float = 0.0
-    error: str | None = None
-    own: dict = field(default_factory=dict)      # the engine's or the worker's own figures
 
 
 class Embedder(Protocol):

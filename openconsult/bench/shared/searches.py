@@ -13,9 +13,9 @@ import json
 import math
 from pathlib import Path
 
-# v1's form, byte for byte (V1/app/rag.py and scripts/ingest_guidelines.py).
-QUERY_PREFIX = "task: search result | query: "
-PASSAGE_FORM = "title: {title} | text: {text}"
+# v1's forms, kept in the app since 8b (openconsult/guidelines/texts.py) and read from there.
+from openconsult.guidelines.texts import PASSAGE_FORM, QUERY_PREFIX  # noqa: F401
+
 VECTOR_SIZE = 768
 LISTS_FILE = Path(__file__).with_name("searches.json")
 

@@ -7,6 +7,7 @@ message landed, so a refusal can never be lost (V1_LESSONS 5.1).
 
 from __future__ import annotations
 
+import email
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import parse_qsl
@@ -35,6 +36,33 @@ async def form_fields(request: Request) -> dict[str, str]:
     """The fields of a plain form post, with the standard library."""
     body = (await request.body()).decode("utf-8", errors="replace")
     return dict(parse_qsl(body, keep_blank_values=True))
+
+
+async def multipart_fields(request: Request, limit: int | None = None) -> tuple[dict[str, str], dict[str, tuple[str, bytes]], bool]:
+    """The fields and the files of a multipart form post, with the standard
+    library's email parser: no library added for one upload (8b). Gives
+    (fields, files, too_big); a body over the limit is not parsed."""
+    body = await request.body()
+    if limit is not None and len(body) > limit:
+        return {}, {}, True
+    content_type = request.headers.get("content-type", "")
+    if not content_type.lower().startswith("multipart/form-data"):
+        return dict(parse_qsl(body.decode("utf-8", errors="replace"), keep_blank_values=True)), {}, False
+    message = email.message_from_bytes(b"Content-Type: " + content_type.encode("latin-1") + b"\r\nMIME-Version: 1.0\r\n\r\n" + body)
+    fields, files = {}, {}
+    for part in message.walk():
+        if part.is_multipart():
+            continue
+        name = part.get_param("name", header="content-disposition")
+        if not name:
+            continue
+        payload = part.get_payload(decode=True) or b""
+        filename = part.get_filename()
+        if filename is not None:
+            files[name] = (filename, payload)
+        else:
+            fields[name] = payload.decode("utf-8", errors="replace")
+    return fields, files, False
 
 
 def render(request: Request, template: str, status: int = 200,

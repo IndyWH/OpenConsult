@@ -9,6 +9,33 @@
   <div class="pane-body">{{ machine_rows(machine, models, room, speech, choices) }}</div>
 </section>
 
+<section class="pane" id="guidelines">
+  <div class="pane-head"><h2>{{ words.SECTION_GUIDELINES }}</h2></div>
+  <div class="pane-body">
+    <p class="mark">{{ words.GUIDELINES_INTRO }}</p>
+    <p class="mark" id="guideline-worker">{{ guidelines.worker_line }}</p>
+    {% if guidelines.sources %}
+    <table class="plain" id="guideline-sources">
+      <tr><th>{{ words.COL_TITLE }}</th><th>{{ words.COL_PUBLISHER }}</th><th>{{ words.COL_PASSAGES }}</th><th>{{ words.COL_ADDED }}</th><th></th></tr>
+      {% for s in guidelines.sources %}
+      <tr data-source="{{ s.id }}"><td>{{ s.title }}</td><td>{{ s.publisher }}</td><td>{{ s.passage_count }}</td><td>{{ s.added }}</td>
+        <td><form method="post" action="/settings/guidelines/{{ s.id }}/remove"><button id="remove-{{ s.id }}" aria-describedby="remove-{{ s.id }}-refusal">{{ words.REMOVE_GUIDELINE }}</button>{{ refusal("remove-" ~ s.id) }}</form></td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="mark" id="no-guidelines">{{ words.NO_GUIDELINES }}</p>{% endif %}
+    {% if guidelines.notice %}<p class="notice">{{ guidelines.notice }}</p>{% endif %}
+    <form method="post" action="/settings/guidelines/add" enctype="multipart/form-data" id="add-guideline-form">
+      <label>{{ words.FIELD_GUIDELINE_FILE }}<input type="file" name="file" accept=".html,.htm,.pdf,.txt,.md"></label>
+      <label>{{ words.FIELD_GUIDELINE_TITLE }}<input name="title" autocomplete="off"></label>
+      <label>{{ words.FIELD_GUIDELINE_PUBLISHER }}<input name="publisher" autocomplete="off"></label>
+      <label class="tick"><input type="checkbox" name="statement" value="yes"> {{ words.GUIDELINE_STATEMENT_TICK }}</label>
+      <button class="primary" id="add-guideline" aria-describedby="add-guideline-refusal"{% if guidelines.add_disabled %} disabled{% endif %}>{{ words.ADD_GUIDELINE }}</button>
+      {% if guidelines.add_disabled %}<p class="mark" id="add-guideline-reason">{{ guidelines.add_disabled }}</p>{% endif %}
+      {{ refusal("add-guideline") }}
+    </form>
+  </div>
+</section>
+
 <section class="pane" id="thresholds">
   <div class="pane-head"><h2>{{ words.SECTION_THRESHOLDS }}</h2></div>
   <div class="pane-body">
