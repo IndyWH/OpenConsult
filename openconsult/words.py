@@ -321,6 +321,9 @@ PICK_LABEL = "Pick Doctor, Patient or Unsure."
 ENTRY_EMPTY = "An entry cannot be empty. Edit its words instead."
 NOTE_NOT_EDITABLE = "This draft is refused, so its entries cannot be edited. Edit the transcript and draft the note again."
 NOT_CHANGED_BY_CHECK = "The check did not change this line's speaker, so there is nothing to undo."
+# The referral letters (spec 15.12, rulings 1, 2, 4 and 8; R2, R5, R15, R20). Drafts.
+# The placeholder is also the words the letter prompt tells the model to write; the check writes this one.
+LETTER_PLACEHOLDER = "[to be completed by the referring doctor]"
 # The player (spec 8.8; D51). Drafts.
 PLAYER = "The recording"
 PLAY_FROM_LINE = "Play from here"

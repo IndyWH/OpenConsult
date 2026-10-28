@@ -36,6 +36,14 @@ APPROVED_BYTES = {
     "background.frame": "48875847e78d1830e69a7bd4afccf0a975502af86dc4196189709470cdcf2fe3",
     "background.note": "79b41aaff3a95d4ae0b8c0d00e4e82f9fd6a9ce26f47ed711cf1d487dbfc08b7",
     "background.cut": "c00401b4a0a993c4f639ea9261517ac448106c6b84838e0711a98f26ae7c2b4e",
+    # The two prompts of 8a (15.12, rulings 3 and 8), the two frames of the
+    # detail The two letter frames, and the one line that masks an
+    # Assessment line for the letter call (the plan of 8a, item 2).
+    "letter": "b2e5e816185b0cc249feb69f7f328749c3f9e3b615ef1556df5b3c4ec20f4624",
+    "referrals": "5eab5bb56333fd5c4643dd482caa04afc9cb8a2c2ae922d69192ecaed5632962",
+    "letter.frame": "727bf80252fcee71b5ee79b141a2264302afacc41d0c8414f80838fdb73475de",
+    "referrals.frame": "af9401ac6241ef8dcdb665e5e49ac6279d444390002ba69442452d824359c4b8",
+    "letter.withheld": "a0950641e45a39a87a8df02a5c3b4045c58a92fa7e7cd085c7a4e9766b5d6f26",
 }
 
 

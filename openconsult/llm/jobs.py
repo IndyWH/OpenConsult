@@ -52,6 +52,23 @@ JOBS = {
         on_failure="The labels stand as the who-spoke answer set them; the final page says the check "
                    "did not run and why. Nothing is asked a second time.",
     ),
+    # The two calls of 8a (15.12, rulings 2, 3 and 8; R30). Design choices
+    # until the bench measures them: the list's reply is a reasoning under
+    # 60 words and a few items, so 1,500 tokens and the assessment's 60 s;
+    # the letter's a reasoning under 80 words and four paragraphs, about
+    # 700 tokens, so 2,500 and the note's 120 s.
+    "referrals": Job(
+        name="referrals", prompt="referrals", form="referrals", frames=("referrals",),
+        max_tokens=1500, timeout_s=60.0,
+        on_failure="The review page says the referral list could not be made and why, and offers to make it again; "
+                   "name a specialty still drafts a letter.",
+    ),
+    "letter": Job(
+        name="letter", prompt="letter", form="letter", frames=("letter",),
+        max_tokens=2500, timeout_s=120.0,
+        on_failure="The letter's page says the letter could not be drafted and why; Draft again is offered. "
+                   "Nothing is asked a second time by itself.",
+    ),
     # The note (15.10, The note): the transcript alone, no patient line (D3).
     "note": Job(
         name="note", prompt="note", form="note", frames=("note",),

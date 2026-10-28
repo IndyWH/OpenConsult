@@ -24,6 +24,7 @@ KNOWN_CAPITALS = {
     "NEVER", "NEW", "ONE", "TO", "COMMITTED", "SUSPICION", "TODAY",
     "IF", "END", "THE", "DOCTOR", "PATIENT",                          # the note prompt's emphasis (6b)
     "BACKGROUND", "FROM", "EARLIER", "CONSULTATIONS",                 # the background frame's heading (7a)
+    "APPROVED", "CONSULTATION", "NOTE", "SPECIALTY", "FOUR", "ONLY", "ENT",   # the two letter prompts and their frames (8a)
 }
 GUIDELINE_WORDS = ("guideline", "guidance")
 
@@ -41,7 +42,7 @@ def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
 def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
     # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
     words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
-    assert len(words) == 12     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a)
+    assert len(words) == 17     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a); the letters' two prompts, two frames and the withheld line (8a)
     for path in words:
         assert '"' not in _words(path), path.name
     assert '"' in 'a "quoted" word'   # the twin
@@ -82,7 +83,7 @@ def test_R13_no_prompt_file_names_a_country():
     countries = [c.strip() for c in _words(Path(__file__).parent / "countries.txt").splitlines() if c.strip()]
     assert len(countries) > 150
     files = loader.every_prompt_file()
-    assert len(files) == 16     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a)
+    assert len(files) == 23     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a), the letters' seven (8a)
     for path in files:
         text = _words(path).lower()
         for country in countries:
@@ -114,3 +115,37 @@ def test_ruling_5_15_8_ruling_1_the_three_background_files_are_the_approved_byte
     assert loader.file_text("background.note").split("\n") == [
         "Consultation of {date}:", "Subjective: {subjective}", "Objective: {objective}", "Assessment: {assessment}", "Plan: {plan}"]
     assert loader.file_text("background.cut") == "The note is cut here"
+
+
+def test_rulings_3_and_8_the_two_letter_prompts_are_the_approved_bytes_and_the_frames_the_fixed_words():
+    # 15.12 rulings 3 and 8: each block followed by one line break, nothing else; the two frames and the withheld
+    # line as the plan of 8a gives them byte for byte (the detail The two letter frames; item 2).
+    import hashlib
+    expected = {"letter": "b2e5e816185b0cc249feb69f7f328749c3f9e3b615ef1556df5b3c4ec20f4624",
+                "referrals": "5eab5bb56333fd5c4643dd482caa04afc9cb8a2c2ae922d69192ecaed5632962",
+                "letter.frame": "727bf80252fcee71b5ee79b141a2264302afacc41d0c8414f80838fdb73475de",
+                "referrals.frame": "af9401ac6241ef8dcdb665e5e49ac6279d444390002ba69442452d824359c4b8",
+                "letter.withheld": "a0950641e45a39a87a8df02a5c3b4045c58a92fa7e7cd085c7a4e9766b5d6f26"}
+    for name, digest in expected.items():
+        data = loader.prompt_bytes(name) if name in ("letter", "referrals") else loader.file_bytes(name)
+        assert hashlib.sha256(data).hexdigest() == digest == loader.APPROVED_BYTES[name], name
+        assert data.endswith(b"\n") and not data.endswith(b"\n\n") and b'"' not in data
+    assert loader.prompt("letter").startswith("You draft the body of a GP referral letter to the requested specialty.")
+    assert loader.prompt("referrals").startswith("You read an APPROVED GP consultation note")
+    assert loader.frame("referrals") == "APPROVED CONSULTATION NOTE:\n{note}"
+    assert loader.frame("letter") == "SPECIALTY: {specialty}\n\nAPPROVED CONSULTATION NOTE:\n{note}"
+    assert loader.file_text("letter.withheld") == "[assessment withheld from referral letters]"
+    filled = loader.fill(loader.frame("letter"), specialty="a {brace} specialty", note="[1] a {note} line")
+    assert filled == "SPECIALTY: a {brace} specialty\n\nAPPROVED CONSULTATION NOTE:\n[1] a {note} line"
+    # The forms: the field names are the prompts' own words; at most four paragraphs (the letter prompt's FOUR).
+    letter_form, list_form = loader.form("letter"), loader.form("referrals")
+    assert sorted(letter_form["properties"]["paragraphs"]["items"]["properties"]) == ["note_lines", "text"]
+    assert letter_form["properties"]["paragraphs"]["maxItems"] == 4
+    assert sorted(list_form["properties"]["referrals"]["items"]["properties"]) == ["lines", "reason", "specialty", "suggestion", "title", "urgency"]
+    assert list_form["properties"]["referrals"]["items"]["properties"]["urgency"]["enum"] == ["urgent", "routine"]
+
+
+def test_ruling_4_the_placeholder_in_the_prompt_is_the_one_the_check_writes():
+    from openconsult import words
+    assert words.LETTER_PLACEHOLDER == "[to be completed by the referring doctor]"
+    assert words.LETTER_PLACEHOLDER in loader.prompt("letter")

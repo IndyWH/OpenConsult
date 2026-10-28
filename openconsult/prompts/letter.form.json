@@ -1,0 +1,8 @@
+{
+ "type": "object",
+ "properties": {
+  "reasoning": {"type": "string"},
+  "paragraphs": {"type": "array", "maxItems": 4, "items": {"type": "object", "properties": {"text": {"type": "string"}, "note_lines": {"type": "array", "items": {"type": "integer"}}}, "required": ["text", "note_lines"]}}
+ },
+ "required": ["reasoning", "paragraphs"]
+}

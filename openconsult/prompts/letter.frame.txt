@@ -1,0 +1,4 @@
+SPECIALTY: {specialty}
+
+APPROVED CONSULTATION NOTE:
+{note}

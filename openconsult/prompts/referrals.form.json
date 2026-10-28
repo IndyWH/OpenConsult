@@ -1,0 +1,8 @@
+{
+ "type": "object",
+ "properties": {
+  "reasoning": {"type": "string"},
+  "referrals": {"type": "array", "maxItems": 6, "items": {"type": "object", "properties": {"specialty": {"type": "string"}, "title": {"type": "string"}, "reason": {"type": "string"}, "urgency": {"type": "string", "enum": ["urgent", "routine"]}, "lines": {"type": "array", "items": {"type": "integer"}}, "suggestion": {"type": "boolean"}}, "required": ["specialty", "title", "reason", "urgency", "lines", "suggestion"]}}
+ },
+ "required": ["reasoning", "referrals"]
+}

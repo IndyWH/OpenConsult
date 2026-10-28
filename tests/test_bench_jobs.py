@@ -111,7 +111,7 @@ def test_R31_the_three_jobs_are_not_in_the_apps_table(record):
     door, engine = door_with(record, [])
     with pytest.raises(KeyError):
         door.ask("bench_note", "words")
-    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "label_check", "note"] and engine.calls == []
+    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "label_check", "letter", "note", "referrals"] and engine.calls == []   # 8a adds the two letter calls
 
 
 def test_R31_nothing_of_the_app_names_part_two():
