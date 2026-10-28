@@ -9,7 +9,10 @@ a figure inside a word, as the 2 of T2DM, is a number), when it turns a
 planned test into a result, judged per sentence, or when it holds the
 placeholder anywhere (ruling 15); an expectation sentence stands only
 where a valid line holds the words Patient's expectations followed by a
-colon, and is dropped otherwise, never replaced. A failed sentence
+colon, and is dropped otherwise, never replaced; a sentence about
+allergies (the word allerg in any form) stands only when a valid line
+holds that word, and is dropped and counted otherwise, judged before the
+other rules (ruling 16; R4). A failed sentence
 becomes the placeholder, one for a run; the letter is refused when fewer
 than half its sentences are grounded, or there is none. Ported from v1's
 letters.validate_letter as plain functions (6.1), to the spec's rules."""
@@ -27,6 +30,7 @@ from openconsult.speech.matching import normalise
 PLACEHOLDER = words.LETTER_PLACEHOLDER
 KEPT, REPLACED, DROPPED = "kept", "placeholder", "dropped"
 NO_LINE, NUMBER, UPGRADE, MODEL_PLACEHOLDER = "no_line", "number", "upgrade", "model_placeholder"
+ALLERGY = "allergy"   # the reason of a dropped allergy sentence (ruling 16)
 
 _SENTENCE_END = re.compile(r"(?<=[.!?\]])\s+")   # a closing bracket ends the placeholder, so it stands alone
 # v1's word lists: a result-class verb over cited lines that only plan the test is an upgrade the note never made.
@@ -40,6 +44,7 @@ _EXPECTATION_CLASS = re.compile(r"patient'?s expectations|patient (?:wants|would
                                 re.IGNORECASE)
 _EXPECTATION_LINE = re.compile(r"patient'?s expectations\s*:", re.IGNORECASE)
 _FIGURE = re.compile(r"\d+(?:\.\d+)?")   # a figure, also inside a word (ruling 15)
+_ALLERGY = re.compile(r"allerg", re.IGNORECASE)   # allergy, allergies, allergic, allergen
 
 
 @dataclass(frozen=True)
@@ -90,6 +95,8 @@ def _verdict(sentence: str, cited: list[str], allowed: set[str], has_expectation
     """cited holds the words of the paragraph's valid lines, one each."""
     if expectation_sentence(sentence) and not has_expectation_line:
         return DROPPED, None
+    if _ALLERGY.search(sentence) and not any(_ALLERGY.search(text) for text in cited):
+        return DROPPED, ALLERGY
     if not cited:
         return REPLACED, NO_LINE
     if PLACEHOLDER in sentence:
@@ -106,7 +113,7 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
     against the numbered note; allowed_numbers is the patient's age."""
     by_number = {line.n: line for line in lines}
     out, detail = [], []
-    total = grounded = placeholders = dropped = 0
+    total = grounded = placeholders = dropped = allergies = 0
     for paragraph in paragraphs:
         cited = [n for n in (paragraph.get("note_lines") or []) if isinstance(n, int) and not isinstance(n, bool)]
         assessment = sorted({n for n in cited if n in by_number and by_number[n].section == "assessment" and not by_number[n].heading})
@@ -118,7 +125,9 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
             total += 1
             verdict, reason = _verdict(sentence, cited, set(allowed_numbers), has_line)
             verdicts.append({"text": sentence, "verdict": verdict, "reason": reason})
-            if verdict == DROPPED:
+            if verdict == DROPPED and reason == ALLERGY:
+                allergies += 1
+            elif verdict == DROPPED:
                 dropped += 1
             elif verdict == REPLACED:
                 placeholders += 1
@@ -131,7 +140,7 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
         if kept:
             out.append(" ".join(kept))
     refused = total == 0 or grounded / total < LETTER_GROUNDED_HALF
-    return Checked(out, {"paragraphs": detail}, total, grounded, placeholders, dropped, refused)
+    return Checked(out, {"paragraphs": detail, "allergies_dropped": allergies}, total, grounded, placeholders, dropped, refused)
 
 
 def cites_assessment(detail: dict | None) -> bool:
@@ -139,5 +148,9 @@ def cites_assessment(detail: dict | None) -> bool:
 
 
 def reasons_of(detail: dict | None) -> list[str]:
-    """Every failed sentence's reason, for the bench's counts."""
-    return [s["reason"] for p in (detail or {}).get("paragraphs", []) for s in p["sentences"] if s["reason"]]
+    """Every replaced sentence's reason, for the bench's counts; a dropped sentence is not a failed one."""
+    return [s["reason"] for p in (detail or {}).get("paragraphs", []) for s in p["sentences"] if s["verdict"] == REPLACED]
+
+
+def allergies_dropped(detail: dict | None) -> int:
+    return int((detail or {}).get("allergies_dropped", 0))

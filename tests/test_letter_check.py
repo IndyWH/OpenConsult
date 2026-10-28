@@ -1,5 +1,5 @@
 """The letter check (spec 15.12, ruling 4 and its detail; the plan
-review of 8a, point 1; ruling 15; R4, R5). Made letters on made notes:
+review of 8a, point 1; rulings 15 and 16; R4, R5). Made letters on made notes:
 every rule of the check has a case that shows it catching the thing it
 is for. What a model says is never asserted here."""
 
@@ -104,8 +104,9 @@ def test_ruling_15_the_upgrade_rule_is_judged_per_sentence():
 
 
 def test_ruling_15_the_models_placeholder_is_caught_anywhere_in_a_sentence():
-    # The second bench's A letters: an allergy sentence ending in the placeholder, for a note with no allergy line.
-    inside = lc.check([para(f"Food sticks. She has an allergy to {words.LETTER_PLACEHOLDER}. He lost 4 kg.", [2, 3])], NOTE, AGE)
+    # The second bench's A letters: a sentence ending in the placeholder (there, an allergy sentence, which ruling 16 now
+    # drops before this rule is reached; here a sentence with no allergy word, so that this rule is the one judged).
+    inside = lc.check([para(f"Food sticks. She has a history of {words.LETTER_PLACEHOLDER}. He lost 4 kg.", [2, 3])], NOTE, AGE)
     assert verdicts(inside) == [("kept", None), ("placeholder", "model_placeholder"), ("kept", None)]
     assert inside.paragraphs == [f"Food sticks. {words.LETTER_PLACEHOLDER} He lost 4 kg."]
     assert (inside.total, inside.grounded, inside.placeholders) == (3, 2, 1)
@@ -128,3 +129,38 @@ def test_ruling_15_a_figure_inside_a_word_is_read_as_a_number():
     assert verdicts(lc.check([para("HbA1c was 64 mmol/mol and eGFR 68 ml/min/1.73m².", [5])], note, set())) == [("placeholder", "number")]
     assert verdicts(lc.check([para("HbA1c was 64 and eGFR 68.", [5])], note, set())) == [("kept", None)]
     assert verdicts(lc.check([para("She has T2DM.", [5])], note, set())) == [("placeholder", "number")]
+
+
+def test_ruling_16_an_allergy_sentence_stands_only_on_a_cited_allergy_line():
+    # The third bench: six letters carried an allergy status the note does not hold, which no rule read because it
+    # holds no number. Now a sentence holding the word allerg in any form stands only when one of the paragraph's valid
+    # cited lines holds that word; otherwise it is dropped and counted, as the expectations rule drops its sentence.
+    note = numbered_lines("Subjective\nSix weeks of food sticking.\nStopped before: ramipril (dry cough).\n"
+                          "Allergic to penicillin (rash).\n\nObjective\nWeight 71 kg.\n\nAssessment\nA made-up impression.\n\n"
+                          "Plan\nNothing today.\n")
+    # The lines: 1 Subjective, 2 sticking, 3 stopped before, 4 allergic, 5 Objective, 6 weight, 7 Assessment, 8 impression,
+    # 9 Plan, 10 nothing.
+    # No known allergies, citing lines with no allergy word: dropped and counted, never replaced; the sentence beside it stands.
+    none = lc.check([para("Food sticks. No known allergies.", [2, 6])], note, set())
+    assert none.paragraphs == ["Food sticks."] and verdicts(none) == [("kept", None), ("dropped", "allergy")]
+    assert (none.total, none.grounded, none.placeholders, none.dropped) == (2, 1, 0, 0)   # the four counts unchanged
+    assert none.detail["allergies_dropped"] == 1 == lc.allergies_dropped(none.detail) and lc.allergies_dropped(None) == 0
+    # Allergic to penicillin, citing the line that holds Allergic to penicillin: kept.
+    kept = lc.check([para("She is allergic to penicillin, which causes a rash.", [4])], note, set())
+    assert verdicts(kept) == [("kept", None)] and kept.detail["allergies_dropped"] == 0 and kept.grounded == 1
+    # An allergy to ramipril, citing the Stopped before line: dropped; a side effect is not an allergy, and the paragraph goes.
+    side = lc.check([para("She has an allergy to ramipril which caused a dry cough.", [3])], note, set())
+    assert side.paragraphs == [] and verdicts(side) == [("dropped", "allergy")] and side.detail["allergies_dropped"] == 1
+    # Every form of the word, and the rule judged before the others: a sentence citing no valid line, or holding a number
+    # the lines lack, is dropped, not replaced; on the allergy line the other rules still apply.
+    for sentence in ("Allergies: none.", "No allergens are known.", "She is allergic to nothing.", "ALLERGY: nil."):
+        assert verdicts(lc.check([para(sentence, [2])], note, set())) == [("dropped", "allergy")], sentence
+    assert verdicts(lc.check([para("No known allergies.", [99])], note, set())) == [("dropped", "allergy")]
+    # The third bench's A letters: the model's placeholder inside an allergy sentence is dropped with it, so the page gets
+    # neither the sentence nor a placeholder for it, as the prompt now says.
+    assert verdicts(lc.check([para(f"She has an allergy to {words.LETTER_PLACEHOLDER}.", [2])], note, set())) == [("dropped", "allergy")]
+    assert verdicts(lc.check([para("She has 3 allergies.", [4])], note, set())) == [("placeholder", "number")]
+    # A sentence with no allergy word is untouched by the rule, and a dropped sentence is not among the failed reasons.
+    assert verdicts(lc.check([para("She weighs 71 kg.", [3, 6])], note, set())) == [("kept", None)]
+    assert lc.reasons_of(none.detail) == [] and lc.reasons_of(side.detail) == []
+    assert lc.reasons_of(lc.check([para("She has 3 allergies. No known allergies.", [4, 2])], note, set()).detail) == ["number"]

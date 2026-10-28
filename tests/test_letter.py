@@ -58,6 +58,7 @@ def test_R20_R30_the_letter_draft_stores_both_bodies_the_counts_and_a_failed_cal
     assert sent.startswith("The patient is a 64-year-old woman.") and "BACKGROUND" not in sent
     line = rows["audit"].lines()[0]
     assert line.event == "letter.drafted" and "4 sentences, 3 grounded, 1 placeholders" in line.detail and "made-up history" not in line.detail
+    assert "0 allergy sentences dropped" in line.detail and drafted["check_detail"]["allergies_dropped"] == 0   # ruling 16
     # A refused draft keeps both bodies and the counts, refused 1, and the audit line says so.
     refused = letter.draft(door, rows["letters"], rows["notes"], rows["consultations"], rows["audit"], cid, item)
     assert (refused["refused"], refused["sentences_total"], refused["sentences_grounded"], refused["n"]) == (1, 3, 0, 2)
