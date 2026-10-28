@@ -163,3 +163,21 @@ def _approve_rows(p, cid):
     from openconsult.consult import note
     draft = p.notes.current_draft(cid)
     p.notes.approve(cid, draft["id"], note.plain_text(p.notes.entries(draft["id"])))
+
+
+def test_8_4_D24_R5_the_letter_calls_of_a_consultation_with_the_switch_on_carry_no_block_and_read_only_the_approved_note(tmp_path, clock, machine):
+    # 8a: after Approve of the second consultation, the list call and the letter call read the approved note alone.
+    from tests.test_letters_page import LETTER, LIST
+    app, client, p = _three_consultations(tmp_path, clock, machine)
+    engine = p.door._engine
+    engine.script["referrals"], engine.script["letter"] = [LIST], [LETTER]
+    _approve_rows(p, 2)
+    client.get("/consultations/2")
+    item = p.letters.items(2)[0]
+    client.post(f"/consultations/2/referrals/{item['id']}/draft")
+    calls = [c for c in p.consultations.model_calls(2) if c["job"] in ("referrals", "letter")]
+    assert sorted(c["job"] for c in calls) == ["letter", "referrals"]
+    for call in calls:
+        user = json.loads(call["request"])["user"]
+        assert HEADING not in user and "This is background only" not in user and "TRANSCRIPT" not in user, call["job"]
+        assert user.startswith("The patient is a ") and "APPROVED CONSULTATION NOTE:\n[1] Subjective" in user

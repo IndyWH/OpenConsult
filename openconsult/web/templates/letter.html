@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = title_line %}
+{% block main %}
+<div id="letter-page" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}/letters/{{ letter.id }}">
+<script id="words" type="application/json">{{ words_json|safe }}</script>
+<h1 class="page">{{ title_line }}</h1>
+<p class="mark"><a href="/consultations/{{ cid }}" id="back">{{ words.BACK_TO_REVIEW }}</a></p>
+<section class="pane letter" id="letter">
+  <div class="pane-head"><h2>{{ title_line }}</h2>
+    {% if approval %}<span class="mark approved" id="approved-line">{{ approved_line }}</span>
+    {% elif doctor_refused_line %}<span class="mark" id="doctor-refused-line">{{ doctor_refused_line }}</span>
+    {% else %}<span class="mark">{{ words.LETTER_DRAFT_LINE }}</span>{% endif %}
+  </div>
+  <div class="pane-body">
+    {% if failed_line %}<p class="failed" id="letter-failed">{{ failed_line }}</p>{% endif %}
+    {% if refused_line %}<p class="failed" id="letter-refused">{{ refused_line }}</p>{% endif %}
+    {% if has_body %}
+    <p class="letter-part" id="salutation">{{ salutation }}</p>
+    <p class="letter-part" id="re-line">{{ re_line }}</p>
+    {% for paragraph in letter.paragraphs %}
+    <div class="paragraph" id="paragraph-{{ loop.index0 }}-block">
+      {% if read_only %}<p class="letter-part paragraph-text">{{ paragraph }}</p>{{ refusal("paragraph-" ~ loop.index0) }}
+      {% else %}<form method="post" action="/consultations/{{ cid }}/letters/{{ letter.id }}/paragraphs/{{ loop.index0 }}" class="paragraph-form">
+        <textarea name="text" class="paragraph-text" rows="4" aria-label="{{ words.SAVE_PARAGRAPH }}">{{ paragraph }}</textarea>
+        <button id="paragraph-{{ loop.index0 }}" aria-describedby="paragraph-{{ loop.index0 }}-refusal">{{ words.SAVE_PARAGRAPH }}</button>
+        {{ refusal("paragraph-" ~ loop.index0) }}
+      </form>{% endif %}
+    </div>
+    {% endfor %}
+    <p class="letter-part" id="sign-off">{{ sign_off }}</p>
+    {% endif %}
+    <p class="mark" id="letter-counts">{{ counts }}</p>
+    {% if earlier %}<p class="mark" id="earlier-letters">{{ earlier }}</p>{% endif %}
+  </div>
+</section>
+<section class="pane controls" id="letter-controls">
+  <div class="pane-body control-row">
+    <form method="post" action="/consultations/{{ cid }}/letters/{{ letter.id }}/approve">
+      <button class="primary" id="approve" aria-describedby="approve-refusal" {% if approve_reason %}disabled{% endif %}>{{ words.APPROVE_LETTER }}</button>
+      {{ refusal("approve") }}
+      {% if approve_reason and not (refused and refused.control == "approve") %}<p class="mark reason">{{ approve_reason }}</p>{% endif %}
+    </form>
+    <form method="post" action="/consultations/{{ cid }}/letters/{{ letter.id }}/refuse">
+      <button id="refuse" aria-describedby="refuse-refusal" {% if refuse_reason %}disabled{% endif %}>{{ words.REFUSE_LETTER }}</button>
+      {{ refusal("refuse") }}
+    </form>
+    <form method="post" action="/consultations/{{ cid }}/letters/{{ letter.id }}/again">
+      <button id="again" aria-describedby="again-refusal" {% if again_reason %}disabled{% endif %}>{{ words.DRAFT_LETTER_AGAIN }}</button>
+      {{ refusal("again") }}
+    </form>
+    {% if approval %}
+    <div class="copy">
+      <button type="button" id="copy-letter">{{ words.COPY_LETTER }}</button>
+      <p class="notice" id="copy-letter-result"></p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+<p class="model-line" id="letter-model-line">{{ model_line }}</p>
+</div>
+<script src="/static/use.js"></script>
+<script src="/static/letters.js"></script>
+{% endblock %}

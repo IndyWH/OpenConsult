@@ -26,6 +26,7 @@ from openconsult.consult.gate import LOW_CONFIDENCE
 from openconsult.speech.choices import CHOICES
 from openconsult.speech.loudness import WINDOW_S
 from openconsult.web import guards
+from openconsult.web import letters as letters_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -188,7 +189,7 @@ def page_data(p, row: dict) -> dict:
     alarm_rows = alarms.alarm_lines(pass_rows, p.consultations.live_lines(cid), datetime.fromisoformat(row["started_at"]),
                                     alarms.acknowledged_keys(p.audit.lines(), cid), words)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
-            "background_read": background_read(row),
+            "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
             "lines": lines, "warnings": warnings,
@@ -207,6 +208,7 @@ def page_data(p, row: dict) -> dict:
 def review_page(request: Request, user, consultation_id: int, refused: tuple | None = None, asking_delete: bool = False):
     p = parts(request)
     row = final_row(request, consultation_id)
+    letters_web.ensure_list(p, consultation_id)      # the list call, once, at the first opening after Approve (15.12 ruling 2)
     data = page_data(p, row)
     data["asking_delete"] = asking_delete
     data["delete_question"] = words.DELETE_CONSULTATION_QUESTION.format(name=data["ran_with"]["name"], date=data["date"])

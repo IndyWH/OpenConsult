@@ -44,6 +44,11 @@ class Door:
         self._timer = timer
         self._identity: tuple[str | None, str | None] | None = None
 
+    @property
+    def engine_name(self) -> str:
+        """The engine's own name, as the record names it (R20)."""
+        return self._engine.name
+
     def call_for(self, job_name: str, user: str, sampling: Sampling | None = None) -> Call:
         """The parts of a call, as the engine will see them. The sampling
         override is for the bench's chains only; the app takes the

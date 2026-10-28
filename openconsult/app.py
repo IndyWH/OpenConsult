@@ -37,7 +37,7 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import consult, guards, live, patients as patients_web, review, routes
+from openconsult.web import consult, guards, letters as letters_web, live, patients as patients_web, review, routes
 from openconsult.web.first_run import FirstRun
 
 STATIC = Path(__file__).parent / "web" / "static"
@@ -140,6 +140,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.include_router(live.router)
     app.include_router(review.router)
     app.include_router(patients_web.router)
+    app.include_router(letters_web.router)
     return app
 
 

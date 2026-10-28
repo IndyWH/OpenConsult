@@ -44,7 +44,7 @@ def test_R20_R30_the_letter_draft_stores_both_bodies_the_counts_and_a_failed_cal
     item = rows["letters"].item(item_id)
     drafted = letter.draft(door, rows["letters"], rows["notes"], rows["consultations"], rows["audit"], cid, item)
     # The stamp from the door, the prompt hash, the masked note sent, both bodies, the detail and the counts (R20; ruling 11).
-    assert (drafted["engine"], drafted["engine_version"], drafted["model_tag"], drafted["model_digest"]) == ("ollama", "0.0-made-up", "gemma4:26b-a4b-it-qat", "made-up-digest")
+    assert (drafted["engine"], drafted["engine_version"], drafted["model_tag"], drafted["model_digest"]) == ("made-up", "0.0-made-up", "gemma4:26b-a4b-it-qat", "made-up-digest")   # the engine's own name, as model_call names it
     assert drafted["prompt_sha256"] == loader.APPROVED_BYTES["letter"] and drafted["note_lines"] == referral_note.letter_text(referral_note.numbered_lines(TEXT))
     assert "[assessment withheld from referral letters]" in drafted["note_lines"] and "made up impression" not in drafted["note_lines"]
     assert drafted["model_body"] == good["paragraphs"] and drafted["reasoning"] == "made reasoning"

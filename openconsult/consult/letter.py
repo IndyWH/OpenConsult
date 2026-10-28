@@ -61,7 +61,7 @@ def draft(door: Door, letters: Letters, notes, consultations, audit: Audit, cons
     else:
         failure = f"{result.failure}: {result.detail}"
     letter_id = letters.add_letter(LetterRow(
-        consultation_id, item["id"], result.call_id, door.profile.engine, version, door.profile.tag, digest,
+        consultation_id, item["id"], result.call_id, door.engine_name, version, door.profile.tag, digest,
         hashlib.sha256(loader.prompt_bytes("letter")).hexdigest(), sent, reasoning, model_body, body, detail,
         total, grounded, placeholders, dropped, refused, failure, result.wall_ms))
     where = f"consultation {consultation_id}: item {item['id']}, letter {letter_id}"

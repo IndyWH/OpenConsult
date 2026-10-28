@@ -57,6 +57,9 @@
   </div>
 </section>
 
+{# The Referral letters section (15.12 ruling 2), under the approved note, only after Approve. #}
+{% if letters %}{% include "_letters.html" %}{% endif %}
+
 {# Two: Approve and Refuse, the count of warnings on the Approve control (R15). #}
 <section class="pane controls no-print" id="controls">
   <div class="pane-body control-row">
@@ -164,5 +167,6 @@
 <script src="/static/use.js"></script>
 <script src="/static/alarmdialog.js"></script>
 <script src="/static/review.js"></script>
+<script src="/static/letters.js"></script>
 <script src="/static/player.js"></script>
 {% endblock %}

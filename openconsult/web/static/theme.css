@@ -179,3 +179,22 @@ li.red { color: var(--red); font-weight: 600; }
 button.red-name { border-color: var(--red); color: var(--red); font-size: .78rem; padding: .15rem .6rem; margin-left: .4rem; }
 dialog.alarm-dialog { border: 1px solid var(--line); border-radius: var(--radius); padding: 1.1rem 1.4rem; max-width: 520px; }
 dialog.alarm-dialog::backdrop { background: rgba(41, 35, 31, .35); }
+
+/* The referral letters (8a): the items in two kinds, the line's words shown in place, the letter's page. */
+ul.items { list-style: none; padding: 0; margin: .4rem 0 .8rem; }
+li.referral-item { border-top: 1px solid var(--line); padding: .6rem 0; }
+li.referral-item .item-line { margin: 0 0 .2rem; }
+li.referral-item .item-status { margin-left: .6rem; color: var(--green); }
+li.referral-item .reason-line { margin: 0 0 .4rem; font-size: .92rem; }
+.line-words { display: block; margin: .2rem 0 .3rem; }
+form.title-form, form.draft-form { display: inline-flex; gap: .6rem; align-items: flex-end; margin: 0 1rem .3rem 0; flex-wrap: wrap; }
+form.title-form label { margin: 0; }
+form.title-form input { width: 14rem; margin-top: .2rem; }
+form.title-form button, form.draft-form button.primary { margin-top: 0; padding: .3rem .8rem; font-size: .8rem; }
+form.title-form .refusal, form.draft-form .refusal { flex-basis: 100%; margin: 0; }
+form.named-form { margin-top: .6rem; max-width: 30rem; }
+form.named-form button.primary { margin-top: .6rem; }
+.letter-part { margin: 0 0 .9rem; font-size: .95rem; max-width: 46rem; white-space: pre-wrap; }
+.paragraph-form { display: flex; flex-direction: column; gap: .3rem; margin: 0 0 .9rem; max-width: 46rem; }
+textarea.paragraph-text { font-family: var(--sans); font-size: .95rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .7rem; width: 100%; }
+.paragraph-form button { align-self: flex-start; padding: .3rem .8rem; font-size: .8rem; }

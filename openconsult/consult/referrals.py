@@ -69,13 +69,19 @@ def sort_items(answer: dict, lines: list[NoteLine]) -> list[Item]:
     return found
 
 
-def make_list(door: Door, letters: Letters, notes, consultations, audit: Audit, consultation_id: int) -> dict:
+def make_list(door: Door, letters: Letters, notes, consultations, audit: Audit, consultation_id: int,
+              again: bool = False) -> dict:
     """The one call for the list, once per approved note: the message of
     the detail, the sorting, the rows (the note lines sent as the named
     part of ruling 11), the audit line with counts and never a word. A
-    second call for the same approval gives back the list that stands."""
+    second call for the same approval gives back the list that stands;
+    with again, a list whose call failed gives way to a new call (R30):
+    its model_call row and its audit line are the record of the failure."""
     with letters.list_lock:
         standing = letters.list_of(consultation_id)
+        if standing is not None and again and standing["failure"]:
+            letters.drop_failed_list(standing["id"])
+            standing = None
         if standing is not None:
             return standing
         approval = notes.approval(consultation_id)

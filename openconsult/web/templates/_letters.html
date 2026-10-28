@@ -1,0 +1,39 @@
+{# The Referral letters section (spec 15.12, ruling 2; the detail The page), after Approve, under the approved note:
+   the stated items, the suggestions under their line, then name a specialty. Each item: the specialty, the title in a
+   field, the reason with each note line a press that shows the line's words, urgent or routine, Draft the letter. #}
+{% macro item_block(item) -%}
+<li class="referral-item" id="item-{{ item.id }}" data-kind="{{ item.kind }}">
+  <p class="item-line"><b class="specialty">{{ item.specialty }}</b>
+    {% if item.urgency_word %}<span class="mark">({{ item.urgency_word }})</span>{% endif %}
+    {% if item.status %}<span class="mark item-status">{{ item.status }}</span>{% endif %}</p>
+  {% if item.reason %}<p class="reason-line">{{ item.reason }}
+    {% for c in item.cited %}<button type="button" class="cite note-cite" aria-controls="line-words-{{ item.id }}-{{ c.n }}" aria-label="{{ words.NOTE_LINE.format(n=c.n) }}">[{{ c.n }}]</button><span class="line-words mark" id="line-words-{{ item.id }}-{{ c.n }}" hidden>{{ c.text }}</span>{% endfor %}</p>{% endif %}
+  <form method="post" action="/consultations/{{ cid }}/referrals/{{ item.id }}/title" class="title-form">
+    <label>{{ words.FIELD_TITLE_OF_CONSULTANT }}<input name="title" value="{{ item.title }}" autocomplete="off"></label>
+    <button id="title-{{ item.id }}" aria-describedby="title-{{ item.id }}-refusal">{{ words.SAVE_TITLE }}</button>{{ refusal("title-" ~ item.id) }}
+  </form>
+  {% if item.letter %}<a class="button" href="/consultations/{{ cid }}/letters/{{ item.letter.id }}" id="open-{{ item.id }}">{{ words.OPEN_THE_LETTER }}</a>{{ refusal("draft-" ~ item.id) }}
+  {% else %}<form method="post" action="/consultations/{{ cid }}/referrals/{{ item.id }}/draft" class="draft-form">
+    <button class="primary" id="draft-{{ item.id }}" aria-describedby="draft-{{ item.id }}-refusal">{{ words.DRAFT_THE_LETTER }}</button>{{ refusal("draft-" ~ item.id) }}
+  </form>{% endif %}
+</li>
+{%- endmacro %}
+<section class="pane no-print" id="letters">
+  <div class="pane-head"><h2>{{ words.LETTERS_HEADING }}</h2></div>
+  <div class="pane-body">
+    {% if letters.failed %}<p class="failed" id="list-failed">{{ letters.failed }}</p>
+    <form method="post" action="/consultations/{{ cid }}/referrals/list"><button id="list-again" aria-describedby="list-again-refusal">{{ words.LIST_AGAIN }}</button>{{ refusal("list-again") }}</form>
+    {% else %}{{ refusal("list-again") }}{% endif %}
+    {% if letters.none %}<p class="mark" id="no-referrals">{{ letters.none }}</p>{% endif %}
+    {% if letters.stated %}<ul class="items" id="stated-items">{% for item in letters.stated %}{{ item_block(item) }}{% endfor %}</ul>{% endif %}
+    {% if letters.suggested %}<p class="mark" id="suggestions-line">{{ words.SUGGESTIONS_LINE }}</p>
+    <ul class="items" id="suggested-items">{% for item in letters.suggested %}{{ item_block(item) }}{% endfor %}</ul>{% endif %}
+    {% if letters.named %}<ul class="items" id="named-items">{% for item in letters.named %}{{ item_block(item) }}{% endfor %}</ul>{% endif %}
+    <form method="post" action="/consultations/{{ cid }}/referrals/named" class="named-form" id="named-form">
+      <h3 class="section-head">{{ words.NAME_A_SPECIALTY }}</h3>
+      <label>{{ words.FIELD_SPECIALTY }}<input name="specialty" autocomplete="off"></label>
+      <label>{{ words.FIELD_TITLE_OF_CONSULTANT }}<input name="title" autocomplete="off"></label>
+      <button class="primary" id="draft-named" aria-describedby="draft-named-refusal">{{ words.DRAFT_THE_LETTER }}</button>{{ refusal("draft-named") }}
+    </form>
+  </div>
+</section>

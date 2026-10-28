@@ -3,7 +3,7 @@
    entries' words as they stand; nothing of the model's differentials, the
    warnings, the transcript, the player, the controls or the model line. */
 header.app, footer.disclaimer, .no-print, .entry-form, button.cite, .uncited, .differentials, #controls, #warnings,
-#transcript, #model-line, .refusal, .reason { display: none !important; }
+#transcript, #model-line, #letters, .refusal, .reason { display: none !important; }
 .print-only { display: inline !important; }
 .print-keep { display: block; }
 .pane { border: none; }

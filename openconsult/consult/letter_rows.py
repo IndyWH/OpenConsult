@@ -100,6 +100,12 @@ class Letters:
                                    (consultation_id,))
         return dict(found) if found else None
 
+    def drop_failed_list(self, list_id: int) -> None:
+        """A list whose call failed holds no item and no word of a reply;
+        it gives way to the call made again (R30). A list that stands
+        with items is never dropped."""
+        self._db.execute("DELETE FROM referral_list WHERE id = ? AND failure IS NOT NULL", (list_id,))
+
     # ----------------------------------------------------------- the items
 
     def add_item(self, row: ItemRow) -> int:

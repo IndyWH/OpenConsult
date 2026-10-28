@@ -329,6 +329,55 @@ LETTER_PLACEHOLDER = "[to be completed by the referring doctor]"
 LETTER_SALUTATION = "Dear Consultant {title},"
 LETTER_RE = "Re: {name}, born {born}, {sex}"
 LETTER_SIGN_OFF = "Yours faithfully,"
+# The Referral letters section of the review page, after Approve (ruling 2; the detail The page).
+LETTERS_HEADING = "Referral letters"
+SUGGESTIONS_LINE = "These are the model's suggestions, not advice. The note does not state them."
+NO_REFERRALS = "The note states no referral, and the model suggests none."
+LIST_FAILED = "The referral list could not be made: {reason}"
+LIST_AGAIN = "Make the list again"
+LIST_STANDS = "The referral list is made."
+URGENCY_WORDS = {"urgent": "urgent", "routine": "routine"}
+FIELD_TITLE_OF_CONSULTANT = "Consultant's title"
+SAVE_TITLE = "Save"
+TITLE_EMPTY = "Enter the consultant's title, for example Physician."
+TITLE_UNCHANGED = "Nothing changed."
+NOTE_LINE = "Line {n} of the note"
+DRAFT_THE_LETTER = "Draft the letter"
+OPEN_THE_LETTER = "Open the letter"
+ITEM_DRAFTED = "Drafted"
+ITEM_APPROVED = "Approved"
+ITEM_REFUSED = "Refused"
+ITEM_REFUSED_BY_CHECK = "Refused by the check"
+ITEM_FAILED = "Not drafted: the call failed"
+NAME_A_SPECIALTY = "Name a specialty"
+FIELD_SPECIALTY = "Specialty"
+SPECIALTY_EMPTY = "Enter the specialty."
+# The letter's own page (rulings 1 and 4; R2, R15, R20).
+LETTER_TITLE = "Referral letter: {specialty}"
+LETTER_DRAFT_LINE = "A draft, written from the approved note only. Nothing is final until you approve it."
+LETTER_COUNTS = ("{total} sentences; {grounded} grounded in the note; {placeholders} replaced by the placeholder; "
+                 "{dropped} expectation sentences dropped; {allergies} allergy sentences dropped.")
+LETTER_REFUSED = ("The letter was refused: only {grounded} of {total} sentences are grounded in the note, fewer than half. "
+                  "Draft it again, or write the letter yourself.")
+LETTER_CALL_FAILED = "The letter could not be drafted: {reason}"
+LETTER_APPROVED_LINE = "Approved on {date} at {time}. The letter is read-only."
+LETTER_REFUSED_LINE = "You refused this letter on {date} at {time}."
+LETTER_READ_ONLY = "The letter is approved and read-only."
+LETTER_ALREADY_APPROVED = "The letter is already approved."
+LETTER_NOTHING_TO_APPROVE = "There is no letter to approve."
+LETTER_ALREADY_REFUSED = "This letter is already refused."
+LETTER_NOT_EDITABLE = "This letter cannot be edited. Draft it again."
+PARAGRAPH_EMPTY = "A paragraph cannot be empty."
+SAVE_PARAGRAPH = "Save"
+DRAFT_LETTER_AGAIN = "Draft the letter again"
+APPROVE_LETTER = "Approve"
+REFUSE_LETTER = "Refuse"
+COPY_LETTER = "Copy the letter"
+NO_LETTER_TEXT_YET = "The letter is not approved, so there is no text to copy yet."
+EARLIER_LETTERS = "{count} earlier draft of this letter is kept in the record."
+EARLIER_LETTERS_MANY = "{count} earlier drafts of this letter are kept in the record."
+BACK_TO_REVIEW = "Back to the review page"
+LETTER_MODEL_LINE = "Language model: {model} on {engine} {version}."
 # The player (spec 8.8; D51). Drafts.
 PLAYER = "The recording"
 PLAY_FROM_LINE = "Play from here"
@@ -469,6 +518,16 @@ EVENTS = {
     "label.set": "Speaker label set by the doctor",
     "label.undone": "The check's change of a speaker label undone by the doctor",
     "labels.swapped": "Doctor and patient swapped on every line",
+    "referrals.listed": "Referral list made from the approved note",
+    "referrals.failed": "Referral list could not be made",
+    "referral.title_changed": "Consultant's title changed on a referral item",
+    "referral.named": "Referral item named by the doctor",
+    "letter.drafted": "Referral letter drafted",
+    "letter.refused_by_check": "Referral letter refused by the check: fewer than half the sentences grounded",
+    "letter.failed": "Referral letter could not be drafted",
+    "letter.edited": "Referral letter paragraph edited by the doctor",
+    "letter.approved": "Referral letter approved",
+    "letter.refused": "Referral letter refused by the doctor",
 }
 
 # The command. Plain ASCII, for every terminal.
