@@ -14,7 +14,7 @@ REPO = Path(__file__).resolve().parents[1]
 
 
 def _module(name: str):
-    path = REPO / "openconsult" / "bench" / "shared" / "embedding2" / f"{name}.py"
+    path = REPO / "openconsult" / "guidelines" / "embedding2" / f"{name}.py"
     spec = importlib.util.spec_from_file_location(f"embedding2_{name}", path)
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

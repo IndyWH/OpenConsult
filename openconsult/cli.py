@@ -1,9 +1,10 @@
 """The one command (spec 15.6): openconsult starts the app, openconsult
 reset-password resets the password (D26), openconsult install-speech
-builds a speech choice's environment and fetches its models, and
-openconsult self-test runs a speech choice's self-test (15.9). Both name
-their choice with --choice; with none named they take WhisperX with
-pyannote, as before 5b."""
+builds a speech choice's environment and fetches its models, openconsult
+self-test runs a speech choice's self-test (15.9), and openconsult
+install-guidelines builds the embedding worker's environment and fetches
+its two models (15.12). The speech ones name their choice with --choice;
+with none named they take WhisperX with pyannote, as before 5b."""
 
 from __future__ import annotations
 
@@ -21,6 +22,7 @@ import uvicorn
 from openconsult import browser, words
 from openconsult.app import build_app
 from openconsult.db import NewerDatabase, open_database
+from openconsult.guidelines import environment as guidelines_environment
 from openconsult.patients.audit import Audit
 from openconsult.patients.users import MIN_PASSWORD, Users, password_problem
 from openconsult.settings import store
@@ -42,7 +44,7 @@ def main(argv: list[str] | None = None, say: Callable = print,
     machine."""
     parser = argparse.ArgumentParser(prog="openconsult")
     parser.add_argument("command", nargs="?",
-                        choices=["run", "reset-password", "install-speech", "self-test"], default="run")
+                        choices=["run", "reset-password", "install-speech", "self-test", "install-guidelines"], default="run")
     parser.add_argument("--data-folder", type=Path, help="where the data lives, for a development run")
     parser.add_argument("--port", type=int, help="the port to listen on; 8001 if not given")
     parser.add_argument("--no-browser", action="store_true", help="start without opening the browser")
@@ -55,6 +57,8 @@ def main(argv: list[str] | None = None, say: Callable = print,
         return install_speech(args.data_folder, CHOICES[args.choice], say=say, run=run_process, which=which)
     if args.command == "self-test":
         return self_test(args.data_folder, CHOICES[args.choice], say=say, make_speech=make_speech, sleep=sleep)
+    if args.command == "install-guidelines":
+        return guidelines_environment.install(store.build(args.data_folder).data_folder, say=say, run=run_process, which=which)
     return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine,
                open_browser=None if args.no_browser else (open_browser or browser.start))
 

@@ -1,6 +1,7 @@
-# The environment of the EmbeddingGemma 2 worker of the bench (spec 15.9,
-# ruling 25; 6.2). Not a package: only its locked libraries are installed,
-# into the user's data folder, by openconsult-bench shared-install. The
+# The environment of the EmbeddingGemma 2 worker, a worker of the app since
+# 8b (spec 15.9, ruling 25; 15.12; 6.2). Not a package: only its locked
+# libraries are installed, into the user's data folder, by openconsult
+# install-guidelines (and the bench's shared-install, the same code). The
 # model's own page asks for sentence-transformers 6.1.0 or later;
 # transformers 5.19.0 is the first release that knows its architecture;
 # torch comes from PyPI (CUDA 13 wheels on Linux, processor wheels on

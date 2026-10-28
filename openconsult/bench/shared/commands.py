@@ -25,6 +25,7 @@ from openconsult.bench.shared.searches import read_lists
 from openconsult.bench.writer import Refused, ResultWriter
 from openconsult.llm.ollama import DEFAULT_ADDRESS
 from openconsult.settings import paths
+from openconsult.guidelines import environment as guidelines_environment
 from openconsult.speech import environment
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
@@ -66,37 +67,10 @@ def _write_once(path: Path, data: dict, say: Callable) -> bool:
 def shared_install(data_folder: Path, say: Callable = print, run: Callable = subprocess.run,
                    which: Callable = shutil.which, environ: Mapping[str, str] = os.environ) -> int:
     """The environment of the EmbeddingGemma 2 worker from the lock file,
-    then the one fetch of the model, with no token, into the data folder."""
-    uv = which(environment.UV)
-    if uv is None:
-        say(words.UV_MISSING)
-        return 7
-    target = embed.venv(data_folder)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    say(words.EMBED_BUILDING.format(folder=target.parent))
-    done = run([uv, "sync", "--locked", "--project", str(embed.WORKER_FOLDER), "--python", PYTHON],
-               env={**environ, "UV_PROJECT_ENVIRONMENT": str(target)}, capture_output=True, text=True)
-    if done.returncode != 0:
-        say(words.EMBED_BUILD_FAILED.format(reason=environment._last_line(done.stderr) or environment._last_line(done.stdout)))
-        return 7
-    say(words.EMBED_BUILT if "Installed" in (done.stderr or "") else words.EMBED_ALREADY_BUILT)
-    model = embed.model_folder(data_folder)
-    say(words.EMBED_FETCHING.format(revision="pinned", folder=model))
-    env = {k: v for k, v in environ.items() if k not in environment.KEY_NAMES and k != "HF_HUB_OFFLINE"}
-    env.update(HF_HUB_DISABLE_IMPLICIT_TOKEN="1", HF_HOME=str(embed.folder(data_folder) / "hub"))
-    fetched = run([str(embed.python(data_folder)), str(embed.WORKER_FOLDER / "fetch.py"), "--folder", str(model)],
-                  env=env, capture_output=True, text=True)
-    reports = [json.loads(line) for line in (fetched.stdout or "").splitlines() if line.startswith("{")]
-    if not reports:
-        say(words.EMBED_FETCH_FAILED.format(reason=environment._last_line(fetched.stderr) or f"exit code {fetched.returncode}"))
-        return 8
-    report = reports[-1]
-    if not report["ok"]:
-        say(words.EMBED_GATED if "account" in (report["error"] or "") else words.EMBED_FETCH_FAILED.format(reason=report["error"]))
-        return 8
-    size = environment.plain_size(int(report["bytes"]))
-    say((words.EMBED_FETCHED if report["fetched"] else words.EMBED_FOUND).format(revision=report["revision"], size=size))
-    return 0
+    then the one fetch of the model, with no token, into the data folder:
+    the app's own install since 8b, without the reranker the bench of 5d
+    never needed."""
+    return guidelines_environment.install(Path(data_folder), say=say, run=run, which=which, environ=environ, reranker=False)
 
 
 # --------------------------------------------------------------- search
@@ -109,7 +83,7 @@ def embedder_for(embedding: str, where: str, data_folder: Path | None, service: 
         say(words.EMBED_NOT_INSTALLED.format(folder=embed.folder(data_folder) if data_folder else "(no data folder)"))
         return None
     worker = embed.WorkerEmbedder(where, data_folder)
-    reason = worker.start()
+    reason = worker.start()           # the bench's start waits, and gives the reason when the worker is not ready
     if reason is not None:
         say(words.EMBED_WORKER_FAILED.format(reason=reason))
         worker.close()

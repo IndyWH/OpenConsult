@@ -18,10 +18,10 @@ import urllib.request
 from pathlib import Path
 from typing import Callable, Mapping, Protocol
 
+from openconsult.guidelines import environment
 from openconsult.guidelines.embedder import Vectors  # noqa: F401 - the app's, since 8b
+from openconsult.guidelines.embedder import WorkerEmbedder as AppWorkerEmbedder
 from openconsult.llm.ollama import DEFAULT_ADDRESS, encode
-from openconsult.speech import environment
-from openconsult.speech.worker import Worker, WorkerGone
 
 # The model's name on the Ollama service, as v1 names it (V1/app/rag.py).
 FIRST_MODEL = "embeddinggemma"
@@ -33,11 +33,7 @@ KEEP_ALIVE = "30m"
 WHERE = ("card", "processor")
 EMBED_TIMEOUT_S = 120.0
 STATUS_TIMEOUT_S = 5.0
-WORKER_READY_S = 300.0
-WORKER_REQUEST_S = 120.0
 
-HERE = Path(__file__).resolve().parent
-WORKER_FOLDER = HERE / "embedding2"
 
 
 class Embedder(Protocol):
@@ -149,80 +145,23 @@ def where_is(listed: list[dict] | None, model: str) -> dict | None:
 
 # --------------------------------------------- the worker of version 2
 
-def folder(data_folder: Path) -> Path:
-    return Path(data_folder) / "embedding" / "embeddinggemma2"
-
-
-def venv(data_folder: Path) -> Path:
-    return folder(data_folder) / ".venv"
-
-
-def python(data_folder: Path, system: str | None = None) -> Path:
-    return environment.python_in(venv(data_folder), system)
-
-
-def model_folder(data_folder: Path) -> Path:
-    return folder(data_folder) / "model"
-
-
-def installed(data_folder: Path, system: str | None = None) -> bool:
-    """A path check only: the environment's Python and the model's weights."""
-    return python(data_folder, system).exists() and (model_folder(data_folder) / "model.safetensors").exists()
+# The worker is the app's since 8b (openconsult/guidelines): its folder,
+# its environment and its door are read from there; the bench's name for
+# it stays.
+WORKER_FOLDER = environment.WORKER_FOLDER
+folder, venv, python, model_folder, installed = (environment.folder, environment.venv, environment.python,
+                                                 environment.model_folder, environment.installed)
+worker_env = environment.worker_env
 
 
 def worker_command(data_folder: Path, where: str, system: str | None = None) -> list[str]:
-    return [str(python(data_folder, system)), str(WORKER_FOLDER / "worker.py"),
-            "--model", str(model_folder(data_folder)), "--device", where]
+    return environment.worker_command(data_folder, where, system)
 
 
-def worker_env(data_folder: Path, environ: Mapping[str, str] = os.environ) -> dict:
-    """The speech workers' environment (the hub's network off, no key),
-    with the hub's home inside the data folder, so the shared cache is
-    never touched (rule 19 of the stage)."""
-    env = environment.worker_env(environ)
-    env["HF_HOME"] = str(folder(data_folder) / "hub")
-    return env
-
-
-class WorkerEmbedder:
+class WorkerEmbedder(AppWorkerEmbedder):
+    """The app's worker door with the bench's start: start and wait, the reason when it is not ready."""
     name = "second"
 
-    def __init__(self, where: str, data_folder: Path, environ: Mapping[str, str] = os.environ,
-                 command: list[str] | None = None, clock: Callable = time.perf_counter):
-        if where not in WHERE:
-            raise ValueError(f"not a place for a model: {where}")
-        self.where, self.data_folder = where, Path(data_folder)
-        log = folder(self.data_folder) / "worker.log"
-        log.parent.mkdir(parents=True, exist_ok=True)
-        self._worker = Worker(command or worker_command(self.data_folder, where), log_path=log,
-                              env=worker_env(self.data_folder, environ),
-                              ready_timeout_s=WORKER_READY_S, request_timeout_s=WORKER_REQUEST_S)
-        self._clock = clock
-
     def start(self) -> str | None:
-        """Start the worker and wait until it is ready; the reason when it is not."""
-        self._worker.start()
-        if not self._worker.wait_ready():
-            return self._worker.reason or "the embedding worker is not ready"
-        return None
-
-    def embed(self, texts: list[str]) -> Vectors:
-        started = self._clock()
-        try:
-            reply = self._worker.request({"type": "embed", "texts": list(texts)})
-        except WorkerGone as gone:
-            return Vectors(False, [], self._clock() - started, f"{gone.kind}: {gone.detail}")
-        wall = self._clock() - started
-        if reply.get("type") != "vectors":
-            return Vectors(False, [], wall, str(reply.get("message") or f"an answer of type {reply.get('type')!r}"))
-        return Vectors(True, list(reply.get("vectors") or []), wall, None,
-                       {k: reply.get(k) for k in ("seconds",)})
-
-    def info(self) -> dict:
-        info = dict(self._worker.info)
-        info.pop("type", None)
-        info.pop("nbytes", None)
-        return {"where_asked": self.where, **info}
-
-    def close(self) -> None:
-        self._worker.stop()
+        super().start()
+        return self.ready()

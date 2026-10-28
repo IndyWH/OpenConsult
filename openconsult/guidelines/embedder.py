@@ -9,14 +9,21 @@ started again by itself."""
 from __future__ import annotations
 
 import os
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Mapping, Protocol
+from typing import Callable, Mapping, Protocol
 
 from openconsult import words
+from openconsult.guidelines import environment
+from openconsult.speech.worker import Worker, WorkerGone
 
 WHERE = ("card", "processor")
 NOT_INSTALLED, STARTING, READY, FAILED, STOPPED = "not_installed", "starting", "ready", "failed", "stopped"
+# The load took up to about ten seconds in 5d; a cold cache after a reboot is slower (the speech workers' figure).
+WORKER_READY_S = 300.0
+# A search's call is a few texts; a load of a document sends 16 at a time.
+WORKER_REQUEST_S = 120.0
 
 
 @dataclass(frozen=True)
@@ -94,11 +101,93 @@ class NotInstalled:
         pass
 
 
-def make_embedder(data_folder: Path, where: str, environ: Mapping[str, str] = os.environ):
-    """The app's embedder for a data folder: the worker when its
+class WorkerEmbedder:
+    """The worker of EmbeddingGemma 2 behind the door (6.2): started once
+    and left to load; the first use waits for it; a death is a failure
+    with its reason and nothing is started again by itself (10.4)."""
+
+    def __init__(self, where: str, data_folder: Path, environ: Mapping[str, str] = os.environ,
+                 command: list[str] | None = None, clock: Callable = time.perf_counter, reranker: bool = False,
+                 reranker_where: str | None = None):
+        if where not in WHERE:
+            raise ValueError(f"not a place for a model: {where}")
+        self.where, self.data_folder, self.reranker = where, Path(data_folder), reranker
+        self._worker = Worker(command or environment.worker_command(self.data_folder, where, reranker=reranker,
+                                                                     reranker_where=reranker_where),
+                              log_path=environment.log_path(self.data_folder), env=environment.worker_env(self.data_folder, environ),
+                              ready_timeout_s=WORKER_READY_S, request_timeout_s=WORKER_REQUEST_S)
+        self._clock = clock
+
+    installed = True
+
+    def start(self) -> None:
+        """Spawn the process and return at once; the models load in it."""
+        self._worker.start()
+
+    def ready(self) -> str | None:
+        """Wait once for the load; None when ready, else the reason."""
+        if self._worker.state == "ready":
+            return None
+        if self._worker.state == "starting" and self._worker.wait_ready():
+            return None
+        return self._worker.reason or words.GUIDELINE_WORKER_NOT_READY
+
+    @property
+    def state(self) -> str:
+        return self._worker.state
+
+    @property
+    def reason(self) -> str | None:
+        return self._worker.reason
+
+    @property
+    def model_id(self) -> str | None:
+        info = self._worker.info
+        return f"{info.get('model')}@{info.get('revision')}" if info.get("model") else None
+
+    def embed(self, texts: list[str]) -> Vectors:
+        started = self._clock()
+        try:
+            reply = self._worker.request({"type": "embed", "texts": list(texts)})
+        except WorkerGone as gone:
+            return Vectors(False, [], self._clock() - started, f"{gone.kind}: {gone.detail}")
+        wall = self._clock() - started
+        if reply.get("type") != "vectors":
+            return Vectors(False, [], wall, str(reply.get("message") or f"an answer of type {reply.get('type')!r}"))
+        return Vectors(True, list(reply.get("vectors") or []), wall, None, {"seconds": reply.get("seconds")})
+
+    def rerank(self, query: str, texts: list[str]) -> Scores:
+        started = self._clock()
+        try:
+            reply = self._worker.request({"type": "rerank", "query": query, "texts": list(texts)})
+        except WorkerGone as gone:
+            return Scores(False, [], self._clock() - started, f"{gone.kind}: {gone.detail}")
+        wall = self._clock() - started
+        if reply.get("type") != "scores":
+            return Scores(False, [], wall, str(reply.get("message") or f"an answer of type {reply.get('type')!r}"))
+        return Scores(True, [float(x) for x in (reply.get("scores") or [])], wall, None)
+
+    def info(self) -> dict:
+        info = dict(self._worker.info)
+        info.pop("type", None)
+        info.pop("nbytes", None)
+        return {"where_asked": self.where, "state": self.state, **info}
+
+    def close(self) -> None:
+        self._worker.stop()
+
+
+def make_embedder(data_folder: Path, where: str, environ: Mapping[str, str] = os.environ, reranker: bool = False,
+                  reranker_where: str | None = None, start: bool = True):
+    """The app's embedder for a data folder: the worker, started, when its
     environment and model are installed there, else the door with no
-    worker. The worker arrives with the next commit of 8b."""
-    return NotInstalled(where)
+    worker behind it."""
+    if not environment.installed(Path(data_folder)):
+        return NotInstalled(where)
+    worker = WorkerEmbedder(where, Path(data_folder), environ, reranker=reranker, reranker_where=reranker_where)
+    if start:
+        worker.start()
+    return worker
 
 
 def state_line(embedder) -> str:

@@ -43,8 +43,11 @@ def main(argv: list[str]) -> int:
     os.dup2(2, 1)
     sys.stdout = sys.stderr
     inp = sys.stdin.buffer
+    reranker = "--reranker" in argv
     frames.write_frame(out, {"type": "ready", "model": "made-up/embedder", "revision": "0", "device": device,
-                             "dtype": "made-up", "versions": {"made-up": "0"}, "load_s": 0.0})
+                             "dtype": "made-up", "versions": {"made-up": "0"}, "load_s": 0.0,
+                             "reranker": "made-up/reranker" if reranker else None, "reranker_revision": "r0" if reranker else None,
+                             "reranker_device": (argv[argv.index("--reranker-device") + 1] if "--reranker-device" in argv else device) if reranker else None})
     requests = 0
     while True:
         frame = frames.read_frame(inp)
@@ -64,6 +67,12 @@ def main(argv: list[str]) -> int:
             texts = list(header.get("texts") or [])
             frames.write_frame(out, {"type": "vectors", "vectors": [vector(t, mode) for t in texts],
                                      "seconds": 0.001, "texts_seen": texts})
+        elif kind == "rerank" and not reranker:
+            frames.write_frame(out, {"type": "error", "fatal": False, "message": "no reranker is loaded"})
+        elif kind == "rerank":
+            texts = list(header.get("texts") or [])
+            # The made-up score: a text's length, so a test can order them as it likes.
+            frames.write_frame(out, {"type": "scores", "scores": [float(len(t)) for t in texts], "seconds": 0.001})
         else:
             frames.write_frame(out, {"type": "error", "fatal": False, "message": f"made-up: unknown {kind!r}"})
 

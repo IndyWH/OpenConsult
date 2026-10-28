@@ -445,6 +445,14 @@ WORKER_STATES = {
     "failed": "not running: {reason}",
     "stopped": "stopped",
 }
+GUIDELINE_WORKER_NOT_READY = "The guideline search's worker is not ready."
+# openconsult install-guidelines (the detail The embedding worker in the app; ruling 9; the plan review of 8b). Drafts.
+RERANKER_FETCHING = "Fetching the reranker into {folder}, with no token, at the revision its page names now."
+RERANKER_FOUND = "Found the reranker at revision {revision} ({size})."
+RERANKER_FETCHED = "Downloaded the reranker at revision {revision} ({size}); the revision and the weights' hash are pinned beside it."
+RERANKER_GATED = "The reranker could not be fetched: the hub asks for an account, a token or a licence. Nothing was written."
+RERANKER_FETCH_FAILED = "The reranker could not be fetched: {reason}"
+GUIDELINES_INSTALLED = "The guideline search is installed. Start OpenConsult, and add documents under Settings, Guidelines."
 # The loader command of the bench kit (ruling 18), said in the terminal. Counts only.
 LOAD_NEEDS_PUBLISHER = "guideline-load needs --publisher, the publisher's name, which is never written into OpenConsult itself."
 LOAD_NEEDS_STATEMENT = "guideline-load needs --statement-accepted: the statement of the Guidelines section, given as the owner's."
@@ -767,7 +775,7 @@ EMBED_FOUND = "Found EmbeddingGemma 2 at revision {revision} ({size})."
 EMBED_FETCHED = "Downloaded EmbeddingGemma 2 at revision {revision} ({size})."
 EMBED_GATED = "EmbeddingGemma 2 could not be fetched: the hub asks for an account, a token or a licence. Nothing was written."
 EMBED_FETCH_FAILED = "EmbeddingGemma 2 could not be fetched: {reason}"
-EMBED_NOT_INSTALLED = "The embedding worker is not installed in {folder}. Run openconsult-bench shared-install first."
+EMBED_NOT_INSTALLED = "The embedding worker is not installed in {folder}. Run openconsult install-guidelines first."
 EMBED_WORKER_FAILED = "The embedding worker could not start: {reason}"
 EMBED_WORKER_SAYS = "The embedding worker says: device {device}, number format {dtype}, {model} at {revision}."
 EMBED_PLACED = "The embedding model {embedding} was asked for on the {where}; it says: {info}"
