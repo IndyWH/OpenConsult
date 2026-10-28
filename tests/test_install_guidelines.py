@@ -46,7 +46,7 @@ def test_ruling_5_install_guidelines_builds_the_environment_and_fetches_with_no_
                   "revision": "r-" + which, "error": None}
         return Done(0, out=json.dumps(report) + "\n")
     said = []
-    assert environment.install(data, say=said.append, run=run, which=lambda name: "/made-up/uv", environ={"HF_HUB_OFFLINE": "1", "PATH": "x"}) == 0
+    assert environment.install(data, say=said.append, run=run, which=lambda name: "/made-up/uv", environ={"HF_HUB_OFFLINE": "1", "PATH": "x"}, reranker=True) == 0
     assert [c[0][-1] for c in calls[1:]] == ["embedding", "reranker"] and calls[1][0][-3] == str(environment.model_folder(data))
     assert calls[2][0][-3] == str(environment.reranker_folder(data))
     assert words.EMBED_BUILT in said and words.EMBED_FOUND.format(revision="r-embedding", size="1.5 GB") in said
@@ -60,8 +60,15 @@ def test_ruling_5_install_guidelines_builds_the_environment_and_fetches_with_no_
             return Done(1, out=json.dumps({"ok": False, "error": "asks for an account, a token or a licence"}) + "\n")
         return Done(0, out=json.dumps({"ok": True, "fetched": False, "bytes": 1, "revision": "r", "error": None}) + "\n")
     said = []
-    assert environment.install(data, say=said.append, run=gated, which=lambda name: "/made-up/uv", environ={}) == 8
+    assert environment.install(data, say=said.append, run=gated, which=lambda name: "/made-up/uv", environ={}, reranker=True) == 8
     assert said[-1] == words.RERANKER_GATED
+    # R31: the reranker is not wired, so the install fetches it only when asked; the app's command asks only with --reranker.
+    said = []
+    assert environment.install(data, say=said.append, run=gated, which=lambda name: "/made-up/uv", environ={}) == 0
+    assert said[-1] == words.GUIDELINES_INSTALLED and said[-2] == words.EMBED_FOUND.format(revision="r", size="1 kB")
+    said = []
+    assert commands.shared_install(data, say=said.append, run=gated, which=lambda name: "/made-up/uv", environ={}) == 0
+    assert said[-1] == words.EMBED_FOUND.format(revision="r", size="1 kB")      # 5d's command ends as it did
     said = []
     assert commands.shared_install(data, say=said.append, run=gated, which=lambda name: "/made-up/uv", environ={}) == 0
     assert said[-1] == words.EMBED_FOUND.format(revision="r", size="1 kB") and words.RERANKER_FETCHING.split("{")[0] not in " ".join(said)
@@ -69,6 +76,9 @@ def test_ruling_5_install_guidelines_builds_the_environment_and_fetches_with_no_
     # The command line reaches the same code.
     said = []
     assert main(["install-guidelines", "--data-folder", str(data)], say=said.append, run_process=run, which=lambda name: "/made-up/uv") == 0
+    assert said[-1] == words.GUIDELINES_INSTALLED and words.RERANKER_FETCHING.split("{")[0] not in " ".join(said) and words.EMBED_FOUND.format(revision="r-embedding", size="1.5 GB") in said
+    assert main(["install-guidelines", "--data-folder", str(data), "--reranker"], say=said.append, run_process=run, which=lambda name: "/made-up/uv") == 0
+    assert said[-1] == words.GUIDELINES_INSTALLED
 
 
 def test_plan_review_4_a_model_whose_weights_match_the_pinned_hash_is_found_and_not_fetched_again(tmp_path):

@@ -70,7 +70,7 @@ def shared_install(data_folder: Path, say: Callable = print, run: Callable = sub
     then the one fetch of the model, with no token, into the data folder:
     the app's own install since 8b, without the reranker the bench of 5d
     never needed."""
-    return guidelines_environment.install(Path(data_folder), say=say, run=run, which=which, environ=environ, reranker=False)
+    return guidelines_environment.install(Path(data_folder), say=say, run=run, which=which, environ=environ, reranker=False, closing=False)
 
 
 # --------------------------------------------------------------- search

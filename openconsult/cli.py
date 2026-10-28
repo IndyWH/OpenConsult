@@ -50,6 +50,8 @@ def main(argv: list[str] | None = None, say: Callable = print,
     parser.add_argument("--no-browser", action="store_true", help="start without opening the browser")
     parser.add_argument("--choice", choices=sorted(CHOICES), default=WHISPERX_PYANNOTE.name,
                         help="the speech choice for install-speech and self-test")
+    parser.add_argument("--reranker", action="store_true",
+                        help="install-guidelines: fetch the reranker too, for the bench; the app does not use it (15.12 ruling 9, not wired)")
     args = parser.parse_args(argv)
     if args.command == "reset-password":
         return reset_password(args.data_folder, say=say, ask=ask)
@@ -58,7 +60,8 @@ def main(argv: list[str] | None = None, say: Callable = print,
     if args.command == "self-test":
         return self_test(args.data_folder, CHOICES[args.choice], say=say, make_speech=make_speech, sleep=sleep)
     if args.command == "install-guidelines":
-        return guidelines_environment.install(store.build(args.data_folder).data_folder, say=say, run=run_process, which=which)
+        return guidelines_environment.install(store.build(args.data_folder).data_folder, say=say, run=run_process, which=which,
+                                              reranker=args.reranker)
     return run(args.data_folder, args.port, say=say, serve=serve or _serve, machine=machine,
                open_browser=None if args.no_browser else (open_browser or browser.start))
 

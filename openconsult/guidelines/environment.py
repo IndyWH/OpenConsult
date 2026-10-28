@@ -2,10 +2,11 @@
 are installed (spec 15.12, The embedding worker in the app; 15.9 ruling
 25; 6.2, 6.4; the plan review of 8b, points 1 and 4): in the user's data
 folder, under embedding, from the lock file committed beside the worker,
-by uv; then EmbeddingGemma 2's one fetch and the reranker's one fetch,
-each with no token, each skipped when its weights are there and match
-the pinned hash. openconsult install-guidelines runs it; the bench's
-shared-install runs the same code without the reranker."""
+by uv; then EmbeddingGemma 2's one fetch and, only when asked, the
+reranker's one fetch, each with no token, each skipped when its weights
+are there and match the pinned hash. openconsult install-guidelines runs
+it; the reranker is fetched for the bench alone, with --reranker, since
+ruling 9's mark did not hold and the app does not use it (R31)."""
 
 from __future__ import annotations
 
@@ -92,7 +93,7 @@ def _fetch(data_folder: Path, which: str, target: Path, run: Callable, environ: 
 
 
 def install(data_folder: Path, say: Callable = print, run: Callable = subprocess.run, which: Callable = shutil.which,
-            environ: Mapping[str, str] = os.environ, reranker: bool = True) -> int:
+            environ: Mapping[str, str] = os.environ, reranker: bool = False, closing: bool = True) -> int:
     """The environment from the lock file (uv audits and changes nothing
     when it is complete), then each model's one fetch, skipped when its
     weights are there and match. Exit codes: 7 uv or the environment, 8 a fetch."""
@@ -117,6 +118,8 @@ def install(data_folder: Path, say: Callable = print, run: Callable = subprocess
     size = speech_environment.plain_size(int(report["bytes"]))
     say((words.EMBED_FETCHED if report["fetched"] else words.EMBED_FOUND).format(revision=report["revision"], size=size))
     if not reranker:
+        if closing:
+            say(words.GUIDELINES_INSTALLED)
         return 0
     say(words.RERANKER_FETCHING.format(folder=reranker_folder(data_folder)))
     report = _fetch(data_folder, "reranker", reranker_folder(data_folder), run, environ)
