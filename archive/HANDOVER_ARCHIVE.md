@@ -3,6 +3,135 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-10-20. Stage 6b: the live consultation, from Stop to approve
+
+Built and proven on 20 Oct 2026 in two sessions (the first cut by the
+usage limit after the player's commit). The plan was reviewed by Cowork
+the same day (five points; all are in). The bench of the note prompt ran
+first and the owner ruled on it the same day. The report is
+STAGE6B_REPORT.md in the private log folder. The room run is the owner's,
+still to come: the steps are in the report.
+
+The rulings it builds, one line each (spec 15.10):
+- 3: the note prompt is one file, openconsult/prompts/note.prompt.txt,
+  the approved block byte for byte, sha256 0666c026...284207, proven by
+  hash and by cmp against Cowork's copy; the answer form needs at least
+  one subjective entry.
+- 4: beside the assessment stand the differentials of the last shown
+  pass, read from cds_pass, under a heading that says they are the
+  model's and not part of the note; the copy text, the approved text and
+  the browser's print of the page hold the note alone.
+- 5: the frame around the transcript is the bench's words,
+  note.frame.txt, sha256 44f10e08...1e0637 (the label check's bytes);
+  the three speaker words live in consult/note.py and the bench reads
+  them there, so no word a model reads is new.
+- 6: the form has text and turns and nothing else; an entry's words are
+  stored and shown letter for letter; the app holds no list of names and
+  no replacement.
+- 8: v1's citation check as plain functions, CITATION_HALF 0.5; an entry
+  that cites no real line is kept and marked; a note in which fewer than
+  half the entries cite a real line is refused with the count and its
+  entries discarded.
+- 11: the review page in the busy GP's order; draft again only after an
+  edit, never by itself, the earlier draft kept; Approve audited, the
+  note read-only after; Refuse recorded.
+- 12: every keystroke on the page is use; an unsaved edit holds off the
+  quiet refresh.
+- 16: 6b from Stop to approve. The player of 8.8 as D51; the recording
+  route to the logged-in user on this computer only (15.6 ruling 6).
+
+What was built (the app without the bench 10,019 lines of Python, from
+9,130 at 6a, and 1,018 of pages and scripts; the tests 12,106 lines):
+- schema version 5: note_draft (stamp, prompt hash, what the model read,
+  citation count, refused, failure), note_entry (as written and as it
+  stands, the turns cited and the lines they hold), note_edit,
+  transcript_edit (words, label, undo, swap, each with what stood before),
+  note_approval (one at most, with the approved text), note_refusal;
+  transcript_line gains set_by_doctor. A version 4 folder comes forward
+  with its rows.
+- consult/note.py: the turns by the bench's rule over the lines as they
+  stand, the citation check, the copy text, the last shown differentials,
+  the draft; consult/note_rows.py the rows; the note as the last stage of
+  Stop after the gate, the stopping page saying Drafting the note, the
+  page going to the review page; 6a's final transcript page folded into
+  the review page.
+- web/review.py with review.html, review.js, player.js and print.css;
+  use.js widened to any element marked data-use; the recording route; the
+  copy text served as note.txt; Draft the note for a final consultation
+  that has none; the home page's list of consultations waiting for
+  review, one row each by the latest state.
+- the bench's note job reads the app's prompt, frame, form and limits and
+  its own two note files are gone (spec 5.1); speech-calls takes --kind.
+
+The constants, each with its source:
+- NOTE_MAX_TOKENS 3,000 and NOTE_TIMEOUT_S 120: the bench's figures; the
+  rehearsal's longest note was 1,284 tokens and 8.2 s.
+- CITATION_HALF 0.5: v1's, a design choice and not a measurement; the
+  room may move it.
+
+The bench of the note prompt, 20 Oct 2026, on vLLM 0.31.0 with the room
+of 3c, thinking off, 28 page notes and 8 script notes, two rounds at
+temperature 0 and seed 42, the baseline v1's prompt on 11 Oct: rule 1 (no
+reply cut by a stray quote) held, 0 of 36 beside 0; rule 2a (no real drug
+of the model's own on the made recording's AssemblyAI page) held, 0 and 0
+beside 0 and 0; rule 2b (the garbled name written as heard with unclear)
+not judged on this material, since the only garbled mention sits on a
+page where the drug is also spoken rightly three times and no page holds
+a drug garbled everywhere; rule 3 (key facts not found from the scripts)
+held, 12 beside 20; rule 4 (figures not spoken) held, 33 and 6 beside 34
+and 8. Kept by the owner's ruling of 20 Oct. The typical note call 4.67 s
+beside 4.83. One finding: the note on the tied pair's page of 477, round
+2, ran to the 3,000-token limit with a turns list that never ended (its
+round 1 answered in 445 tokens); if it recurs in the room the cure is a
+limit on the turns list in the answer form, benched on its own, not a
+change to the prompt's words. Rule 2b stays for 5e. The detail's wording
+of rule 2 was corrected by the plan review before the run.
+
+The owner's room run of 6a, 20 Oct 2026, consultation 1 on his own data
+folder: word to page 3.03 s typical, pass 2.61 s typical, Stop to final
+19.6 s. His words: OpenConsult was spot on; alarms came at the right
+time.
+
+My proof of 6b, 20 Oct 2026, on a copy of 6a's throwaway data folder
+brought forward to version 5, vLLM up: consultation 3 (94 lines, 19 pass
+rows) had no note; Draft the note answered in 4.6 s with 26 entries, all
+26 cited, 145 line presses; five differentials beside the assessment; 47
+on the Approve control (24 warning rows and 23 labels the check changed);
+a press on line 30, which starts at 76.0 s, had the recording at 78.9 s
+three seconds later; note.txt 33 lines, the four headings and the
+entries' words, no differential, no bracketed number, no model line;
+Approve wrote the approval row (1,115 characters, the copy text
+unchanged), left no entry or line form on the page, and refused a second
+Approve and a line edit on the control; the Log page shows Note drafted
+and Note approved; the home list went from four to three. Consultations
+1, 2 and 4, refused by the gate, show no note and Draft the note disabled
+with the reason. 648 tests, green three times before the last commit,
+none skipped. No file over 600 lines, no function over 80. CLAUDE.md 98
+lines. The private word check printed nothing before every commit.
+Nothing of the bench or the recordings entered the repo.
+
+Made untrue by this stage: 6a's line, above, that Stop ends at the final
+transcript page (the note is drafted after the gate and the page goes to
+the review page; final.html is gone); the home sentence, README's so far
+and CLAUDE.md's running lines, fixed in this commit; the bench's prompts
+folder holds one prompt now, the drug name's; the 15.10 detail's sentence
+on rule 2 of the bench, which Cowork folds into the spec with the ruling.
+
+Departures from the plan: the proof ran before the documents commit, as
+6a's did; the plan's 38 tests landed as 36 (the line-words edit, the
+citation-stripping copy, the audio-gone line and the home list's one row
+each are pinned inside their neighbours, and the note stage's spinning
+state inside the Stop test).
+
+For stage 7: the line that the recording has gone, with the date, stands
+in the player's place when the file is missing (player.available), built
+now and true once the retention clock removes files; an edited line's
+words change transcript_line.text in place with the words before in
+transcript_edit, and the raw words stay in stop_raw and live_line; the
+approved text in note_approval is the record of what was approved; the
+state column keeps its three values, and an approved consultation is one
+with a note_approval row.
+
 ## 2026-10-20. Stage 6a: the live consultation, from Start to Stop
 
 Built and proven on 20 Oct 2026 in one session. The plan was reviewed by

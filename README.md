@@ -5,8 +5,8 @@ This branch is where OpenConsult v2.0 is being built.
 - The working app, v1, is on the main branch.
 - The plan for v2 is in V2_SPEC.md.
 - So far this version runs acted consultations from a patient list to an
-  approved note. The Patients page lists every acted patient, last seen
-  first, with a number, and one search box finds one by part of a name, a
+  approved note and its referral letters. The Patients page lists every
+  acted patient, last seen first, with a number, and one search box finds one by part of a name, a
   date of birth or the number; the patient's page corrects a name, a date
   of birth or a sex with every change audited, and an earlier consultation
   keeps the details it ran with. A consultation starts under a patient seen
@@ -27,7 +27,20 @@ This branch is where OpenConsult v2.0 is being built.
   warnings and the alarms each a press from the sound, and the transcript
   with a player for the recording, where a word or a speaker can be
   corrected and the note drafted again. An approved note is read-only and
-  audited; the copy gives the note alone. Recordings are deleted after a
+  audited; the copy gives the note alone. After Approve, a Referral
+  letters section lists the referrals the note states and, under a line
+  saying they are the model's suggestions and not advice, the ones it
+  suggests, each with the consultant's title in a field the doctor can
+  change; one press drafts a letter from the approved note only, with the
+  assessment withheld from the model, and code checks every sentence
+  against the note lines it cites, replacing a failed one with a
+  placeholder, dropping an allergy sentence the note does not support,
+  and refusing a letter under half grounded; the letter has its own page,
+  each paragraph editable, with Approve (then read-only, and one copy
+  gives the letter alone) and Refuse, and a specialty the doctor names
+  gets a letter with no list. The letter prompts were benched four times
+  on four approved notes, the owner ruling after each, before the page
+  was wired. Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line
   of counts. The background to the model was measured before it was kept,
