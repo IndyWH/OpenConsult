@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import openconsult
-from openconsult.bench import background, export, figures, score, wordcheck
+from openconsult.bench import background, export, figures, letter_marks, letters, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench.repeat import run_repeat
@@ -41,7 +41,7 @@ def say(line: str) -> None:
     print(f"[{dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}] {line}", flush=True)
 
 
-def open_arm(args, together: bool = False, with_background: bool = False):
+def open_arm(args, together: bool = False, with_background: bool = False, differs=None):
     """The door, its record and the writer of an arm; or the code to stop
     with, when the engine or the model is not the one this arm needs.
     The door gets the one profile as this engine knows the model, or with
@@ -74,9 +74,11 @@ def open_arm(args, together: bool = False, with_background: bool = False):
         say(f"STOP: the engine runs at a context of {context}, not {profile.context}; an arm is measured at the profile's")
         return 8
     held = writer.read_all()
-    differs = arm_differs(next(iter(held.values())), door, together, with_background) if held else None
-    if differs:
-        say(f"STOP: {differs}")
+    first = next(iter(held.values())) if held else None
+    # The letters bench (8a) carries its own stamp; the replay's is the default.
+    why = (differs(first, door) if differs else arm_differs(first, door, together, with_background)) if held else None
+    if why:
+        say(f"STOP: {why}")
         return 5
     return door, record, writer
 
@@ -146,6 +148,50 @@ def cmd_score(args) -> int:
     (out / "scores.md").write_text(text, encoding="utf-8")
     print(text)
     return 0 if scored["hard_met"] else 1
+
+
+def cmd_letters(args) -> int:
+    """The letters bench of 8a (15.12 ruling 10): the list call and the
+    letter calls on the approved notes, 13 chains a case, through the
+    app's own numbering, frames and check."""
+    opened = open_arm(args, differs=letters.arm_differs)
+    if isinstance(opened, int):
+        return opened
+    door, _, writer = opened
+    cases = load_cases(Path(args.cases))
+    if args.case:
+        cases = [c for c in cases if c.name in args.case]
+    named = dict(item.split("=", 1) for item in args.letter or [])
+    try:
+        for case in cases:
+            letters.specialties_for(case, named)
+    except ValueError as refused:
+        say(f"STOP: {refused}")
+        return 9
+    chains = [c for c in CHAINS if not args.chains or c.name in args.chains]
+    if any(not writer.exists(case.name, chain.name) for case in cases for chain in chains):
+        first = letters.first_call(door, cases[0])
+        say(f"the first call, not measured: {first.wall_ms} ms")
+        if not first.ok:
+            say(f"STOP: the first call failed: {first.failure}: {first.detail}")
+            return 4
+    summary = letters.run(door, cases, writer, named, chains, log=say)
+    say(f"done: ran {summary['run']} chains, kept {summary['kept']}")
+    return 0
+
+
+def cmd_letters_score(args) -> int:
+    """The marks of 15.12 ruling 10 from the stored results alone: the
+    table to the write folder, never over a file that exists; 0 when
+    every mark holds."""
+    try:
+        marked = letter_marks.score(ResultWriter(Path(args.out)).read_all())
+        letter_marks.write(Path(args.write), marked)
+    except (Refused, letter_marks.MarksRefused) as refused:
+        say(f"STOP: {refused}")
+        return 6
+    print(letter_marks.as_markdown(marked), end="")
+    return 0 if marked["held"] else 1
 
 
 def cmd_background_score(args) -> int:
@@ -413,6 +459,18 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--workload", nargs="*", help="only these v1 workloads")
     p = command("score", cmd_score, out=False)
     p.add_argument("--replies", help="score a published replies file")
+    p = command("letters", cmd_letters)
+    p.add_argument("--cases", required=True, help="the folder holding the case list and the approved notes")
+    p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
+    p.add_argument("--kind", choices=sorted(KINDS), default="ollama", help="the kind of engine at that address")
+    p.add_argument("--data-folder", help="an app data folder results may not go under, beside the real one")
+    p.add_argument("--model", help="the name the engine knows the model by")
+    p.add_argument("--digest", help="refuse to run unless the model has this digest")
+    p.add_argument("--case", nargs="*", help="only these cases")
+    p.add_argument("--chains", nargs="*", help="only these chains, for a check")
+    p.add_argument("--letter", action="append", help="CASE=SPECIALTY, the specialty a case that states no referral drafts to")
+    p = command("letters-score", cmd_letters_score)
+    p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
     p = sub.add_parser("background-score")
     p.set_defaults(fn=cmd_background_score)
     p.add_argument("--with", required=True, help="the result folder of the arm with the background block")
