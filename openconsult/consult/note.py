@@ -58,6 +58,9 @@ def turns_text(turns: list[dict]) -> str:
 # (consultation 78; ruling 8). A design choice from v1, not a measurement;
 # the room may move it.
 CITATION_HALF = 0.5
+# The letter's half (15.12 ruling 4): the same shape as the note gate, a
+# letter with fewer than half its sentences grounded in the note refused.
+LETTER_GROUNDED_HALF = 0.5
 SECTIONS = ("subjective", "objective", "assessment", "plan")
 _BRACKETS = re.compile(r"\[([^\[\]]+)\]")
 

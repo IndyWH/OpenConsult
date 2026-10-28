@@ -324,6 +324,11 @@ NOT_CHANGED_BY_CHECK = "The check did not change this line's speaker, so there i
 # The referral letters (spec 15.12, rulings 1, 2, 4 and 8; R2, R5, R15, R20). Drafts.
 # The placeholder is also the words the letter prompt tells the model to write; the check writes this one.
 LETTER_PLACEHOLDER = "[to be completed by the referring doctor]"
+# The parts code writes, never the model (ruling 1): the title from the item, the three details the consultation
+# ran with (15.11 ruling 2), the one user's title and name.
+LETTER_SALUTATION = "Dear Consultant {title},"
+LETTER_RE = "Re: {name}, born {born}, {sex}"
+LETTER_SIGN_OFF = "Yours faithfully,"
 # The player (spec 8.8; D51). Drafts.
 PLAYER = "The recording"
 PLAY_FROM_LINE = "Play from here"
