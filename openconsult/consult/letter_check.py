@@ -4,13 +4,14 @@ paragraph cites. A heading and an Assessment line are never citable: a
 citation into Assessment is dropped and recorded on the paragraph, and
 the sentences are judged on the valid lines left (the plan review of
 8a, point 1). A sentence fails when its paragraph has no valid line,
-when a number in it is not in those lines (the patient's age excepted),
-when it turns a planned test into a result, or when it is the
-placeholder itself; an expectation sentence stands only where a valid
-line holds the words Patient's expectations followed by a colon, and is
-dropped otherwise, never replaced. A failed sentence becomes the
-placeholder, one for a run; the letter is refused when fewer than half
-its sentences are grounded, or there is none. Ported from v1's
+when a number in it is not in those lines (the patient's age excepted;
+a figure inside a word, as the 2 of T2DM, is a number), when it turns a
+planned test into a result, judged per sentence, or when it holds the
+placeholder anywhere (ruling 15); an expectation sentence stands only
+where a valid line holds the words Patient's expectations followed by a
+colon, and is dropped otherwise, never replaced. A failed sentence
+becomes the placeholder, one for a run; the letter is refused when fewer
+than half its sentences are grounded, or there is none. Ported from v1's
 letters.validate_letter as plain functions (6.1), to the spec's rules."""
 
 from __future__ import annotations
@@ -38,6 +39,7 @@ _PLANNED_WORDS = re.compile(r"\b(arranged|planned|requested|ordered|booked|organ
 _EXPECTATION_CLASS = re.compile(r"patient'?s expectations|patient (?:wants|would like|hopes|expects|was hoping|is hoping)",
                                 re.IGNORECASE)
 _EXPECTATION_LINE = re.compile(r"patient'?s expectations\s*:", re.IGNORECASE)
+_FIGURE = re.compile(r"\d+(?:\.\d+)?")   # a figure, also inside a word (ruling 15)
 
 
 @dataclass(frozen=True)
@@ -58,11 +60,11 @@ def sentences_of(text: str) -> list[str]:
 def numbers_in(text: str) -> set[str]:
     """The numbers of a text as the normaliser reads them: number words
     become figures, a slash between figures is over, a hyphen is a space
-    (so 2-week and two-week are both 2 week), decimals stay."""
+    (so 2-week and two-week are both 2 week), decimals stay, and a figure
+    inside a word counts, so type 2 diabetes and T2DM both hold the 2."""
     found = set()
     for word in normalise(str(text or "").replace("-", " ")):
-        if word.replace(".", "", 1).isdigit():
-            found.add(word)
+        found.update(_FIGURE.findall(word))
     return found
 
 
@@ -70,16 +72,31 @@ def expectation_sentence(sentence: str) -> bool:
     return bool(_EXPECTATION_CLASS.search(sentence))
 
 
-def _verdict(sentence: str, valid: list[int], cited_text: str, allowed: set[str], has_expectation_line: bool) -> tuple[str, str | None]:
+def _upgrade(sentence: str, cited: list[str], allowed: set[str]) -> bool:
+    """A result-class verb over cited lines of which one only plans a
+    test is an upgrade, judged per sentence (ruling 15): only when no
+    cited line holds every number of the sentence (a sentence with no
+    number has none held), or when every cited line plans and none holds
+    a result verb. So a true result with its own line stands."""
+    if not _RESULT_WORDS.search(sentence) or not any(_PLANNED_WORDS.search(text) for text in cited):
+        return False
+    numbers = numbers_in(sentence)
+    held = any(numbers and numbers <= numbers_in(text) | allowed for text in cited)
+    all_planned = all(_PLANNED_WORDS.search(text) and not _RESULT_WORDS.search(text) for text in cited)
+    return not held or all_planned
+
+
+def _verdict(sentence: str, cited: list[str], allowed: set[str], has_expectation_line: bool) -> tuple[str, str | None]:
+    """cited holds the words of the paragraph's valid lines, one each."""
     if expectation_sentence(sentence) and not has_expectation_line:
         return DROPPED, None
-    if not valid:
+    if not cited:
         return REPLACED, NO_LINE
-    if sentence.strip() == PLACEHOLDER:
+    if PLACEHOLDER in sentence:
         return REPLACED, MODEL_PLACEHOLDER
-    if not numbers_in(sentence) <= (numbers_in(cited_text) | allowed):
+    if not numbers_in(sentence) <= (numbers_in(" ".join(cited)) | allowed):
         return REPLACED, NUMBER
-    if _RESULT_WORDS.search(sentence) and _PLANNED_WORDS.search(cited_text) and not _RESULT_WORDS.search(cited_text):
+    if _upgrade(sentence, cited, allowed):
         return REPLACED, UPGRADE
     return KEPT, None
 
@@ -94,12 +111,12 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
         cited = [n for n in (paragraph.get("note_lines") or []) if isinstance(n, int) and not isinstance(n, bool)]
         assessment = sorted({n for n in cited if n in by_number and by_number[n].section == "assessment" and not by_number[n].heading})
         valid = sorted({n for n in cited if n in by_number and by_number[n].citable})
-        cited_text = " ".join(by_number[n].text for n in valid)
+        cited = [by_number[n].text for n in valid]
         has_line = any(_EXPECTATION_LINE.search(by_number[n].text) for n in valid)
         kept, verdicts = [], []
         for sentence in sentences_of(paragraph.get("text", "")):
             total += 1
-            verdict, reason = _verdict(sentence, valid, cited_text, set(allowed_numbers), has_line)
+            verdict, reason = _verdict(sentence, cited, set(allowed_numbers), has_line)
             verdicts.append({"text": sentence, "verdict": verdict, "reason": reason})
             if verdict == DROPPED:
                 dropped += 1
