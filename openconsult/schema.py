@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 7
+VERSION = 8
 
 MIGRATIONS = {
     1: """
@@ -388,6 +388,67 @@ CREATE TABLE letter_approval (
     letter_id INTEGER NOT NULL UNIQUE REFERENCES letter(id),
     at TEXT NOT NULL,
     text TEXT NOT NULL
+);
+""",
+
+    # Stage 8b (spec 15.12, The passages and the search; rulings 5, 6 and
+    # 11; ruling 25 of 15.9; R2, R3, R20): the corpus the doctor loads, each
+    # source with its title, publisher, file, hash, the statement ticked
+    # and the model that built its passages; each passage with its heading
+    # trail, its text and its vector as bytes; and each guideline search of
+    # a live consultation with the passages sent, the outcome, the summary
+    # and the seconds. A version 7 folder comes forward with every row;
+    # these tables start empty: the corpus ships empty (ruling 5).
+    8: """
+CREATE TABLE guideline_source (
+    id INTEGER PRIMARY KEY,
+    title TEXT NOT NULL,
+    publisher TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('html', 'pdf', 'text')),
+    sha256 TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    added_at TEXT NOT NULL,
+    added_by TEXT NOT NULL CHECK (added_by IN ('page', 'command')),
+    statement_accepted INTEGER NOT NULL CHECK (statement_accepted = 1),
+    passage_count INTEGER NOT NULL,
+    model TEXT NOT NULL,
+    removed_at TEXT
+);
+
+CREATE TABLE guideline_passage (
+    id INTEGER PRIMARY KEY,
+    source_id INTEGER NOT NULL REFERENCES guideline_source(id),
+    position INTEGER NOT NULL,
+    trail TEXT NOT NULL,
+    text TEXT NOT NULL,
+    words INTEGER NOT NULL,
+    vector BLOB NOT NULL,
+    model TEXT NOT NULL
+);
+
+CREATE TABLE guideline_answer (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    pass_n INTEGER NOT NULL,
+    at TEXT NOT NULL,
+    names TEXT NOT NULL,
+    query TEXT NOT NULL,
+    passages TEXT NOT NULL,
+    candidates INTEGER NOT NULL,
+    top_similarity REAL,
+    floor REAL NOT NULL,
+    reranker_ran INTEGER NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('covered', 'not_covered', 'below_floor', 'no_citation', 'failed')),
+    call_id INTEGER REFERENCES model_call(id),
+    covered INTEGER,
+    summary TEXT,
+    passages_cited TEXT,
+    invalid_cites INTEGER NOT NULL DEFAULT 0,
+    failure TEXT,
+    search_ms INTEGER NOT NULL,
+    wall_ms INTEGER NOT NULL,
+    shown INTEGER NOT NULL
 );
 """,
 }

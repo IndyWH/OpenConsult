@@ -47,6 +47,7 @@ ROW_DELETIONS = (
     ("live_lines", "DELETE FROM live_line WHERE consultation_id = ?"),
     ("warnings", "DELETE FROM warning WHERE consultation_id = ?"),
     ("passes", "DELETE FROM cds_pass WHERE consultation_id = ?"),
+    ("guideline_answers", "DELETE FROM guideline_answer WHERE consultation_id = ?"),
     ("model_calls", "DELETE FROM model_call WHERE consultation_id = ?"),
     ("consultation", "DELETE FROM consultation WHERE id = ?"),
 )

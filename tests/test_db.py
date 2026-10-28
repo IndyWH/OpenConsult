@@ -205,7 +205,7 @@ def test_6_5_a_version_6_database_with_its_approved_notes_comes_forward_to_7(tmp
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 7
+    assert new.version() >= 7          # 8b's version 8 comes with it, as the version 6 test allows for 7
     assert {"referral_list", "referral_item", "letter", "letter_edit", "letter_approval"} <= set(new.tables())
     assert Users(new, Audit(new)).verify("example-password")
     assert new.query_one("SELECT text FROM note_approval")["text"] == "made up"
@@ -227,4 +227,54 @@ def test_6_5_a_version_6_database_with_its_approved_notes_comes_forward_to_7(tmp
     new.execute("INSERT INTO letter_approval (letter_id, at, text) VALUES (1, 't', 'x')")
     with pytest.raises(sqlite3.DatabaseError):
         new.execute("INSERT INTO letter_approval (letter_id, at, text) VALUES (1, 't', 'y')")
+    new.close()
+
+
+def test_6_5_a_version_7_database_with_its_letters_comes_forward_to_8(tmp_path, monkeypatch):
+    # The owner's real database and stage8a-data are at version 7 (stage 8a).
+    # Stage 8b's three tables arrive empty (the corpus ships empty, ruling
+    # 5), every row stays, and the CHECKs hold (15.12, The passages and the search).
+    from openconsult.patients.audit import Audit
+    from openconsult.patients.users import Users
+
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 7)
+    old = open_database(path)
+    assert old.version() == 7 and "guideline_source" not in old.tables()
+    Users(old, Audit(old)).set_up("Dr", "Example", "example-password")
+    old.execute("INSERT INTO patient (name, date_of_birth, sex, created_at) VALUES ('Made-up', '1990-01-01', 'F', 't')")
+    old.execute("INSERT INTO consultation (patient_id, started_at, intended_minutes, speech_choice, engine, model_tag, "
+                "speakers_given, state, patient_name, patient_date_of_birth, patient_sex) "
+                "VALUES (1, 't', 15, 'nemotron', 'vllm', 'tag', 2, 'final', 'Made-up', '1990-01-01', 'F')")
+    old.execute("INSERT INTO note_draft (consultation_id, n, at, asked_by, engine, model_tag, prompt_sha256, transcript, "
+                "entries_total, entries_cited, refused, wall_ms) VALUES (1, 1, 't', 'stop', 'e', 't', 'h', 'x', 1, 1, 0, 1)")
+    old.execute("INSERT INTO note_approval (consultation_id, draft_id, at, text) VALUES (1, 1, 't', 'made up')")
+    old.execute("INSERT INTO referral_item (consultation_id, kind, specialty, title, note_lines, position, created_at) "
+                "VALUES (1, 'named', 's', 't', '[]', 0, 't')")
+    old.execute("INSERT INTO letter (consultation_id, item_id, n, at, engine, model_tag, prompt_sha256, note_lines, sentences_total, "
+                "sentences_grounded, placeholders, expectations_dropped, refused, wall_ms) VALUES (1, 1, 1, 't', 'e', 't', 'h', 'x', 0, 0, 0, 0, 0, 1)")
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 8
+    assert {"guideline_source", "guideline_passage", "guideline_answer"} <= set(new.tables())
+    assert Users(new, Audit(new)).verify("example-password")
+    assert new.query_one("SELECT text FROM note_approval")["text"] == "made up"
+    assert new.query_one("SELECT n FROM letter")["n"] == 1
+    assert new.query("SELECT * FROM guideline_source") == [] and new.query("SELECT * FROM guideline_passage") == []
+    assert new.query("SELECT * FROM guideline_answer") == []
+    source = ("INSERT INTO guideline_source (title, publisher, file_name, kind, sha256, bytes, added_at, added_by, "
+              "statement_accepted, passage_count, model) VALUES ('t', 'p', 'f', ?, 'h', 1, 't', ?, ?, 1, 'm')")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute(source, ("docx", "page", 1))            # not a kind
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute(source, ("html", "page", 0))            # the statement not accepted
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute(source, ("html", "model", 1))           # not a way of adding
+    new.execute(source, ("html", "page", 1))
+    answer = ("INSERT INTO guideline_answer (consultation_id, pass_n, at, names, query, passages, candidates, floor, reranker_ran, "
+              "outcome, search_ms, wall_ms, shown) VALUES (1, 1, 't', '[]', 'q', '[]', 0, 0.45, 0, ?, 1, 1, 1)")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute(answer, ("guessed",))
+    new.execute(answer, ("below_floor",))
     new.close()

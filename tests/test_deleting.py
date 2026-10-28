@@ -19,7 +19,7 @@ from tests.test_review_page import LINES, engine_with, nemotron_doors, run_throu
 from tests.test_start import PATIENT, TICKS, app_with
 
 TABLES = ("letter_edit", "letter_approval", "letter", "referral_item", "referral_list", "note_edit", "note_entry", "note_approval", "note_refusal", "note_draft", "transcript_edit", "transcript_line",
-          "live_line", "warning", "cds_pass", "model_call", "consultation")
+          "live_line", "warning", "cds_pass", "guideline_answer", "model_call", "consultation")
 
 
 def rows_of(db, cid):
@@ -51,6 +51,11 @@ def letters_rows(p, cid):
     letters.add_letter(LetterRow(**{**row.__dict__, "item_id": named}))
     letters.set_paragraph(one, 0, "edited body.")
     letters.approve(one, "Dear Consultant Physician,\n\nedited body.")
+    # 8b: two guideline searches of the consultation (ruling 6), so the delete takes them too (D44).
+    from openconsult.guidelines.sources import AnswerRow, Sources
+    answers = Sources(p.db, p.audit)
+    for n, outcome in ((1, "below_floor"), (2, "covered")):
+        answers.add_answer(AnswerRow(cid, n, ["Made-up A"], "Made-up A", [], 0, 0.5, 0.45, False, outcome, None, None, "made", None, 0, None, 1, 1, True))
 
 
 def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_file_and_leaves_the_audit_line_with_counts_and_no_words(tmp_path, clock, machine):
@@ -62,7 +67,7 @@ def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_
     letters_rows(p, 1)
     before = rows_of(p.db, 1)
     assert before["letter"] == 2 and before["letter_edit"] == 1 and before["letter_approval"] == 1 and before["referral_item"] == 2
-    assert before["transcript_line"] == 2 and before["cds_pass"] >= 1 and before["note_approval"] == 1 and before["note_edit"] == 1
+    assert before["transcript_line"] == 2 and before["cds_pass"] >= 1 and before["note_approval"] == 1 and before["note_edit"] == 1 and before["guideline_answer"] == 2
     recording = tmp_path / "recordings" / "consultation_1.wav"
     assert recording.is_file() and approved_notes(p.notes, 1) and 1 in p.running
     size = recording.stat().st_size
@@ -79,7 +84,7 @@ def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_
     assert line.detail == (f"patient 1, consultation 1 of 2026-10-04: 1 letter edits, 1 letter approvals, 2 letters, 2 referral items, "
                            f"1 referral lists, {before['note_edit']} edits, {before['note_entry']} entries, "
                            f"1 approvals, 0 refusals, 1 drafts, 0 transcript edits, 2 lines, 2 live lines, {before['warning']} warnings, "
-                           f"{before['cds_pass']} passes, {before['model_call']} model calls, 1 recording file, {size} bytes")
+                           f"{before['cds_pass']} passes, 2 guideline answers, {before['model_call']} model calls, 1 recording file, {size} bytes")
     for word in ("word", "Yes", "made up", "edited"):
         assert word not in line.detail                                                       # no word of the note or a line
     # Gone from the patient's page, the earlier notes and the block (8.3); the Patients page still lists the patient.
