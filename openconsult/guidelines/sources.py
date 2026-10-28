@@ -160,7 +160,7 @@ class Sources:
 
     def index_rows(self) -> list[dict]:
         """Every loaded passage with its vector, for the index in memory."""
-        rows = self._db.query("SELECT p.id, p.source_id, p.trail, p.text, p.model, p.vector, s.title, s.publisher "
+        rows = self._db.query("SELECT p.id, p.source_id, p.trail, p.text, p.model, p.vector, s.title, s.publisher, s.file_name "
                               "FROM guideline_passage p JOIN guideline_source s ON s.id = p.source_id "
                               "WHERE s.removed_at IS NULL ORDER BY p.id")
         return [{**dict(r), "vector": unpack(r["vector"])} for r in rows]
