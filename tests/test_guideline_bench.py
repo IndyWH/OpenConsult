@@ -23,6 +23,7 @@ from tests.test_guideline_search import axis, corpus
 
 QUERIES = {"queries": [{"id": "Q01", "file": "A.html", "heading": "Heading A1", "query": "Made-up query one"},
                        {"id": "M01", "file": "", "heading": "", "query": "Made-up nothing"}]}
+NUMBERED = {"id": "Q02", "file": "B.html", "heading": "Section B", "query": "Made-up query two"}
 
 
 def queries_file(tmp_path):
@@ -57,6 +58,12 @@ def test_ruling_10_the_bench_runs_each_query_once_through_the_apps_search_and_13
     searched = results[("Q01", "search")]
     right = [r["id"] for r in index.rows if r["file_name"] == "A.html" and r["trail"] == "Heading A1"]
     assert searched["right_passages"] == right and searched["rank_merged"] == 1 and searched["rank_sent"] == 1 and searched["real"]
+    # A numbered section whose passages sit under its subsections: every passage whose trail passes through it is right.
+    from openconsult.bench.guideline import under_heading, unnumbered
+    assert unnumbered("1.3 Section B") == "section b" and unnumbered("1.3.2") == "" and unnumbered("Plain") == "plain"
+    assert under_heading("Recommendations \u203a 1.3 Section B \u203a 1.3.2", "Section B") and under_heading("1.3 Section B", "section b")
+    assert not under_heading("Recommendations \u203a 1.4 Section C \u203a 1.3.2", "Section B") and not under_heading("", "Section B")
+    assert guideline.right_passages(index, NUMBERED) == []                         # the made corpus has no such heading
     assert searched["top_similarity"] == 1.0 and not searched["below_floor"] and len(searched["sent"]) == 6 and searched["search_ms"] >= 0
     assert searched["reranker"] is False and searched["queries_sha256"] == sha and searched["embedding_model"] == "made-up/embedder@0"
     assert searched["prompts"]["guideline"] == "7e07e0170f2f38ac06551fabd8cb67d66d9a0e21a2e4a507d82c20629975d94f" and searched["floor"] == 0.45

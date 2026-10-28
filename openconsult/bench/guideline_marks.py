@@ -21,6 +21,28 @@ class MarksRefused(Exception):
     pass
 
 
+def rematch(results: dict, rows: list[dict], queries: list[dict]) -> dict:
+    """The right passages and their ranks found again from the stored
+    candidate order and the corpus's rows, by the rule as it now stands
+    (the first scoring of 28 Oct matched the trail's last heading alone
+    and missed a numbered section's subsections). Nothing stored changes."""
+    from openconsult.bench.guideline import under_heading
+    by_id = {q["id"]: q for q in queries}
+    found = {}
+    for key, data in results.items():
+        qid, chain = key
+        if chain != "search":
+            found[key] = data
+            continue
+        query = by_id.get(qid, {})
+        right = [r["id"] for r in rows if query.get("file") and r["file_name"] == query["file"] and under_heading(r["trail"], query.get("heading") or "")]
+        merged = [c["passage_id"] for c in data.get("candidate_ranks") or []]
+        sent = [p["passage_id"] for p in data.get("sent") or []]
+        rank = lambda ids: next((i for i, pid in enumerate(ids, 1) if pid in right), None)  # noqa: E731
+        found[key] = {**data, "right_passages": right, "right_count": len(right), "rank_merged": rank(merged), "rank_sent": rank(sent), "rematched": True}
+    return found
+
+
 def by_query(results: dict) -> dict:
     """{query id: {"search": ..., "chains": [...]}} from a result folder's files."""
     found: dict = {}

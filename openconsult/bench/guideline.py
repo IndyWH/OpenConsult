@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import time
 from dataclasses import asdict
 from pathlib import Path
@@ -67,17 +68,27 @@ def arm_differs(held: dict, door: Door, embedder=None, reranker: bool = False, q
     return f"this folder holds results from {then}; the arm now is {now}"
 
 
+SECTION_NUMBER = re.compile(r"^\s*\d+(\.\d+)*\.?(\s+|$)")
+
+
+def unnumbered(heading: str) -> str:
+    """A heading without its section number, lower case (ruling 19: the number is left out of the query)."""
+    return SECTION_NUMBER.sub("", heading or "").strip().lower()
+
+
+def under_heading(trail: str, heading: str) -> bool:
+    """Whether a passage's trail passes through the heading: any of its
+    headings, its section number left out, equals the query's heading, so
+    a passage under a subsection of that heading is under it too."""
+    wanted = unnumbered(heading)
+    return bool(wanted) and any(unnumbered(part) == wanted for part in trail.split(TRAIL_JOINT))
+
+
 def right_passages(index: Index, query: dict) -> list[int]:
-    """The ids of the passages under the query's heading in its file: the
-    trail's last heading equals the heading (ruling 19)."""
+    """The ids of the passages under the query's heading in its file (ruling 19)."""
     if not query["file"] or not query["heading"]:
         return []
-    found = []
-    for row in index.rows:
-        last = row["trail"].split(TRAIL_JOINT)[-1] if row["trail"] else ""
-        if row["file_name"] == query["file"] and last.strip().lower() == query["heading"].strip().lower():
-            found.append(row["id"])
-    return found
+    return [row["id"] for row in index.rows if row["file_name"] == query["file"] and under_heading(row["trail"], query["heading"])]
 
 
 def rank_of(ids: list[int], hits) -> int | None:

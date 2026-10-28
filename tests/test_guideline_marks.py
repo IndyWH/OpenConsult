@@ -86,3 +86,19 @@ def test_ruling_10_the_marks_are_judged_by_code_from_made_results(tmp_path):
         marks.write(tmp_path / "marks", both)
     with pytest.raises(marks.MarksRefused):
         marks.score({})
+
+
+def test_ruling_19_the_right_passages_are_matched_again_from_the_stored_candidates_and_the_corpus():
+    # The first scoring of 28 Oct matched the trail's last heading alone; the rule as it stands matches any heading of the trail,
+    # its section number left out, so a numbered section's subsections count. Nothing stored changes but the ranks.
+    rows = [{"id": 1, "file_name": "A.html", "trail": "Recommendations \u203a 1.3 Section B \u203a 1.3.2"},
+            {"id": 2, "file_name": "A.html", "trail": "Recommendations \u203a 1.4 Other"},
+            {"id": 3, "file_name": "C.html", "trail": "1.3 Section B"}]
+    queries = [{"id": "Q01", "file": "A.html", "heading": "Section B", "query": "x"}, {"id": "M01", "file": None, "heading": None, "query": "y"}]
+    results = {("Q01", "search"): {"real": True, "right_passages": [], "right_count": 0, "rank_merged": None, "rank_sent": None,
+                                   "candidate_ranks": [{"passage_id": 2}, {"passage_id": 1}, {"passage_id": 3}], "sent": [{"passage_id": 2}, {"passage_id": 1}]},
+               ("Q01", "A1"): chain("A1"), ("M01", "search"): {"real": False, "candidate_ranks": [], "sent": []}, ("M01", "A1"): chain("A1", "below_floor", call=False)}
+    again = marks.rematch(results, rows, queries)
+    assert again[("Q01", "search")]["right_passages"] == [1] and again[("Q01", "search")]["rank_merged"] == 2 and again[("Q01", "search")]["rank_sent"] == 2
+    assert again[("Q01", "search")]["rematched"] and again[("Q01", "A1")] == chain("A1") and again[("M01", "search")]["right_passages"] == []
+    assert results[("Q01", "search")]["rank_merged"] is None                       # the stored record is not changed

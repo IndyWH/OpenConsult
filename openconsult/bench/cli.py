@@ -326,9 +326,16 @@ def cmd_guideline(args) -> int:
 
 
 def cmd_guideline_score(args) -> int:
+    """With --data-folder and --queries, the right passages are matched again from the corpus by the rule as it stands."""
     try:
+        without = ResultWriter(Path(args.without)).read_all()
         with_ = ResultWriter(Path(getattr(args, "with"))).read_all() if getattr(args, "with") else None
-        marked = guideline_marks.score(ResultWriter(Path(args.without)).read_all(), with_)
+        if args.data_folder:
+            rows = Index(Sources(open_database(Path(args.data_folder) / "openconsult.db"), None)).rows
+            queries = guideline.read_queries(Path(args.queries), None)
+            without = guideline_marks.rematch(without, rows, queries)
+            with_ = guideline_marks.rematch(with_, rows, queries) if with_ else None
+        marked = guideline_marks.score(without, with_)
         guideline_marks.write(Path(args.write), marked)
     except (Refused, guideline_marks.MarksRefused) as refused:
         say(f"STOP: {refused}")
@@ -557,6 +564,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--without", required=True, help="the result folder of the arm without the reranker")
     p.add_argument("--with", help="the result folder of the arm with the reranker")
     p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
+    p.add_argument("--data-folder", help="the corpus's data folder: the right passages matched again from it by the rule as it stands")
+    p.add_argument("--queries", help="the queries file, with --data-folder")
     p = sub.add_parser("guideline-load")
     p.set_defaults(fn=cmd_guideline_load)
     p.add_argument("--folder", required=True, help="the folder of documents, every file loaded")
