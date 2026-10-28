@@ -39,7 +39,7 @@ APPROVED_BYTES = {
     # The two prompts of 8a (15.12, rulings 3 and 8), the two frames of the
     # detail The two letter frames, and the one line that masks an
     # Assessment line for the letter call (the plan of 8a, item 2).
-    "letter": "d10ccaa4a542cb7885e7325744dfaafe3c2ac7785e5640e035ca1ea6042bc9e0",
+    "letter": "49c1f652392cba08194c60609c4010dd450b9f5b6b41dc920ecbabc81169b4db",
     "referrals": "5eab5bb56333fd5c4643dd482caa04afc9cb8a2c2ae922d69192ecaed5632962",
     "letter.frame": "727bf80252fcee71b5ee79b141a2264302afacc41d0c8414f80838fdb73475de",
     "referrals.frame": "af9401ac6241ef8dcdb665e5e49ac6279d444390002ba69442452d824359c4b8",
