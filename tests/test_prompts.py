@@ -25,6 +25,7 @@ KNOWN_CAPITALS = {
     "IF", "END", "THE", "DOCTOR", "PATIENT",                          # the note prompt's emphasis (6b)
     "BACKGROUND", "FROM", "EARLIER", "CONSULTATIONS",                 # the background frame's heading (7a)
     "APPROVED", "CONSULTATION", "NOTE", "SPECIALTY", "FOUR", "ONLY", "ENT", "MUST",   # the two letter prompts and their frames (8a; MUST from ruling 14)
+    "QUERY", "PASSAGES", "NOTHING",                                   # the summary prompt and its frame (8b)
 }
 GUIDELINE_WORDS = ("guideline", "guidance")
 
@@ -42,7 +43,7 @@ def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
 def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
     # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
     words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
-    assert len(words) == 17     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a); the letters' two prompts, two frames and the withheld line (8a)
+    assert len(words) == 20     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a); the letters' two prompts, two frames and the withheld line (8a); the summary prompt, its frame and its passage layout (8b)
     for path in words:
         assert '"' not in _words(path), path.name
     assert '"' in 'a "quoted" word'   # the twin
@@ -83,7 +84,7 @@ def test_R13_no_prompt_file_names_a_country():
     countries = [c.strip() for c in _words(Path(__file__).parent / "countries.txt").splitlines() if c.strip()]
     assert len(countries) > 150
     files = loader.every_prompt_file()
-    assert len(files) == 23     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a), the letters' seven (8a)
+    assert len(files) == 27     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a), the letters' seven (8a), the summary's four (8b)
     for path in files:
         text = _words(path).lower()
         for country in countries:
@@ -93,7 +94,8 @@ def test_R13_no_prompt_file_names_a_country():
 def test_R21_no_prompt_file_names_a_guideline_publisher():
     for path in loader.every_prompt_file():
         text = _words(path)
-        for word in GUIDELINE_WORDS:
+        # The summary prompt's own approved words (15.12 ruling 7) say guideline, as its job is; it names no publisher.
+        for word in GUIDELINE_WORDS if not path.name.startswith("guideline.") else ():
             assert word not in text.lower(), f"{path.name} holds {word}"
         unknown = set(re.findall(r"\b[A-Z][A-Z]+\b", text)) - KNOWN_CAPITALS
         assert not unknown, f"{path.name} has a capitalised word not on the list: {unknown}"
@@ -149,3 +151,29 @@ def test_ruling_4_the_placeholder_in_the_prompt_is_the_one_the_check_writes():
     from openconsult import words
     assert words.LETTER_PLACEHOLDER == "[to be completed by the referring doctor]"
     assert words.LETTER_PLACEHOLDER in loader.prompt("letter")
+
+
+def test_ruling_7_the_summary_prompt_and_its_frames_are_the_approved_bytes():
+    # 15.12 ruling 7: the block followed by one line break, nothing else; the frame and the layout of one
+    # passage as the plan of 8b gives them byte for byte (item 5); the form v1's three fields.
+    import hashlib
+    expected = {"guideline": "7e07e0170f2f38ac06551fabd8cb67d66d9a0e21a2e4a507d82c20629975d94f",
+                "guideline.frame": "4b07fd0dac1086c318c416c94a4fcebc1b41b857cb86bb1ff735fd15363f07e9",
+                "guideline.passage": "c1bcff2265bdd94c9121c407fde08b33895e6d761167aa6630451f0ce5958227",
+                "guideline.form": "a3fd2e5d0991fde7c0fcfcf6547bd68c9ff7d5c60bcce5fefd9930836872da9c"}
+    for name, digest in expected.items():
+        data = (loader.prompt_bytes(name) if name == "guideline" else
+                loader.form_bytes("guideline") if name == "guideline.form" else loader.file_bytes(name))
+        assert hashlib.sha256(data).hexdigest() == digest == loader.APPROVED_BYTES[name], name
+        assert data.endswith(b"\n") and not data.endswith(b"\n\n")
+        if name != "guideline.form":
+            assert b'"' not in data
+    assert loader.prompt("guideline").startswith("You are preparing a short guideline summary for a doctor during a consultation.")
+    assert loader.prompt("guideline").endswith("Output JSON only.")
+    assert loader.frame("guideline") == "QUERY: {query}\n\nPASSAGES:\n{passages}"
+    assert loader.file_text("guideline.passage") == "[{n}] {source}\n{text}"
+    form = loader.form("guideline")
+    assert sorted(form["required"]) == ["covered", "passages_cited", "summary"] and form["properties"]["covered"]["type"] == "boolean"
+    assert form["properties"]["passages_cited"]["items"] == {"type": "integer"}
+    from openconsult.llm.jobs import job
+    assert job("guideline").frames == ("guideline", "guideline.passage") and job("guideline").max_tokens == 1000

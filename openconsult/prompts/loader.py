@@ -44,6 +44,13 @@ APPROVED_BYTES = {
     "letter.frame": "727bf80252fcee71b5ee79b141a2264302afacc41d0c8414f80838fdb73475de",
     "referrals.frame": "af9401ac6241ef8dcdb665e5e49ac6279d444390002ba69442452d824359c4b8",
     "letter.withheld": "a0950641e45a39a87a8df02a5c3b4045c58a92fa7e7cd085c7a4e9766b5d6f26",
+    # The summary prompt of 8b (15.12, ruling 7), its frame and the layout of
+    # one passage (the detail The passages and the search; the plan of 8b,
+    # item 5), and its form, v1's.
+    "guideline": "7e07e0170f2f38ac06551fabd8cb67d66d9a0e21a2e4a507d82c20629975d94f",
+    "guideline.frame": "4b07fd0dac1086c318c416c94a4fcebc1b41b857cb86bb1ff735fd15363f07e9",
+    "guideline.passage": "c1bcff2265bdd94c9121c407fde08b33895e6d761167aa6630451f0ce5958227",
+    "guideline.form": "a3fd2e5d0991fde7c0fcfcf6547bd68c9ff7d5c60bcce5fefd9930836872da9c",
 }
 
 
@@ -75,6 +82,10 @@ def file_text(name: str) -> str:
 
 def file_bytes(name: str) -> bytes:
     return (FOLDER / f"{name}.txt").read_bytes()
+
+
+def form_bytes(name: str) -> bytes:
+    return (FOLDER / f"{name}.form.json").read_bytes()
 
 
 def fill(frame_text: str, **slots: str) -> str:

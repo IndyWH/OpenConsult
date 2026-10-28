@@ -1,0 +1,4 @@
+QUERY: {query}
+
+PASSAGES:
+{passages}

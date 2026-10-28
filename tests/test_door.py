@@ -127,7 +127,7 @@ def test_3_11_each_job_sends_its_own_prompt_form_cap_and_time_limit(record):
     assert (assessment.max_tokens, assessment.timeout_s) == (1500, 60.0)
     assert alarm.user == assessment.user == "words"
     with pytest.raises(KeyError):
-        door.ask("guideline", "words")     # a job of a later stage is not in the table (R31; 8b)
+        door.ask("teaching_case", "words")     # a job of a later stage is not in the table (R31; stage 10)
 
 
 @pytest.mark.parametrize("bad, reason", [

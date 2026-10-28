@@ -1,0 +1,22 @@
+{
+ "type": "object",
+ "properties": {
+  "covered": {
+   "type": "boolean"
+  },
+  "summary": {
+   "type": "string"
+  },
+  "passages_cited": {
+   "type": "array",
+   "items": {
+    "type": "integer"
+   }
+  }
+ },
+ "required": [
+  "covered",
+  "summary",
+  "passages_cited"
+ ]
+}

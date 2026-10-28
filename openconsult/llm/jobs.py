@@ -69,6 +69,15 @@ JOBS = {
         on_failure="The letter's page says the letter could not be drafted and why; Draft again is offered. "
                    "Nothing is asked a second time by itself.",
     ),
+    # The guideline summary of 8b (15.12, rulings 6 and 7; R30): a covered
+    # summary is under 150 words, about 250 tokens, so 1,000; the pass
+    # calls' 60 s. Design choices until the bench measures them.
+    "guideline": Job(
+        name="guideline", prompt="guideline", form="guideline", frames=("guideline", "guideline.passage"),
+        max_tokens=1000, timeout_s=60.0,
+        on_failure="The panel says the summary could not be made and why; the pass and the alarm are untouched; "
+                   "the next change of the top two differentials asks again.",
+    ),
     # The note (15.10, The note): the transcript alone, no patient line (D3).
     "note": Job(
         name="note", prompt="note", form="note", frames=("note",),
