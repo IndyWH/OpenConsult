@@ -1,6 +1,6 @@
 """One document into the corpus (spec 15.12, ruling 5; the detail The
 passages and the search): the kind sniffed, the passages cut, each
-embedded in the document form, the rows written together or not at all.
+embedded in the document form one at a time, the rows written together or not at all.
 The page and the loader command both come here, so the bench tests the
 loader the doctor uses (ruling 18). A refusal is one named reason; nothing
 is half-added."""
@@ -15,7 +15,6 @@ from openconsult.guidelines import passages as cutter
 from openconsult.guidelines.sources import Passage, SourceRow, Sources
 from openconsult.guidelines.texts import passage_text
 
-BATCH = 16            # texts in one request to the worker, as v1 sent them
 # A document a doctor saves for their own use is a few hundred kB; this is far above it.
 UPLOAD_LIMIT_BYTES = 50_000_000
 
@@ -54,10 +53,13 @@ def add_document(sources: Sources, embedder, name: str, data: bytes, publisher: 
         return Refused("no_passages")          # no passage of 40 words or more: nothing worth searching
     title = (title or cutter.title_from_line(document.title_line, document.kind) or name).strip()
     vectors = []
-    for start in range(0, len(cuts), BATCH):
-        found = embedder.embed([passage_text(title, c.trail, c.text) for c in cuts[start:start + BATCH]])
-        if not found.ok or len(found.vectors) != len(cuts[start:start + BATCH]):
-            return Refused("embed_failed", found.error or f"{len(found.vectors)} vectors came back for {len(cuts[start:start + BATCH])} texts")
+    # One passage a request (15.12, ruling 27): sixteen at a time, the worker held about 4,900 MiB on the card for a
+    # moment, which beside the engines and a speech worker could run the card out; one at a time it holds little more
+    # than its model, and the vectors are the same.
+    for c in cuts:
+        found = embedder.embed([passage_text(title, c.trail, c.text)])
+        if not found.ok or len(found.vectors) != 1:
+            return Refused("embed_failed", found.error or f"{len(found.vectors)} vectors came back for 1 text")
         vectors.extend(found.vectors)
     rows = [Passage(i, c.trail, c.text, c.words, v) for i, (c, v) in enumerate(zip(cuts, vectors))]
     seconds = round(clock() - started, 2)

@@ -6,7 +6,7 @@ embedder; no document of any publisher."""
 
 from openconsult import words
 from openconsult.app import build_app
-from openconsult.guidelines.loading import UPLOAD_LIMIT_BYTES
+from openconsult.guidelines.loading import UPLOAD_LIMIT_BYTES, add_document
 from openconsult.settings import store
 from tests.conftest import PORT, browser, log_in, refusal_on, set_up, text_of
 from tests.fakes import FakeEngine, MadeUpEmbedder
@@ -53,7 +53,8 @@ def test_ruling_5_7_3_R15_the_guidelines_section_adds_lists_and_removes_with_eve
     sources = p.sources.loaded()
     assert len(sources) == 1 and sources[0]["passage_count"] == len(p.sources.passages_of(sources[0]["id"])) >= 5
     assert sources[0]["added_by"] == "page" and sources[0]["kind"] == "html" and sources[0]["model"] == "made-up/embedder@0"
-    assert embedder.embedded and embedder.embedded[0][0].startswith("title: Made-up title | text: Intro") and any(t.startswith("title: Made-up title: Recommendations | text: ") for t in embedder.embedded[0])
+    assert embedder.embedded and embedder.embedded[0][0].startswith("title: Made-up title | text: Intro")
+    assert any(t.startswith("title: Made-up title: Recommendations | text: ") for request in embedder.embedded for t in request)
     assert p.audit.lines()[0].event == "guideline.added" and "Made-up" not in p.audit.lines()[0].detail
     # Every refusal lands on Add (R15); nothing is added by a refused post.
     for response, expected in (
@@ -106,3 +107,18 @@ def test_7_3_rule_1_with_no_worker_installed_add_is_disabled_with_the_reason_and
     other = build_app(store_module.build(tmp_path / "other", PORT), machine=machine, clock=clock,
                       engines={"vllm": FakeEngine(version=None), "ollama": FakeEngine()})
     assert other.state.parts.embedder.installed is False and other.state.parts.embedder.where == "card"
+
+
+def test_ruling_27_a_load_embeds_one_passage_at_a_time(tmp_path, clock, machine):
+    # 15.12, ruling 27: a document of several passages makes one embed request per passage, in order, through the page
+    # and the command's shared loader alike; a search is unchanged (test_guideline_search: one request for the names).
+    embedder = MadeUpEmbedder()
+    app, client = app_with_embedder(tmp_path, clock, machine, embedder)
+    p = app.state.parts
+    assert add(client).status_code == 303
+    passages = p.sources.passages_of(p.sources.loaded()[0]["id"])
+    assert len(passages) >= 5 and len(embedder.embedded) == len(passages) and all(len(request) == 1 for request in embedder.embedded)
+    assert [request[0].split(" | text: ")[1][:30] for request in embedder.embedded] == [row["text"][:30] for row in passages]
+    embedder.embedded.clear()
+    added = add_document(p.sources, embedder, "again.html", PAGE.encode(), "Made-up publisher", "command")
+    assert added.passages == len(passages) and len(embedder.embedded) == len(passages) and all(len(r) == 1 for r in embedder.embedded)
