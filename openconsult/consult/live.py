@@ -27,6 +27,7 @@ from openconsult.consult.note_rows import Notes
 from openconsult.consult.passes import Passes
 from openconsult.consult.recording import Recording
 from openconsult.consult.transcript import Transcript
+from openconsult.guidelines.panel import PanelState
 from openconsult.llm.door import Door
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.patients.patients import PatientRow
@@ -80,11 +81,12 @@ class Consultation:
                  speech: SpeechDoor, llm: Door, rows: Consultations, audit: Audit, data_folder: Path,
                  clock: Clock = now_local, timer: Callable[[], float] = time.perf_counter,
                  on_stop: Callable | None = None, notes: Notes | None = None, converter=None,
-                 background: str | None = None):
+                 background: str | None = None, guidelines=None):
         self.id = consultation_id
         self.notes = notes                # the note's rows (6b), given by the app
         self.converter = converter        # the recording converter (7a), given by the app; None keeps the WAV
         self.background = background      # the block of 15.11 ruling 5 for the two calls, or None (7b)
+        self.guideline = PanelState(guidelines, self) if guidelines is not None else None   # the panel (8b), given by the app
         self.patient = patient
         self.intended_minutes = int(intended_minutes)
         self.started_at = started_at
@@ -225,11 +227,17 @@ class Consultation:
             stored = self.passes.settle(n, result, shown, wall_ms)
             self.rows.add_pass(self.id, n, text, result.alarm.call_id, result.assessment.call_id, stored, shown)
             self._changed()
+            if shown and self.guideline is not None:
+                self.guideline.after_pass(n, result.assessment)    # after the pass is stored and shown: it can touch nothing of it (R30)
 
     def wait_for_pass(self, timeout_s: float = 30.0) -> None:
         """For tests and for Stop: the pass in flight, if any, lands."""
         if self._pass is not None:
             self._pass.result(timeout=timeout_s)
+
+    def wait_for_guideline(self, timeout_s: float = 30.0) -> None:
+        if self.guideline is not None:
+            self.guideline.wait(timeout_s)
 
     def acknowledge(self, key: str) -> bool:
         with self.lock:
@@ -285,6 +293,8 @@ class Consultation:
         if self._stop_thread is not None and self._stop_thread is not threading.current_thread():
             self._stop_thread.join()
         self._pool.shutdown(wait=True)
+        if self.guideline is not None:
+            self.guideline.close()
         self._wait_for_my_threads()
 
     def _is_mine(self, thread: threading.Thread) -> bool:
@@ -343,6 +353,7 @@ class Consultation:
                     "partial": self.transcript.partial,
                 },
                 "passes": self.passes.state(),
+                "guidelines": self.guideline.state() if self.guideline is not None else None,
             }
 
 

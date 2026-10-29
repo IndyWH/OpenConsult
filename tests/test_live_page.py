@@ -36,3 +36,16 @@ def test_15_6_every_sentence_the_page_script_renders_comes_from_the_one_file(sta
     page = client.get("/consultations/1").text
     assert '<script id="words" type="application/json">' in page and words.ALARM_NO_ACTION in text_of(client.get("/consultations/1"))
     assert client.get("/static/panels.js").status_code == 200
+
+
+def test_R15_15_6_the_live_page_holds_the_guideline_pane_and_its_script_in_its_own_file(started):
+    # 8b: the pane in the side column after the assessment, its script in its own file, its words from the one file.
+    app, client, worker = started
+    page = client.get("/consultations/1").text
+    assert page.index('id="assessment"') < page.index('id="guidelines-pane"') and 'id="passage-dialog"' in page
+    assert page.index('/static/panels.js') < page.index('/static/guidelines.js') < page.index('/static/live.js')
+    script = client.get("/static/guidelines.js").text
+    for name in ("GUIDELINE_NO_CORPUS", "GUIDELINE_NOT_COVERED", "GUIDELINE_PROVENANCE", "GUIDELINE_PASSAGE_TITLE", "CLOSE"):
+        assert "words." + name in script and name in SCRIPT_WORDS
+    state = app.state.parts.running[1].page_state()["guidelines"]
+    assert state["state"] == "no_corpus" and words.GUIDELINE_NO_CORPUS in page

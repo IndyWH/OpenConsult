@@ -157,7 +157,7 @@ def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, ear
     block = background.block_for(p.notes, patient.id, started_at, cid) if earlier_notes_shown else None
     consultation = Consultation(cid, patient, minutes, started_at, door, p.door, p.consultations, p.audit,
                                 p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes, converter=p.converter,
-                                background=block)
+                                background=block, guidelines=p.guidelines)
     consultation.on_final = _on_final(p)
     p.running[cid] = consultation
     p.audit.record("consultation.started", f"consultation {cid}, patient {patient.id}, {minutes} minutes")

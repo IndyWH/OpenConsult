@@ -198,3 +198,11 @@ form.named-form button.primary { margin-top: .6rem; }
 .paragraph-form { display: flex; flex-direction: column; gap: .3rem; margin: 0 0 .9rem; max-width: 46rem; }
 textarea.paragraph-text { font-family: var(--sans); font-size: .95rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .7rem; width: 100%; }
 .paragraph-form button { align-self: flex-start; padding: .3rem .8rem; font-size: .8rem; }
+
+/* The guideline panel (8b): the summary with its marks as presses, the cited sources, the passage pop-up. */
+.guideline-summary { font-size: .92rem; line-height: 1.5; }
+.guideline-summary button.cite { font-size: .85rem; }
+.guideline-summary .mark-invalid { color: var(--ink-faint); }
+ul.cited-sources { margin: .2rem 0 .6rem; padding-left: 1.1rem; font-size: .85rem; }
+dialog.passage-dialog .passage { white-space: pre-wrap; font-size: .9rem; line-height: 1.5; max-height: 60vh; overflow: auto; }
+dialog.passage-dialog .source { font-size: .85rem; color: var(--ink-soft); margin: .2rem 0 .8rem; }

@@ -19,6 +19,8 @@ from openconsult.consult.letter_rows import Letters
 from openconsult.consult.note_rows import Notes
 from openconsult.db import Database, open_database
 from openconsult.guidelines.embedder import make_embedder
+from openconsult.guidelines.panel import Guidelines
+from openconsult.guidelines.search import Index
 from openconsult.guidelines.sources import Sources
 from openconsult.llm.choose import NoEngine, choose
 from openconsult.llm.door import Door
@@ -69,6 +71,7 @@ class Parts:
     stored: Stored = None                          # the settings a page can change (7a)
     sources: Sources = None                        # the corpus's rows (8b)
     embedder: object = None                        # the door to the embedding worker, where the room check put it (8b)
+    guidelines: Guidelines = None                  # the panel's service: the index, the worker, the door, the floor (8b)
     converter: object = None                       # the recording converter found at start, or None (7a)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     clock: Clock = now_local
@@ -110,6 +113,8 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         doors.setdefault(WHISPERX_PYANNOTE.name, speech)
     for name, choice in CHOICES.items():
         doors.setdefault(name, make_door(settings.data_folder, choice))
+    sources = Sources(db, audit, clock)
+    door = Door(engine, ModelCalls(db, clock), profile)
     parts = Parts(
         settings=settings,
         db=db,
@@ -119,7 +124,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         first_run=FirstRun(db, users, clock),
         machine=machine,
         engine=engine,
-        door=Door(engine, ModelCalls(db, clock), profile),
+        door=door,
         decisions=decisions,
         speech=doors[WHISPERX_PYANNOTE.name],
         self_tests=SelfTests(db, clock),
@@ -129,8 +134,9 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         notes=Notes(db, clock),
         letters=Letters(db, clock),
         stored=Stored(db, audit, clock),
-        sources=Sources(db, audit, clock),
+        sources=sources,
         embedder=embedder,
+        guidelines=Guidelines(sources, Index(sources), embedder, door, audit),
         converter=converter,
         clock=clock,
         finaliser=_finalise,
@@ -145,13 +151,8 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
-    app.include_router(routes.router)
-    app.include_router(consult.router)
-    app.include_router(live.router)
-    app.include_router(review.router)
-    app.include_router(patients_web.router)
-    app.include_router(letters_web.router)
-    app.include_router(guidelines_web.router)
+    for module in (routes, consult, live, review, patients_web, letters_web, guidelines_web):
+        app.include_router(module.router)
     return app
 
 

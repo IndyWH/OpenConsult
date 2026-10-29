@@ -599,6 +599,9 @@ EVENTS = {
     "letter.refused": "Referral letter refused by the doctor",
     "guideline.added": "Guideline document added",
     "guideline.removed": "Guideline document removed",
+    "guideline.summary": "Guideline summary made from the loaded documents",
+    "guideline.not_covered": "Guideline summary refused: the loaded documents do not cover the differentials",
+    "guideline.failed": "Guideline summary could not be made",
 }
 
 # The command. Plain ASCII, for every terminal.

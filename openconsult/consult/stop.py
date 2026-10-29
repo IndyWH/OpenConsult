@@ -247,7 +247,7 @@ def resume(p, row: dict) -> Consultation:
     door = p.doors[row["speech_choice"]]
     c = Consultation(row["id"], patient, row["intended_minutes"], datetime.fromisoformat(row["started_at"]), door,
                      p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes,
-                     converter=p.converter)
+                     converter=p.converter, guidelines=p.guidelines)
     c.state = STOPPING
     c.stop_stage = row["stop_stage"] if row["stop_stage"] in STAGES[1:] else "who_spoke"
     c.stopped_at = datetime.fromisoformat(row["stopped_at"]) if row["stopped_at"] else p.clock()

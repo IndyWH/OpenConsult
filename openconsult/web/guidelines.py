@@ -97,7 +97,5 @@ async def remove(request: Request, source_id: int, user=Depends(guards.logged_in
 
 
 def _index_changed(p) -> None:
-    """The search's index in memory reads the rows again after a change (the search arrives with 8b's next commits)."""
-    index = getattr(p, "index", None)
-    if index is not None:
-        index.refresh()
+    """The search's index in memory reads the rows again after a change."""
+    p.guidelines.index.refresh()
