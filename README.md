@@ -47,13 +47,20 @@ This branch is where OpenConsult v2.0 is being built.
   to 350 words, embeds them with EmbeddingGemma 2 in a worker of its own
   on the graphics card or the processor, and lists them with Remove;
   the corpus ships empty and the app never fetches a document itself.
-  The panel that answers on the live page from those passages alone, with
-  each line a press from its passage, was built and benched on fifteen
-  approved queries, 13 chains each; two of its three marks held in every
-  chain and the third, under 150 words, missed on two queries, so the panel
-  is held outside this version until the owner rules on its figures, as
-  the stage's rule says. A reranker was benched beside it and its own marks
-  held; it waits with the panel.
+  The Guidelines pane on the live page answers from those passages alone:
+  after a pass whose top two differentials change, a search over the
+  loaded passages and one summary call, the summary with each [n] mark a
+  press that opens its passage with its source's title and publisher, the
+  cited sources and the counts of the corpus under it, or the one line
+  that the loaded guidelines do not cover those names; a failed call
+  changes nothing of the pass or the alarm, and with no document loaded
+  nothing is asked. It was benched first on fifteen approved queries, 13
+  chains each: the summary cited only passages it was given in every
+  chain and refused every made-up topic, and ran over 150 words on two
+  queries, which the owner ruled to keep as the measure of this model's
+  word limit. A reranker was benched beside it and held its own marks,
+  but on the card beside the engines it would sit on the processor at
+  about four seconds a search, so it is not in the app.
   Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line

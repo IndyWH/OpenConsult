@@ -3,6 +3,233 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-10-28. Stage 8a: the referral letters, benched four times, then wired
+
+Built in five sessions on 28 Oct 2026. The plan was reviewed by Cowork the
+same day (three points; all are in). The bench of the two new prompts ran
+first and stopped at its figures four times; the owner ruled after each
+run (spec 15.12, rulings 14 to 17), three sentences of the letter prompt
+changed after the first, four after the second, one after the third, and
+five rules of the check were made finer; the fourth ruling let the figures
+stand and wired the page from the patch held since the first run. The
+report is STAGE8A_REPORT.md in the private log folder. The room run is the
+owner's, still to come: the steps are in the report, and his reading of
+the letters is the judge of them (V1_LESSONS, the twelve, point 1).
+
+The spec, committed five times, not a character changed: 6e46f3d
+(sha256 c5833101..., the brainstorm of 28 Oct), 731aa30 (5d5a374a...,
+ruling 14), be3e933 (67d60a1c..., ruling 15), a7ade2d (1d8529a7...,
+ruling 16), 8cecb12 (56e9dd5f..., ruling 17).
+
+The rulings it builds, one line each (spec 15.12):
+- 1: one letter per specialty, any number per consultation; code writes
+  the salutation (Dear Consultant and the item's title), the Re line
+  (name, date of birth and sex as the consultation ran with them) and
+  the sign-off (Yours faithfully, the one user's title and name); the
+  model writes the body only.
+- 2: after Approve the review page shows the referral items: the ones
+  the note states, then, under a line that they are the model's
+  suggestions and not advice, the ones it suggests; the list call runs
+  once per approved note, at the first opening after Approve; code sorts
+  the items by the cited Plan line and the specialty's words
+  (referrals.sort_items), never the model.
+- 3 and 8: openconsult/prompts/letter.prompt.txt sha256 220d61f0...
+  (as ruling 16 left it; b2e5e816..., d10ccaa4... and 49c1f652... were
+  the three earlier texts of the day) and referrals.prompt.txt
+  5eab5bb5..., each the approved block byte for byte with one line
+  break, proven by hash and by cmp against Cowork's copies. The two
+  frames are fixed words in letter.frame.txt (SPECIALTY: {specialty}, a
+  blank line, APPROVED CONSULTATION NOTE: and {note}) and
+  referrals.frame.txt (APPROVED CONSULTATION NOTE: and {note}); the
+  letter call sees each Assessment entry's words replaced by
+  letter.withheld.txt ([assessment withheld from referral letters]), the
+  numbers unchanged. The patient line opens both messages (R11); the
+  background block reaches neither (D24).
+- 4: the check in code (consult/letter_check.py), per sentence against
+  the lines its paragraph cites: a heading and an Assessment line are
+  never citable; a number must be in the cited lines (the age excepted;
+  a figure inside a word counts); a result verb over a line that only
+  plans the test is an upgrade; the model's placeholder anywhere fails
+  the sentence; an expectation sentence stands only on a line holding
+  Patient's expectations and a colon, else dropped; an allergy sentence
+  stands only on a cited line holding the word, else dropped and
+  counted; a failed sentence becomes the placeholder, one for a run; the
+  letter is refused under half grounded, LETTER_GROUNDED_HALF = 0.5
+  beside CITATION_HALF.
+- 8: name a specialty, two fields and one control, a named item and its
+  letter with no list call.
+- 10: the bench, below. 11: the note lines sent are a named part of the
+  record, in referral_list.note_lines and letter.note_lines.
+- 14 to 17: the four benches and the rulings on them, below.
+
+The record (6.5): schema version 7 brings a version 6 folder forward with
+every row kept: referral_list (the approved note it was made from, the
+call, the note lines sent, the failure), referral_item (kind stated,
+suggested or named; specialty, title, reason, urgency, the lines cited,
+position), letter (its item and number, the call, engine, version, tag
+and digest, the prompt's hash, the note lines sent as masked, both
+bodies, the check's detail, the four counts, refused, the failure, the
+seconds, the doctor's refusal), letter_edit (before and after),
+letter_approval (one per letter, the text). Delete takes them with the
+consultation, counted in the audit line.
+
+The bench (ruling 10; bench/letters.py and letter_marks.py): four
+approved notes (A, B by reference to 7b's cases; C dysphagia and D polyp
+with psoriasis, made for 8a), 13 chains each (A1 to A3 at temperature 0,
+B1 to B10 at 0.5), one list call a chain and one letter call per
+specialty, through the door with the app's own numbering, frames and
+check; vLLM 0.31.0 at the local port, the model of 3c (digest
+2096d38d...), thinking off in every request and none in any reply; about
+three minutes a run; 260 letter calls over the four runs, one failed
+(a loop of bracketed line numbers to the 2,500-token limit, 13.8 s,
+stored as too_long). The five marks, fixed before the first run and
+never loosened: M1 no letter refused and no failed call, 13 of 13; M2
+the placeholder absent in at least 12 of 13; M3 no Assessment citation
+and no number outside the cited lines, 13 of 13; M4 no expectation
+sentence for the one note without the line, 13 of 13; M5 the stated
+list as the note states it, 13 of 13. The four runs side by side, chains
+holding the mark of 13 (run 1 the morning prompt and the first check;
+run 2 after ruling 14; run 3 after ruling 15, the finer check; run 4
+after ruling 16, the allergy rule):
+
+| mark | A 1 | A 2 | A 3 | A 4 | B 1 | B 2 | B 3 | B 4 | C 1 | C 2 | C 3 | C 4 | D 1 | D 2 | D 3 | D 4 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| M1 | 13 | 13 | 13 | 12 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 |
+| M2 (12 needed) | 12 | 8 | 0 | 9 | 13 | 13 | 10 | 13 | 13 | 2 | 13 | 13 | 11 | 9 | 10 | 13 |
+| M3 numbers | 12 | 8 | 1 | 9 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 12 | 10 | 10 | 13 |
+| M3 Assessment | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 |
+| M4 (A only) | 13 | 13 | 13 | 13 | | | | | | | | | | | | |
+| M5 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 12 | 12 | 12 | 12 | 13 | 13 | 13 | 13 |
+
+Marks held: 13, 11, 11, 13 of 17. The fourth run, as numbers: held, M1 on
+B, C and D, M2 on B, C and D, M3 on B, C and D, M4 on A, M5 on A, B and
+D; missed, M1 on A (12 of 13, the one failed call), M2 on A (9 of 13),
+M3 on A (9 of 13 without a number outside the lines), M5 on C (12 of 13,
+the list call's empty answer on seed 5, the fourth time). Every mark held
+in every chain at temperature 0, the app's own sampling (10.4). The
+longest finished letter reply was 505 tokens in 2.88 s against the
+letter job's 2,500 tokens and 120 s; the longest list reply under 300
+tokens in 1.5 s against 1,500 and 60 s.
+
+The owner's four rulings of the day, in plain words:
+- 14, after the first run (13 held): nothing invented reached a letter,
+  but C's letter never said the suspected-cancer referral was urgent,
+  and A's letter gave the medicines as they were before the Plan changed
+  them. Three sentences of the letter prompt changed (the urgency
+  said; the medicines as the Plan leaves them); no rule of the check
+  changed; run again.
+- 15, after the second run (11 held): the two things were now written,
+  but every C letter wrote the haemoglobin with a unit the note does not
+  give, the upgrade rule replaced C's true results sentence in 11 of
+  13, and the model's own placeholder inside a sentence went uncaught.
+  Four sentences of the prompt changed (no unit the note does not give,
+  no reckoning; a started medicine with its dose; citations in
+  note_lines only; the placeholder as a sentence of its own) and four
+  rules of the check (the upgrade per sentence; the placeholder
+  anywhere; a figure inside a word; a unit's figure); run a third time.
+- 16, after the third run (11 held): C clean and A's medicines right,
+  but six letters carried an allergy status the note does not hold,
+  which no rule read; the invention R4 exists to stop. One sentence of
+  the prompt changed (allergy status only where a note line records it,
+  no placeholder for a missing one) and one rule of the check (an
+  allergy sentence stands only on a cited allergy line, else dropped and
+  counted); run a fourth time, and the ruling on wiring made on what
+  reaches the page, not on M2 and M3 alone.
+- 17, after the fourth run (13 held): nothing invented reached a letter;
+  of 65 letters 34 state an allergy status and every one rests on a
+  cited note line that records it, the one written for a note without
+  an allergy line dropped by the new rule; no unit the note does not
+  give, no bracketed fragment, no old dose, no stopped medicine given as
+  taken, no Assessment line cited, no letter refused. The misses are
+  four chains of A at temperature 0.5, each a placeholder the doctor
+  sees beside its line before Approve, one failed call said plainly, and
+  C's one empty list. The figures stand, no fifth run; M2 and M3 on A at
+  0.5 are the record of how well this model cites; the page is wired.
+
+Left for the brainstorm of 8b as prompt matters with their own bench,
+what the check cannot read:
+- the letter prompt: C's urgent suspected-cancer referral unnamed in
+  2 of 13 chains (0 of 13 in the third run) when the concerns line is
+  cited instead of the Plan line;
+- the letter prompt: D's dermatology letter opening with the nose, the
+  other letter's problem, in 12 of 13;
+- the letter prompt: a medicine the Plan starts named in 1 letter of 39,
+  the sentence that asks for it not reaching the model;
+- the referrals prompt, unchanged all day: an empty list on C's seed 5
+  in all four runs; and the expectation pattern's pronoun form.
+
+The proof on this machine (stage8a_proof.py on a copy of 7b's data
+folder, through the app's own pages; stage8a-proof.log; counts only): the
+folder came from version 6 to 7 with every row kept; vLLM chosen. A final
+consultation with no approved note shows no section and makes no list
+call. The owner's consultation of 20 Oct (30 numbered lines, 25 citable):
+one list call at the first opening and none at the second, 1.0 s, the
+stored note lines the list text byte for byte, the request the patient
+line and the frame with no block; 1 stated and 2 suggested items. The
+letter drafted against vLLM in 2.1 s: engine, version, tag, digest and
+the prompt file's hash stored, the note lines sent the masked text byte
+for byte, the request the letter message byte for byte; 14 sentences, 14
+grounded, the body as the check left it equal to the check run again on
+the stored model body. An edit kept what stood before; Approve wrote the
+assembled text, the copy text is that text alone, every post after is
+refused on its control. Name a specialty: no second list call, one letter
+call, the typed title in the salutation. On a made consultation whose
+made note holds a planned line, a made letter got each thing the check
+gives it: the paragraph citing Assessment alone became the placeholder,
+a number not in its line the placeholder beside its kept sentences, a
+planned test written as a result the placeholder with the planning
+sentence kept, an allergy sentence with no allergy line dropped and
+counted (9 sentences, 5 grounded, 3 placeholders, 1 dropped, shown in
+the counts sentence); a made letter 0 of 3 grounded was refused with the
+reason on the page, no body, Approve refused.
+
+What was built, by file: consult/letter_rows.py (the rows), referral_note.py
+(the numbering, the masking, the two messages), referrals.py (the list
+call, the sorting by code, the named item), letter_check.py and letter.py
+(the check, the draft, assemble); web/letters.py, templates/_letters.html
+and letter.html, static/letters.js; bench/letters.py and letter_marks.py;
+Door.engine_name. The constants: LETTER_GROUNDED_HALF = 0.5 (ruling 4;
+v1's shape); the jobs' limits, referrals 1,500 tokens and 60 s, letter
+2,500 tokens and 120 s (the plan); CHAINS = 13 and MARK_PLACEHOLDER_ABSENT
+= 12 (ruling 10). Every sentence shown to the user is in words.py, the
+section's, the letter's (LETTER_COUNTS now with the allergy count) and
+ten audit events, drafts for the owner to correct on screen; the
+placeholder in the prompt and the one the check writes are one string,
+pinned by a test.
+
+Sizes (5.4): no function over 80 lines; no file over 600 but words.py at
+721, accepted under 5.4 as 7a's review did. The suite: 711 before commit
+16, 723 from commit 17 (ten page tests, the no-block case in
+test_background, one on the allergy count shown), green three times
+before the last commit. Nothing pushed.
+
+What this stage has made untrue: README's so far and CLAUDE.md's running
+and bench lines, fixed in this commit; 6b's entry, moved to the archive;
+stage-prompts/STAGE_08A.md, whose rule 4 gives the letter prompt's first
+hash and whose rule 5 says a missed mark stops the stage, both
+superseded by rulings 14 to 17, kept as the record of the prompt as
+given; the plan's items 4, 5, 8 and 9, as the report lists. The spec's
+15.12 says Done when you see: not yet, and the 15.4 row's done-when
+sentence waits on the owner's room run; both are Cowork's.
+
+What 8b should know: the review page is the draft note, then the
+Referral letters section, then the controls, the warnings and alarms, the
+transcript with the player, the model line, Delete; the letter's own page
+is /consultations/{cid}/letters/{lid}; the guideline panel lives on the
+live page. The stored parts by name (ruling 11): referral_list.note_lines
+and letter.note_lines hold the numbered note as each call read it,
+model_call.request the request as sent, tied by call_id;
+letter.model_body the paragraphs with their note_lines;
+letter.check_detail each sentence's verdict and reason and
+allergies_dropped. The embedding worker of the bench kit sits in
+openconsult/bench/shared/embedding2 with its own pyproject and lock,
+started by bench/shared/commands.py; 8b brings it into the app as a
+worker of its own, started where the room check put it (15.8, ruling
+32). The check cannot read a sentence with no number that the note does
+not support, an omission, or which problem a letter is about: those are
+the doctor's eye, or a prompt matter. The model can loop; the token
+limit stopped it, the clock did not have to.
+
 ## 2026-10-21. Stage 7b: the bench of 8.6, and the background to the model
 
 Built in two sessions on 21 Oct 2026. The plan was reviewed by Cowork the

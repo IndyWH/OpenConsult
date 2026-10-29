@@ -235,9 +235,8 @@ Stage 8b. The EmbeddingGemma 2 worker of stage 5d is now a worker of the
 app (openconsult/guidelines/embedding2), run as a separate process in its
 own environment in the user's data folder, built by openconsult
 install-guidelines from the same lock file; its libraries are those listed
-under stage 5d, unchanged, and the app imports none of them. The models it
-loads are fetched by that command, each with no token: EmbeddingGemma 2
-(Google, Apache-2.0, as under stage 5d) and, only with --reranker and for
-the bench alone, BGE Reranker v2 M3 (BAAI, Apache-2.0,
-https://huggingface.co/BAAI/bge-reranker-v2-m3), which the app does not use
-(spec 15.12 ruling 9: its mark was measured, nothing of it is wired).
+under stage 5d, unchanged, and the app imports none of them. The one model
+it loads for the app is fetched by that command with no token: EmbeddingGemma 2
+(Google, Apache-2.0, as under stage 5d). The reranker the bench kit can
+fetch beside it, only when asked, is no part of the app (spec 15.12,
+ruling 25: not wired) and is not listed here.
