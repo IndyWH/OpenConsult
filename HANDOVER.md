@@ -4,6 +4,217 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-10-28. Stage 8b: the guideline corpus, its search and its bench; the panel held
+
+Built in one session on 28 and 29 Oct 2026, under the plan review of
+Cowork (five points; all are in; the owner's ruling on the stop was A: a
+third fetch, the reranker's, by name). The unattended bench ran the
+guideline queries on vLLM and the Gemma 4 bench of stage 3 on two
+Ollamas (ruling 12); the panel's marks did not all hold, so the panel
+and its record are held in the private log folder as a patch, as 7b and
+8a held theirs, and nothing of the reranker is wired either (rule 5 of
+the stage). The report is STAGE8B_REPORT.md in the private log folder.
+The room run is the owner's, still to come: the Guidelines section is
+his to try now; the panel waits on his ruling on the figures.
+
+The spec, committed once, not a character changed: eee605d
+(sha256 d913903c..., 8a marked done and rulings 18 to 23 of 28 Oct).
+
+The rulings it builds, one line each (spec 15.12):
+- 5: the corpus ships empty; the Guidelines section of Settings takes a
+  file from this computer (HTML, PDF or plain text) with its title, its
+  publisher and the one statement, splits it, embeds it and lists it
+  with Remove; every add and remove audited; the app fetches nothing.
+- 6: the panel (held): called after a pass whose top two differentials
+  differ from the last search's pair, one at a time, never during Stop;
+  the summary with [n] marks each a press to the passage with its
+  source's title and publisher, or the one line that the loaded
+  guidelines do not cover the names; a failed call touches nothing of
+  the pass or the alarm; with no document loaded, no call.
+- 7: openconsult/prompts/guideline.prompt.txt sha256 7e07e017..., the
+  approved block byte for byte with one line break, proven by hash and
+  by cmp against Cowork's copy. The frame is fixed words in
+  guideline.frame.txt (QUERY: {query}, a blank line, PASSAGES: and
+  {passages}) and guideline.passage.txt ([{n}] {source} and the text
+  under it), the form v1's three fields; the patient line opens the
+  message (R11); the background block never reaches it (D24).
+- 9: the reranker benched as an arm, in the worker's own environment and
+  process, on its own device; its three marks held; not wired, because
+  the panel's did not (the plan's rule, accepted by the review).
+- 10, 19: the bench, below. 11: guideline_answer keeps the names, the
+  query and the passages sent with their sources and similarities, the
+  named parts; the model_call row the request as sent.
+- 12, 21, 23: the two Ollama arms, below; vLLM stopped and started by
+  the owner's script for this run alone; the service never touched.
+- 18: the loader command, every file through the same code as the page.
+- Ruling 25 of 15.9: every passage records the model and revision that
+  built it; an index built with another model is never searched.
+
+The record (6.5): schema version 8 brings a version 7 folder forward with
+every row kept: guideline_source (title, publisher, file name, kind,
+hash, size, date added, by the page or the command, the statement
+accepted, the passage count, the model, the date removed),
+guideline_passage (the trail, the text, the words, the vector as 768
+float32 at unit length, the model) and guideline_answer (the pass, the
+names, the query, the passages sent with sources and similarities, the
+candidates, the top similarity, the floor, whether the reranker ran, the
+outcome, the call, covered, the summary, the numbers cited, the invalid
+marks, the failure, the search and the whole in milliseconds, shown).
+Delete takes the answers with the consultation (D44).
+
+The loader (guidelines/passages.py): HTML by its headings with the
+standard library's parser, one passage per leaf section with its trail,
+a stem and its bullets one unit, nav and the like dropped, as v1's
+chunker did; PDF by pypdf's text in page order at blank lines; plain
+text at blank lines; MAX_WORDS 350 and MIN_WORDS 40 (v1), a small
+section joining the next under the same parent, a last small subsection
+joining its parent section, a long one split at paragraph ends and a
+long paragraph at sentence ends, never inside a sentence; a file with no
+passage of 40 words is refused. The corpus of the bench: 47 files, 1,143
+passages, 75 outside 40 to 350 words, 4.7 s to cut and embed on the
+card, 3 to 106 passages a file.
+
+The search (guidelines/search.py; 6.3): the names' vectors from the
+worker in one request, the dot product over every loaded passage from an
+index in memory read again after a change, the nearest 12 a name, merged
+by passage at the higher similarity, at most 2 from one source, 6 in
+all; GUIDELINE_FLOOR = 0.45 (v1's) under which nothing is sent; the
+reranker's reordering before the floor and the cut when a search asks
+for it (the bench alone). 29 to 53 ms a search without the reranker on
+1,143 passages, 53 to 76 with it on the card, 1.6 to 4.6 s with it on
+the processor.
+
+The summary call (guidelines/summary.py): the message from the frame,
+the call through the door (job guideline, 1,000 tokens, 60 s), the
+outcome by code: covered false is a refusal with the model's one
+sentence; a covered reply citing no number it was given is a refusal
+(no_citation); a covered reply's marks are checked against the numbers
+sent, the invalid ones counted and left as plain text.
+
+The worker (guidelines/embedding2, moved from the bench kit with its
+lock file; guidelines/embedder.py, environment.py): started at app
+start where the room check put it, the load not waited for, the first
+use waiting once; a death a failure with its reason and no restart by
+itself; openconsult install-guidelines builds the environment from the
+lock file and fetches EmbeddingGemma 2 at its pinned revision with no
+token, and with --reranker the reranker at the revision its page named
+at the fetch (953dc6f6..., pinned with the weights' hash beside it);
+a model whose weights are there and match is never fetched again
+(the review, point 4). The worker loads in about 7 s on the card and
+held 1,004 MiB with the embedding alone through its arm and 2,324 to
+2,438 with the reranker through its, about 1,430 more (the report).
+One finding for the room: at the load of the 47 files the worker's
+process peaked at 4,892 MiB (the card 23,131 of 24,564 beside vLLM),
+the working room of embedding sixteen passages at a time, which the
+room check's 1,010 does not count; an Add beside vLLM and a speech
+worker could run the card out, the worker would die and the Add be
+refused on the control until the next start. The fix proposed in the
+report, not made after the bench: embed one passage at a time at a
+load, or count the load's peak in the room check.
+
+The bench (rulings 10 and 19; bench/guideline.py, guideline_marks.py,
+guideline_load.py): fifteen approved queries (twelve real, from the
+documents' headings; three made), each once through the app's search
+and 13 chains through its call, once without the reranker and once with
+it, on vLLM 0.31.0 with the model of 3c, the patient line 50 and F for
+every query; 390 summary calls, none failed, about 1.2 s each, 8 minutes
+for both arms. The marks, fixed before the run as numbers:
+
+| mark | what | without the reranker | with it |
+|---|---|---|---|
+| G1 | cites only passage numbers it was given, 13 of 13, each real query | held, 12 of 12 queries | held, 12 of 12 |
+| G2 | under 150 words, 13 of 13, each real query | missed on Q07 (1 of 13) and Q12 (11 of 13); held on 10 | missed on Q05 (12), Q07 (3), Q09 (12), Q12 (10); held on 8 |
+| G3 | each made query refused 13 of 13 | held, 3 of 3 | held, 3 of 3 |
+| R1 | the right passage first in more queries with than without | 11 of 12 without | 12 of 12 with: held |
+| R2 | none first without lost from the top three with | | held, 0 lost |
+| R3 | every search with the reranker under 1 s on this card | | held, slowest 76 ms |
+
+The over-length summaries run 150 to 178 words; the three made queries
+were refused by the model in 78 of 78 chains, not by the floor: their
+top similarities (0.66 to 0.68) are above 0.45, and the lowest real
+query's is 0.72, so the floor is the owner's to set again (rule 5). The
+first scoring's matching of the right passage read the trail's last
+heading alone and missed six numbered sections' subsections (R1 then 6
+against 5); commit 2bd8308 matches any heading of the trail, its
+section number left out, and the scorer matches the stored searches
+again from the corpus; both scorings are in the report.
+
+The two Ollama arms (ruling 12), the stage 3 command on its 16 cases,
+13 chains, the hard marks of 15.7, report only, no verdict (the owner's):
+
+
+| | the service, 0.40.7 | the private release, 0.40.12 |
+|---|---|---|
+| every hard mark of 15.7 (H1 to H7) | met, 13 of 13 each | met, 13 of 13 each |
+| soft marks | 8 of 9 (S12: script 05's alarm in 7 chains against 4) | 8 of 9, the same |
+| 495: median pass, slowest pass (6.0, 8.0 s) | 4.76, 6.28 | 4.71, 6.26 |
+| chains, failed; the arm's time | 208, none; 2 h 26 min | 208, none; 2 h 27 min |
+
+The same model blob (digest 2dd70431...) in both; the two gave the same
+differential names at every pass in all 208 chains. The private release
+was installed by the run (ruling 21): v0.40.12 of 27 Oct, its Linux
+amd64 archive checked against the release's own sha256 file, extracted
+under the engine folder as ollama-0.40.12 with its own home, the model
+pulled once into ollama-0.40.12-models beside it, started on port 11500
+and stopped after its arm; the service, its unit, its port and its store
+untouched; vLLM stopped and started by the owner's script, the card read
+before and after each; the service let its model go by itself (1,630 s)
+with no request sent to it. The first driver stumbled three times in its
+own steps (a raw count before the schema came forward, a cold first call
+over the 60 s, the asset's ./ name); the second driver reran every step
+but the checks; the report says it plainly.
+
+The proof on this machine (stage8b_proof.py on stage8b-data with the
+patch applied for the proof alone, against vLLM and the real worker on
+the card; stage8b-proof.log and -part2.log; counts only): the folder came
+forward with every row kept; the section listed the 47 sources, Remove
+took one out with its 23 passages and Add put it back through the page
+in 0.13 s, both audited; a headache story's two searches gave two
+covered summaries (0.79 and 0.84 top similarity, 2 passages each, 46 ms
+a search, 1.2 s a call), the row's parts by name rebuilding the request
+byte for byte (2,174 bytes), the patient line first, no background, the
+marks opening passages with title and publisher; a nasal polyp story's
+three searches gave the refusal line (the model's covered false at 0.68
+to 0.73, over the floor); nothing of the panel in the alarm, assessment,
+label check, note, list or letter calls nor on the review page; a timed
+out summary call left the pass and the alarm as judged; the corpus
+emptied gave no_corpus and no call.
+
+What was built, by file: guidelines/{sources,passages,texts,loading,
+embedder,environment,search,summary}.py and embedding2/ (worker.py with
+the rerank request, fetch.py with the reranker's fetch); web/guidelines.py
+and the section in settings.html; bench/guideline.py, guideline_marks.py,
+guideline_load.py; the prompt, the two frames and the form; the job;
+schema 8; the multipart reader in web/pages.py; MadeUpEmbedder in the
+fakes. Held in the patch: guidelines/panel.py, static/guidelines.js, the
+pane in live.html, the hook in consult/live.py, the state, the words.
+The constants: GUIDELINE_FLOOR 0.45, NEAREST_PER_NAME 12, PER_SOURCE 2,
+SENT 6 (v1 app/rag.py); MAX_WORDS 350, MIN_WORDS 40 (v1 app/chunking.py);
+UPLOAD_LIMIT_BYTES 50,000,000 and BATCH 16 (the plan); WORKER_READY_S 300
+and WORKER_REQUEST_S 120 (the speech workers'); the job's 1,000 tokens and
+60 s (the plan, until this bench: the longest reply 1.8 s, under 300
+tokens). Every sentence shown to the user is in words.py, drafts for the
+owner. pypdf 6.21.4 (BSD-3) is the one library added (NOTICE).
+
+Sizes (5.4): no function over 80 lines; no file over 600 but words.py at
+792, accepted under 5.4 as 7a's and 8a's reviews did. The suite: 748 tests (585 before 8b; 5 more in the patch), green three times before the last commit, none skipped
+Nothing pushed. The private word check printed nothing before every
+commit. R21: no file in the repo names the publisher; the private check
+holds its name; one test of stage 3, that no prompt holds a guideline
+word, now passes over the summary prompt's own approved words.
+
+What this stage has made untrue: README's so far and CLAUDE.md's lines,
+fixed in this commit; 7a's and 7b's entries, moved to the archive; the
+spec's 15.12 Done when you see, which waits on the owner's ruling and his
+room run (Cowork's); the plan's items 5 and 9 where they said the panel
+would be wired and the room run would show it; the 8a report's line that
+the panel lives on the live page, true of the patch alone. For the view
+run of ruling 11: guideline_answer.names, .query and .passages (each
+with passage_id, source_id, title, publisher, trail, text, similarity,
+rerank_score, cited) are the named parts; model_call.request the request
+as sent, tied by call_id; summary.message(query, passages, patient)
+rebuilds the request from the row's parts byte for byte.
+
 ## 2026-10-28. Stage 8a: the referral letters, benched four times, then wired
 
 Built in five sessions on 28 Oct 2026. The plan was reviewed by Cowork the
@@ -230,270 +441,3 @@ worker of its own, started where the room check put it (15.8, ruling
 not support, an omission, or which problem a letter is about: those are
 the doctor's eye, or a prompt matter. The model can loop; the token
 limit stopped it, the clock did not have to.
-
-## 2026-10-21. Stage 7b: the bench of 8.6, and the background to the model
-
-Built in two sessions on 21 Oct 2026. The plan was reviewed by Cowork the
-same day (three points; all are in). The first session ran the bench and
-stopped at its figures, as the prompt said; the owner ruled (spec 15.11,
-ruling 11); the second committed the ruling and finished the wiring from
-the held patch. The report is STAGE7B_REPORT.md in the private log folder.
-
-The owner's room run of 7a, 21 Oct 2026, his words: Previous note
-appeared on the right hand side. Good note. Good diarisation.
-
-The bench (8.6; 15.11, ruling 6 and the detail The bench of 8.6): the two
-approved cases, each in two arms, with the block and without, 13 chains
-each (A1 to A3 at temperature 0, B1 to B10 at 0.5), the two calls sent
-together, cut every 4 turns and the end; vLLM 0.31.0 at the local port,
-the model of 3c (xbill9/gemma-4-26B-A4B-it-qat-q4_0-w4a16-ct, digest
-2096d38dad51a19b8e982b44241c47102a8bbb00, context 16,384), thinking off
-in every request and no thinking text in any reply; 287 calls an arm,
-no failed call, no failed chain; about 8 minutes an arm. The block in the
-arm with it is the case's earlier note parsed by earlier.sections_of and
-laid out by background.build_block, placed by messages.with_background,
-so what was benched is what the app sends. The table, by background-score
-from the stored results alone:
-
-| case | arm | chains | fired | named hypoglycaemia | both | named subarachnoid | typical pass s |
-|---|---|---|---|---|---|---|---|
-| A_hypo | with | 13 | 13 | 13 | 13 | 0 | 3.1 |
-| A_hypo | without | 13 | 13 | 13 | 13 | 0 | 2.77 |
-| B_headache | with | 13 | 13 | 0 | 0 | 13 | 3.0 |
-| B_headache | without | 13 | 13 | 0 | 0 | 13 | 2.94 |
-
-The marks, fixed as numbers in the plan before the run:
-- A1, case A with the block, both at least 12 of 13: 13 of 13. Held.
-- A2, case A without the block, both fewer than with it: 13 of 13
-  against 13 of 13. Missed; by the owner's ruling, not judged.
-- B1, case B with the block, fired 13 of 13: 13 of 13. Held.
-- B2, case B without the block, fired 13 of 13: 13 of 13. Held.
-
-The owner's ruling, in plain words (ruling 11): the figures stand and
-there is no second run. Case A was written so that today's words alone
-would leave the list wide, and for this model they did not: the first
-four turns put hypoglycaemia first in every chain at the first pass,
-with the block or without, so there was nothing left for the background
-to help with. That is a limit of the case, not a finding against the
-block. The background did not mislead (case B's migraine history
-softened nothing) and did not slow the pass (0.1 to 0.3 s longer for
-about 300 words more of input). Mark A2 is recorded as not judged on
-this material, and the block is wired on A1, B1 and B2. What 8.6 asked
-and what was shown: that the background does not mislead and that the
-alarm still fires are shown; that it helps where it should is not shown
-by this bench, because its case did not need help.
-
-Owed to a later stage: a bench of its own with a case A that needs the
-history, such as the same patient 12 days after starting dapagliflozin
-with vomiting, abdominal pain and fast breathing and no mention of her
-tablets, where ketoacidosis belongs on the list only with the note; the
-preclinical study's cases may supply it. The bench needs nothing more:
-run --background and background-score, as CLAUDE.md gives them.
-
-What was built:
-- messages.with_background: the message as with_patient built it, split
-  at its first blank line; the patient line, a blank line, the block, a
-  blank line, the frame as it was (ruling 5; R25). cds_pass.messages
-  and run_pass take the block; the bench and the app pass it.
-- At Start, when the switch is on, web/consult.begin builds the block
-  once by background.block_for and hands it to the Consultation, which
-  gives it to every pass; off, or no note, hands None. The alarm and the
-  assessment get it in both passes of a consultation; the note call and
-  the label check never do (8.4; D24; R4); the stored request holds the
-  message as sent. Proven on a copy of 7a's throwaway folder with the
-  made doors: the stored alarm request of a second consultation under
-  patient 3, with two approved notes, was the patient line, the block
-  and the frame byte for byte, 1,825 bytes with the block 1,413; the
-  label check and the note held none; with the switch off no request
-  held it; the record check printed counts only.
-- The switch's label at Start is now SWITCH_USES_AS_BACKGROUND (Use the
-  earlier notes as background for the model and show them on your
-  screen.); 7a's label stays in words.py as its record. The mark of 8.5,
-  EARLIER_NOTES_IN_USE (Earlier notes in use.), at the top of the
-  decision support panel from the page state's background flag while
-  the block is sent, and at review beside the model's last differentials
-  when the row says the switch was on and notes were listed, read from
-  the row alone (the plan review, point 2); the copy text, the approved
-  text and the print carry no mark. Two new sentences, both in words.py.
-- The small fix of 15.11: Consultation.close joins the Stop thread and
-  shuts the pass pool waiting; the lifespan closes every running
-  consultation, so the app joins the thread at shutdown; the two page
-  tests of test_stop.py close their consultations before the database;
-  one test pins that no thread of a consultation outlives it.
-- The bench side (commit 3 of the first session): the 7b case list with
-  the earlier note and its date, run --background, bench/background.py
-  and background-score, each with its test on made results. No case
-  text, note text or reply enters the repo.
-
-691 tests, green three times before the last commit, none skipped, no
-thread exception warning. No function over 80 lines; no file over 600
-but words.py at 654 (accepted under 5.4 by 7a's plan review). CLAUDE.md
-98 lines. The private word check printed nothing before every commit.
-The three background files are byte for byte as ruling 5 gives them
-(sha256 48875847...2fe3, 79b41aaf...08b7, c00401b4...2b4e), proven before
-the wiring commit and before the last; the four prompts, their frames,
-their forms and the patient line are untouched.
-
-The Ubuntu check of run 17 (the push of 60bc652) failed the small fix's
-test once, 1 of 691: after close() the table still held consultation-1_0,
-the idle pool worker of an earlier test's consultation with the same id
-in its own database, whose app never ran its shutdown and whose pool
-waited on the garbage collector; the other machines collected it in time.
-The fix, 21 Oct: close() ends by waiting, bounded by CLOSE_WAIT_S (5 s),
-until no thread named stop-{id} or consultation-{id}_ is alive; every app
-built in a test is shut down at its end as the lifespan does it
-(conftest); and a deleted consultation is closed before it is dropped
-from the running table, the same leak in the room. Proven with the
-collector switched off: 42 such threads on the table before the test,
-then none; the test's assertion is as it was.
-
-What stage 8 should know: Alba's area and question calls take the same
-block in the same place by with_background (ruling 5, last sentence;
-D24). The three background files and with_background are the whole of
-what a model reads for the background; the switch's stored setting
-decides it. The review page's mark reads the row, never the record.
-
-Made untrue by this stage: README's line that the earlier notes reach
-the doctor's screen only and the background waits for its bench, and
-CLAUDE.md's bench lines without --background and background-score, both
-fixed in this commit; the 7a entry's lines that no call carries the
-block and that the switch's label says the notes are shown on your
-screen, now history; the words of ruling 6 that case A's words alone
-leave the list wide, which did not hold for this model on this script
-(ruling 11 records it). The entries of 6a (20 Oct) and 15 Oct move to
-the archive to keep this file under 500 lines.
-
-## 2026-10-21. Stage 7a: patients and earlier consultations, the patient side
-
-Built and proven on 21 Oct 2026 in one session. The plan was reviewed by
-Cowork the same day (six points; all are in). The report is
-STAGE7A_REPORT.md in the private log folder. The room run is the owner's,
-still to come: the steps are in the report. 7b, the background to the
-model after its bench, is not built here.
-
-The rulings it builds, one line each (spec 15.11):
-- 1: the home page is the Patients page: the rows waiting at Stop and
-  for review at the top, the one search box (part of a name with case
-  and accents folded; digits as the number exactly and, failing that, as
-  part of a name; a date of birth typed as a date), the list last seen
-  first with the five columns; the number is the row's id.
-- 2: the patient's page corrects each of the three on its own control,
-  patient_change keeping before, after, when and by whom, audited; every
-  consultation keeps the three as copied at its Start, shown on its own
-  page from its own row with one dated line when they were corrected
-  after it; the live consultation holds the row it started with (R11).
-- 3: the Start screen of a patient with an approved note lists the notes
-  (number, date, assessment or first plan entry) and the switch, on by
-  default, labelled as showing the earlier notes on your screen; the
-  setting and the numbers listed are stored with the consultation; no
-  list and no switch without an approved note.
-- 4: the earlier-notes pane in the live page's side column, below the
-  assessment, never the fixed zone: the last three approved before the
-  consultation started, folded, the approved text of note_approval
-  opened in place with citations stripped; hidden when the switch is
-  off; earlier.js only shows and hides.
-- 5: openconsult/prompts/background.frame.txt (sha256 48875847...2fe3),
-  background.note.txt (79b41aaf...08b7) and background.cut.txt
-  (c00401b4...2b4e, the plan review's point 1), together every word a
-  model reads for the background; the block built by
-  consult/background.py from earlier.panel_notes, cut on the laid-out
-  text after the last whole entry that fits; no call carries it, and a
-  test proves it over a whole consultation (8.4).
-- 7: audio_retention_days in the setting table, default 90, 0 keeps, on
-  the Thresholds section, audited from what to what; the sweep at
-  start-up and every 24 hours in the lifespan's own task, deferred 60 s
-  while a consultation is stopping; one audio_deletion row and one audit
-  line per sweep that deleted; after Stop's final step the WAV becomes
-  Ogg Opus (mono, 32 kbps, voip), decoded back and checked within
-  DURATION_TOLERANCE_S, the WAV removed only then; a failure leaves the
-  WAV with its reason on the page; with no converter at all nothing is
-  attempted, the row says why and the start's decision line stands.
-- 8: consult/deletion.py, the rows in one transaction children first,
-  then the file, one audit line of counts and no words; refused when not
-  final or already gone; Delete patient only when no consultation is
-  left; both ask once on the page; the orphan sweep reports at start-up.
-- 9: consult/alarms.py matches an alarm's reasoning and actions to the
-  differential names with matching.normalise and a contiguous whole-word
-  run; marked in the live state and on the review page beside the
-  assessment with the alarm in a dialog; one alarm line per alarm key at
-  its first firing with its state then, acknowledged from the audit
-  log, a press playing from the last line the pass had read; two counts
-  on Approve.
-- 10: 7a the patient side; 7b after the bench.
-
-What was built (the app without the bench 11,254 lines of Python, from
-10,019 at 6b, and 1,243 of pages and scripts; the tests 13,135 lines):
-- schema version 6: patient_change; on the consultation the three
-  details it ran with, earlier_notes_shown, earlier_notes,
-  recording_format, conversion_failure, audio_deleted_at;
-  audio_deletion; setting. A version 5 folder comes forward with every
-  row, the details filled from the patient as it stands. The database
-  gains a transaction context.
-- patients/patients.py (the list, the fold, the search, the
-  corrections); web/patients.py and patient.html; patients.html as the
-  home page; consult/earlier.py, background.py, opus.py, retention.py,
-  deletion.py, alarms.py; settings/stored.py; earlier.js and
-  alarmdialog.js; the converter as a decision element with its row on
-  This machine on every machine.
-- imageio-ffmpeg 0.6.0 is a dependency: a static ffmpeg 7.0.2 with
-  libopus for Linux (x86_64, aarch64), macOS (x86_64, arm64) and Windows
-  (x86_64), found by uv; the computer's own ffmpeg on the path is the
-  fallback. On this machine the room check found the package's.
-
-The constants, each with its source:
-- BACKGROUND_NOTE_MAX_WORDS 400: the longest note of 5c part two held 228
-  words of entries, the longest of the 6b bench 317; a margin over both.
-  A design choice; the room may move it.
-- DURATION_TOLERANCE_S 0.1: a made 1 s and 7.37 s WAV decoded back from
-  Opus to the sample on this machine; five Opus frames of 20 ms.
-- SWEEP_EVERY_S 86,400 and RETRY_S 60 (ruling 7); DEFAULT_RETENTION_DAYS
-  90 (v1's).
-
-My proof, 21 Oct 2026, on a copy of 6b's throwaway database and
-recordings brought forward to version 6, the made doors of the suite,
-the package's converter: the Patients page listed the four patients last
-seen first and found patient 3 by part of the name, by the number and by
-the date of birth; the Start screen for patient 3 listed consultation
-3's approved note with the switch on; consultation 5 started with the
-switch's setting and the three details stored; the live page showed the
-pane with note 3 below the assessment; a made pass whose alarm named
-Made-up condition A marked it red; no call carried the block (alarm,
-assessment, label check, note); after Stop the 192,044-byte WAV became a
-10,511-byte Opus file that decoded to 2.00 s against 2.00 s fed, served
-as audio/ogg, with three press-a-line controls; the review page showed
-the red mark, one alarm line and the two counts (2 warnings, 1 alarm);
-a correction of patient 3's date of birth left consultations 3 and 5
-showing 21 Oct 1990 with the dated line; Delete on consultation 4
-removed 5 lines, 4 live lines, 1 pass, 3 model calls, 7 warnings and the
-352,044-byte file, with the audit line of counts; the sweep at 0 deleted
-nothing and at 1 day deleted the three recordings of 20 Oct (10,456,132
-bytes) and left the new Opus file; the Log page showed each line. 682
-tests, green three times before the last commit, none skipped. No file
-over 600 lines but words.py at 648 (accepted under 5.4 by the plan
-review, point 2); no function over 80. CLAUDE.md under 100 lines. The
-private word check printed nothing before every commit. Nothing of any
-recording entered the repo.
-
-Made untrue by this stage: the home page's Waiting for review list as
-its own page (home.html is gone; the rows sit at the top of the Patients
-page); 6b's lines that the audio-gone line becomes true in stage 7, now
-true; 6a's line that the retention clock and deletion are stage 7, now
-built; the home sentence, README's so far and CLAUDE.md's running lines,
-fixed in this commit; the 3c entry of 13 Oct moves to the archive.
-
-Seen in passing, not touched: the approved text of 6b's proof holds an
-entry whose citation was stripped to leave a space before its full stop
-(the copy text of 6b), which the Start screen's line and the block show
-as it stands; the block's reading of an approved text is byte-faithful
-to what was approved.
-
-For 7b: cds_pass places the block between with_patient's line and each
-frame, a blank line each side, for both calls, with the stored request
-holding it; background.block_for(notes, patient_id, started_at,
-consultation_id) gives the block or None; the switch's setting is stored
-with the consultation, so 7b reads consultation.earlier_notes_shown to
-decide whether the block is sent (ruling 3); the second label goes in
-words.py beside SWITCH_SHOWS_ON_SCREEN and the Start screen picks it
-once the bench's pass is recorded; the mark of 8.5 goes on the
-assessment pane of the live page; earlier.panel_notes is the one reader
-of the approved notes for the pane and the block alike.

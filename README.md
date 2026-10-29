@@ -40,12 +40,25 @@ This branch is where OpenConsult v2.0 is being built.
   gives the letter alone) and Refuse, and a specialty the doctor names
   gets a letter with no list. The letter prompts were benched four times
   on four approved notes, the owner ruling after each, before the page
-  was wired. Recordings are deleted after a
+  was wired. A Guidelines section of Settings takes guideline documents
+  from files on this computer (HTML, PDF or plain text), each with its
+  title, its publisher and one statement that the doctor holds the right
+  to use it this way, splits each by its headings into passages of 40
+  to 350 words, embeds them with EmbeddingGemma 2 in a worker of its own
+  on the graphics card or the processor, and lists them with Remove;
+  the corpus ships empty and the app never fetches a document itself.
+  The panel that answers on the live page from those passages alone, with
+  each line a press from its passage, was built and benched on fifteen
+  approved queries, 13 chains each; two of its three marks held in every
+  chain and the third, under 150 words, missed on two queries, so the panel
+  is held outside this version until the owner rules on its figures, as
+  the stage's rule says. A reranker was benched beside it and its own marks
+  held; it waits with the panel.
+  Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line
   of counts. The background to the model was measured before it was kept,
-  on two made follow-up cases with the marks set first. Alba, the guideline
-  search and the teaching mode come later. Underneath: one user and a
+  on two made follow-up cases with the marks set first. Alba and the teaching mode come later. Underneath: one user and a
   login, This machine, the language model engine chosen once at start
   (vLLM first on Linux with a suitable graphics card, Ollama otherwise)
   with the two calls of a pass sent together, the room on the card read
