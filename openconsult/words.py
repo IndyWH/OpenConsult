@@ -456,7 +456,11 @@ GUIDELINES_INSTALLED = "The guideline search is installed. Start OpenConsult, an
 # The loader command of the bench kit (ruling 18), said in the terminal. Counts only.
 LOAD_NEEDS_PUBLISHER = "guideline-load needs --publisher, the publisher's name, which is never written into OpenConsult itself."
 LOAD_NEEDS_STATEMENT = "guideline-load needs --statement-accepted: the statement of the Guidelines section, given as the owner's."
-LOAD_FOLDER_REFUSED = "guideline-load never loads into the default data folder or the repository: give a bench folder by its path."
+LOAD_FOLDER_REFUSED = ("guideline-load loads into a bench folder given by its path. To load into your own data folder, with "
+                       "OpenConsult closed, give it by its path and add --into-my-data-folder.")
+LOAD_REPO_REFUSED = "guideline-load never loads into the repository: give a data folder by its path."
+LOAD_APP_RUNNING = ("OpenConsult looks to be running on this folder: a consultation is live or stopping. Close it first. "
+                    "Nothing was loaded.")
 LOAD_FILE = "{name}: {kind}, {passages} passages ({outside} outside 40 to 350 words), {seconds} s."
 LOAD_FILE_REFUSED = "{name}: not loaded: {reason}"
 LOAD_DONE = "Loaded {files} of {given} files: {passages} passages, {outside} outside 40 to 350 words, {seconds} s."

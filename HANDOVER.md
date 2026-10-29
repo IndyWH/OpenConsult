@@ -73,6 +73,11 @@ The rulings of 28 Oct it builds, one line each (spec 15.12):
 - 12, 21, 23: the two Ollama arms, below; vLLM stopped and started by
   the owner's script for the bench run alone; the service never touched.
 - 18: the loader command, every file through the same code as the page.
+  Fixed on 29 Oct after the room run stopped at it: the owner's own data
+  folder is accepted by its path with --into-my-data-folder and the app
+  closed (a consultation live or stopping refuses), since the command
+  he runs by hand on his folder on purpose is his to run (the review,
+  point 3); the repository is refused always.
 - Ruling 25 of 15.9: every passage records the model and revision that
   built it; an index built with another model is never searched.
 

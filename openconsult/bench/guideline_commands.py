@@ -100,7 +100,7 @@ def cmd_guideline_load(args) -> int:
     """The loader command of 8b (15.12 ruling 18): a folder of documents into a bench data folder's corpus."""
     say = _say()
     return guideline_load.guideline_load(Path(args.folder), args.publisher, Path(args.data_folder), args.statement_accepted,
-                                         args.where, say=say)
+                                         args.where, say=say, into_my_data_folder=args.into_my_data_folder)
 
 
 
@@ -135,6 +135,8 @@ def add_guideline_commands(sub, command) -> None:
     p.set_defaults(fn=cmd_guideline_load)
     p.add_argument("--folder", required=True, help="the folder of documents, every file loaded")
     p.add_argument("--publisher", required=True, help="the publisher's name, given here and never written into the repository")
-    p.add_argument("--data-folder", required=True, help="the bench's data folder whose corpus is loaded; never the default one")
+    p.add_argument("--data-folder", required=True, help="the data folder whose corpus is loaded: a bench folder, or your own with the flag below")
+    p.add_argument("--into-my-data-folder", action="store_true",
+                   help="accept your own data folder, named by its path, with OpenConsult closed; the repository is never accepted")
     p.add_argument("--statement-accepted", action="store_true", help="the statement of the Guidelines section, given as the owner's")
     p.add_argument("--where", choices=["card", "processor"], default="card", help="where the embedding worker runs")
