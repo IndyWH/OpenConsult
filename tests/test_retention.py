@@ -132,7 +132,7 @@ def test_ruling_7_R18_a_made_one_second_wav_is_converted_to_opus_after_stops_fin
     c = app.state.parts.running[1]
     from openconsult.web.live import capture_from
     from tests.test_review_page import CAPTURE, LOUD
-    from tests.test_stop import until
+    from tests.test_stop import SLOW_RUNNER_S, until
     c.begin_sound(capture_from(CAPTURE))
     for _ in range(8):
         c.sound(LOUD)
@@ -188,7 +188,7 @@ def test_ruling_7_R30_a_failed_conversion_is_shown_on_the_consultations_page_and
     c = p.running[1]
     from openconsult.web.live import capture_from
     from tests.test_review_page import CAPTURE, LOUD
-    from tests.test_stop import until
+    from tests.test_stop import SLOW_RUNNER_S, until
     c.begin_sound(capture_from(CAPTURE))
     for _ in range(8):
         c.sound(LOUD)
@@ -197,7 +197,7 @@ def test_ruling_7_R30_a_failed_conversion_is_shown_on_the_consultations_page_and
     assert until(lambda: c.stop_stage == "who_spoke")
     client.post("/consultations/1/speakers", data={"speaker": "S1"})
     assert until(lambda: c.state == FINAL)
-    assert until(lambda: p.consultations.get(1)["conversion_failure"] is not None)
+    assert until(lambda: p.consultations.get(1)["conversion_failure"] is not None, SLOW_RUNNER_S)
     row = p.consultations.get(1)
     assert row["recording_format"] == "wav" and row["recording_file"] == "consultation_1.wav"
     assert (tmp_path / "recordings" / "consultation_1.wav").is_file()
@@ -217,7 +217,7 @@ def test_ruling_7_R30_a_failed_conversion_is_shown_on_the_consultations_page_and
     client2.post("/consultations/1/stop")
     assert until(lambda: c2.stop_stage == "who_spoke")
     client2.post("/consultations/1/speakers", data={"speaker": "S1"})
-    assert until(lambda: c2.state == FINAL) and until(lambda: app2.state.parts.consultations.get(1)["conversion_failure"] is not None)
+    assert until(lambda: c2.state == FINAL) and until(lambda: app2.state.parts.consultations.get(1)["conversion_failure"] is not None, SLOW_RUNNER_S)
     assert app2.state.parts.consultations.get(1)["conversion_failure"] == words.CONVERSION_NO_CONVERTER
     assert not any(l.event == "recording.conversion_failed" for l in app2.state.parts.audit.lines())
     assert words.CONVERSION_FAILED.format(reason=words.CONVERSION_NO_CONVERTER) in text_of(client2.get("/consultations/1"))

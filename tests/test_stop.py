@@ -33,6 +33,12 @@ CHECK = {"lines": [{"line": 1, "label": "doctor"}, {"line": 2, "label": "patient
                    {"line": 4, "label": "unsure"}]}
 
 
+# The wait for a step a slow runner may take long over: GitHub's Windows
+# run of 30 Oct 2026 took 31 minutes for the suite and the retention test's
+# wait for the conversion step timed out at 10 s (15.12 ruling 28).
+SLOW_RUNNER_S = 60.0
+
+
 def until(condition, timeout_s=10.0):
     end = time.monotonic() + timeout_s
     while time.monotonic() < end:
