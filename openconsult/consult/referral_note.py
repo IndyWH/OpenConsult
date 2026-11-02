@@ -91,7 +91,12 @@ def patient_of(row: dict) -> Patient:
     """The patient line's age and sex for a letter call: from the details
     the consultation ran with (15.11 ruling 2), the age on the day it
     started, which is the age the live calls read."""
+    return patient_on(row, datetime.fromisoformat(row["started_at"]).date())
+
+
+def patient_on(row: dict, day: date) -> Patient:
+    """The same details on any day: the view of 8c reads a live call's
+    line back on the day of the call."""
     born = date.fromisoformat(row["patient_date_of_birth"])
-    day = datetime.fromisoformat(row["started_at"]).date()
     before_birthday = (day.month, day.day) < (born.month, born.day)
     return Patient(day.year - born.year - (1 if before_birthday else 0), row["patient_sex"])
