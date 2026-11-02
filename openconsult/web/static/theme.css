@@ -214,7 +214,7 @@ dialog.passage-dialog .source { font-size: .85rem; color: var(--ink-soft); margi
 .band-row .bar { position: absolute; top: .15rem; height: .8rem; min-width: 2px; background: var(--plum); border-radius: 2px; opacity: .8; }
 .band-row .bar.failed { background: var(--red); }
 .band-passes { position: relative; height: 1.3rem; }
-.band-passes .pass { position: absolute; top: 0; height: 1.1rem; min-width: 2px; border-left: 1px solid var(--ink-soft); font-size: .65rem; color: var(--ink-soft); padding-left: .15rem; white-space: nowrap; overflow: visible; }
+.band-passes .pass { position: absolute; top: 0; height: 1.1rem; min-width: 2px; border-left: 1px solid var(--ink-soft); font-size: .65rem; color: var(--ink-soft); padding-left: .15rem; white-space: nowrap; overflow: hidden; }
 .band-passes .pass.long { border-left: 2px solid var(--red); color: var(--red); font-weight: 600; }
 .band-edges { position: relative; height: 1.1rem; font-size: .7rem; color: var(--ink-faint); }
 .band-edges span { position: absolute; top: 0; white-space: nowrap; }

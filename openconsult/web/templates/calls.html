@@ -15,16 +15,15 @@
   <div class="pane-body">
     <div class="band">
       <div class="band-passes">
-        {% for p in band.passes %}<span class="pass{% if p.long %} long{% endif %}" style="left: {{ (p.left * 100)|round(2) }}%; width: {{ (p.width * 100)|round(2) }}%" data-pass="{{ p.n }}" title="{{ p.label }}">{{ p.label }}</span>{% endfor %}
+        {% for p in band.passes %}<span class="pass{% if p.long %} long{% endif %}" style="left: {{ (p.left * 100)|round(2) }}%; width: {{ (p.width * 100)|round(2) }}%" data-pass="{{ p.n }}" title="{{ p.label }}">{{ p.n }}</span>{% endfor %}
       </div>
       {% for kind, name in band.row_names %}
       <div class="band-row" data-kind="{{ kind }}"><span class="row-name">{{ name }}</span>
         {% for b in band.bars if b.kind == kind %}<a class="bar{% if b.outcome != 'ok' %} failed{% endif %}" href="#call-{{ b.call_id }}" style="left: {{ (b.left * 100)|round(2) }}%; width: {{ (b.width * 100)|round(2) }}%" title="{{ b.seconds }} s"></a>{% endfor %}
       </div>
       {% endfor %}
-      <div class="band-edges"><span style="left: 0">{{ words.TIMELINE_START }}</span>
-        {% if band.stop_left is not none %}<span class="stop" style="left: {{ (band.stop_left * 100)|round(2) }}%">{{ words.TIMELINE_STOP }}</span>{% endif %}
-        <span style="right: 0">{{ words.TIMELINE_FINAL }}</span></div>
+      {% if band.stop_left is not none %}<div class="band-edges"><span class="stop" style="left: {{ (band.stop_left * 100)|round(2) }}%">{{ words.TIMELINE_STOP }}</span></div>{% endif %}
+      <div class="band-edges"><span style="left: 0">{{ words.TIMELINE_START }}</span><span style="right: 0">{{ words.TIMELINE_FINAL }}</span></div>
     </div>
     <p class="mark" id="typical">{{ band.typical }}</p>
     <h3 class="mark">{{ words.AVERAGES_HEADING }}</h3>
