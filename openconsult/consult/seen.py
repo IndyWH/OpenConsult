@@ -360,5 +360,6 @@ def calls_of(consultations, notes, letters, sources, consultation_id: int) -> li
     if row is None or row["state"] != "final":
         return []
     named = references(consultations, notes, letters, sources, consultation_id)
-    calls = sorted(consultations.model_calls(consultation_id), key=lambda c: (c["at"], c["id"]))
+    # By the moment, not the text: the stamps carry the clock's offset, which changes twice a year.
+    calls = sorted(consultations.model_calls(consultation_id), key=lambda c: (datetime.fromisoformat(c["at"]), c["id"]))
     return [seen_call(call, row, named.get(call["id"])) for call in calls]

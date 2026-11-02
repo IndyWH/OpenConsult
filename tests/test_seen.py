@@ -285,6 +285,12 @@ def test_ruling_28_every_call_of_a_consultation_is_found_by_its_row_in_time_orde
     assert ats == sorted(ats)
     assert found[7].call["id"] == dropped and found[7].taken_apart is False and found[7].reason == seen.NO_PATIENT_LINE
     assert all(c.taken_apart for k, c in enumerate(found) if k != 7)
+    # The order is by the moment: a stamp with the summer offset before one with the winter offset the same morning.
+    winter = hand_made(room, request=json.dumps({"job": "alarm", "user": "x"}))
+    room.record._db.execute("UPDATE model_call SET at = '2026-10-25T01:30:00.000+00:00' WHERE id = ?", (winter,))
+    summer = hand_made(room, request=json.dumps({"job": "alarm", "user": "x"}))
+    room.record._db.execute("UPDATE model_call SET at = '2026-10-25T01:45:00.000+01:00' WHERE id = ?", (summer,))
+    assert [c.call["id"] for c in room.seen()][-2:] == [summer, winter]
     # A consultation that is not final yet has no view (ruling 28).
     room.consultations.set(room.cid, state="stopping")
     assert room.seen() == []
