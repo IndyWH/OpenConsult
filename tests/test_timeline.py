@@ -44,7 +44,7 @@ def test_ruling_28_the_averages_per_kind_the_bars_against_the_clock_and_the_call
     row = {"id": 7, "started_at": at(0), "stopped_at": at(60), "final_at": at(100)}
     calls = [a_call(1, "alarm", 10, 1.0), a_call(2, "assessment", 12, 3.0), a_call(3, "guideline", 14, 0.5),
              a_call(4, "alarm", 50, 1.0, "too_slow"), a_call(5, "assessment", 52, 5.0),
-             a_call(6, "label_check", 70, 2.0), a_call(7, "note", 95, 4.0),
+             a_call(6, "label_check", 70, 2.0), a_call(7, "note", 95, 4.0), a_call(11, "note", 100.9, 0.5),
              a_call(8, "referrals", 100 + 45, 1.0), a_call(9, "letter", 100 + 3700, 2.0), a_call(10, "note", 100 + 2 * 86400 + 5, 4.0)]
     passes = [a_pass(1, 12, 3.0), a_pass(2, 52, 5.0)]
     audit = [Line(at(300), "consultation.final", "consultation 8: other"), Line(at(100), "consultation.final", "consultation 7: made figures"),
@@ -52,7 +52,8 @@ def test_ruling_28_the_averages_per_kind_the_bars_against_the_clock_and_the_call
     found = timeline.band(row, calls, passes, audit)
     assert (found["length_s"], found["stop_s"], found["stop_left"]) == (100.0, 60.0, 0.6)
     assert found["rows"] == ["alarm", "assessment", "guideline", "label_check", "note"]
-    assert [b["call_id"] for b in found["bars"]] == [1, 2, 3, 4, 5, 6, 7]
+    assert [b["call_id"] for b in found["bars"]] == [1, 2, 3, 4, 5, 6, 7, 11]     # 11 ended in final's own second: within
+    assert found["bars"][7]["left"] == 1.0 and found["bars"][7]["width"] == 0.0
     assert found["bars"][1] == {"call_id": 2, "kind": "assessment", "start_s": 9.0, "end_s": 12.0, "seconds": 3.0, "outcome": "ok",
                                 "at": at(12), "left": 0.09, "width": 0.03}
     assert found["bars"][3]["outcome"] == "too_slow"
@@ -65,7 +66,7 @@ def test_ruling_28_the_averages_per_kind_the_bars_against_the_clock_and_the_call
         {"kind": "assessment", "count": 2, "failed": 0, "mean_s": 4.0, "slowest_s": 5.0},
         {"kind": "guideline", "count": 1, "failed": 0, "mean_s": 0.5, "slowest_s": 0.5},
         {"kind": "label_check", "count": 1, "failed": 0, "mean_s": 2.0, "slowest_s": 2.0},
-        {"kind": "note", "count": 2, "failed": 0, "mean_s": 4.0, "slowest_s": 4.0},
+        {"kind": "note", "count": 3, "failed": 0, "mean_s": 2.8, "slowest_s": 4.0},
         {"kind": "referrals", "count": 1, "failed": 0, "mean_s": 1.0, "slowest_s": 1.0},
         {"kind": "letter", "count": 1, "failed": 0, "mean_s": 2.0, "slowest_s": 2.0}]
     assert (found["typical_pass_s"], found["long_passes"]) == (4.0, [])

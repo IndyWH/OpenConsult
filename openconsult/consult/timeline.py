@@ -17,6 +17,9 @@ import statistics
 from datetime import datetime
 
 LONG_FACTOR = 2
+# final_at is written to the second and a call's at to the millisecond, so
+# a call that ended in final's own second reads as up to a second after it.
+FINAL_PRECISION_S = 1.0
 # The kinds drawn as rows of the band, in this order; a kind not here
 # (the referral list, a letter) comes after final and is listed apart.
 ROW_ORDER = ("alarm", "assessment", "guideline", "label_check", "note")
@@ -61,7 +64,8 @@ def pass_marks(pass_rows: list[dict], started_at: str, length_s: float) -> list[
 
 def bars(calls: list[dict], started_at: str, final_at: str, length_s: float) -> tuple[list[dict], list[dict]]:
     """Each call as a bar from (at less wall) to at, as fractions of Start to
-    final; a call that ended after final is listed apart with its lead."""
+    final; a call that ended after final, by more than final's own
+    precision, is listed apart with its lead."""
     within, after = [], []
     for call in calls:
         seconds = call["wall_ms"] / 1000
@@ -69,7 +73,7 @@ def bars(calls: list[dict], started_at: str, final_at: str, length_s: float) -> 
         start_s = max(0.0, end_s - seconds)
         bar = {"call_id": call["id"], "kind": call["job"], "start_s": round(start_s, 2), "end_s": round(end_s, 2),
                "seconds": round(seconds, 2), "outcome": call["outcome"], "at": call["at"]}
-        if seconds_between(final_at, call["at"]) <= 0:
+        if seconds_between(final_at, call["at"]) <= FINAL_PRECISION_S:
             within.append({**bar, "left": _fraction(start_s, length_s),
                            "width": round(_fraction(end_s, length_s) - _fraction(start_s, length_s), 4)})
         else:
