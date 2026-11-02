@@ -60,7 +60,16 @@ This branch is where OpenConsult v2.0 is being built.
   queries, which the owner ruled to keep as the measure of this model's
   word limit. A reranker was benched beside it and held its own marks,
   but on the card beside the engines it would sit on the processor at
-  about four seconds a search, so it is not in the app.
+  about four seconds a search, so it is not in the app. Every
+  consultation has a read-only page, What the model saw, reached from
+  its review page and from the patient's page: a timeline of every model
+  call from Start to final with the passes marked and a slow pass seen at
+  a glance, the seconds per kind of call, and each call in time order
+  opened to what went in, marked by its source (the patient line, the
+  earlier notes as background, the fixed words of the frame by file
+  name, the transcript as sent, the note lines, the passages with their
+  sources, the query), the reply word for word, and the prompt by name
+  and hash, never its text.
   Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line
