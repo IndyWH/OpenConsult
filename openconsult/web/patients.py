@@ -43,7 +43,8 @@ def consultation_rows(p, patient_id: int) -> list[dict]:
         refused = any(r["draft_id"] == latest for r in p.notes.refusals(cid)) if latest else False
         state = consultation_state(row, p.notes.approval(cid) is not None, refused)
         when = datetime.fromisoformat(row["started_at"])
-        found.append({"id": cid, "when": f"{words.plain_date(when)} {when:%H:%M}", "state": words.STATE_WORDS[state]})
+        found.append({"id": cid, "when": f"{words.plain_date(when)} {when:%H:%M}", "state": words.STATE_WORDS[state],
+                      "final": row["state"] == "final"})    # the view of 8c is read after the consultation (ruling 28)
     return found
 
 

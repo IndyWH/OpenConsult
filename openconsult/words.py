@@ -546,6 +546,75 @@ NEW_PASSWORDS_DIFFER = "The two new passwords do not match."
 
 # Typing as use (15.10 ruling 12): the page asks for the time left; nothing is shown.
 
+# What the model saw (spec 15.12, rulings 11 and 28; 15.8 ruling 1; R2,
+# R20). One page per consultation, read only. Drafts for the owner.
+MODEL_SAW_LINK = "What the model saw"
+MODEL_SAW_TITLE = "What the model saw"
+MODEL_SAW_INTRO = ("The record read back: every model call of this consultation in time order, what went into each, "
+                   "marked by its source, and what came back word for word. Nothing on this page changes anything.")
+MODEL_SAW_NO_CALLS = "No model call is recorded for this consultation."
+BACK_TO_CONSULTATION = "The consultation's page"
+TIMELINE_HEADING = "Timeline"
+TIMELINE_START, TIMELINE_STOP, TIMELINE_FINAL = "Start", "Stop", "final"
+TIMELINE_LENGTH = "Start to final: {seconds} s."
+TIMELINE_PASS = "pass {n}"
+TIMELINE_LONG = "long, {seconds} s"
+TIMELINE_TYPICAL = "Typical pass {seconds} s, the median; a pass over twice it is marked long."
+TIMELINE_LONG_PASSES = "Marked long: {passes}."
+TIMELINE_NO_PASS = "No pass ran."
+AVERAGES_HEADING = "Seconds per kind of call"
+AVERAGE_LINE = "{kind}: {count} calls, {mean} s on average, {slowest} s at most{failed}"
+AVERAGE_FAILED = ", {failed} failed"
+FINAL_FIGURES = "The final line: {line}"
+FINAL_FIGURES_NONE = "No consultation.final line was written for this consultation."
+AFTER_FINAL_HEADING = "After the final transcript"
+AFTER_FINAL_LINE = "{kind} at {when}, {lead} after final"
+LEAD_WORDS = {"seconds": ("1 second", "{n} seconds"), "minutes": ("1 minute", "{n} minutes"),
+              "hours": ("1 hour", "{n} hours"), "days": ("1 day", "{n} days")}
+CALLS_HEADING = "The calls, in time order"
+CALL_KINDS = {"alarm": "pass {n}, the alarm", "assessment": "pass {n}, the assessment", "label_check": "the label check",
+              "note": "note draft {n}, {asked}", "referrals": "the referral list", "letter": "letter {n}, {specialty}",
+              "guideline": "guideline summary after pass {n}"}
+CALL_ASKED_BY = {"stop": "at Stop", "draft": "by Draft the note", "again": "by Draft again"}
+CALL_UNKNOWN_KIND = "a call of the job {job}"
+CALL_LINE = "{time}: {kind}, {seconds} s, {outcome}."
+CALL_OUTCOMES = {"ok": "answered", "too_slow": "too slow", "too_long": "the reply was cut at its limit",
+                 "unreachable": "the engine could not be reached", "bad_form": "the reply did not fit its form",
+                 "did_not_fit": "the input did not fit the context"}
+CALL_NO_ROW = "No row of the record refers to this call; it is tied to the consultation by its own row alone."
+CALL_SEARCH_MS = "The search before this call took {ms} ms."
+CALL_FAILURE = "Failure: {detail}"
+CALL_TOKENS = "Tokens: {read} read, {written} written."
+KIND_WORDS = {"alarm": "alarm", "assessment": "assessment", "guideline": "guideline summary", "label_check": "label check",
+              "note": "note", "referrals": "referral list", "letter": "letter"}
+WENT_IN_HEADING = "What went in, by source"
+SOURCE_LABELS = {"patient_line": "The patient line, written by code from the details the consultation ran with",
+                 "background": "The background block: the earlier approved notes, as background",
+                 "frame": "The fixed words of {file}",
+                 "transcript": "The transcript as sent, as the speech choice gave it",
+                 "stale": "The earlier pass's differentials, names only",
+                 "lines": "The numbered lines as sent, with no speaker",
+                 "turns": "The turns as sent, with their speaker words",
+                 "note_lines": "The note lines as sent, from the approved note",
+                 "specialty": "The specialty, from the referral item",
+                 "query": "The query, from the top two differentials",
+                 "passages": "The passages sent, from the loaded guidelines, each with its source"}
+PASSAGE_SENT = "[{n}] {title}, {publisher}{trail}; similarity {similarity}{cited}"
+PASSAGE_TRAIL = ": {trail}"
+PASSAGE_CITED = "; cited"
+CAME_BACK_HEADING = "What came back, word for word"
+NO_REPLY = "Nothing came back."
+PROMPT_LINE_SAME = "Prompt: {name}, sha256 {hash}. The file of that name in the repository today has the same hash."
+PROMPT_LINE_DIFFERS = "Prompt: {name}, sha256 {hash}. The file of that name in the repository today differs."
+PROMPT_LINE_NONE = "Prompt: sha256 {hash}. No prompt file for this job is in the repository today."
+NOT_TAKEN_APART = "Not taken apart: {reason} What was sent is shown whole."
+NOT_TAKEN_APART_REASONS = {"not_json": "the stored request is not JSON.",
+                           "no_user_text": "no user text was found in the stored request.",
+                           "no_patient_line": "the first paragraph is not the patient line the consultation's details give.",
+                           "frame_not_found": "the frame's fixed words were not found.",
+                           "rebuild_differs": "the parts read back do not give the request byte for byte.",
+                           "unknown_job": "the view does not know this job."}
+
 # The log page.
 LOG_TITLE = "Log"
 COL_WHEN = "When"

@@ -41,7 +41,7 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import consult, guards, guidelines as guidelines_web, letters as letters_web, live, patients as patients_web, review, routes
+from openconsult.web import calls as calls_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, patients as patients_web, review, routes
 from openconsult.web.first_run import FirstRun
 
 STATIC = Path(__file__).parent / "web" / "static"
@@ -151,7 +151,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
-    for module in (routes, consult, live, review, patients_web, letters_web, guidelines_web):
+    for module in (routes, consult, live, review, patients_web, letters_web, guidelines_web, calls_web):
         app.include_router(module.router)
     return app
 

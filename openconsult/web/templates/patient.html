@@ -28,7 +28,7 @@
   <div class="pane-head"><h2>{{ words.CONSULTATIONS }}</h2></div>
   <div class="pane-body">
     {% if consultations %}<ul class="panel-list">{% for c in consultations %}
-    <li class="consultation" data-consultation="{{ c.id }}"><a href="/consultations/{{ c.id }}">{{ c.when }}</a>: {{ c.state }}</li>{% endfor %}</ul>
+    <li class="consultation" data-consultation="{{ c.id }}"><a href="/consultations/{{ c.id }}">{{ c.when }}</a>: {{ c.state }}{% if c.final %} <a class="mark" href="/consultations/{{ c.id }}/calls">{{ words.MODEL_SAW_LINK }}</a>{% endif %}</li>{% endfor %}</ul>
     {% else %}<p class="mark">{{ words.NO_CONSULTATIONS }}</p>{% endif %}
     <p><a class="button" href="/consultations/start/{{ patient.id }}" id="new-consultation">{{ words.NEW_CONSULTATION }}</a></p>
   </div>

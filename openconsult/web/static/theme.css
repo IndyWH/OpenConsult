@@ -206,3 +206,21 @@ textarea.paragraph-text { font-family: var(--sans); font-size: .95rem; color: va
 ul.cited-sources { margin: .2rem 0 .6rem; padding-left: 1.1rem; font-size: .85rem; }
 dialog.passage-dialog .passage { white-space: pre-wrap; font-size: .9rem; line-height: 1.5; max-height: 60vh; overflow: auto; }
 dialog.passage-dialog .source { font-size: .85rem; color: var(--ink-soft); margin: .2rem 0 .8rem; }
+
+/* What the model saw (8c): the band of calls against the clock, drawn from computed fractions; no script. */
+.band { position: relative; margin: .6rem 0 .4rem; }
+.band-row { position: relative; height: 1.1rem; margin: .15rem 0; background: var(--paper); border-radius: 4px; }
+.band-row .row-name { position: absolute; left: .3rem; top: 0; font-size: .7rem; color: var(--ink-faint); line-height: 1.1rem; }
+.band-row .bar { position: absolute; top: .15rem; height: .8rem; min-width: 2px; background: var(--plum); border-radius: 2px; opacity: .8; }
+.band-row .bar.failed { background: var(--red); }
+.band-passes { position: relative; height: 1.3rem; }
+.band-passes .pass { position: absolute; top: 0; height: 1.1rem; min-width: 2px; border-left: 1px solid var(--ink-soft); font-size: .65rem; color: var(--ink-soft); padding-left: .15rem; white-space: nowrap; overflow: visible; }
+.band-passes .pass.long { border-left: 2px solid var(--red); color: var(--red); font-weight: 600; }
+.band-edges { position: relative; height: 1.1rem; font-size: .7rem; color: var(--ink-faint); }
+.band-edges span { position: absolute; top: 0; white-space: nowrap; }
+.band-edges .stop { border-left: 1px dashed var(--ink-faint); padding-left: .2rem; }
+details.call { border-top: 1px solid var(--line); padding: .35rem 0; }
+details.call summary { cursor: pointer; font-size: .92rem; }
+details.call .part { margin: .5rem 0; }
+details.call .part h4 { margin: 0 0 .2rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; }
+details.call pre { white-space: pre-wrap; font-family: var(--sans); font-size: .88rem; line-height: 1.45; margin: 0; padding: .5rem .7rem; background: var(--paper); border-radius: 6px; max-height: 24rem; overflow: auto; }
