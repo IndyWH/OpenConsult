@@ -221,6 +221,7 @@ STOPPING_TITLE = "Stopping"
 STAGE_LINES = {
     "speech": "Finishing the transcript.",
     "who_spoke": "Waiting for your answer.",
+    "answered": "Your answer is taken. Checking who spoke each line.",
     "label_check": "Checking who spoke each line.",
     "checks": "Checking for missing speech.",
     "gate": "Checking the transcript.",

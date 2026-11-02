@@ -38,6 +38,10 @@ WITHIN, OVER = "within", "over"
 LIVE, STOPPING, FINAL = "live", "stopping", "final"
 # The named in-progress states a spinner may show (V1_LESSONS 5.3).
 SPINNING = ("speech_starting", "pass_running", "speech", "label_check", "checks", "gate", "note")
+# The moment after the who-spoke answer and before the Stop thread moves
+# the stage on: the page shows it as its own named state, so the question
+# never stands on screen with the answer taken (15.12 ruling 28; R15).
+ANSWERED = "answered"
 # A thread that has returned leaves the table a moment later; close waits for
 # that moment, far beyond its length on the slowest machine, and no longer, so
 # that the app's shutdown never hangs on a thread that will not end.
@@ -328,6 +332,8 @@ class Consultation:
             if self.passes.running:
                 return "pass_running"
             return None
+        if self.state == STOPPING and self.stop_stage == "who_spoke" and self.doctor_speaker is not None:
+            return ANSWERED           # the answer taken, the labels being set (15.12 ruling 28)
         if self.state == STOPPING and self.stop_stage in SPINNING:
             return self.stop_stage
         return None
@@ -340,6 +346,7 @@ class Consultation:
                 "version": self.version,
                 "state": self.state,
                 "stop_stage": self.stop_stage,
+                "answered": self.doctor_speaker is not None,
                 "spinning": self.spinning(),
                 "started_at": self.started_at.isoformat(timespec="seconds"),
                 "intended_minutes": self.intended_minutes,

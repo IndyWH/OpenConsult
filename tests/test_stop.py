@@ -353,3 +353,41 @@ def test_the_small_fix_of_7b_no_thread_of_the_consultation_outlives_it(tmp_path,
     with browser(app):                                               # the lifespan runs: start, then shutdown
         pass
     assert consultation.closed and not mine(1)
+
+
+def test_ruling_28_R15_the_who_spoke_page_changes_after_the_answer_and_a_second_answer_is_refused(tmp_path, clock, machine):
+    """2 Nov 2026, consultations 7 and 8: the question stood on screen after
+    the answer, so the owner picked twice. The finaliser is held here, so
+    the stage stays who_spoke under the test's hand and the moment after
+    the answer is pinned, not raced."""
+    app, client = app_on(tmp_path, clock, machine, MadeUpWorker(live=[LINES]))
+    set_up(client)
+    log_in(client)
+    client.post("/patients", data=PATIENT)
+    client.post("/consultations/start/1", data=TICKS)
+    c = app.state.parts.running[1]
+    c.on_stop = None
+    c.begin_sound(CAPTURE)
+    c.sound(LOUD)
+    c.wait_for_pass()
+    assert until(lambda: len(c.transcript.heard) == 4)
+    client.post("/consultations/1/stop")
+    stop.final_lines(c)
+    c.set_stage("who_spoke")
+    page = client.get("/consultations/1")
+    assert words.WHO_SPOKE_TITLE in text_of(page) and 'type="radio"' in page.text and 'http-equiv="refresh"' not in page.text
+    done = client.post("/consultations/1/speakers", data={"speaker": "S1"})
+    assert done.status_code == 303 and done.headers["location"] == "/consultations/1"
+    assert c.doctor_speaker == "S1" and app.state.parts.consultations.get(1)["doctor_speaker"] == "S1"
+    # The page after the answer, the stage still who_spoke: it says so, the choices are gone, and it moves by itself.
+    after = client.get("/consultations/1")
+    text = text_of(after)
+    assert words.STAGE_LINES["answered"] in text and words.WHO_SPOKE_TITLE not in text
+    assert 'type="radio"' not in after.text and 'id="answer"' not in after.text
+    assert 'http-equiv="refresh"' in after.text and 'class="spinner"' in after.text and 'class="spinner" hidden' not in after.text
+    assert c.page_state()["answered"] and c.page_state()["spinning"] == "answered"
+    again = client.post("/consultations/1/speakers", data={"speaker": "S2"})
+    assert again.status_code == 303 and c.doctor_speaker == "S1"                        # refused: the first answer stands
+    assert [line.event for line in app.state.parts.audit.lines()].count("speakers.answered") == 1
+    assert words.WHO_SPOKE_TITLE not in text_of(client.get("/consultations/1"))
+    c.close()

@@ -14,7 +14,7 @@ from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 
 from openconsult import words
 from openconsult.consult import earlier, speakers, stop as stop_module
-from openconsult.consult.live import FINAL, LIVE, Capture
+from openconsult.consult.live import ANSWERED, FINAL, LIVE, Capture
 from openconsult.web import guards, review
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -93,11 +93,14 @@ def live_page(request: Request, user, consultation, refused=None):
 def stopping_page(request: Request, user, consultation, refused=None):
     """While Stop runs: the named stage, with a quiet refresh each second
     (a spinner only for a named in-progress state, V1_LESSONS 5.3); at the
-    who-spoke stage the question, which waits (ruling 7)."""
+    who-spoke stage the question, which waits (ruling 7), until the answer
+    is taken."""
     state = consultation.page_state()
-    asking = state["stop_stage"] == "who_spoke"
-    context = dict(user=user, active="new_patient", consultation=consultation, state=state,
-                   stage_line=words.STAGE_LINES.get(state["stop_stage"] or "", ""), patient=consultation.patient,
+    # The question only until the answer is taken; then the page says so and moves on by itself (15.12 ruling 28; R15).
+    asking = state["stop_stage"] == "who_spoke" and not state["answered"]
+    stage = ANSWERED if state["stop_stage"] == "who_spoke" and state["answered"] else state["stop_stage"]
+    context = dict(user=user, active="new_patient", consultation=consultation, state=state, asking=asking,
+                   stage_line=words.STAGE_LINES.get(stage or "", ""), patient=consultation.patient,
                    page_path=f"/consultations/{consultation.id}", refresh_every=0 if asking else 1,
                    options=speakers.options(consultation.rows.transcript_lines(consultation.id)) if asking else [])
     if refused:

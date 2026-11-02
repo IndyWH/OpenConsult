@@ -2,7 +2,7 @@
 {% set title = words.STOPPING_TITLE %}
 {% block main %}
 <h1 class="page">{{ words.STOPPING_TITLE }}</h1>
-{% if state.stop_stage == "who_spoke" %}
+{% if asking %}
 {% include "who_spoke.html" %}
 {% else %}
 <div class="pane"><div class="pane-body">
