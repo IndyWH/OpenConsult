@@ -7,9 +7,12 @@ the sentences are judged on the valid lines left (the plan review of
 when a number in it is not in those lines (the patient's age excepted;
 a figure inside a word, as the 2 of T2DM, is a number), when it turns a
 planned test into a result, judged per sentence, or when it holds the
-placeholder anywhere (ruling 15); an expectation sentence stands only
-where a valid line holds the words Patient's expectations followed by a
-colon, and is dropped otherwise, never replaced; a sentence about
+placeholder anywhere (ruling 15); an expectation sentence (holding
+Patient's expectations, or he, she, they or the patient followed by
+hopes, hoped, wants, wanted, would like, expects, expected, is hoping or
+was hoping, ruling 33) stands only where a valid line holds the words
+Patient's expectations followed by a colon, and is dropped otherwise,
+never replaced; a sentence about
 allergies (the word allerg in any form) stands only when a valid line
 holds that word, and is dropped and counted otherwise, judged before the
 other rules (ruling 16; R4). A failed sentence
@@ -40,8 +43,11 @@ _RESULT_WORDS = re.compile(
 _PLANNED_WORDS = re.compile(r"\b(arranged|planned|requested|ordered|booked|organised|organized|will be|to be done)\b",
                             re.IGNORECASE)
 # An expectation-class sentence, and the words of the note line that may ground it.
-_EXPECTATION_CLASS = re.compile(r"patient'?s expectations|patient (?:wants|would like|hopes|expects|was hoping|is hoping)",
-                                re.IGNORECASE)
+# The pronoun form too (ruling 33): the model writes He hoped for a scan more often than the patient hopes.
+_EXPECTATION_CLASS = re.compile(
+    r"patient'?s expectations|"
+    r"\b(?:he|she|they|patient)\s+(?:hopes|hoped|wants|wanted|would like|expects|expected|is hoping|was hoping)\b",
+    re.IGNORECASE)
 _EXPECTATION_LINE = re.compile(r"patient'?s expectations\s*:", re.IGNORECASE)
 _FIGURE = re.compile(r"\d+(?:\.\d+)?")   # a figure, also inside a word (ruling 15)
 _ALLERGY = re.compile(r"allerg", re.IGNORECASE)   # allergy, allergies, allergic, allergen

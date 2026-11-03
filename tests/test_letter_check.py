@@ -1,5 +1,5 @@
 """The letter check (spec 15.12, ruling 4 and its detail; the plan
-review of 8a, point 1; rulings 15 and 16; R4, R5). Made letters on made notes:
+review of 8a, point 1; rulings 15, 16 and 33; R4, R5). Made letters on made notes:
 every rule of the check has a case that shows it catching the thing it
 is for. What a model says is never asserted here."""
 
@@ -63,7 +63,7 @@ def test_ruling_4_R4_R5_the_check_catches_each_thing_it_is_for():
     assert (dropped.total, dropped.grounded, dropped.placeholders, dropped.dropped) == (2, 1, 0, 1)
     kept = lc.check([para("The patient expects a scan.", [4])], NOTE, AGE)
     assert kept.paragraphs == ["The patient expects a scan."] and kept.dropped == 0
-    assert lc.expectation_sentence("Patient's expectations were discussed.") and not lc.expectation_sentence("He expects nothing.")
+    assert lc.expectation_sentence("Patient's expectations were discussed.") and not lc.expectation_sentence("He is expected in clinic.")
     # The model's own placeholder counts as a placeholder, never as grounded, and joins a run.
     own = lc.check([para(f"Food sticks. {words.LETTER_PLACEHOLDER} He lost 9 kg.", [2])], NOTE, AGE)
     assert own.paragraphs == [f"Food sticks. {words.LETTER_PLACEHOLDER}"] and verdicts(own)[1] == ("placeholder", "model_placeholder")
@@ -164,3 +164,36 @@ def test_ruling_16_an_allergy_sentence_stands_only_on_a_cited_allergy_line():
     assert verdicts(lc.check([para("She weighs 71 kg.", [3, 6])], note, set())) == [("kept", None)]
     assert lc.reasons_of(none.detail) == [] and lc.reasons_of(side.detail) == []
     assert lc.reasons_of(lc.check([para("She has 3 allergies. No known allergies.", [4, 2])], note, set()).detail) == ["number"]
+
+
+def test_ruling_33_the_expectation_pattern_reads_the_pronoun_form():
+    # The fourth bench of 8a: the model wrote He hoped for a scan, which the pattern from v1 read as an ordinary
+    # sentence, so it reached the page on lines that do not hold it. Now the pronoun form is an expectation sentence
+    # too, and the rule of ruling 4 applies as before: kept on a cited line holding Patient's expectations and a
+    # colon, else dropped and counted, never replaced.
+    from openconsult.bench import letter_marks
+    for sentence in ("He hoped for a scan.", "She wanted a stronger cream.", "The patient expects nothing.",
+                     "They would like a referral.", "She is hoping for something that works.",
+                     "The patient was hoping for a scan.", "This patient wants a scan.", "Patient's expectations were discussed."):
+        assert lc.expectation_sentence(sentence), sentence
+    for sentence in ("He has had six weeks of food sticking.", "She was started on a nasal spray two weeks ago.",
+                     "They were told the plaques are not catching.", "He is expected in clinic next week.",
+                     "The hoped-for result did not come."):
+        assert not lc.expectation_sentence(sentence), sentence
+    # Dropped and counted without the line among the valid lines; the sentence beside it stands; not a failed reason.
+    dropped = lc.check([para("Food sticks. He hoped for a scan.", [2])], NOTE, AGE)
+    assert dropped.paragraphs == ["Food sticks."] and verdicts(dropped) == [("kept", None), ("dropped", None)]
+    assert (dropped.total, dropped.grounded, dropped.placeholders, dropped.dropped) == (2, 1, 0, 1)
+    assert lc.reasons_of(dropped.detail) == []
+    # Kept on the line, alone or among others; dropped, not replaced, when only the Assessment line is cited.
+    assert verdicts(lc.check([para("She wanted a stronger cream.", [4])], NOTE, AGE)) == [("kept", None)]
+    assert verdicts(lc.check([para("He hoped for a scan.", [2, 4])], NOTE, AGE)) == [("kept", None)]
+    assert verdicts(lc.check([para("He hoped for a scan.", [9])], NOTE, AGE)) == [("dropped", None)]
+    # An allergy sentence beside it is judged by its own rule, untouched.
+    both = lc.check([para("He hoped for a scan. No known allergies.", [2])], NOTE, AGE)
+    assert verdicts(both) == [("dropped", None), ("dropped", "allergy")] and both.dropped == 1 and both.detail["allergies_dropped"] == 1
+    # The bench's two expectation readings go through the same function, so M4 on A reads the pronoun form too.
+    def chain(text):
+        return {"letters": [{"model_body": [{"text": text, "note_lines": [2]}], "body": [text]}]}
+    assert letter_marks.expectation_model(chain("Food sticks. He hoped for a scan.")) and letter_marks.expectation_checked(chain("He hoped for a scan."))
+    assert not letter_marks.expectation_model(chain("He has had six weeks of this.")) and not letter_marks.expectation_checked(chain("Food sticks."))
