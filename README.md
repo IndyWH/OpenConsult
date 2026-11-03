@@ -40,10 +40,12 @@ This branch is where OpenConsult v2.0 is being built.
   gives the letter alone) and Refuse, and a specialty the doctor names
   gets a letter with no list. The letter prompts were benched four times
   on four approved notes, the owner ruling after each, before the page
-  was wired; a fifth bench, of four prompt edits and one rule of the
-  check, kept the rule (an expectation sentence in the pronoun form is
-  read by the check) and held the prompt edits for the owner's ruling,
-  because the marks fell. A Guidelines section of Settings takes guideline documents
+  was wired; a fifth and a sixth bench, of four prompt edits and one
+  rule of the check, kept the rule (an expectation sentence in the
+  pronoun form is read by the check) and held the prompt edits both
+  times, the owner rewording two sentences between them, because the
+  marks fell each time; the edits stopped there, and the letters run on
+  the prompts the fourth bench left. A Guidelines section of Settings takes guideline documents
   from files on this computer (HTML, PDF or plain text), each with its
   title, its publisher and one statement that the doctor holds the right
   to use it this way, splits each by its headings into passages of 40
