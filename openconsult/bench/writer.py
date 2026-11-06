@@ -33,7 +33,21 @@ class ResultWriter:
         return self.path(case, chain).is_file()
 
     def write(self, case: str, chain: str, data: dict) -> Path:
-        target = self.path(case, chain)
+        return self._write_to(self.path(case, chain), data)
+
+    def path_apart(self, case: str, chain: str) -> Path:
+        """Where a chain the run stopped in goes (run 9a, the review's point
+        3): under stopped, which read_all never reads, so a later run of
+        the same command runs that chain again and keeps the whole ones."""
+        target = (self.folder / "results" / case / "stopped" / f"{chain}.json").resolve()
+        if not target.is_relative_to(self.folder):
+            raise Refused(f"{case}/{chain} would leave the results folder")
+        return target
+
+    def write_apart(self, case: str, chain: str, data: dict) -> Path:
+        return self._write_to(self.path_apart(case, chain), data)
+
+    def _write_to(self, target: Path, data: dict) -> Path:
         if target.exists():
             raise Refused(f"{target} exists and is never written over")
         target.parent.mkdir(parents=True, exist_ok=True)

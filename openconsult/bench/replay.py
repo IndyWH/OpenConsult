@@ -157,6 +157,11 @@ def run(door: Door, cases: list[Case], writer: ResultWriter, chains: list[Chain]
                 continue
             log(f"=== {case.name} {chain.name} T={chain.temperature} seed={chain.seed}")
             result = run_chain(door, case, chain, log, together, background)
+            if door.stopped:
+                # Never the model's miss: the chain is written apart, to run again (run 9a, rule 9).
+                writer.write_apart(case.name, chain.name, result)
+                log(f"STOP: {door.stopped}; {case.name} {chain.name} written apart, to run again")
+                return {"run": done, "kept": skipped, "failed": failed, "stopped": door.stopped}
             writer.write(case.name, chain.name, result)
             done += 1
             if result["failed"]:

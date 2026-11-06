@@ -57,11 +57,15 @@ class OllamaEngine:
 
     # ------------------------------------------------------------ the wire
 
+    def headers(self, data: bytes | None) -> dict:
+        """The headers of one request; the body is never touched here. The
+        bench's cloud kind adds the service's one (15.13, run 9a)."""
+        return {"Content-Type": "application/json"} if data else {}
+
     def _request(self, path: str, data: bytes | None, timeout_s: float) -> tuple[int, str]:
         """One HTTP exchange. Gives the status and the body as text; raises
         only the joint's two exceptions."""
-        request = urllib.request.Request(self.address + path, data=data,
-                                         headers={"Content-Type": "application/json"} if data else {})
+        request = urllib.request.Request(self.address + path, data=data, headers=self.headers(data))
         sent = data.decode("utf-8") if data else None
         try:
             with self._urlopen(request, timeout=timeout_s) as answer:

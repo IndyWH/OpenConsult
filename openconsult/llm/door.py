@@ -49,6 +49,13 @@ class Door:
         """The engine's own name, as the record names it (R20)."""
         return self._engine.name
 
+    @property
+    def stopped(self) -> str | None:
+        """The engine's own reason a bench must send nothing more (the
+        cloud kind after a refused key or used-up credit; run 9a, rule 9).
+        None for every engine of the app; the app never reads it."""
+        return getattr(self._engine, "stopped", None)
+
     def call_for(self, job_name: str, user: str, sampling: Sampling | None = None) -> Call:
         """The parts of a call, as the engine will see them. The sampling
         override is for the bench's chains only; the app takes the

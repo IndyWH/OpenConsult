@@ -109,12 +109,13 @@ class MadeUpServer:
     request's body that gives one."""
 
     def __init__(self):
-        self.routes, self.received = {}, []
+        self.routes, self.received, self.headers = {}, [], []
         outer = self
 
         class Handler(BaseHTTPRequestHandler):
             def _answer(self, body):
                 outer.received.append((self.path, body))
+                outer.headers.append({name.lower(): value for name, value in self.headers.items()})
                 found = outer.routes.get(self.path, (404, {"error": "made-up: no such path"}))
                 status, reply = found(body) if callable(found) else found
                 data = (reply if isinstance(reply, str) else json.dumps(reply)).encode("utf-8")

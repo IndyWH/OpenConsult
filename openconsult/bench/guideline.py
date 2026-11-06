@@ -160,9 +160,15 @@ def run(door: Door, index: Index, embedder, queries: list[dict], writer: ResultW
                 continue
             started = time.perf_counter()
             result = run_chain(door, searched, chain, patient, query["query"])
-            writer.write(qid, chain.name, {"query_id": qid, "real": searched["real"], "chain": chain.name, "temperature": chain.temperature,
-                                           "seed": chain.seed, "patient": asdict(patient), "sent_count": len(searched["sent"]),
-                                           "wall_s": round(time.perf_counter() - started, 3), **result, **stamped})
+            row = {"query_id": qid, "real": searched["real"], "chain": chain.name, "temperature": chain.temperature,
+                   "seed": chain.seed, "patient": asdict(patient), "sent_count": len(searched["sent"]),
+                   "wall_s": round(time.perf_counter() - started, 3), **result, **stamped}
+            if door.stopped:
+                # Never the model's miss: the chain is written apart, to run again (run 9a, rule 9).
+                writer.write_apart(qid, chain.name, row)
+                log(f"STOP: {door.stopped}; {qid} {chain.name} written apart, to run again")
+                return {"run": done, "kept": skipped, "stopped": door.stopped}
+            writer.write(qid, chain.name, row)
             done += 1
             log(f"  {qid} {chain.name}: {result['outcome']}, {result['words']} words, cited {result['cited']}, invalid {result['invalid']}"
                 + (f", {result['call']['wall_ms']} ms" if result["call"] else ", no call") + (f" FAILED {result['failure']}" if result["failure"] else ""))

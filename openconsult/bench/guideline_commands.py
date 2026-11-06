@@ -71,7 +71,8 @@ def cmd_guideline(args) -> int:
         summary = guideline.run(door, index, embedder, queries, writer, patient, args.reranker, chains, args.search_only,
                                 args.queries_sha256, log=say)
         say(f"done: ran {summary['run']}, kept {summary['kept']}")
-        return 0
+        from openconsult.bench.cli import stopped
+        return stopped(summary)
     finally:
         embedder.close()
 

@@ -17,6 +17,7 @@ import openconsult
 from openconsult.bench import background, export, figures, guideline_commands, letter_marks, letters, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
+from openconsult.bench.ollama_cloud import KEY_NAME, AddressRefused, OllamaCloudEngine
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.shared import commands as shared_commands
@@ -30,15 +31,47 @@ from openconsult.llm.ollama import DEFAULT_ADDRESS, OllamaEngine
 from openconsult.llm.profile import GEMMA_4_QAT
 from openconsult.llm.record import ModelCalls
 from openconsult.llm.vllm import VllmEngine
-from openconsult.settings import paths
+from openconsult.settings import keys, paths
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
-# The engines the bench can speak to. The app has Ollama and vLLM (15.8, ruling 30); llama.cpp is the bench's alone.
-KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
+# The engines the bench can speak to. The app has Ollama and vLLM (15.8, ruling 30); llama.cpp and
+# the cloud kind of 9a (15.13, R31) are the bench's alone.
+KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine, "ollama-cloud": OllamaCloudEngine}
+STOPPED = 11   # the exit code when the service stopped the run (15.13, run 9a, rule 9)
 
 
 def say(line: str) -> None:
     print(f"[{dt.datetime.now(dt.timezone.utc).isoformat(timespec='seconds')}] {line}", flush=True)
+
+
+def make_engine(args):
+    """The engine of an arm, or the code to stop with. The cloud kind takes
+    its key from the folder --key-folder names, read inside the process by
+    the one key module (15.13, The key): never from the command line, and
+    the value is never said."""
+    if args.kind != "ollama-cloud":
+        return KINDS[args.kind](args.engine)
+    folder = getattr(args, "key_folder", None)
+    if not folder:
+        say(f"STOP: the cloud kind needs --key-folder, the data folder whose .env holds {KEY_NAME}")
+        return 10
+    key = keys.read_key(KEY_NAME, Path(folder))
+    if not key:
+        say(f"STOP: no key named {KEY_NAME} in the environment or in {Path(folder) / keys.KEY_FILE}")
+        return 10
+    try:
+        return OllamaCloudEngine(args.engine, key)
+    except AddressRefused as refused:
+        say(f"STOP: {refused}")
+        return 10
+
+
+def stopped(summary: dict) -> int:
+    """0, or the stop code with its reason said, after a bench's loop."""
+    if summary.get("stopped"):
+        say(f"STOP: {summary['stopped']}; the run ends here for the owner")
+        return STOPPED
+    return 0
 
 
 def open_arm(args, together: bool = False, with_background: bool = False, differs=None):
@@ -50,13 +83,15 @@ def open_arm(args, together: bool = False, with_background: bool = False, differ
     server whose context is not exactly the profile's is refused before
     the arm starts; the app's own rule is at least (15.8, 3c)."""
     out = Path(args.out)
-    forbidden = [REPO, paths.default_data_folder()] + ([Path(args.data_folder)] if args.data_folder else [])
+    forbidden = [REPO, paths.default_data_folder()] + [Path(f) for f in (args.data_folder, getattr(args, "key_folder", None)) if f]
     try:
         writer = ResultWriter(out, forbidden=forbidden)
     except Refused as refused:
         say(f"STOP: {refused}")
         return 6
-    engine = KINDS[args.kind](args.engine)
+    engine = make_engine(args)
+    if isinstance(engine, int):
+        return engine
     profile = GEMMA_4_QAT.for_engine(engine.name) if engine.name in GEMMA_4_QAT.tags else GEMMA_4_QAT
     profile = dataclasses.replace(profile, tag=args.model or profile.tag, engine=engine.name)
     record = ModelCalls(open_database(out / "calls.db"))
@@ -111,7 +146,7 @@ def cmd_run(args) -> int:
     say(f"done: ran {summary['run']} chains, kept {summary['kept']}, failed {len(summary['failed'])}")
     for case, chain, why in summary["failed"]:
         say(f"  failed chain {case}/{chain}: {why}")
-    return 0
+    return stopped(summary)
 
 
 def cmd_repeat(args) -> int:
@@ -177,7 +212,7 @@ def cmd_letters(args) -> int:
             return 4
     summary = letters.run(door, cases, writer, named, chains, log=say)
     say(f"done: ran {summary['run']} chains, kept {summary['kept']}")
-    return 0
+    return stopped(summary)
 
 
 def cmd_letters_score(args) -> int:
@@ -440,7 +475,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("run", "repeat"):
         p = sub.choices[name]
         p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
-                       help="the kind of engine at that address: ollama, llamacpp or vllm")
+                       help="the kind of engine at that address: ollama, llamacpp, vllm or ollama-cloud (the bench's alone, with --key-folder)")
         p.add_argument("--data-folder", help="an app data folder results may not go under, beside the real one")
         p.add_argument("--model", help="the name the engine knows the model by")
         p.add_argument("--digest", help="refuse to run unless the model has this digest")
@@ -470,6 +505,9 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--chains", nargs="*", help="only these chains, for a check")
     p.add_argument("--letter", action="append", help="CASE=SPECIALTY, the specialty a case that states no referral drafts to")
     guideline_commands.add_guideline_commands(sub, command)
+    for name in ("run", "repeat", "letters", "guideline"):
+        sub.choices[name].add_argument("--key-folder", help="the cloud kind: the data folder whose .env holds the service's key, "
+                                                           "read inside the process; results may not go under it")
     p = command("letters-score", cmd_letters_score)
     p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
     p = sub.add_parser("background-score")
