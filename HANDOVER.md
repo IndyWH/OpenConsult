@@ -4,6 +4,87 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-06. Run 9a2: Gemma 4 26B on DeepInfra through the door on all four benches; stage 3, 7b and 8b passed, the letters missed
+
+Built and run in one session on 6 Nov 2026 under Cowork's plan review
+(four points; all are in). Run 9a2 is 15.13 ruling 11: the host of the
+cloud Gemma 4 is DeepInfra if one gate call passes, benched as rulings 4
+and 8 say, report only, nothing on any page (R31). The gate, the plan,
+the trial and the report are STAGE9A2_GATE.md, STAGE9A2_PLAN.md,
+STAGE9A2_TRIAL.md and STAGE9A2_REPORT.md in the private log folder.
+
+The spec, committed once, not a character changed: adf27e9 (sha256
+858a6815...). The run prompt is 6532985 (stage-prompts/STAGE_09A2.md).
+
+The kind (deec370; bench/deepinfra.py, the bench's alone): a subclass of
+the app's chat engine, so the request body is the vLLM arm's, the six
+sampling fields included (proven on the stored records against the
+local vLLM runs: 0 parts differing on every bench run); the host's own
+address over https and no other; the key in the Authorization header
+alone, read from the key folder's .env by the one module and written
+nowhere; the host gives no version and no digest, so the record holds
+the two lines that say so with the date and the model field of every
+reply. A later run cannot be proven to be the same build. 401, 402, 403
+and 429 stop the run with the chain written apart. Ollama cloud's kind
+was taken out (7cd68f7; ruling 11). 12 tests, each named for its rule.
+
+The gate passed on try (a), the request as the chat engine sends it: the
+form's JSON, no thinking, 723 tokens read as on vLLM. The trial met its
+three conditions (61 of 61 ok, 0.80 dollars estimated, thinking off).
+
+The benches, the host beside the local vLLM, the host being the local
+model's size at another precision than the local build:
+- Stage 3: passed on the model's words. Every hard mark the local held,
+  held; the routine scripts fired on 0 chains (the local 9 on one case).
+  One failed call of the run's 4,729, a chain of case 10 at 0.5 whose
+  assessment got no answer within the app's 60 s; the scorer reads that
+  chain as a miss of H6 and H7, the rule of the run does not. The two
+  time marks of the 495 case missed: a pass 6.64 s median (the mark 6.0;
+  the local 2.94) and 34.38 at the slowest (8.0; 4.07).
+- 7b: passed, the same four lines as the local, A2 missed both ways in
+  the same manner.
+- 8a: missed, on A M2, A M3 and D M3. The model writes the two blood
+  results of case A with units the note does not give (12 letters of 13;
+  the local 1), the check puts the placeholder in their place, 0 units
+  reach the page. One stale fact on the page: the medicine the Plan
+  stops given as taken in 3 letters of 13 at 0.5 (the local's fourth
+  bench 0, its first 12). No kind reached the page that the local's
+  list did not hold; the dermatology letter opens with the skin 13 of
+  13 (the local 1). The two letters for the owner's reading are in
+  STAGE9A2_LETTERS.md, private.
+- 8b: passed. The run first stopped at the searches, as the plan says
+  on any difference from 8b's stored run: the searches send the local's
+  passages on 14 of 15 queries, and on one made query two of six differ,
+  because three documents of the bench's own data folder were removed
+  and loaded again on 29 Oct after 8b's bench ran (the same files; new
+  ids and vectors); 8b's stored search rows also carry its first
+  matcher's right passages, not the re-matched ones. The owner ruled in
+  chat that the summaries run on the corpus as it stands, that query
+  reported as not like for like. G1 13 of 13 on all twelve real queries
+  and G3 13 of 13 on all three made ones, as the local; G2 (under 150
+  words) 13 on ten, the two the local missed held in more chains (Q07 9
+  against 1, Q12 12 against 11); covered 13 of 13 on every real query.
+
+The wait and the cost: a pass sent together 6.5 s median over stage 3
+(the local 2.8), 60 s at the slowest; 36 passes of 1,889 over 20 s, the
+host's queue; a summary call 4.5 s median (the local about 1.2). The
+whole run 0.80 dollars by the tokens and 0.80 by the host's own
+estimated_cost; a 15-minute consultation about 3.2 US cents (ruling 4's
+count scaled, beside the estimate of 3 to 5). Thinking in 0 of 4,729
+replies. The seed: the same reply at every pass on the
+three chains at temperature 0 in 0 of 16 cases, as the local vLLM arm.
+No engine stopped or started; the card 18 MiB throughout.
+
+Untrue now: nothing in the repo but CLAUDE.md's bench line, fixed with
+this entry. For 9b: 8b's stored search rows and the corpus of
+stage8b-data are not what its bench ran with (above); every reply
+carries the host's service_tier field, and the owner has said a faster
+tier at 1.5 times the price is to be tested after this run. For 5e,
+the owner's idea, said on 6 Nov and his to rule on: a local speech model
+on a laptop processor for the live stream, the final transcription and
+the diarization in the cloud after Stop.
+
+
 ## 2026-11-06. Run 9a: the cloud kind built, the bench of Ollama cloud stopped at its first call
 
 Built in one session on 6 Nov 2026 under the plan review of Cowork
