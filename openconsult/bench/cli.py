@@ -17,7 +17,7 @@ import openconsult
 from openconsult.bench import background, export, figures, guideline_commands, letter_marks, letters, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
-from openconsult.bench.ollama_cloud import KEY_NAME, AddressRefused, OllamaCloudEngine
+from openconsult.bench import deepinfra, ollama_cloud
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.shared import commands as shared_commands
@@ -35,8 +35,11 @@ from openconsult.settings import keys, paths
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
 # The engines the bench can speak to. The app has Ollama and vLLM (15.8, ruling 30); llama.cpp and
-# the cloud kind of 9a (15.13, R31) are the bench's alone.
-KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine, "ollama-cloud": OllamaCloudEngine}
+# the cloud kinds (15.13, R31) are the bench's alone. A cloud kind reads its key by its name.
+CLOUD = {"deepinfra": (deepinfra.DeepInfraEngine, deepinfra.KEY_NAME, deepinfra.AddressRefused),
+         "ollama-cloud": (ollama_cloud.OllamaCloudEngine, ollama_cloud.KEY_NAME, ollama_cloud.AddressRefused)}
+KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine,
+         **{name: cls for name, (cls, _, _) in CLOUD.items()}}
 STOPPED = 11   # the exit code when the service stopped the run (15.13, run 9a, rule 9)
 
 
@@ -49,19 +52,20 @@ def make_engine(args):
     its key from the folder --key-folder names, read inside the process by
     the one key module (15.13, The key): never from the command line, and
     the value is never said."""
-    if args.kind != "ollama-cloud":
+    if args.kind not in CLOUD:
         return KINDS[args.kind](args.engine)
+    engine_class, key_name, refused_class = CLOUD[args.kind]
     folder = getattr(args, "key_folder", None)
     if not folder:
-        say(f"STOP: the cloud kind needs --key-folder, the data folder whose .env holds {KEY_NAME}")
+        say(f"STOP: the cloud kind needs --key-folder, the data folder whose .env holds {key_name}")
         return 10
-    key = keys.read_key(KEY_NAME, Path(folder))
+    key = keys.read_key(key_name, Path(folder))
     if not key:
-        say(f"STOP: no key named {KEY_NAME} in the environment or in {Path(folder) / keys.KEY_FILE}")
+        say(f"STOP: no key named {key_name} in the environment or in {Path(folder) / keys.KEY_FILE}")
         return 10
     try:
-        return OllamaCloudEngine(args.engine, key)
-    except AddressRefused as refused:
+        return engine_class(args.engine, key)
+    except refused_class as refused:
         say(f"STOP: {refused}")
         return 10
 
@@ -475,7 +479,7 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("run", "repeat"):
         p = sub.choices[name]
         p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
-                       help="the kind of engine at that address: ollama, llamacpp, vllm or ollama-cloud (the bench's alone, with --key-folder)")
+                       help="the kind of engine at that address: ollama, llamacpp, vllm, or a cloud kind (the bench's alone, with --key-folder)")
         p.add_argument("--data-folder", help="an app data folder results may not go under, beside the real one")
         p.add_argument("--model", help="the name the engine knows the model by")
         p.add_argument("--digest", help="refuse to run unless the model has this digest")

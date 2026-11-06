@@ -275,7 +275,7 @@ def test_15_13_the_example_settings_file_names_the_language_model_key_with_no_va
     from openconsult.bench.cli import REPO
     found = keys.parse_env((REPO / ".env.example").read_text(encoding="utf-8"))
     assert found[KEY_NAME] == "" and all(value == "" for value in found.values())
-    assert set(found) == {"SPEECHMATICS_API_KEY", "ASSEMBLYAI_API_KEY", KEY_NAME}
+    assert {"SPEECHMATICS_API_KEY", "ASSEMBLYAI_API_KEY", KEY_NAME} <= set(found)
 
 
 def test_15_13_the_record_check_reads_thinking_in_a_reply_of_either_shape():
