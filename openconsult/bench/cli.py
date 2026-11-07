@@ -18,6 +18,7 @@ from openconsult.bench import background, export, figures, guideline_commands, l
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench import deepinfra
+from openconsult.bench.cloud import AddressRefused, CloudKind
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.shared import commands as shared_commands
@@ -35,10 +36,10 @@ from openconsult.settings import keys, paths
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
 # The engines the bench can speak to. The app has Ollama and vLLM (15.8, ruling 30); llama.cpp and
-# the cloud kind of 9a2 (15.13, ruling 11; R31) are the bench's alone. A cloud kind reads its key by its name.
-CLOUD = {"deepinfra": (deepinfra.DeepInfraEngine, deepinfra.KEY_NAME, deepinfra.AddressRefused)}
+# the cloud kinds (15.13, rulings 11 and 15; R31) are the bench's alone. A cloud kind reads its key by its name.
+CLOUD = {"deepinfra": CloudKind(deepinfra.DeepInfraEngine, deepinfra.KEY_NAME)}
 KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine,
-         **{name: cls for name, (cls, _, _) in CLOUD.items()}}
+         **{name: kind.engine for name, kind in CLOUD.items()}}
 STOPPED = 11   # the exit code when the host stopped the run (15.13, run 9a, rule 9)
 
 
@@ -53,7 +54,8 @@ def make_engine(args):
     the value is never said."""
     if args.kind not in CLOUD:
         return KINDS[args.kind](args.engine)
-    engine_class, key_name, refused_class = CLOUD[args.kind]
+    kind = CLOUD[args.kind]
+    key_name = kind.key_name
     folder = getattr(args, "key_folder", None)
     if not folder:
         say(f"STOP: the cloud kind needs --key-folder, the data folder whose .env holds {key_name}")
@@ -63,8 +65,8 @@ def make_engine(args):
         say(f"STOP: no key named {key_name} in the environment or in {Path(folder) / keys.KEY_FILE}")
         return 10
     try:
-        return engine_class(args.engine, key)
-    except refused_class as refused:
+        return kind.engine(args.engine, key)
+    except AddressRefused as refused:
         say(f"STOP: {refused}")
         return 10
 

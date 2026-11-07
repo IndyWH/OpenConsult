@@ -14,8 +14,9 @@ from __future__ import annotations
 import urllib.request
 from typing import Callable
 
+from openconsult.bench.cloud import AddressRefused, Stops, own_address, stop_line  # noqa: F401  (the shared part; the tests import the refusal from here)
 from openconsult.llm.chat_engine import STATUS_TIMEOUT_S, ChatEngine
-from openconsult.llm.engine import Call, EngineStatus, EngineUnreachable, Reply
+from openconsult.llm.engine import Call, EngineStatus, Reply
 from openconsult.llm.vllm import VllmEngine
 
 ADDRESS = "https://api.deepinfra.com"
@@ -27,11 +28,7 @@ NO_DIGEST = "no digest given by the host"
 STOP_STATUSES = (401, 402, 403, 429)
 
 
-class AddressRefused(ValueError):
-    """The key goes to the host's own address and to no other."""
-
-
-class DeepInfraEngine(ChatEngine):
+class DeepInfraEngine(Stops, ChatEngine):
     name = "deepinfra"
     # The six fields the vLLM arm sends, so the chains at 0.5 are sampled
     # as the local model's were (the plan review of 9a2, point 1).
@@ -39,23 +36,18 @@ class DeepInfraEngine(ChatEngine):
 
     def __init__(self, address: str = ADDRESS, key: str = "", expected: str | None = None,
                  urlopen: Callable = urllib.request.urlopen):
-        expected = expected or ADDRESS   # read at the call, so a test may stand a made host in its place
-        if address.rstrip("/") != expected.rstrip("/"):
-            raise AddressRefused(f"the cloud kind speaks to {expected} alone, not {address}")
-        super().__init__(address, urlopen)
+        # The expected address is read at the call, so a test may stand a made host in its place.
+        super().__init__(own_address(address, expected or ADDRESS), urlopen)
         self._key = key
-        self.stopped: str | None = None
 
     def headers(self, data: bytes | None) -> dict:
         return {**super().headers(data), "Authorization": f"Bearer {self._key}"}
 
     def chat(self, call: Call) -> Reply:
-        if self.stopped:
-            raise EngineUnreachable(self.stopped)
+        self.refuse_if_stopped()
         reply = super().chat(call)
         if reply.status in STOP_STATUSES:
-            self.stopped = (f"the host answered HTTP {reply.status}, so the key is refused or the credit "
-                            f"is used up; nothing more is sent")
+            self.stop(stop_line(reply.status))
         return reply
 
     def did_not_fit(self, status: int, text: str) -> bool:
