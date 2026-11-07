@@ -4,6 +4,92 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-07. Run 9d: Claude Haiku 5.5 through the door on all four benches; 7b passed, stage 3, the letters and the summaries missed, every failed call a list limit
+
+Built and run in one session on 7 Nov 2026 under Cowork's plan review
+(four points; all are in). Run 9d is 15.13 rulings 14 to 17: Claude
+Haiku 5.5 benched on every job after one gate call of its own, report
+only, nothing on any page (R31). The gate, the plan, the trial and the
+report are STAGE9D_GATE.md, STAGE9D_PLAN.md, STAGE9D_TRIAL.md and
+STAGE9D_REPORT.md in the private log folder.
+
+The spec, committed once, not a character changed: 3567994 (sha256
+6a622d74...). The run prompt is 0aeb21c (stage-prompts/STAGE_09D.md).
+
+The gate (four calls, the last passed): the service demands every
+object marked as taking no other property, does not hold maxItems, and
+refuses the temperature field on its API version 2026-10-21 (its words:
+temperature: Extra inputs are not permitted); thinking off by its own
+field was taken. The form and the service's own instruction add 391
+tokens to the alarm call; Claude adds an instruction of its own whose
+words are not published (ruling 16). The owner's word at the plan: no
+temperature is sent, so all thirteen chains sample at the service's
+default; the list limits are held by the door alone.
+
+The kinds (bd28624, cab1088): what the two cloud kinds share is in
+bench/cloud.py (the address rule, the stop, the registry's shape).
+bench/claude.py is a class of its own on the door's joint in the
+Messages API shape: the system message in the system field, the user
+message in messages, the form in output_config.format as a copy with
+every object marked and maxItems off (the door checks the whole form),
+thinking disabled, the job's max_tokens; no temperature, no seed, none
+of the local arm's sampling values; the key in the x-api-key header
+alone, read from the key folder's .env by the one module; the record
+holds engine claude, engine_version "anthropic-version 2026-10-21", the
+tag and the line "no digest given by the service" (a later run cannot
+be proven the same build); the rate kept by the service's reply headers
+with no second send, a 429 a failed call and three in a row a stop;
+401, 403 or a credit message stop the run with the chain written
+apart. 15 tests, each named for its rule; the suite 820.
+
+The trial met its three conditions (61 of 61 ok, 2.23 dollars
+estimated, thinking off). The benches 20:17 to 23:06 UTC, no stop, no
+wait for the rate, the proof of the words 0 parts differing on each:
+- Stage 3: missed by the scorer on H6, H7 and T18; held on the words.
+  72 alarm replies of 1,743 listed 4 or 5 urgent actions where the form
+  allows 3 and the door refused them; in the emergency cases that fails
+  the chain, so 55 chains of 208 failed. In every one the alarm had
+  fired on an accepted reply or on the refused one (all 72 said time
+  critical); no male case named a female term on any accepted reply. The
+  495 case 5.27 s median (mark 6.0, held) and 8.61 slowest (8.0,
+  missed). S12 0 on every routine case (the local 9 on one).
+- 7b: passed, the same four lines as the local and the host; 24 refused
+  alarm replies failed no chain.
+- 8a: missed on M1 of A, C and D (15 letters of 65 refused for 5 or
+  more paragraphs against the form's 4), M2 and M3 of A, M3 of B, M2
+  and M3 of D (13 placeholders in 12 letters, the check's number rule).
+  No unit the note does not give, no line number, no citation into
+  Assessment. On case A the check replaced the one sentence that said
+  ibuprofen was stopped in 9 letters of 13, so the page reads her as
+  still on it (the local 0, the host 4), and in 2 of those the sentence
+  held every change of the plan, so the page gives the old doses of
+  gliclazide and losartan as current. Nothing reached the page that the
+  local's list did not hold; 4 marked lines against 49 and 31.
+- 8b: the searches matched 9a2's 15 of 15 before any summary call. G1
+  and G3 held in every chain; G2 missed on five queries (Q03 12, Q04 7,
+  Q05 6, Q07 8, Q12 1 of 13; the local missed Q07 1 and Q12 11).
+
+The wait and the cost: a pass sent together 4.6 s median over stage 3
+(the local 2.8, the host 6.5), 8.6 s slowest, 0 of 1,742 over 10 s (the
+host 241); a summary call 1.9 s. The whole run 2.13 dollars by the
+tokens (4,438 calls, 8.46 million read, 2.57 million written); a
+15-minute consultation about 8 cents (Cowork's estimate 4.6, the host
+3.2); the owner reads the service's own figure on his usage page.
+Thinking in 0 of 4,438 replies; 0 cut replies; the three A chains gave
+the same reply in 0 of 16 cases, as the local and the host.
+
+Every failed call of the run (108 in the benches) is a list limit the
+forms carry and the service does not hold; the prompt names no number.
+The owner said in chat that the check should accept more than three and
+that a brainstorm with Cowork follows; nothing was changed in this run.
+
+Untrue now: nothing in the repo but CLAUDE.md's bench line, fixed with
+this entry. For the owner's three rulings (the default cloud model, the
+letters, Alba in cloud mode) and the brainstorm on the list limits, the
+report's last section.
+
+
+
 ## 2026-11-06. Run 9a2: Gemma 4 26B on DeepInfra through the door on all four benches; stage 3, 7b and 8b passed, the letters missed
 
 Built and run in one session on 6 Nov 2026 under Cowork's plan review
@@ -333,127 +419,3 @@ sentence does not reach the model is not the whole story (it reaches
 the model and is answered). The 8c report's note for the letters session
 stays true: the frames, the withheld line and the rows' named parts are
 unchanged.
-
-
-## 2026-11-02. Stage 8c: the what-the-model-saw view, its timeline, and two small fixes
-
-Built in one session on 2 Nov 2026 under the plan review of Cowork (two
-points; both are in). The view run of 15.12 ruling 11, settled by ruling
-28: one read-only page per final consultation, reached by one link from
-the review page beside the model line and one on each final
-consultation's row of the patient's page, listing every model call in
-time order, each opened to what went in, marked by source, and what came
-back word for word, with a timeline at its head. No bench, no mark: the
-view reads the record and writes nothing but its page. No word a model
-reads changed: git diff 0d28f63 -- openconsult/prompts prints nothing.
-The report is STAGE8C_REPORT.md in the private log folder. The room run
-is the owner's, still to come.
-
-The spec, committed once, not a character changed: 96fef56 (8b marked
-done on 2 Nov and ruling 28; sha256 87d90be3...).
-
-How every call is found (consult/seen.py): model_call.consultation_id
-ties each call since stage 6; the list is ordered by the parsed moment
-of model_call.at, then id (the stamps' offset changes twice a year). Each
-call is named by the row that references it: cds_pass.alarm_call_id and
-assessment_call_id (pass n), note_draft.call_id (draft n, asked at Stop,
-by Draft the note or by Draft again), referral_list.call_id (the list),
-letter.call_id (letter n, the item's specialty), guideline_answer.call_id
-(after pass n, with search_ms). The label check is referenced by no row:
-it is found by its job on the consultation and the page says so in
-plain words. A referral list whose call failed is dropped when the list
-is made again, so its call stands alone the same way. A live or stopping
-consultation has no view yet; its address leads back to its page.
-
-How each call is read back. The request's two texts come from the body
-as sent in its three shapes (the chat body's two messages; the made
-engine's job and user pair; the Call's own parts of a call that never
-reached its engine). The system text is hashed against prompt_sha256 and
-shown as the prompt's file name and hash only, with one of three words:
-the file today has the same hash, differs, or no file of that name
-(15.8 ruling 1). The user text is taken apart by the kind's own builder
-and the reader proves itself by rebuilding it byte for byte: the patient
-line, the first paragraph, must equal patient_line for the details the
-consultation ran with on the day of the call or on the day of Start
-(R11; 15.11 ruling 2; referral_note.patient_on); the background block
-by the fixed words of background.frame.txt, looked for in the two pass
-calls only (R25); each frame by its fixed segments around its slots
-(assessment.first then assessment.later; letter's specialty and note;
-guideline's query and passages); the label check's numbered lines and
-the note's turns rebuilt through labels.lines_text and note.turns_text
-(D3: no patient line there); the list's and the letter's note lines
-equal to the row's named part; the guideline call from the row's names,
-query and passages through summary.message. A request the reader cannot
-take apart is shown whole with its reason (not JSON; no user text; the
-first paragraph not the patient line; the frame's words not found; the
-parts not rebuilding the request; an unknown job), and even then with
-every prompt's words replaced by a mark; never a guess.
-
-The timeline (consult/timeline.py). The band runs from Start to final
-with Stop marked; each call is a bar from its at less its wall to its
-at; a call that ended after final by more than final's own precision of
-one second (final_at is written to the second, a call's at to the
-millisecond) is listed under the band with its lead in plain units. The
-typical pass is the median of the stored passes' wall_ms, the whole
-pass with both calls, over every pass shown or not: the same figure
-stop.figures gives the consultation.final line, so the two agree. A pass
-over twice the typical pass is marked long, in the warning colour, and
-named under the band; with one pass nothing is long. The seconds per
-kind are the mean with the count, the failed count and the slowest,
-failed calls counted in their kind. The consultation.final line's own
-figures stand beside them. No script: the bars are placed by the
-computed fractions and a details element opens each call.
-
-The speaker page (ruling 28; R15): the answer's redirect could land
-before the Stop thread moved the stage on, so the question stood on
-screen again with no refresh and the owner picked twice on 2 Nov. The
-page learns the answer was taken from page_state (answered), asks only
-until then, and after it shows its own named state, Your answer is
-taken. Checking who spoke each line, with the spinner and the refresh,
-the choices gone. A second answer is still refused and the first stands.
-
-The retention test: SLOW_RUNNER_S = 60.0 beside the stop tests' wait
-helper, taken by the test's two waits on the conversion step (GitHub's
-Windows run of 30 Oct took 31 minutes and the 10 s wait timed out);
-nothing else of the test changed.
-
-The proof on this machine (stage8c_proof.py on stage8c-data, the 8b
-folder's database alone; stage8c-proof.log; counts only): 11 final
-consultations, 116 calls, every one listed in time order and taken
-apart, the parts joined by plain code equal to the stored request in
-116 of 116; the patient line on the 96 alarm, assessment, referral list,
-letter and guideline calls and on no other; the background block on the
-two pass calls of the one consultation that ran with the switch on after
-7b and on no other (consultation 5 ran with the switch on under 7a,
-which sent nothing, and the view shows that honestly); the 11 guideline
-calls rebuilt from their rows' named parts; each pass call's transcript
-equal to cds_pass.transcript, each note's text to note_draft.transcript,
-each list's and letter's lines to its row; the averages, the typical
-pass, the long marks and every bar equal to a recount from the rows; the
-final line found for every consultation; no prompt's first line on any
-page; the record's tables unchanged by every view page (the password
-change and the login on the copy are the only writes). Consultation 3,
-8a's: 43 calls, 19 passes, typical pass 2.98 s, no long pass, 4 calls
-after final (the note drafted again, the list, two letters). Seen in
-the browser on the copy: the band, the pass ticks, a call opened to its
-parts by source. Two corrections came from the proof: final's precision
-in the band, and the order by the moment.
-
-Every sentence shown to the user is in words.py, drafts for the owner;
-the link text is What the model saw. words.py is 869 lines, over 600,
-accepted under 5.4 as the reviews of 7a, 8a and 8b did; no other file
-over 600 and no function over 80. The suite: 764 tests (756 before 8c),
-green three times before the last commit, none skipped. Nothing pushed.
-The private word check printed nothing before every commit. The commits:
-96fef56, 2fc8350, a7b2f90, 31a50ce, 420e1a0, ae8e0a6, fa0c188, 99fc75e,
-eae7ff6, 8c1d82e and this one.
-
-What this stage has made untrue: README's so far and CLAUDE.md's line,
-fixed in this commit; the 8b entry's and report's words that the view
-is still to be built; the spec's 15.12 Done when you see for ruling 28,
-which waits on the owner's room run (Cowork marks it). For the letters
-session of ruling 20: the view reads letter.note_lines and the item's
-specialty as the letter call's named parts, and letter.frame.txt's
-fixed words by name; a change to the letter frame or to what the letter
-row stores must keep referral_note's fill the builder of the message, or
-the reader's rebuild fails and the call is shown whole with its reason.
