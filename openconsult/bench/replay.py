@@ -59,8 +59,13 @@ def answer_text(raw: str | None) -> tuple[str | None, str | None]:
     record holds it, whichever engine wrote it."""
     try:
         body = json.loads(raw or "")
+        if isinstance(body.get("content"), list):   # the Messages API shape (run 9d): content blocks by type
+            blocks = [b for b in body["content"] if isinstance(b, dict)]
+            texts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
+            thought = [b.get("thinking") or "redacted thinking" for b in blocks if b.get("type") in ("thinking", "redacted_thinking")]
+            return ("".join(texts) if texts else None), ("\n".join(thought) or None)
         message = body["message"] if "message" in body else body["choices"][0]["message"]
-    except (ValueError, KeyError, IndexError, TypeError):
+    except (ValueError, KeyError, IndexError, TypeError, AttributeError):
         return None, None
     thinking = message.get("thinking") or message.get("reasoning_content") or message.get("reasoning")
     return message.get("content"), thinking or None

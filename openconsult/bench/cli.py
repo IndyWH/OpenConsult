@@ -17,7 +17,7 @@ import openconsult
 from openconsult.bench import background, export, figures, guideline_commands, letter_marks, letters, score, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
-from openconsult.bench import deepinfra
+from openconsult.bench import claude, deepinfra
 from openconsult.bench.cloud import AddressRefused, CloudKind
 from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
@@ -37,7 +37,8 @@ from openconsult.settings import keys, paths
 REPO = Path(openconsult.__file__).resolve().parents[1]
 # The engines the bench can speak to. The app has Ollama and vLLM (15.8, ruling 30); llama.cpp and
 # the cloud kinds (15.13, rulings 11 and 15; R31) are the bench's alone. A cloud kind reads its key by its name.
-CLOUD = {"deepinfra": CloudKind(deepinfra.DeepInfraEngine, deepinfra.KEY_NAME)}
+CLOUD = {"deepinfra": CloudKind(deepinfra.DeepInfraEngine, deepinfra.KEY_NAME),
+         "claude": CloudKind(claude.ClaudeEngine, claude.KEY_NAME)}
 KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine,
          **{name: kind.engine for name, kind in CLOUD.items()}}
 STOPPED = 11   # the exit code when the host stopped the run (15.13, run 9a, rule 9)

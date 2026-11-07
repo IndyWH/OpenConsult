@@ -105,8 +105,9 @@ REVISION = "0123456789abcdef0123456789abcdef01234567"
 
 class MadeUpServer:
     """A loopback server that answers each path from a table and keeps
-    what it was sent. An answer is (status, body) or a function of the
-    request's body that gives one."""
+    what it was sent. An answer is (status, body), or (status, body,
+    headers) when the reply carries headers of its own (a cloud kind's
+    rate headers), or a function of the request's body that gives one."""
 
     def __init__(self):
         self.routes, self.received, self.headers = {}, [], []
@@ -117,11 +118,13 @@ class MadeUpServer:
                 outer.received.append((self.path, body))
                 outer.headers.append({name.lower(): value for name, value in self.headers.items()})
                 found = outer.routes.get(self.path, (404, {"error": "made-up: no such path"}))
-                status, reply = found(body) if callable(found) else found
+                status, reply, *more = found(body) if callable(found) else found
                 data = (reply if isinstance(reply, str) else json.dumps(reply)).encode("utf-8")
                 self.send_response(status)
                 self.send_header("Content-Type", "application/json")
                 self.send_header("Content-Length", str(len(data)))
+                for name, value in (more[0] if more else {}).items():
+                    self.send_header(name, str(value))
                 self.end_headers()
                 self.wfile.write(data)
 

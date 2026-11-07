@@ -273,7 +273,7 @@ def test_rule_9_the_letters_and_guideline_benches_stop_the_same_way(tmp_path, cl
                                      describe("Windows", "AMD64", [Card("Made-up card", 24564)]), describe("Darwin", "arm64", [])])
 def test_rule_6_the_app_cannot_reach_the_cloud_kind(machine, tmp_path):
     assert "deepinfra" not in choose.order_for(machine) and "deepinfra" not in choose.ORDER
-    assert set(KINDS) == {"ollama", "llamacpp", "vllm", "deepinfra"} and "deepinfra" not in app_module.__dict__.get("KINDS", {})
+    assert set(KINDS) == {"ollama", "llamacpp", "vllm", "deepinfra", "claude"} and "deepinfra" not in app_module.__dict__.get("KINDS", {})
     code = ("import sys\n"
             "from openconsult.app import build_app\n"
             "from openconsult.settings import store\n"
@@ -301,7 +301,7 @@ def test_15_13_the_example_settings_file_names_the_language_model_key_with_no_va
     from openconsult.bench.cli import REPO
     found = keys.parse_env((REPO / ".env.example").read_text(encoding="utf-8"))
     assert found[KEY_NAME] == "" and all(value == "" for value in found.values())
-    assert set(found) == {"SPEECHMATICS_API_KEY", "ASSEMBLYAI_API_KEY", KEY_NAME}                  # and no OLLAMA_API_KEY (ruling 11)
+    assert set(found) == {"SPEECHMATICS_API_KEY", "ASSEMBLYAI_API_KEY", KEY_NAME, "ANTHROPIC_API_KEY"}   # and no OLLAMA_API_KEY (ruling 11)
 
 
 def test_15_13_the_record_check_reads_thinking_in_a_reply_of_either_shape():
