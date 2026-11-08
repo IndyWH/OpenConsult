@@ -7,8 +7,10 @@ the sentences are judged on the valid lines left (the plan review of
 when a number in it is not in those lines (the patient's age excepted;
 a figure inside a word, as the 2 of T2DM, is a number), when it turns a
 planned test into a result, judged per sentence, or when it holds the
-placeholder anywhere (ruling 15). A sentence whose only failure is the
-number is not removed: it stays in the text as the model wrote it, in a
+placeholder anywhere (ruling 15). A prescription frequency is one figure
+whether abbreviated or in words (15.13, ruling 24), so qds in the note
+and four times a day in the letter agree. A sentence whose only failure
+is the number is not removed: it stays in the text as the model wrote it, in a
 fourth state, marked, counted as not grounded and shown on the page with
 the words figure not in the note, please check beside it, for the doctor
 to decide (15.13, ruling 20); a sentence that also fails another rule
@@ -55,6 +57,12 @@ _EXPECTATION_CLASS = re.compile(
     re.IGNORECASE)
 _EXPECTATION_LINE = re.compile(r"patient'?s expectations\s*:", re.IGNORECASE)
 _FIGURE = re.compile(r"\d+(?:\.\d+)?")   # a figure, also inside a word (ruling 15)
+# The prescription frequencies as figures (ruling 24); the number words (four) are figures by the normaliser already.
+_FREQUENCY = {"od": "1", "om": "1", "mane": "1", "nocte": "1", "once": "1", "bd": "2", "twice": "2", "tds": "3", "qds": "4"}
+# on (omni nocte) is also the English preposition, so it is a frequency only after a dose: a figure then a unit,
+# the unit at most three tokens before it (20 mg up to on). Read everywhere it marked 38 true sentences of run 9d2.
+_ON, _DOSE_REACH = "on", 3
+_DOSE_UNITS = {"mg", "g", "mcg", "ml", "units", "iu", "tablet", "tablets", "puff", "puffs", "drop", "drops"}
 _ALLERGY = re.compile(r"allerg", re.IGNORECASE)   # allergy, allergies, allergic, allergen
 
 
@@ -74,14 +82,25 @@ def sentences_of(text: str) -> list[str]:
     return [s.strip() for s in _SENTENCE_END.split(str(text or "").strip()) if s.strip()]
 
 
+def _after_dose(tokens: list[str], i: int) -> bool:
+    return any(tokens[k] in _DOSE_UNITS and _FIGURE.fullmatch(tokens[k - 1]) for k in range(max(1, i - _DOSE_REACH), i))
+
+
 def numbers_in(text: str) -> set[str]:
     """The numbers of a text as the normaliser reads them: number words
     become figures, a slash between figures is over, a hyphen is a space
     (so 2-week and two-week are both 2 week), decimals stay, and a figure
-    inside a word counts, so type 2 diabetes and T2DM both hold the 2."""
+    inside a word counts, so type 2 diabetes and T2DM both hold the 2. A
+    prescription frequency is its figure (ruling 24), whole words only:
+    abdomen holds no bd, and on counts only after a dose."""
+    tokens = normalise(str(text or "").replace("-", " "))
     found = set()
-    for word in normalise(str(text or "").replace("-", " ")):
+    for i, word in enumerate(tokens):
         found.update(_FIGURE.findall(word))
+        if word in _FREQUENCY:
+            found.add(_FREQUENCY[word])
+        elif word == _ON and _after_dose(tokens, i):
+            found.add("1")
     return found
 
 

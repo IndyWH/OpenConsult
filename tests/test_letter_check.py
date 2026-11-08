@@ -237,3 +237,54 @@ def test_ruling_20_a_true_sentence_holding_a_number_the_lines_do_not_give_is_kep
     assert verdicts(lc.check([para("He hoped for 3 scans.", [2])], NOTE, AGE)) == [("dropped", None)]
     # The other rules stand: a true number in the lines is kept; the age is allowed.
     assert verdicts(lc.check([para("This 58-year-old man has lost 4 kg in 2 months.", [3])], NOTE, AGE)) == [("kept", None)]
+
+
+# Case A of the letters bench in miniature (15.13, ruling 24): the note's shorthand frequencies beside the letter's words.
+# 1 Subjective, 2 losartan, 3 medicines, 4 abdomen, 5 Objective, 6 weight, 7 Assessment, 8 impression, 9 Plan,
+# 10 the stop line of case A, 11 the same in words, 12 the other frequencies, 13 atorvastatin bd.
+NOTE_A = numbered_lines(
+    "Subjective\nTaking losartan.\nMedicines now: metformin 1 g bd; atorvastatin 20 mg nocte; gliclazide 80 mg om.\n"
+    "Abdomen soft, alert.\n\nObjective\nWeight 71 kg.\n\nAssessment\nA made-up impression.\n\n"
+    "Plan\nStop ibuprofen; paracetamol 1 g up to qds instead. No co-codamol. No aspirin.\n"
+    "Paracetamol 1 g four times a day.\n"
+    "Levothyroxine 75 mcg od; omeprazole 20 mg mane; amlodipine 5 mg once daily; a made-up tablet 10 mg tds.\n"
+    "Atorvastatin 20 mg bd.\n")
+STOP_SENTENCE = "Ibuprofen is stopped and paracetamol 1 g up to four times a day is used instead; co-codamol is stopped and no aspirin is given."
+
+
+def test_ruling_24_a_prescription_frequency_is_one_figure_whether_abbreviated_or_in_words():
+    # Run 9d2: the check marked the true stop sentence in 13 of 13 letters of case A, because the model wrote four
+    # times a day where the note's line reads 1 g up to qds. Now the frequency is one figure both ways.
+    one = lc.check([para(STOP_SENTENCE, [10])], NOTE_A, AGE)
+    assert verdicts(one) == [("kept", None)] and one.marked == 0 and one.paragraphs == [STOP_SENTENCE]
+    assert verdicts(lc.check([para("Paracetamol 1 g qds is used instead.", [11])], NOTE_A, AGE)) == [("kept", None)]
+    # Each row of the table, beside the number word the normaliser already reads.
+    for words_, figure in ((("od", "om", "mane", "nocte", "once", "one"), "1"), (("bd", "twice", "two"), "2"),
+                           (("tds", "three"), "3"), (("qds", "four"), "4")):
+        assert all(lc.numbers_in(w) == {figure} for w in words_), (words_, figure)
+    assert verdicts(lc.check([para("Metformin 1 g twice daily and atorvastatin 20 mg at night, once a day.", [3])], NOTE_A, AGE)) == [("kept", None)]
+    assert verdicts(lc.check([para("Levothyroxine 75 mcg once daily, omeprazole 20 mg each morning, amlodipine 5 mg od, "
+                                   "a made-up tablet 10 mg three times a day.", [12])], NOTE_A, AGE)) == [("kept", None)]
+
+
+def test_ruling_24_a_figure_the_lines_do_not_hold_is_still_marked():
+    # The rule widens what matches, never what is allowed: a frequency the lines do not give is a figure outside them,
+    # marked as ruling 20 says, not grounded, and the half rule still refuses.
+    wrong = lc.check([para("Paracetamol 1 g bd is used instead.", [10])], NOTE_A, AGE)
+    assert verdicts(wrong) == [("marked", "number")] and (wrong.total, wrong.grounded, wrong.marked, wrong.refused) == (1, 0, 1, True)
+    assert verdicts(lc.check([para("Metformin 1 g tds.", [3])], NOTE_A, AGE)) == [("marked", "number")]
+    assert verdicts(lc.check([para("Paracetamol 1 g up to four times a day; gliclazide 40 mg om.", [10])], NOTE_A, AGE)) == [("marked", "number")]
+    assert lc.reasons_of(wrong.detail) == ["number"]                                   # the bench's M3 still counts it
+
+
+def test_ruling_24_the_abbreviations_are_whole_words_and_on_is_the_preposition_unless_it_follows_a_dose():
+    # A word that merely contains the letters is not a frequency; on, the preposition in most sentences of a letter,
+    # is one only after a dose (a figure then a unit, within three tokens). Read everywhere, on marked 38 true
+    # sentences of the 65 stored letters of run 9d2.
+    assert verdicts(lc.check([para("Abdomen soft and non-tender; second visit.", [4])], NOTE_A, AGE)) == [("kept", None)]
+    assert verdicts(lc.check([para("She is on losartan.", [2])], NOTE_A, AGE)) == [("kept", None)]
+    assert verdicts(lc.check([para("On examination she is alert.", [4])], NOTE_A, AGE)) == [("kept", None)]
+    assert verdicts(lc.check([para("Atorvastatin 20 mg on.", [3])], NOTE_A, AGE)) == [("kept", None)]           # nocte
+    assert verdicts(lc.check([para("Atorvastatin 20 mg on.", [13])], NOTE_A, AGE)) == [("marked", "number")]    # bd
+    assert lc.numbers_in("20 mg up to on") == {"20", "1"} and lc.numbers_in("20 mg taken as needed on") == {"20"}
+    assert lc.numbers_in("she is on 2 tablets") == {"2"} and lc.numbers_in("abdomen bloods second") == set()
