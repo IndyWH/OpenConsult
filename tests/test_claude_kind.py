@@ -125,6 +125,7 @@ def test_15_13_the_kind_sends_the_messages_api_request_with_the_apps_words_and_t
     assert body["system"] == call.system and body["messages"] == [{"role": "user", "content": call.user}]
     assert body["output_config"] == {"format": {"type": "json_schema", "schema": sent_form(call.form)}}
     assert body["thinking"] == {"type": "disabled"} and body["max_tokens"] == call.max_tokens == 1000 and body["model"] == TAG
+    assert "effort" not in body["output_config"]                                               # the service's default stands (ruling 22)
     for absent in ("temperature", "seed", "top_k", "top_p", "min_p", "repetition_penalty", "presence_penalty", "frequency_penalty", "stream"):
         assert absent not in body
     assert headers["x-api-key"] == MADE_KEY and headers["anthropic-version"] == VERSION and headers["content-type"] == "application/json"
@@ -205,7 +206,7 @@ def test_R20_a_cloud_call_records_the_service_the_api_version_the_model_and_the_
     engine = serve(server)
     row = record.get(cloud_door(engine, record).ask("alarm", "words").call_id)
     assert (row["engine"], row["engine_version"], row["model_tag"], row["model_digest"]) == ("claude", ENGINE_VERSION, TAG, NO_DIGEST)
-    assert ENGINE_VERSION == "anthropic-version 2026-10-21" and engine.model_digest("not-listed") is None
+    assert ENGINE_VERSION == "anthropic-version 2026-10-21, effort default" and engine.model_digest("not-listed") is None
     cases, out = bench_folders
     monkeypatch.setattr(claude, "ADDRESS", server.address)
     key_folder = key_folder_with_key(out.parent)
@@ -341,6 +342,37 @@ def test_15_13_the_rate_is_kept_by_waiting_before_a_call_by_the_services_own_hea
     sent = len(messages(server))
     assert engine.stopped and "3 times in a row" in engine.stopped and door.stopped == engine.stopped
     assert door.ask("alarm", "words").failure == "unreachable" and len(messages(server)) == sent
+
+
+def test_15_13_ruling_22_the_effort_is_one_field_of_the_request_held_in_the_record_and_the_claude_kinds_alone(server, record, bench_folders, capsys, monkeypatch):
+    """The effort test of run 9d2 (15.13, ruling 22): the two arms differ in output_config.effort alone; the record
+    holds the effort in engine_version beside the API version on every call; the setting is the Claude kind's."""
+    plain, low = serve(server), ClaudeEngine(server.address, MADE_KEY, expected=server.address, effort="low")
+    call = cloud_door(plain, record).call_for("alarm", "made-up words")
+    a, b = plain.build_request(call), low.build_request(call)
+    assert {k for k in set(a) | set(b) if a.get(k) != b.get(k)} == {"output_config"}
+    assert {k for k in set(a["output_config"]) | set(b["output_config"]) if a["output_config"].get(k) != b["output_config"].get(k)} == {"effort"}
+    assert "effort" not in a["output_config"] and b["output_config"]["effort"] == "low" and b["output_config"]["format"] == a["output_config"]["format"]
+    low_row = record.get(cloud_door(low, record).ask("alarm", "made-up words").call_id)
+    plain_row = record.get(cloud_door(plain, record).ask("alarm", "made-up words").call_id)
+    assert low_row["engine_version"] == "anthropic-version 2026-10-21, effort low" and json.loads(low_row["request"])["output_config"]["effort"] == "low"
+    assert plain_row["engine_version"] == ENGINE_VERSION == "anthropic-version 2026-10-21, effort default"
+    assert "effort" not in json.loads(plain_row["request"])["output_config"]
+    assert low.status(TAG).version == low_row["engine_version"] and claude.engine_version("high") == "anthropic-version 2026-10-21, effort high"
+    with pytest.raises(ValueError):
+        ClaudeEngine(server.address, MADE_KEY, expected=server.address, effort="loud")
+    # The bench: --effort low on every request and in the stamp of every result; another kind refuses the flag before any call.
+    cases, out = bench_folders
+    monkeypatch.setattr(claude, "ADDRESS", server.address)
+    key_folder = key_folder_with_key(out.parent)
+    common = ["run", "--cases", str(cases), "--case", "seven", "--chains", "A1", "--engine", server.address, "--model", TAG]
+    sent = len(messages(server))
+    assert main([*common, "--kind", "vllm", "--out", str(out / "vllm"), "--effort", "low"]) == 10
+    assert "--effort" in capsys.readouterr().out and len(messages(server)) == sent
+    assert main([*common, "--kind", "claude", "--out", str(out), "--digest", NO_DIGEST, "--key-folder", str(key_folder), "--effort", "low"]) == 0
+    assert ResultWriter(out).read("seven", "A1")["engine_version"] == "anthropic-version 2026-10-21, effort low"
+    assert all(body["output_config"]["effort"] == "low" for body, _ in messages(server)[sent:]) and len(messages(server)) > sent
+    capsys.readouterr()
 
 
 def test_15_13_the_two_calls_of_a_pass_are_still_sent_together(server, record):

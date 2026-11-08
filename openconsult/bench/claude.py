@@ -18,6 +18,12 @@ The kind keeps under the account's limits by waiting before a call, by
 the figures of the service's own reply headers, and never sends a call a
 second time; a call refused for rate is a failed call, three in a row
 stop the run. Standard library only.
+
+The effort (15.13, ruling 22): the service's own control of speed and
+cost, low, medium or high, sent in output_config when the bench names
+it and not sent otherwise, so the service's default stands. The record
+holds it in engine_version beside the API version on every call, so a
+later reader knows what was benched.
 """
 
 from __future__ import annotations
@@ -39,7 +45,16 @@ from openconsult.llm.ollama import encode
 ADDRESS = "https://api.anthropic.com"
 KEY_NAME = "ANTHROPIC_API_KEY"
 VERSION = "2026-10-21"                        # the API version the service's reference gives (7 Nov 2026)
-ENGINE_VERSION = f"anthropic-version {VERSION}"   # the one thing the request can pin; the service gives no build version
+EFFORTS = ("low", "medium", "high")           # the service's own setting; None sends nothing and the service's default stands
+
+
+def engine_version(effort: str | None) -> str:
+    """What the request pins, for the record: the API version and the
+    effort sent, or default when none is (the service gives no build version)."""
+    return f"anthropic-version {VERSION}, effort {effort or 'default'}"
+
+
+ENGINE_VERSION = engine_version(None)
 NO_DIGEST = "no digest given by the service"
 STATUS_TIMEOUT_S = 2.0
 # The key refused or forbidden: nothing more is sent. A 400 naming the credit balance is the service's billing answer.
@@ -84,9 +99,12 @@ class ClaudeEngine(Stops):
     name = "claude"
 
     def __init__(self, address: str = ADDRESS, key: str = "", expected: str | None = None,
-                 urlopen: Callable = urllib.request.urlopen, sleep: Callable = time.sleep):
+                 urlopen: Callable = urllib.request.urlopen, sleep: Callable = time.sleep, effort: str | None = None):
         # The expected address is read at the call, so a test may stand a made service in its place.
         self.address = own_address(address, expected or ADDRESS)
+        if effort is not None and effort not in EFFORTS:
+            raise ValueError(f"not an effort the service names: {effort}; one of {', '.join(EFFORTS)}, or none")
+        self.effort = effort
         self._key = key
         self._urlopen = urlopen
         self._sleep = sleep
@@ -172,6 +190,8 @@ class ClaudeEngine(Stops):
         body = {"model": call.tag, "max_tokens": call.max_tokens, "system": call.system,
                 "messages": [{"role": "user", "content": call.user}],
                 "output_config": {"format": {"type": "json_schema", "schema": sent_form(call.form)}}}
+        if self.effort:
+            body["output_config"]["effort"] = self.effort
         if not call.think:
             body["thinking"] = {"type": "disabled"}
         return body
@@ -246,7 +266,7 @@ class ClaudeEngine(Stops):
         return found if isinstance(found, int) and not isinstance(found, bool) else None
 
     def version(self, timeout_s: float = STATUS_TIMEOUT_S) -> str | None:
-        return ENGINE_VERSION
+        return engine_version(self.effort)
 
     def model_digest(self, tag: str, timeout_s: float = STATUS_TIMEOUT_S) -> str | None:
         return NO_DIGEST if self._model(tag, timeout_s) is not None else None
@@ -257,4 +277,4 @@ class ClaudeEngine(Stops):
         digest = self.model_digest(tag, timeout_s)
         if digest is None:
             return EngineStatus(False, None, None, None)
-        return EngineStatus(True, ENGINE_VERSION, True, digest, None)
+        return EngineStatus(True, engine_version(self.effort), True, digest, None)

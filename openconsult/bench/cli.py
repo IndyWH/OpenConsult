@@ -53,6 +53,9 @@ def make_engine(args):
     its key from the folder --key-folder names, read inside the process by
     the one key module (15.13, The key): never from the command line, and
     the value is never said."""
+    if getattr(args, "effort", None) and args.kind != claude.ClaudeEngine.name:
+        say(f"STOP: --effort is the {claude.ClaudeEngine.name} kind's setting alone (15.13, ruling 22); the {args.kind} kind has none")
+        return 10
     if args.kind not in CLOUD:
         return KINDS[args.kind](args.engine)
     kind = CLOUD[args.kind]
@@ -66,10 +69,16 @@ def make_engine(args):
         say(f"STOP: no key named {key_name} in the environment or in {Path(folder) / keys.KEY_FILE}")
         return 10
     try:
-        return kind.engine(args.engine, key)
+        return kind.engine(args.engine, key, **effort_of(args))
     except AddressRefused as refused:
         say(f"STOP: {refused}")
         return 10
+
+
+def effort_of(args) -> dict:
+    """The effort setting for the Claude kind, when the command names one."""
+    effort = getattr(args, "effort", None)
+    return {"effort": effort} if effort else {}
 
 
 def stopped(summary: dict) -> int:
@@ -514,6 +523,8 @@ def main(argv: list[str] | None = None) -> int:
     for name in ("run", "repeat", "letters", "guideline"):
         sub.choices[name].add_argument("--key-folder", help="the cloud kind: the data folder whose .env holds the service's key, "
                                                            "read inside the process; results may not go under it")
+        sub.choices[name].add_argument("--effort", choices=claude.EFFORTS,
+                                       help="the claude kind: the service's effort setting, sent on every call; not given, the service's default stands")
     p = command("letters-score", cmd_letters_score)
     p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
     p = sub.add_parser("background-score")
