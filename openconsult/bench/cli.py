@@ -471,6 +471,15 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--drug-list", help="the drug list, needed when the results of part two are there")
 
 
+def add_cloud_arguments(sub) -> None:
+    """The two options of the cloud kinds, on every command that opens an arm."""
+    for name in ("run", "repeat", "letters", "guideline"):
+        sub.choices[name].add_argument("--key-folder", help="the cloud kind: the data folder whose .env holds the service's key, "
+                                                           "read inside the process; results may not go under it")
+        sub.choices[name].add_argument("--effort", choices=claude.EFFORTS,
+                                       help="the claude kind: the service's effort setting, sent on every call; not given, the service's default stands")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="openconsult-bench")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -520,11 +529,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--chains", nargs="*", help="only these chains, for a check")
     p.add_argument("--letter", action="append", help="CASE=SPECIALTY, the specialty a case that states no referral drafts to")
     guideline_commands.add_guideline_commands(sub, command)
-    for name in ("run", "repeat", "letters", "guideline"):
-        sub.choices[name].add_argument("--key-folder", help="the cloud kind: the data folder whose .env holds the service's key, "
-                                                           "read inside the process; results may not go under it")
-        sub.choices[name].add_argument("--effort", choices=claude.EFFORTS,
-                                       help="the claude kind: the service's effort setting, sent on every call; not given, the service's default stands")
+    add_cloud_arguments(sub)
     p = command("letters-score", cmd_letters_score)
     p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
     p = sub.add_parser("background-score")
