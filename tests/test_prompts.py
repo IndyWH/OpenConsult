@@ -147,6 +147,24 @@ def test_rulings_3_and_8_the_two_letter_prompts_are_the_approved_bytes_and_the_f
     assert list_form["properties"]["referrals"]["items"]["properties"]["urgency"]["enum"] == ["urgent", "routine"]
 
 
+def test_ruling_19_the_alarm_form_carries_no_maxItems_and_the_other_lists_keep_their_numbers_as_targets():
+    """15.13 ruling 19: the alarm carries no limit on urgent actions at all; the other lists keep their numbers in the
+    files as targets a service that honours them holds the model to; the note's minItems stands (15.10 ruling 3)."""
+    def nodes(form):
+        yield form
+        for sub in form.get("properties", {}).values():
+            yield from nodes(sub)
+        if "items" in form:
+            yield from nodes(form["items"])
+    assert not any("maxItems" in node for node in nodes(loader.form("alarm")))
+    assessment = loader.form("assessment")["properties"]
+    assert (assessment["differentials"]["maxItems"], assessment["questions_to_ask"]["maxItems"], assessment["signs_to_check"]["maxItems"]) == (5, 4, 4)
+    assert loader.form("letter")["properties"]["paragraphs"]["maxItems"] == 4
+    assert loader.form("referrals")["properties"]["referrals"]["maxItems"] == 6
+    assert loader.form("note")["properties"]["subjective"]["minItems"] == 1
+    assert not any("maxItems" in node for node in nodes(loader.form("guideline")))
+
+
 def test_ruling_4_the_placeholder_in_the_prompt_is_the_one_the_check_writes():
     from openconsult import words
     assert words.LETTER_PLACEHOLDER == "[to be completed by the referring doctor]"

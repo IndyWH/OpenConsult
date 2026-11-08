@@ -137,7 +137,7 @@ def test_15_13_the_kind_sends_the_messages_api_request_with_the_apps_words_and_t
 
 
 @pytest.mark.parametrize("name", FORMS)
-def test_15_13_the_form_as_sent_takes_off_only_maxItems_adds_only_the_marks_and_the_door_checks_the_whole_form(name, server, record):
+def test_15_13_ruling_19_the_wire_copy_takes_off_only_maxItems_adds_only_the_marks_and_is_unchanged_in_effect(name, server, record):
     original = loader.form(name)
     sent = sent_form(original)
     objects, lists = [], []
@@ -160,14 +160,18 @@ def test_15_13_the_form_as_sent_takes_off_only_maxItems_adds_only_the_marks_and_
     assert strip_marks_and_put_back(sent, original) == original                   # nothing else was touched
     assert sent_form(original) == sent and loader.form(name) == original          # the file's own form is not changed
     if name == "alarm":
-        # The service holds no maxItems; the door still refuses a reply over the list's limit (R30).
+        # Ruling 19: the alarm form carries no maxItems, so nothing is taken off its list for the wire; the marks alone are added.
+        assert "maxItems" not in original["properties"]["urgent_actions"]
+        assert {k: v for k, v in sent["properties"]["urgent_actions"].items() if k != "items"} == {
+            k: v for k, v in original["properties"]["urgent_actions"].items() if k != "items"}
+    if name == "letter":
+        # The service holds no maxItems and the door no longer judges it: a reply past the file's number is an answer.
         engine = serve(server)
-        over = dict(ALARM_FIRES, urgent_actions=[ALARM_FIRES["urgent_actions"][0]] * 4)
+        over = {"reasoning": "made", "paragraphs": [{"text": "Made up.", "note_lines": [2]}] * (original["properties"]["paragraphs"]["maxItems"] + 1)}
         server.routes["/v1/messages"] = message_reply(json.dumps(over))
-        result = cloud_door(engine, record).ask("alarm", "words")
-        assert not result.ok and result.failure == "bad_form" and "more than 3 items" in result.detail
-        assert forms.misfit(over, original) and not forms.misfit(over, sent)
-        assert record.get(result.call_id)["outcome"] == "bad_form"
+        result = cloud_door(engine, record).ask("letter", "words")
+        assert result.ok and result.answer == over and forms.misfit(over, original) is None
+        assert record.get(result.call_id)["outcome"] == "ok"
 
 
 def test_7_3_rule_3_the_key_is_read_from_the_key_folder_by_the_one_module_and_written_nowhere(server, bench_folders, capsys, tmp_path, monkeypatch):

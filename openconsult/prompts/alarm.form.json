@@ -12,7 +12,6 @@
     },
     "urgent_actions": {
       "type": "array",
-      "maxItems": 3,
       "items": {
         "type": "object",
         "properties": {

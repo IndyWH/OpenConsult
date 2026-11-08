@@ -10,6 +10,8 @@ from openconsult.llm.door import Door
 from openconsult.llm.engine import EngineTimeout, EngineUnreachable
 from openconsult.llm.profile import Sampling
 from openconsult.llm.record import ModelCalls
+from openconsult.consult import cds_pass
+from openconsult.llm import forms
 from openconsult.prompts import loader
 from tests.fakes import ALARM_QUIET, ASSESSMENT, FakeEngine, reply
 
@@ -134,7 +136,7 @@ def test_3_11_each_job_sends_its_own_prompt_form_cap_and_time_limit(record):
     ({"reasoning": "x", "time_critical_possible": True, "urgent_actions": []}, "lacks already_done_or_arranged"),
     ({**ALARM_QUIET, "time_critical_possible": "yes"}, "not a boolean"),
     ({**ALARM_QUIET, "urgent_actions": [{"action": "x"}]}, "lacks reason"),
-    ({**ALARM_QUIET, "urgent_actions": [{"action": "a", "reason": "b"}] * 4}, "more than 3"),
+    ({**ALARM_QUIET, "urgent_actions": [{"action": "a", "reason": 7}]}, "not a string"),
 ])
 def test_3_10_a_reply_that_does_not_fit_its_form_is_a_failure(record, bad, reason):
     door, _ = door_with(record, [bad, ALARM_QUIET])
@@ -144,3 +146,31 @@ def test_3_10_a_reply_that_does_not_fit_its_form_is_a_failure(record, bad, reaso
     bad_grade = {**ASSESSMENT, "differentials": [{"condition": "x", "likelihood": "certain", "rationale": "y"}]}
     door2, _ = door_with(record, [bad_grade])
     assert "not one of" in door2.ask("assessment", "words").detail
+
+
+def test_ruling_19_a_reply_over_a_forms_number_is_accepted_for_every_form_that_carries_one_and_minItems_stands(record):
+    """15.13 ruling 19: a list's length is never a reason to refuse. Every form file that still carries maxItems (the
+    assessment's three lists, the letter's paragraphs, the referral list) keeps it as a target; a reply past the number
+    is an answer, whole. The alarm form carries none, and the pass keeps every urgent action in the model's order.
+    minItems stands: the note's empty subjective section is still refused (15.10 ruling 3)."""
+    letter = {"reasoning": "made", "paragraphs": [{"text": "Made up.", "note_lines": [2]}] * 5}            # the form says 4
+    referrals = {"reasoning": "made", "referrals": [{"specialty": "Made-up", "title": "Physician", "reason": "made", "urgency": "urgent",
+                                                    "lines": [9], "suggestion": False}] * 7}             # the form says 6
+    assessment = {**ASSESSMENT, "differentials": ASSESSMENT["differentials"] * 3,                           # 6 against 5
+                  "questions_to_ask": ASSESSMENT["questions_to_ask"] * 5, "signs_to_check": ASSESSMENT["signs_to_check"] * 5}
+    alarm = {**ALARM_QUIET, "time_critical_possible": True,
+             "urgent_actions": [{"action": f"Made-up step {n}", "reason": "made-up reason"} for n in range(5)]}
+    for job, answer, where, over in (("letter", letter, "paragraphs", 5), ("referrals", referrals, "referrals", 7),
+                                     ("assessment", assessment, "differentials", 6), ("alarm", alarm, "urgent_actions", 5)):
+        form = loader.form(job)
+        if job != "alarm":
+            assert over > form["properties"][where]["maxItems"]       # the file's target, kept
+        door, _ = door_with(record, [answer])
+        result = door.ask(job, "words")
+        assert result.ok and result.answer == answer and len(result.answer[where]) == over
+        assert record.get(result.call_id)["outcome"] == "ok" and forms.misfit(answer, form) is None
+    assert cds_pass._alarm(result, False).actions == alarm["urgent_actions"]       # every action, in the model's order
+    empty = {"reasoning": "made up.", "subjective": [], "objective": [], "assessment": [], "plan": []}
+    door, _ = door_with(record, [empty])
+    refused = door.ask("note", "words")
+    assert refused.failure == "bad_form" and "subjective has fewer than 1 items" in refused.detail
