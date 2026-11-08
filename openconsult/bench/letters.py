@@ -84,14 +84,14 @@ def run_chain(door: Door, case: Case, chain: Chain, named: dict[str, str], log: 
     for specialty in specialties_for(case, named):
         drafted = door.ask("letter", referral_note.letter_message(text, specialty, case.patient), sampling)
         row = {"specialty": specialty, **_call_row(drafted), "reasoning": None, "model_body": None, "body": None,
-               "check_detail": None, "total": 0, "grounded": 0, "placeholders": 0, "dropped": 0, "refused": None}
+               "check_detail": None, "total": 0, "grounded": 0, "placeholders": 0, "dropped": 0, "marked": 0, "refused": None}
         if drafted.ok:
             paragraphs = [{"text": str(p.get("text", "")), "note_lines": list(p.get("note_lines") or [])}
                           for p in drafted.answer.get("paragraphs") or [] if isinstance(p, dict)]
             checked = letter_check.check(paragraphs, lines, {str(case.patient.age)})
             row.update(reasoning=str(drafted.answer.get("reasoning") or ""), model_body=paragraphs, body=checked.paragraphs,
                        check_detail=checked.detail, total=checked.total, grounded=checked.grounded,
-                       placeholders=checked.placeholders, dropped=checked.dropped, refused=checked.refused)
+                       placeholders=checked.placeholders, dropped=checked.dropped, marked=checked.marked, refused=checked.refused)
         letters.append(row)
         log(f"  {case.name} {chain.name} letter to {specialty}: {drafted.wall_ms} ms, {row['grounded']} of {row['total']} grounded, "
             f"{row['placeholders']} placeholders" + (" REFUSED" if row["refused"] else "") + (f" FAILED {drafted.failure}" if not drafted.ok else ""))

@@ -43,6 +43,14 @@ def number_outside(chain: dict) -> bool:
     return any(letter_check.NUMBER in letter_check.reasons_of(l.get("check_detail")) for l in chain["letters"])
 
 
+def letters_marked(chain: dict) -> int:
+    """The letters of the chain with a sentence kept and marked for a figure
+    the cited lines do not give (15.13 ruling 20), read from the verdicts,
+    so results stored before the rule count 0."""
+    return sum(1 for l in chain["letters"]
+               if any(s["verdict"] == letter_check.MARKED for p in (l.get("check_detail") or {}).get("paragraphs", []) for s in p["sentences"]))
+
+
 def upgrade(chain: dict) -> bool:
     return any(letter_check.UPGRADE in letter_check.reasons_of(l.get("check_detail")) for l in chain["letters"])
 
@@ -97,7 +105,8 @@ def case_table(results: dict, case: str) -> dict:
             "list_s": round(statistics.median(list_walls) / 1000, 2) if list_walls else None,
             "letter_s": round(statistics.median(letter_walls) / 1000, 2) if letter_walls else None,
             "longest_s": round(max(list_walls + letter_walls) / 1000, 2) if letter_walls or list_walls else None,
-            "longest_reply_tokens": max(outputs) if outputs else None}
+            "longest_reply_tokens": max(outputs) if outputs else None,
+            "letters_marked": sum(letters_marked(r) for r in chains)}
 
 
 def score(results: dict) -> dict:
@@ -130,12 +139,13 @@ def score(results: dict) -> dict:
 
 def as_markdown(marked: dict) -> str:
     lines = ["| case | chains | failed call | letters | refused | placeholder | Assessment cited | number outside | upgrade | "
-             "expectation (model) | expectation (checked) | stated as expected | suggested (median) | list s | letter s | longest s | longest reply tokens |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "expectation (model) | expectation (checked) | stated as expected | suggested (median) | list s | letter s | longest s | longest reply tokens | letters marked |",
+             "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
     for case, t in marked["cases"].items():
         lines.append(f"| {case} | {t['chains']} | {', '.join(t['failed_call']) or 'none'} | {t['letters']} | {t['refused']} | {t['placeholder']} | "
                      f"{t['assessment_cited']} | {t['number_outside']} | {t['upgrade']} | {t['expectation_model']} | {t['expectation_checked']} | "
-                     f"{t['stated_ok']} | {t['suggested']} | {t['list_s']} | {t['letter_s']} | {t['longest_s']} | {t['longest_reply_tokens']} |")
+                     f"{t['stated_ok']} | {t['suggested']} | {t['list_s']} | {t['letter_s']} | {t['longest_s']} | {t['longest_reply_tokens']} | "
+                     f"{t['letters_marked']} |")
     lines.append("")
     for m in marked["marks"]:
         lines.append(f"- Mark {m['mark']}, {m['case']}, {m['text']}: {m['figure']}: {'held' if m['held'] else 'MISSED'}")

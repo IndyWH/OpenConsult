@@ -192,7 +192,10 @@ def letter_state(p, row: dict, found: dict) -> dict:
             "sign_off": f"{words.LETTER_SIGN_OFF} {user.full_name}" if user else words.LETTER_SIGN_OFF,
             "counts": words.LETTER_COUNTS.format(total=found["sentences_total"], grounded=found["sentences_grounded"],
                                                  placeholders=found["placeholders"], dropped=found["expectations_dropped"],
-                                                 allergies=letter_check.allergies_dropped(found["check_detail"])),
+                                                 allergies=letter_check.allergies_dropped(found["check_detail"]),
+                                                 marked=letter_check.marked_count(found["check_detail"])),
+            # The figures to check, by paragraph (ruling 20): drawn beside the paragraph, never in its text.
+            "marked": letter_check.marked_sentences(found["check_detail"], found["paragraphs"]) if has_body else [],
             "refused_line": words.LETTER_REFUSED.format(grounded=found["sentences_grounded"], total=found["sentences_total"]) if found["refused"] else None,
             "failed_line": words.LETTER_CALL_FAILED.format(reason=found["failure"]) if found["failure"] else None,
             "approved_line": words.LETTER_APPROVED_LINE.format(date=_when(approval["at"])[0], time=_when(approval["at"])[1]) if approval else None,

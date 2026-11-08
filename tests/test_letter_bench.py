@@ -67,7 +67,8 @@ def test_ruling_10_the_letters_bench_goes_through_the_door_with_the_apps_own_num
     checked = letter_check.check(LETTER_ANSWER["paragraphs"], lines, {"58"})
     letter = c["letters"][0]
     assert (letter["specialty"], letter["body"], letter["total"], letter["grounded"], letter["placeholders"], letter["dropped"], letter["refused"]) == \
-        ("made-up specialty", checked.paragraphs, 4, 3, 1, 0, False)
+        ("made-up specialty", checked.paragraphs, 4, 3, 0, 0, False)
+    assert letter["marked"] == checked.marked == 1 and "9 kg" in letter["body"][1]           # ruling 20: kept and marked, not replaced
     assert letter["check_detail"] == checked.detail and letter["model_body"] == LETTER_ANSWER["paragraphs"] and letter["failure"] is None
     assert c["lines"][8] == {"n": 9, "section": "plan", "heading": False, "text": "Urgent referral to a made-up specialty."}
     assert c["expected"]["stated_referrals"] == ["made-up specialty"] and c["case_sha256"] == cases[0].sha256
@@ -119,12 +120,14 @@ def test_R18_9_4_the_letters_command_writes_only_under_its_folder_and_names_its_
 
 # ------------------------------------------------------------- the scoring
 
-def made_letter(specialty="made-up specialty", refused=False, placeholders=0, reasons=(), assessment=(), model_text="Made up.", failure=None):
-    detail = {"paragraphs": [{"valid": [2], "assessment_cited": list(assessment),
-                              "sentences": [{"text": model_text, "verdict": "placeholder" if r else "kept", "reason": r} for r in (reasons or [None])]}]}
+def made_letter(specialty="made-up specialty", refused=False, placeholders=0, reasons=(), assessment=(), model_text="Made up.", failure=None,
+                marked=0):
+    sentences = [{"text": model_text, "verdict": "placeholder" if r else "kept", "reason": r} for r in (reasons or [None])]
+    sentences += [{"text": model_text, "verdict": "marked", "reason": "number"}] * marked      # ruling 20: kept and marked
+    detail = {"paragraphs": [{"valid": [2], "assessment_cited": list(assessment), "sentences": sentences}], "marked": marked}
     return {"specialty": specialty, "call_id": 1, "wall_ms": 4000, "failure": failure, "reasoning": "x", "output_tokens": 300,
             "model_body": [{"text": model_text, "note_lines": [2]}], "body": [model_text], "check_detail": detail,
-            "total": 2, "grounded": 2 - placeholders, "placeholders": placeholders, "dropped": 0, "refused": refused}
+            "total": 2, "grounded": 2 - placeholders, "placeholders": placeholders, "dropped": 0, "marked": marked, "refused": refused}
 
 
 def made_chain(case, name, letters, stated=("made-up specialty",), expected=("made-up specialty",), list_failure=None):
@@ -147,7 +150,7 @@ def made_results(case, n=13, expected=("made-up specialty",), stated=("made-up s
                                reasons=["number"] if i < bad.get("number", 0) else (["upgrade"] if i < bad.get("upgrade", 0) else []),
                                assessment=[9] if i < bad.get("assessment", 0) else [],
                                model_text="The patient hopes for a scan." if i < bad.get("expectation", 0) else "Made up.",
-                               failure="too_slow: x" if i < bad.get("failed", 0) else None)]
+                               failure="too_slow: x" if i < bad.get("failed", 0) else None, marked=1 if i < bad.get("marked", 0) else 0)]
         if "second" in bad:
             letters.append(made_letter(specialty="ENT", refused=i < bad["second"]))
         found[(case, f"C{i}")] = made_chain(case, f"C{i}", letters, stated=() if i < bad.get("no_stated", 0) else stated, expected=expected)
@@ -179,6 +182,12 @@ def test_ruling_10_the_letters_scoring_counts_the_marks_on_made_results(tmp_path
     assert marks.score(made_results("C_made", bad={"failed": 1}))["cases"]["C_made"]["failed_call"] == ["C0"]
     assert marks.score(made_results("C_made", bad={"no_stated": 1}))["cases"]["C_made"]["stated_ok"] == 12
     assert marks.score(made_results("C_made", bad={"upgrade": 2}))["cases"]["C_made"]["upgrade"] == 2
+    # Ruling 20: a marked letter is counted by case beside the marks; M3 reads its number as the model's and misses;
+    # M2 counts placeholders alone, so it holds.
+    with_marked = marks.score(made_results("C_made", bad={"marked": 2}))
+    assert with_marked["cases"]["C_made"]["letters_marked"] == 2 and with_marked["cases"]["C_made"]["number_outside"] == 2
+    assert [m["held"] for m in with_marked["marks"] if m["mark"] in ("M2", "M3")] == [True, False]
+    assert held["cases"]["C_made"]["letters_marked"] == 0 and "| letters marked |" in marks.as_markdown(with_marked)
     assert marks.score(made_results("A_hypo", expected=(), stated=(), bad={"expectation": 3}))["cases"]["A_hypo"]["expectation_model"] == 3
     # The stated item is found only with its plan line holding the word.
     chain = made_chain("C_made", "x", [made_letter()])

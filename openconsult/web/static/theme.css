@@ -198,6 +198,8 @@ form.named-form button.primary { margin-top: .6rem; }
 .paragraph-form { display: flex; flex-direction: column; gap: .3rem; margin: 0 0 .9rem; max-width: 46rem; }
 textarea.paragraph-text { font-family: var(--sans); font-size: .95rem; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .45rem .7rem; width: 100%; }
 .paragraph-form button { align-self: flex-start; padding: .3rem .8rem; font-size: .8rem; }
+.figure-check { font-size: .85rem; color: var(--ink-soft); max-width: 46rem; margin: -.4rem 0 .9rem; }
+.figure-check mark { background: #FBEFC8; color: var(--ink); padding: 0 .2rem; border-radius: 4px; }
 
 /* The guideline panel (8b): the summary with its marks as presses, the cited sources, the passage pop-up. */
 .guideline-summary { font-size: .92rem; line-height: 1.5; }

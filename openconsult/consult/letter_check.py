@@ -7,7 +7,12 @@ the sentences are judged on the valid lines left (the plan review of
 when a number in it is not in those lines (the patient's age excepted;
 a figure inside a word, as the 2 of T2DM, is a number), when it turns a
 planned test into a result, judged per sentence, or when it holds the
-placeholder anywhere (ruling 15); an expectation sentence (holding
+placeholder anywhere (ruling 15). A sentence whose only failure is the
+number is not removed: it stays in the text as the model wrote it, in a
+fourth state, marked, counted as not grounded and shown on the page with
+the words figure not in the note, please check beside it, for the doctor
+to decide (15.13, ruling 20); a sentence that also fails another rule
+takes that rule's treatment. An expectation sentence (holding
 Patient's expectations, or he, she, they or the patient followed by
 hopes, hoped, wants, wanted, would like, expects, expected, is hoping or
 was hoping, ruling 33) stands only where a valid line holds the words
@@ -31,7 +36,7 @@ from openconsult.consult.referral_note import NoteLine
 from openconsult.speech.matching import normalise
 
 PLACEHOLDER = words.LETTER_PLACEHOLDER
-KEPT, REPLACED, DROPPED = "kept", "placeholder", "dropped"
+KEPT, REPLACED, DROPPED, MARKED = "kept", "placeholder", "dropped", "marked"
 NO_LINE, NUMBER, UPGRADE, MODEL_PLACEHOLDER = "no_line", "number", "upgrade", "model_placeholder"
 ALLERGY = "allergy"   # the reason of a dropped allergy sentence (ruling 16)
 
@@ -61,6 +66,7 @@ class Checked:
     grounded: int
     placeholders: int
     dropped: int
+    marked: int           # sentences kept with a figure the cited lines do not give (ruling 20)
     refused: bool
 
 
@@ -107,10 +113,10 @@ def _verdict(sentence: str, cited: list[str], allowed: set[str], has_expectation
         return REPLACED, NO_LINE
     if PLACEHOLDER in sentence:
         return REPLACED, MODEL_PLACEHOLDER
-    if not numbers_in(sentence) <= (numbers_in(" ".join(cited)) | allowed):
-        return REPLACED, NUMBER
     if _upgrade(sentence, cited, allowed):
         return REPLACED, UPGRADE
+    if not numbers_in(sentence) <= (numbers_in(" ".join(cited)) | allowed):
+        return MARKED, NUMBER       # kept as written, highlighted on the page (ruling 20)
     return KEPT, None
 
 
@@ -119,7 +125,7 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
     against the numbered note; allowed_numbers is the patient's age."""
     by_number = {line.n: line for line in lines}
     out, detail = [], []
-    total = grounded = placeholders = dropped = allergies = 0
+    total = grounded = placeholders = dropped = allergies = marked = 0
     for paragraph in paragraphs:
         cited = [n for n in (paragraph.get("note_lines") or []) if isinstance(n, int) and not isinstance(n, bool)]
         assessment = sorted({n for n in cited if n in by_number and by_number[n].section == "assessment" and not by_number[n].heading})
@@ -139,6 +145,9 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
                 placeholders += 1
                 if not kept or kept[-1] != PLACEHOLDER:
                     kept.append(PLACEHOLDER)
+            elif verdict == MARKED:
+                marked += 1
+                kept.append(sentence)
             else:
                 grounded += 1
                 kept.append(sentence)
@@ -146,7 +155,8 @@ def check(paragraphs: list[dict], lines: list[NoteLine], allowed_numbers: set[st
         if kept:
             out.append(" ".join(kept))
     refused = total == 0 or grounded / total < LETTER_GROUNDED_HALF
-    return Checked(out, {"paragraphs": detail, "allergies_dropped": allergies}, total, grounded, placeholders, dropped, refused)
+    return Checked(out, {"paragraphs": detail, "allergies_dropped": allergies, "marked": marked},
+                   total, grounded, placeholders, dropped, marked, refused)
 
 
 def cites_assessment(detail: dict | None) -> bool:
@@ -154,9 +164,31 @@ def cites_assessment(detail: dict | None) -> bool:
 
 
 def reasons_of(detail: dict | None) -> list[str]:
-    """Every replaced sentence's reason, for the bench's counts; a dropped sentence is not a failed one."""
-    return [s["reason"] for p in (detail or {}).get("paragraphs", []) for s in p["sentences"] if s["verdict"] == REPLACED]
+    """Every replaced or marked sentence's reason, for the bench's counts,
+    so M3 measures the model's numbers whether the check removed or marked
+    them; a dropped sentence is not a failed one."""
+    return [s["reason"] for p in (detail or {}).get("paragraphs", []) for s in p["sentences"] if s["verdict"] in (REPLACED, MARKED)]
 
 
 def allergies_dropped(detail: dict | None) -> int:
     return int((detail or {}).get("allergies_dropped", 0))
+
+
+def marked_count(detail: dict | None) -> int:
+    """The figures to check, from the detail (a letter checked before ruling 20 has none)."""
+    return int((detail or {}).get("marked", 0))
+
+
+def marked_sentences(detail: dict | None, paragraphs: list[str]) -> list[list[str]]:
+    """For each paragraph of the body, in its order, the marked sentences
+    it still holds as written: the page's furniture (ruling 20). The
+    detail's paragraphs are aligned to the body's by skipping those that
+    put nothing on the page; a sentence the doctor has edited away is
+    no longer marked."""
+    shown = [p for p in (detail or {}).get("paragraphs", [])
+             if any(s["verdict"] in (KEPT, MARKED, REPLACED) for s in p["sentences"])]
+    found = []
+    for k, text in enumerate(paragraphs):
+        sentences = shown[k]["sentences"] if k < len(shown) else []
+        found.append([s["text"] for s in sentences if s["verdict"] == MARKED and s["text"] in text])
+    return found

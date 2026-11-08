@@ -19,13 +19,18 @@
     <p class="letter-part" id="salutation">{{ salutation }}</p>
     <p class="letter-part" id="re-line">{{ re_line }}</p>
     {% for paragraph in letter.paragraphs %}
-    <div class="paragraph" id="paragraph-{{ loop.index0 }}-block">
-      {% if read_only %}<p class="letter-part paragraph-text">{{ paragraph }}</p>{{ refusal("paragraph-" ~ loop.index0) }}
-      {% else %}<form method="post" action="/consultations/{{ cid }}/letters/{{ letter.id }}/paragraphs/{{ loop.index0 }}" class="paragraph-form">
+    {% set k = loop.index0 %}
+    <div class="paragraph" id="paragraph-{{ k }}-block">
+      {% if read_only %}<p class="letter-part paragraph-text">{{ paragraph }}</p>{{ refusal("paragraph-" ~ k) }}
+      {% else %}<form method="post" action="/consultations/{{ cid }}/letters/{{ letter.id }}/paragraphs/{{ k }}" class="paragraph-form">
         <textarea name="text" class="paragraph-text" rows="4" aria-label="{{ words.SAVE_PARAGRAPH }}">{{ paragraph }}</textarea>
-        <button id="paragraph-{{ loop.index0 }}" aria-describedby="paragraph-{{ loop.index0 }}-refusal">{{ words.SAVE_PARAGRAPH }}</button>
-        {{ refusal("paragraph-" ~ loop.index0) }}
+        <button id="paragraph-{{ k }}" aria-describedby="paragraph-{{ k }}-refusal">{{ words.SAVE_PARAGRAPH }}</button>
+        {{ refusal("paragraph-" ~ k) }}
       </form>{% endif %}
+      {# A figure the cited note lines do not give (ruling 20): the sentence again, highlighted, and the words beside it. #}
+      {% for sentence in marked[k] %}
+      <p class="figure-check" id="figure-check-{{ k }}-{{ loop.index0 }}"><mark>{{ sentence }}</mark> {{ words.LETTER_FIGURE_CHECK }}</p>
+      {% endfor %}
     </div>
     {% endfor %}
     <p class="letter-part" id="sign-off">{{ sign_off }}</p>

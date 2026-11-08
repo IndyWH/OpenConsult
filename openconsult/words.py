@@ -357,7 +357,10 @@ SPECIALTY_EMPTY = "Enter the specialty."
 LETTER_TITLE = "Referral letter: {specialty}"
 LETTER_DRAFT_LINE = "A draft, written from the approved note only. Nothing is final until you approve it."
 LETTER_COUNTS = ("{total} sentences; {grounded} grounded in the note; {placeholders} replaced by the placeholder; "
-                 "{dropped} expectation sentences dropped; {allergies} allergy sentences dropped.")
+                 "{dropped} expectation sentences dropped; {allergies} allergy sentences dropped; {marked} figures to check.")
+# Beside a sentence kept as written whose figure the cited note lines do not give (15.13, ruling 20): page furniture,
+# never part of the letter's text, never copied.
+LETTER_FIGURE_CHECK = "figure not in the note, please check"
 LETTER_REFUSED = ("The letter was refused: only {grounded} of {total} sentences are grounded in the note, fewer than half. "
                   "Draft it again, or write the letter yourself.")
 LETTER_CALL_FAILED = "The letter could not be drafted: {reason}"

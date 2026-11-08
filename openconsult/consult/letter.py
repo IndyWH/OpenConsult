@@ -1,8 +1,8 @@
 """One referral letter (spec 15.12, rulings 1, 3 and 4; R2, R5, R11,
 R20, R30; D24): the call on the approved note for the item's specialty,
 the check, and the row with its stamp, the note lines sent, both bodies,
-the check's detail (the allergy sentences dropped counted there) and
-the four counts. The salutation, the Re line and
+the check's detail (the allergy sentences dropped and the figures to
+check counted there; 15.13 ruling 20) and the four counts. The salutation, the Re line and
 the sign-off are written by code from the record, never by the model:
 Dear Consultant and the item's title, the patient's name, date of birth
 and sex as the consultation ran with them (15.11 ruling 2), and the one
@@ -72,5 +72,6 @@ def draft(door: Door, letters: Letters, notes, consultations, audit: Audit, cons
     else:
         audit.record("letter.drafted", f"{where}: {total} sentences, {grounded} grounded, {placeholders} placeholders, "
                                        f"{dropped} expectation sentences dropped, "
-                                       f"{letter_check.allergies_dropped(detail)} allergy sentences dropped, {result.wall_ms} ms")
+                                       f"{letter_check.allergies_dropped(detail)} allergy sentences dropped, "
+                                       f"{letter_check.marked_count(detail)} figures to check, {result.wall_ms} ms")
     return letters.letter(letter_id)

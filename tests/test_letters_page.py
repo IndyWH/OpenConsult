@@ -28,6 +28,10 @@ ALLERGY = {"reasoning": "made", "paragraphs": [
     {"text": "Thank you for seeing this 35-year-old woman with a made-up history. She has no known allergies.", "note_lines": [2]},
     {"text": "Her BP was 120/80.", "note_lines": [5]}]}
 UNDER = {"reasoning": "made", "paragraphs": [{"text": "Made up. Made up twice. Her BP was 120/80.", "note_lines": [99]}]}
+FIGURE = {"reasoning": "made", "paragraphs": [
+    {"text": "Thank you for seeing this 35-year-old woman with a made-up history. She takes a made-up tablet 40 mg daily.", "note_lines": [2]},
+    {"text": "Her BP was 120/80.", "note_lines": [5]}]}
+FIGURES = {"reasoning": "made", "paragraphs": [{"text": "She takes 40 mg. She takes 60 mg too. Her BP was 120/80.", "note_lines": [5]}]}
 
 
 def approved(tmp_path, clock, machine, **script):
@@ -116,7 +120,7 @@ def test_R2_R15_a_letter_is_drafted_edited_approved_audited_and_read_only_and_th
     assert words.LETTER_TITLE.format(specialty="A made-up specialty") in page and words.LETTER_DRAFT_LINE in page
     assert "Dear Consultant Physician," in page and "Re: Made-up Patient, born 21 Oct 1990, Female" in page and "Yours faithfully, Dr Example" in page
     assert raw.count('class="paragraph-form"') == 2 and "She hoped for a made-up wish." in page and "Her BP was 120/80." in page
-    assert words.LETTER_COUNTS.format(total=3, grounded=3, placeholders=0, dropped=0, allergies=0) in page
+    assert words.LETTER_COUNTS.format(total=3, grounded=3, placeholders=0, dropped=0, allergies=0, marked=0) in page
     assert words.LETTER_MODEL_LINE.format(model="gemma4:26b-a4b-it-qat", engine="made-up", version="0.0-made-up") in page   # the engine's own name (R20)
     assert 'id="copy-letter"' not in raw and client.get("/consultations/1/letters/1/letter.txt").status_code == 404   # copy after Approve only
     assert words.ITEM_DRAFTED in text_of(client.get("/consultations/1")) and f'id="open-{item["id"]}"' in client.get("/consultations/1").text
@@ -156,7 +160,7 @@ def test_ruling_4_a_refused_letter_shows_the_reason_no_body_and_draft_again_and_
     raw = client.get("/consultations/1/letters/1").text
     page = text_of(client.get("/consultations/1/letters/1"))
     assert words.LETTER_REFUSED.format(grounded=0, total=3) in page and "paragraph-form" not in raw and "Dear Consultant" not in page
-    assert words.LETTER_COUNTS.format(total=3, grounded=0, placeholders=3, dropped=0, allergies=0) in page
+    assert words.LETTER_COUNTS.format(total=3, grounded=0, placeholders=3, dropped=0, allergies=0, marked=0) in page
     assert refusal_on(text_of(client.post("/consultations/1/letters/1/approve")), "approve") == words.LETTER_NOTHING_TO_APPROVE
     assert client.post("/consultations/1/letters/1/paragraphs/0", data={"text": "x"}).status_code == 303   # no paragraph control on the page
     assert words.ITEM_REFUSED_BY_CHECK in text_of(client.get("/consultations/1")) and p.audit.lines()[0].event == "letter.refused_by_check"
@@ -240,5 +244,43 @@ def test_ruling_16_the_counts_sentence_shows_the_allergy_sentences_dropped(tmp_p
     app, client, engine, item = drafted(tmp_path, clock, machine, letter=[ALLERGY])
     page = text_of(client.get("/consultations/1/letters/1"))
     assert "no known allergies" not in page and words.LETTER_PLACEHOLDER not in page         # dropped, never replaced
-    assert words.LETTER_COUNTS.format(total=3, grounded=2, placeholders=0, dropped=0, allergies=1) in page
+    assert words.LETTER_COUNTS.format(total=3, grounded=2, placeholders=0, dropped=0, allergies=1, marked=0) in page
     assert app.state.parts.letters.letter(1)["check_detail"]["allergies_dropped"] == 1
+
+
+def test_ruling_20_the_page_marks_a_figure_not_in_the_note_and_the_copy_the_approval_and_the_edits_leave_the_mark_out(tmp_path, clock, machine):
+    """15.13 ruling 20: a sentence whose only failure is a figure the cited lines do not give stays in the letter as
+    written; the page highlights it with the words beside it; the mark is page furniture, in no text that leaves the page."""
+    app, client, engine, item = drafted(tmp_path, clock, machine, letter=[FIGURE, FIGURES])
+    p = app.state.parts
+    sentence, mark = "She takes a made-up tablet 40 mg daily.", words.LETTER_FIGURE_CHECK
+    raw = client.get("/consultations/1/letters/1").text
+    page = text_of(client.get("/consultations/1/letters/1"))
+    assert sentence in raw.split('<textarea', 2)[1].split("</textarea>")[0] and mark not in raw.split('<textarea', 2)[1].split("</textarea>")[0]
+    assert 'id="figure-check-0-0"' in raw and f"<mark>{sentence}</mark> {mark}" in raw and raw.count("figure-check-") == 1
+    assert words.LETTER_COUNTS.format(total=3, grounded=2, placeholders=0, dropped=0, allergies=0, marked=1) in page
+    assert words.LETTER_PLACEHOLDER not in page and words.LETTER_REFUSED.split("{")[0] not in page
+    assert p.letters.letter(1)["paragraphs"][0].endswith(sentence) and p.letters.letter(1)["check_detail"]["marked"] == 1
+    assert p.audit.lines()[0].event == "letter.drafted" and "1 figures to check" in p.audit.lines()[0].detail
+    # A second draft where most sentences hold such figures is refused by the half rule, as before.
+    assert client.post("/consultations/1/letters/1/again").status_code == 303
+    second = p.letters.letters(1)[1]
+    assert second["refused"] and words.LETTER_REFUSED.format(grounded=1, total=3) in text_of(client.get(f"/consultations/1/letters/{second['id']}"))
+    assert second["check_detail"]["marked"] == 2
+    # Approve the first: the stored text and the copy hold the sentence as written and never the mark.
+    assert client.post("/consultations/1/letters/1/approve").status_code == 303
+    approval = p.letters.approval(1)
+    assert sentence in approval["text"] and mark not in approval["text"] and "<mark>" not in approval["text"]
+    copy = client.get("/consultations/1/letters/1/letter.txt").text
+    assert copy == approval["text"] and mark not in copy
+    raw = client.get("/consultations/1/letters/1").text
+    assert f"<mark>{sentence}</mark> {mark}" in raw                      # shown on the approved letter too, as the record of the check
+    # On another draft the doctor edits the figure out: what stood before holds the sentence and never the mark, and the
+    # mark leaves the page with the figure.
+    app2, client2, engine2, item2 = drafted(tmp_path / "two", clock, machine, letter=[FIGURE])
+    p2 = app2.state.parts
+    text = p2.letters.letter(1)["paragraphs"][0].replace(" 40 mg", "")
+    assert client2.post("/consultations/1/letters/1/paragraphs/0", data={"text": text}).status_code == 303
+    assert [(e["text_before"].endswith(sentence), mark in e["text_before"], mark in e["text_after"]) for e in p2.letters.edits(1)] == [(True, False, False)]
+    raw = client2.get("/consultations/1/letters/1").text
+    assert "figure-check-" not in raw and mark not in raw
