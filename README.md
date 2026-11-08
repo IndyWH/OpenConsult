@@ -93,6 +93,90 @@ This branch is where OpenConsult v2.0 is being built.
   machine voices; none counts.
 - The engine bench is in engine-bench: the same cases through Ollama, llama.cpp and vLLM, with every reply and every figure.
 
+## The cloud language model, and how it was chosen
+
+On a machine with a suitable NVIDIA card, OpenConsult runs its language
+model on that machine: Gemma 4, through vLLM or Ollama, and nothing a
+patient says leaves the computer. On any other machine, and on every
+Mac, the language model runs in the cloud, and the app says so before
+the first consultation. This is how the cloud model was chosen, in
+November 2026. Every figure below comes from the same four benches the
+local model had run: the 16 acted cases of stage 3 (13 chains each), the
+two made follow-up cases, the four approved notes and their letters, and
+the fifteen guideline queries. The cloud model was sent the same words,
+byte for byte, and judged by the same code.
+
+**Ollama cloud, Gemma 4 31B, 6 November.** The bench stopped at its
+first call. The service does not hold a model to the JSON form the
+request carries, so the reply came back outside the form and the app's
+door refused it, as it refuses every such reply. Every pass of a
+consultation on that service would have failed. Its own page confirmed
+it afterwards: structured outputs are not supported in its cloud. It was
+dropped the same morning, and a rule was added: no service is planned
+on until its own page says it holds a form, and the first act of any run
+on a new service is one real call with the app's own form.
+
+**DeepInfra, Gemma 4 26B, 6 November.** The gate call passed on the
+first try. 4,729 calls; one failed, a call that passed the 60 second
+limit. Every emergency alarm fired in every chain; nothing invented
+reached a letter or a guideline summary. But in 12 of 13 letters of one
+case the model wrote blood results with units the note did not give, so
+the check replaced those sentences, and the letters bench missed three
+marks the local model held. A pass took 6.5 seconds in the middle,
+against 2.8 on the local card; 241 passes of 1,889 took over 10
+seconds and 36 over 20. The service's faster tier was tested and was not
+faster in a way a patient would feel. Cost: about 3 US cents for a
+15-minute consultation. The host gives no version or digest for the
+model it serves, so a later run cannot be proven to be the same build.
+
+**Claude Haiku 5.5, 7 and 8 November.** The gate call needed three tries
+before one passed: the service wants every object of a form marked as
+taking no other property, does not hold a limit on a list's length, and
+refuses the temperature field on its current API version, so the
+thirteen chains sample at the service's own default. It also adds a
+short instruction of its own about the format to every request, whose
+words are not published; on the alarm call that instruction and the form
+cost 391 tokens. The first full run, on 7 November, failed 108 calls of
+4,438, every one of them our own doing: the model wrote four or five
+urgent actions where our alarm form allowed three, and five paragraphs
+where the letter form allowed four, and the door refused the whole
+reply. The owner ruled the same evening that the length of a list is
+never a reason to refuse a reply, since how many things must happen now
+is a fact of the presentation and not a choice of ours, and that the
+letter check marks a figure it cannot find in the note for the doctor
+to look at, instead of removing the sentence. The second full run, on 8
+November, under those rules: 4,685 calls, none failed. Every emergency
+alarm fired in 13 of 13 chains on all seven emergency cases; no alarm
+fired on any routine case. Nothing invented reached any of 65 letters:
+no unit the note did not give, no line number, no ungrounded allergy.
+Nothing invented reached any guideline summary. The misses that remain
+are small: one referral list of 13 named one specialty of two; the
+summaries ran over 150 words on four queries; and the check marks a
+sentence in every letter of one case because the model wrote four times
+a day where the note wrote qds, which the check did not yet read as the
+same figure. A pass took 4.5 seconds in the middle and 12.8 at the
+slowest; one pass of 1,898 took over 10 seconds. Cost: about 9 US cents
+for a 15-minute consultation. The service does not keep what is sent by
+default and does not train on it. Like the host above, it gives no
+digest, so a later run cannot be proven to be the same build.
+
+**The ruling, 7 and 8 November.** Claude Haiku 5.5 is the cloud language
+model of v2.0, as it stands, with the owner's words: the figures stand
+and it is offered. DeepInfra is not offered; its bench kind stays in the
+repo for comparison. The figures that settled it were the wait and the
+letters: 4.5 seconds against 6.5, with one slow pass in 1,898 against
+241; and no invented unit in 65 letters against 12 in 13. The cost, three
+times the host's, was not weighed against a patient's wait. The owner
+also ruled that Alba's auto mode is offered wherever the language model
+answers fast enough and the transcription is live, which the cloud model
+meets on these figures, pending its own auto-mode bench.
+
+What this comparison cannot say: which model picks the better
+differential or asks the better next question. The four benches measure
+floors (does the alarm fire, is anything invented) and faithfulness to
+the note, not clinical judgement. That is the question of the
+preclinical study, which runs on the local model.
+
 OpenConsult is a research and education prototype. It is not a medical
 device. It must never be used with real patients or real patient data.
 

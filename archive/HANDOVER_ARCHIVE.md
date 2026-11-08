@@ -3,6 +3,161 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-11-03. Run 8d: the letters run, benched twice, the check rule kept, the prompt edits stopped
+
+Built in one session on 3 Nov 2026 and resumed the same evening after
+the owner's ruling on the first bench (15.12 ruling 35), under the plan
+review of Cowork (two points; both are in). The letters run of ruling
+34: the four edits to the two letter prompts of rulings 29 to 32 and the
+one rule of the check of ruling 33, benched together on the four
+approved notes of ruling 10 by the letter bench of 8a, kept when no mark
+fell below the fourth bench of 8a and nothing new reached the page, else
+held. The first bench was held on the marks of A, C and D; the owner
+reworded the two added sentences (the words citing that Plan line
+dropped from both, the started medicine written as a medicine to start)
+and the bench ran once more. The second bench was held too: A's and D's
+marks still under the fourth bench, and new kinds on the page. Under
+ruling 35 the prompt edits STOP: the two prompt files are at their bytes
+of 2095421, the check rule is kept, and the letters run as 8a wired
+them. Both benches' bytes are patches in the private log folder. The
+report is STAGE8D_REPORT.md there, with the fourth bench of 8a beside
+both benches and one letter each for C and D from the second bench for
+the owner's reading. No room run: nothing new reaches the app.
+
+The spec, committed twice, not a character changed: f3fe466 (8c marked
+done on 2 Nov and rulings 29 to 34; sha256 49ffe0f2...) and cebfdb0
+(ruling 35 and the reworded prompt text in ruling 3; sha256 5900da8a...).
+The run prompt is 359f715 (stage-prompts/STAGE_08D.md); the resume
+prompt stayed in the private log folder.
+
+The check rule (ruling 33; consult/letter_check.py, commit 251599b): the
+expectation pattern now also reads he, she, they or the patient followed
+by hopes, hoped, wants, wanted, would like, expects, expected, is hoping
+or was hoping, as well as the forms it read; the verdict is unchanged
+(kept only where a valid cited line holds Patient's expectations and a
+colon, else dropped and counted, never replaced). One test pins it; the
+bench's two expectation readings go through the same function, so M4 on
+A reads the pronoun form. One twin sentence of the ruling 4 test changed
+(He expects nothing was its example of a non-match; ruling 33 makes it a
+match; the twin is now He is expected in clinic), accepted by the review
+as a stronger test. Across the two benches the check dropped 12
+expectation sentences and every one was an expectation sentence (the
+fourth bench's stored results: 8 of 8); the pronoun form caught no
+ordinary sentence.
+
+The prompt files: copied byte for byte from the private copies for each
+bench alone (the first bench letter 075a1213... and referrals
+1b8cf5b9...; the second bench letter a7cdd113..., exactly two sentences
+different from the first, and the same referrals text), each proven by
+sha256sum and cmp with nothing else under openconsult/prompts changed,
+then returned with git checkout to 220d61f0... and 5eab5bb5...; git diff
+2095421 -- openconsult/prompts prints nothing. APPROVED_BYTES and the
+hash test are unchanged. The held bytes are stage8d-held-changes.patch
+and stage8d-held-changes2.patch (32 lines each) in the private log
+folder.
+
+The benches (ruling 10; stage8d-bench.sh and stage8d-bench2.sh, the
+fourth bench's command with the run's own copy of 8a's data folder): the
+same four notes at the same hashes, 13 chains each, the owner's vLLM
+0.31.0 with the model of 3c, thinking off in every request and none in
+any reply, 118 calls each, no failed call, three to four minutes each;
+the letter text hashes of the record eb20f7aa (first) and 3a3ea335
+(second), the referrals f44b125a (both). Chains holding each mark of 13,
+the fourth bench of 8a (4), the first bench (1) and the second (2):
+
+| mark | A 4 | A 1 | A 2 | B 4 | B 1 | B 2 | C 4 | C 1 | C 2 | D 4 | D 1 | D 2 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| M1 | 12 | 13 | 13 | 13 | 13 | 13 | 13 | 10 | 13 | 13 | 13 | 13 |
+| M2 (12 needed) | 9 | 1 | 3 | 13 | 13 | 13 | 13 | 10 | 13 | 13 | 5 | 11 |
+| M3 numbers | 9 | 1 | 3 | 13 | 13 | 13 | 13 | 10 | 13 | 13 | 5 | 11 |
+| M3 Assessment | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 | 13 |
+| M4 (A only) | 13 | 13 | 13 | | | | | | | | | |
+| M5 | 13 | 13 | 13 | 13 | 13 | 13 | 12 | 13 | 13 | 13 | 13 | 13 |
+
+Marks held: the fourth bench 13 of 17, the first bench 10, the second
+13. The second bench is under the fourth on four marks (M2 and M3 on A
+and on D) and above it on three (M1 on A, M5 on C, and A's failed call
+gone). Every miss in both benches is the number rule of the check. First
+bench: on A the model wrote the units on the HbA1c and eGFR in 12 of 13
+letters (1 of 13 in the fourth bench), each replaced; on C and D it
+wrote its citations into the text in 10 letters (3 C letters refused).
+Second bench: no citation in any letter and no letter refused; on A the
+units in 10 of 13 letters (13 sentences replaced, 3 of them the nine
+years of diabetes cited to a line that does not hold it); on D the nose
+history in paragraph 1 of two dermatology letters, cited to the skin
+lines (3 sentences). Across both benches, of 65 letters every allergy
+status on the page rests on a cited allergy line (29 and 36 letters), no
+Assessment line was cited, no stopped medicine was given as taken.
+
+The four matters, the fourth bench -> the first -> the second, counted
+by code from the stored results (stage8d-things.py): C's urgent
+suspected-cancer referral named in paragraph 1, 11 -> 13 -> 13 of 13
+chains, and in its second sentence 0 -> 13 -> 13; D's dermatology
+letter opening with the skin 1 -> 13 -> 13 of 13 and with the nose 12 ->
+0 -> 0 (the nose in paragraph 4 alone 0 -> 2 -> 5); a medicine the Plan
+starts named with its dose, A dapagliflozin 1 -> 13 -> 13 of 13, B
+sumatriptan 10 -> 13 -> 13, D mometasone 0 -> 0 -> 0 in the ENT letter
+and betamethasone 0 -> 0 -> 1 in the dermatology letter; C's stated
+list found with line 19, 12 -> 13 -> 13 of 13, the empty list 1 -> 0 ->
+0. The fifth, the expectation sentence by the new pattern in the
+model's body: B 13 -> 13 -> 10, C 12 -> 13 -> 13, D 23 -> 24 -> 14 of 26
+letters, A 0 in every run (M4 held). The review's point 1 passed in both
+benches: none of the four counts worse.
+
+What reached the page that the fourth bench's list did not hold, read in
+every kept sentence of the 65 letters of each bench. First bench: the
+started medicine given among the current medications on A in 11 of 13
+letters; the note's own labels in the text in 8 kept sentences of 3
+letters; one comment on the record. Second bench: an invented negative
+on A (one sentence of one letter saying no recent weight loss or
+polyuria was reported, words the note does not hold; the check cannot
+read it, there is no number in it); a unit the note does not give on the
+page in 1 A letter (the HbA1c with mmol/mol, kept because the figure is
+on the cited line and the unit holds no digit); the note's own words as
+per the plan in 3 C letters, 1 sentence each; the prompt's own phrase
+echoed (as a medicine to start, as to start) in 5 sentences of 3 B
+letters; the old dose of gliclazide beside the new in 1 A letter; two
+medicines stopped before given as ones the Plan stops now in 1 A letter.
+Gone since the first bench: the started medicine among the current
+medications (every A letter now says she is to start it), the comment on
+the record, the citations in the text. The kinds of the fourth bench's
+list in the second bench: the label Patient's expectations: in 7 letters
+(15 in the fourth, 9 in the first), and its words without the colon in 7
+more; a paragraph 4 opening with a bare medicine 6 (12, 0), all B's Plan
+line copied whole.
+
+The reading I would put to the owner, not a decision: the four matters
+the edits were for are answered in the model's body in both benches (the
+urgency sentence, the dermatology letter opening with the skin, A's and
+B's started medicines with their doses, never an empty list), and the
+rewording of ruling 35 removed the citations in the text and the started
+medicine listed as current; what remains is A's units, which swung
+between 1 and 12 of 13 on every change to paragraph 4 in 8a and did so
+again (12, then 10), and D's nose history written into paragraph 1 of
+the dermatology letter against the skin's lines. The invented negative
+on A is one sentence in 130 letters across the two benches and the
+guard against it is the owner's reading, not the check. The edits stop
+here as ruling 35 says; a later session may take the four matters up
+again with the lesson that paragraph 4 moves A's units.
+
+Sizes (5.4): letter_check.py 162 lines, no function over 80; the suite
+770 tests, green before every commit and three times before the last.
+HANDOVER's 8b entry moved to the archive in the first session. Nothing
+pushed; no engine started or stopped; the recordings folder not opened.
+
+What this run has made untrue: the spec's rulings 3 and 8 give
+a7cdd113... and 1b8cf5b9... as the two prompts' hashes while the files
+hold 220d61f0... and 5eab5bb5..., and ruling 35's second bench is now
+run and held (for Cowork to mark); STAGE_08D.md's kept case did not
+happen and its rule 4 names the first bench's letter hash 075a1213...,
+superseded by a7cdd113... in the resume; the archive's 8a entry and
+STAGE_08A.md rule 4 still give 220d61f0... as the letter prompt's hash,
+which is true again; the 8a report's line that the started medicine's
+sentence does not reach the model is not the whole story (it reaches
+the model and is answered). The 8c report's note for the letters session
+stays true: the frames, the withheld line and the rows' named parts are
+unchanged.
+
 ## 2026-11-02. Stage 8c: the what-the-model-saw view, its timeline, and two small fixes
 
 Built in one session on 2 Nov 2026 under the plan review of Cowork (two
