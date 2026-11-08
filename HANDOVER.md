@@ -4,6 +4,84 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-08. Run 9d2: the door accepts any list length, the letter check marks instead of removing, the effort tested, Claude Haiku 5.5 benched again; stage 3 and 7b passed, the letters and the summaries missed, no call failed
+
+Built and run in one session on 8 Nov 2026 under Cowork's plan review
+(one point: the effort test in four rounds). Run 9d2 is 15.13 rulings
+19 to 22. The plan, the effort file, the report and the letters are
+STAGE9D2_PLAN.md, STAGE9D2_EFFORT.md, STAGE9D2_REPORT.md and
+STAGE9D2_LETTERS.md in the private log folder.
+
+The spec, committed once, not a character changed: 739b45a (sha256
+292ec7cb...). The run prompt is e050afc (stage-prompts/STAGE_09D2.md).
+
+The two rules (4e64e09, ea4634d). The door checks the shape and the
+fields of a reply and never refuses for the count of a list's items:
+forms.misfit dropped its maxItems judgement, minItems stands, and the
+alarm form lost its one line, maxItems 3 on urgent_actions, the only
+change in the prompts folder since 15898f5; the other forms keep their
+numbers as targets and the Claude kind's wire copy still takes them off.
+The letter check's number rule marks instead of removing: a sentence
+whose only failure is a figure the cited lines do not give stays as
+written in a fourth state, marked, not grounded, shown again under its
+paragraph with the words figure not in the note, please check, in no
+text that leaves the page (the copy, the approval, an edit's
+text_before); the counts, check_detail and the audit line gain the
+figures to check; the bench's M3 reads a marked sentence's number as the
+model's and the table counts letters with one. The effort setting
+(c3747cf): --effort on the bench command, the Claude kind's alone, sent
+in output_config when named; engine_version holds it on every call
+("anthropic-version 2026-10-21, effort default"). 5 tests added, one
+rewritten; the suite 825.
+
+The effort test (four rounds of case 01, 244 calls, 0.12 dollars):
+pooled, a pass 4,404 ms at the default and 4,376 at low, the two default
+rounds 96 ms apart; 2.1 per cent fewer tokens written at low; the form
+held in all, no thinking, no failed call, H6 and H7 held in every
+round; the one field proven over every request. The owner chose the
+default.
+
+The benches 09:22 to 12:21 UTC, no stop, no wait for the rate, the
+proof of the words 0 parts differing on each, the form as sent equal to
+the wire copy of the files as they stand:
+- Stage 3: passed on every hard, soft and time mark (T17 5.13 s, T18
+  7.61 s; S12 0 on every routine case). 0 failed calls, 0 failed chains
+  (run 9d 72 and 55). 119 of 1,898 alarm replies listed four or five
+  urgent actions, largest 5, all accepted; the assessment's lists never
+  crossed their targets.
+- 7b: passed, the same four lines as this computer, the host and 9d; 0
+  failed calls (9d 24 refused).
+- 8a: missed on M3 of A (13 of 13 letters marked: the paracetamol
+  frequency written as words where the note's line writes qds, 2 also
+  the unchanged doses cited to lines lacking them) and C (one opening
+  sentence's duration) and on M5 of D (one list of 13 named one
+  referral of two). M1 and M2 held on every case (9d missed M1 on three
+  and M2 on two); 0 failed calls, 0 refused, 1 placeholder in 65
+  letters (the model's own), 16 letters of five or six paragraphs
+  accepted. On A every page now says ibuprofen was stopped and names
+  the new doses with the change (13 of 13; 9d 9 stale, 2 wrong); the
+  mark stands beside the stop sentence in 13 letters.
+- 8b: the searches matched 9a2's 15 of 15. G1 and G3 held; G2 missed on
+  four queries (Q04 5, Q05 4, Q07 9, Q12 2 of 13; 9d five; this computer
+  two).
+
+The wait and the cost: a pass 4.5 s median over stage 3 (this computer
+2.8, the host 6.5, 9d 4.6), 12.8 s slowest, 1 of 1,898 over 10 s; the
+alarm call 2.2 s. The benches 2.27 dollars by the tokens (4,685 calls,
+9.04 million read, 2.73 million written), the whole run 2.39; a
+15-minute consultation about 9 cents by stage 3's fuller ratios (9d
+8.2); the owner reads the service's own figure on his usage page.
+Thinking in 0 of 4,929 replies; the three A chains the same in 0 of 16
+cases. Sizes: no function over 80 (cli.main 78 after the cloud options
+moved to a helper); words.py 872 lines, over 600 as before this run.
+
+Made untrue: STAGE9D2_PLAN's sizes and its two-arm effort test; CLAUDE.md's
+bench line (edited here). Open for the owner: Alba in cloud mode
+(ruling 13) and the rule on model-specific lines (ruling 22), the
+candidates the summaries' length on four queries, the fifth paragraph
+in 16 of 65 letters, and the number-word figure the check marks on A.
+Cowork's README section (ruling 21) comes with the next run.
+
 ## 2026-11-07. Run 9d: Claude Haiku 5.5 through the door on all four benches; 7b passed, stage 3, the letters and the summaries missed, every failed call a list limit
 
 Built and run in one session on 7 Nov 2026 under Cowork's plan review
