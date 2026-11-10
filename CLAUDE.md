@@ -30,7 +30,7 @@ Think from the patient's side. In teaching mode, from the learner's side.
 ## How a stage runs
 
 1. One stage or sub-stage in one session. Its prompt is a file in stage-prompts/.
-2. The build model is Fable 5.1 at high effort, or Fable 5.5 when it is out.
+2. The build model is Fable 5.2 at high effort, by the owner's ruling of 10 Nov 2026.
    If you are any other model, say so and stop.
 3. Your first commit is V2_SPEC.md as the brainstorm left it, if it has changed.
 4. Write your plan. List every test you intend, with the rule number or the
