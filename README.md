@@ -15,7 +15,9 @@ This branch is where OpenConsult v2.0 is being built.
   background, marked on the panel and at review, and shows them, folded,
   on the live page; the words appear live beside the model's
   differentials, questions and signs, the alarm in its three states with
-  the differential it names marked red, and a quiet clock; the sound is
+  the differential it names marked red, and a quiet clock; the live page
+  asks the browser for sound at 48,000 samples a second and says so when
+  the browser does not give it; the sound is
   recorded as the microphone gives it and kept as Opus after Stop; at Stop
   the app asks which speaker was the doctor, checks who spoke each line
   with the language model, checks for missing speech against the sound,

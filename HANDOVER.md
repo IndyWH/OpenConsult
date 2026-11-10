@@ -4,6 +4,65 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-10. Stage 5e: the speech bench on three new recordings, both passes of the two cloud services
+
+Built and run in one session on 10 Nov 2026 under the owner's approval of
+the plan. THE FIGURES COUNT: three recordings of 21 Oct 2026, real voices
+(545, 355 and 387 s). Nothing of 5e is built into the app but the opening
+commit (R31). The tables are stage5e-tables3 in the private log folder;
+the private report was not yet written when this entry was made.
+
+The spec, committed once, not a character changed: 233ec9b (sha256
+66469965...). The stage prompt is e56af10 (stage-prompts/STAGE_05E.md).
+
+The opening commit (9e8cfc1): the live page asks the browser for sound at
+48,000 samples a second and says so when it is not given; no fallback.
+
+The bench (4147c6f to d4efa9e): a key folder apart from the workers' data
+folder; each service's upload arm with the delete and its proof; the wait
+to first shown defined again; the line for Alba; the doctor's voice cut
+from a recording's own page and never used on that recording; the label
+check as the app sends it beside the bench's own; the tables of 5e.
+
+The run. 18 live results and 6 uploads, none failed; every upload deleted
+and proven gone, and asked for again afterwards with the two gate clips
+(Speechmatics 5 jobs, AssemblyAI 4): nothing held. The driver's first pass
+gave speech-calls no --data-folder, so its seven steps ended at once with
+no call made; a second pass made the 126 calls on vLLM. The engine was
+found down and left down. Scored twice, the same byte for byte.
+
+For the patient, over the three recordings: no kind of page had a passage
+missing with no sign or a word where nobody spoke. AssemblyAI live wrote
+one drug as another real drug three times, and both notes held it; no
+other kind did. Drug names caught of 61 spoken: WhisperX 50, Nemotron 18,
+the tied pair 8, Speechmatics live 58 and whole 60, AssemblyAI live 56
+and whole 61. Words under the wrong speaker by the choice itself:
+WhisperX 47, Nemotron 2, the tied pair 3, Speechmatics live 5 and whole
+11, AssemblyAI live 257 and whole 0. The label check left more words under the wrong speaker than the choice
+alone on every kind but AssemblyAI live, and as the app sends it today it failed on all three Speechmatics live pages (613 to 785
+lines; the reply would need 8,000 to 10,000 tokens of a limit of 3,000).
+The line for Alba: no live arm serves; almost every patient speech was
+final only after the doctor's reply began.
+
+Read by hand, the line for Alba was wrong three ways and was fixed
+(32c32dd, d4efa9e): a pause inside a short reply taken for the patient's;
+words matching no speech between the line and the reply; a sound going on
+after the line was final. Both script notes of script 14 lack facts 14-03
+and 14-16: the notes lack them, the rule is not wrong.
+
+Flags. The suite is 881 tests in 73 s, over the target of one minute.
+Speechmatics' reply does not itself prove the medical domain was applied;
+the job's own record holds it. AssemblyAI names a host for the uploaded
+file that is not EU by name. Nemotron's largest gap inside a word was
+1.92 s, close to the 2.0 s figure. speech-calls without --data-folder
+refuses its own results folder. The private check found one run of six
+common dosing words of a script in V2_SPEC.md and in a test of 8 Nov,
+neither written by this run.
+
+Made untrue: CLAUDE.md's speech commands and the README's line of the
+live page, both corrected in this commit. No help page names the sample
+rate; none is made untrue.
+
 ## 2026-11-08. Run 9e: the letter check reads prescription frequencies as figures; the README says how the cloud model was chosen
 
 Built in one session on 8 Nov 2026 under the owner's approval of the
