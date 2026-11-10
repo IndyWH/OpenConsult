@@ -359,7 +359,8 @@ def cmd_speech_score(args) -> int:
     return speech_commands.speech_score(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts],
                                         Path(args.marks), Path(args.write), say=say,
                                         key_facts_path=Path(args.key_facts) if args.key_facts else None,
-                                        drug_list_path=Path(args.drug_list) if args.drug_list else None)
+                                        drug_list_path=Path(args.drug_list) if args.drug_list else None,
+                                        counting=args.counting)
 
 
 def cmd_speech_voice(args) -> int:
@@ -515,6 +516,7 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--write", required=True, help="where scores.json and report.md go; never written over")
     p.add_argument("--key-facts", help="the key-fact file, needed when the results of part two are there")
     p.add_argument("--drug-list", help="the drug list, needed when the results of part two are there")
+    p.add_argument("--counting", action="store_true", help="5e: the figures count (the new recordings); adds the tables of 5e")
 
 
 def add_cloud_arguments(sub) -> None:

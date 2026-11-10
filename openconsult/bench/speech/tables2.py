@@ -339,9 +339,9 @@ def page_lines(arm: str, page: dict) -> list[str]:
     return lines
 
 
-def as_markdown(scored: dict) -> str:
+def as_markdown(scored: dict, counting: bool = False) -> str:
     kinds = scored.get("kinds") or ("red_flag", "drug", "negative", "safety_net", "positive", "examination", "plan")
-    lines = ["", "# Part two: what is done with the transcripts", "", "THIS IS A REHEARSAL. NO FIGURE IN IT COUNTS.", "",
+    lines = ["", "# Part two: what is done with the transcripts", "", tables.COUNTING if counting else tables.REHEARSAL, "",
              "## For the patient, first", "", *first_table(scored), ""]
     if scored.get("drug_list"):
         d = scored["drug_list"]

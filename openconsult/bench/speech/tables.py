@@ -278,9 +278,15 @@ def page_table(arm: str, name: str, page: dict) -> list[str]:
     return lines
 
 
-def as_markdown(scored: dict) -> str:
+COUNTING = "THE FIGURES OF THESE TABLES COUNT."
+REHEARSAL = "THIS IS A REHEARSAL. NO FIGURE IN IT COUNTS."
+
+
+def as_markdown(scored: dict, counting: bool = False) -> str:
+    """counting: the run is on the new recordings (5e), where the figures
+    count and nothing is called a rehearsal; said by the one who runs it."""
     lines = ["# The speech bench: part one", "",
-             "THIS IS A REHEARSAL. NO FIGURE IN IT COUNTS.", "",
+             COUNTING if counting else REHEARSAL, "",
              "On a machine-voice recording the two voices are a male and a female machine voice, so who spoke is easy there.", "",
              "## For the patient, first", "", *first_table(scored), ""]
     for name, rec in sorted(scored["recordings"].items()):

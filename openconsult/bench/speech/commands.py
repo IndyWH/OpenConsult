@@ -93,7 +93,8 @@ def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: P
 
 
 def speech_score(out: Path, recordings_folder: Path, script_folders: list[Path], marks_path: Path, write: Path,
-                 say: Callable = print, key_facts_path: Path | None = None, drug_list_path: Path | None = None) -> int:
+                 say: Callable = print, key_facts_path: Path | None = None, drug_list_path: Path | None = None,
+                 counting: bool = False) -> int:
     """The one command: the stored results scored and the tables written,
     never over an existing file. The marks of part one always; the tables
     of part two where its results are there, which then need the key-fact
@@ -117,14 +118,20 @@ def speech_score(out: Path, recordings_folder: Path, script_folders: list[Path],
         return 9
     try:
         scored = tables.score_all(results, listed, [Path(f) for f in script_folders], marks_file)
-        text = tables.as_markdown(scored)
+        text = tables.as_markdown(scored, counting)
         if part_two:
             from openconsult.bench.speech import druglist, keyfacts, tables2
             facts, drugs = keyfacts.KeyFacts.read(key_facts_path), druglist.DrugList.read(drug_list_path)
             scored["part_two"] = tables2.score_all(results, voice_results, call_results, listed, [Path(f) for f in script_folders],
                                                    marks_file, facts, drugs)
             scored["part_two"]["kinds"] = list(facts.kinds)
-            text += tables2.as_markdown(scored["part_two"])
+            text += tables2.as_markdown(scored["part_two"], counting)
+            if counting:
+                # The tables of 5e: the new recordings, where the figures count.
+                from openconsult.bench.speech import tables5e
+                scored["five_e"] = tables5e.score_all(scored, results, voice_results, call_results, listed,
+                                                      [Path(f) for f in script_folders], marks_file, drugs)
+                text += tables5e.as_markdown(scored["five_e"])
         written = tables.write(write, scored, text)
     except tables.ScriptNotFound as missing:
         say(words.BENCH_BAD_LIST.format(reason=missing))
