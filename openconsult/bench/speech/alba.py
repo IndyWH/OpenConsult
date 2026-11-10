@@ -81,6 +81,14 @@ def speeches_of(result: dict, reference: Reference, live_page: Page) -> list[dic
             row["after_reply"] = True
             rows.append(row)
             continue
+        between = [line for line in lines[holding[-1] + 1:] if not line["speeches"]
+                   and line["start"] < (reply_line["start"] if reply_line is not None else last["end"] + 3.0)]
+        if between:
+            # Words no speech of the script owns, after the line and before the reply: whose they are is not
+            # known, so the line may not be the speech's last. No seconds are given, either way.
+            row["apart_choice"] = row["apart_sound"] = "words that match no speech lie between the line and the reply"
+            rows.append(row)
+            continue
         row["end_choice"] = last["end"]
         row["by_choice"] = round(last["t"] - last["end"], 3)
         reply_at = reply_line["start"] if reply_line is not None else last["end"] + 3.0
@@ -92,7 +100,11 @@ def speeches_of(result: dict, reference: Reference, live_page: Page) -> list[dic
         if runs:
             # The last pause before the reply: a pause inside the patient's sentence never moves the end back.
             row["end_sound"], reply_by_sound = runs[-1]
-            row["by_sound"] = round(last["t"] - row["end_sound"], 3)
+            if row["end_sound"] > last["t"]:
+                # The line was final while the sound still went on: the sound is not this line's words.
+                row["apart_sound"] = "the sound went on after the line was final"
+            else:
+                row["by_sound"] = round(last["t"] - row["end_sound"], 3)
             if reply_line is not None and reply_by_sound < bound:
                 reply_began = reply_by_sound
         else:

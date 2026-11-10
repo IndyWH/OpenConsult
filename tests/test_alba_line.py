@@ -111,3 +111,24 @@ def test_ruling_29_a_pause_inside_a_short_reply_of_the_doctor_is_not_taken_for_t
     row = rows_of(result)[0]
     assert row["end_sound"] == 41.4 and row["by_sound"] == 1.9
     assert row["after_reply"] is True                         # final at 43.3, the reply began at 42.3 by the sound
+
+
+def test_ruling_29_no_seconds_are_given_where_the_line_may_not_be_the_last_of_the_speech():
+    # Found on the run of 5e, twice. One: words that match no speech of the script arrive between the patient's
+    # line and the reply; whose they are is not known, so the speech is counted apart both ways.
+    result = result_of([(42.0, line(38.0, 41.3, "In my lower back, and it goes down one leg.")),
+                        (44.0, line(41.5, 41.9, "zzz qqq")),
+                        (46.0, line(42.3, 44.5, "Any numbness between the legs?"))],
+                       quiet=[(41.4, 41.5), (41.9, 42.3)])
+    row = rows_of(result)[0]
+    assert row["apart_choice"] == row["apart_sound"] == "words that match no speech lie between the line and the reply"
+    assert row["by_choice"] is None and row["by_sound"] is None and row["after_reply"] is None
+    assert alba.summary([row])["serves"]["judged"] == 0
+    # Two: the sound goes on after the line was final (a noise, or words nobody wrote): seconds below nought
+    # are not a wait, so the sound gives none and the choice's own time stands alone.
+    result = result_of([(42.0, line(38.0, 41.3, "In my lower back, and it goes down one leg.")),
+                        (46.0, line(43.0, 44.5, "Any numbness between the legs?"))],
+                       quiet=[(42.5, 43.0)])
+    row = rows_of(result)[0]
+    assert row["by_sound"] is None and row["apart_sound"] == "the sound went on after the line was final"
+    assert row["by_choice"] == 0.7 and row["after_reply"] is False
