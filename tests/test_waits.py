@@ -36,7 +36,9 @@ def test_13_3_mark_5_the_wait_to_first_shown_runs_from_the_lines_start_to_final_
     assert found["to_first"] == {"n": 2, "median": 0.325, "longest": 0.4}
     # The partial must hold the first two words in order and together.
     assert waits.first_shown([{"n": 1, "t": 0.1, "partial": "you if"}], 2, ["if", "you"]) is None
-    assert waits.first_shown([{"n": 1, "t": 0.1, "partial": "if you"}, {"n": 3, "t": 0.3, "partial": "nothing"}], 4, ["if", "you"]) is None
+    # As the details of 5e define the wait again: the earliest piece at or after the line's start that holds them,
+    # whatever stood in the text between (part two walked back from the line's arrival and gave None here).
+    assert waits.first_shown([{"n": 1, "t": 0.1, "partial": "if you"}, {"n": 3, "t": 0.3, "partial": "nothing"}], 4, ["if", "you"]) == 0.1
     # On the made recording: the three lines are all of speech 1; only the
     # first gets the wait from the true start, only the last from the true end.
     live = build_page("live", [piece(0.1, 1.0, "If you get this pain"), piece(2.0, 2.6, "at rest, go straight"),
@@ -84,3 +86,31 @@ def test_the_signs_of_the_check_are_counted_right_and_false():
     assert found == {"right": 2, "false": 2, "missing_runs": 1}
     assert waits.missing_runs(page, REF, set()) == [[7, 8, 9, 10, 11]]
     assert waits.missing_runs(page, REF, {8}) == [[9, 10, 11]]           # an agreed place splits a run
+
+
+def test_5e_the_wait_to_first_shown_is_never_taken_from_a_piece_before_the_lines_start():
+    # The details of 5e, the wait defined again: the worked example. A line starts at 12.40 s. Two earlier pieces
+    # hold its first two words by chance of an earlier phrase; the piece at 12.75 is the first at or after its start.
+    result = {"pieces": [{"n": 47, "t": 11.75, "partial": "see you next", "lines": []},
+                         {"n": 49, "t": 12.25, "partial": "see you", "lines": []},
+                         {"n": 51, "t": 12.75, "partial": "see you next week", "lines": []},
+                         {"n": 55, "t": 13.75, "partial": "", "lines": [{"start": 12.4, "end": 13.3, "text": "See you next week."}]}],
+              "stop": {"t": 20.0, "last_live": [], "lines": [], "raw": []}}
+    found = waits.waits(result, REF)
+    assert found["lines"][0]["t_first"] == 12.75 and found["lines"][0]["to_first"] == 0.35
+    assert found["to_first"]["median"] == 0.35 and found["never_shown"] == 0 and found["first_word_unmatched"] == 0
+    # The piece that made the line final, and any after it, never count.
+    assert waits.first_shown(result["pieces"][3:], 55, ["see", "you"], 12.4) is None
+
+
+def test_5e_a_line_whose_first_word_is_not_matched_to_the_script_is_left_out_of_the_wait_and_counted():
+    # The details of 5e: such a line has no wait to first shown, and is counted apart from a line that never showed.
+    result = {"pieces": [{"n": 3, "t": 0.75, "partial": "blah straight to", "lines": []},
+                         {"n": 5, "t": 1.25, "partial": "", "lines": [{"start": 0.1, "end": 1.0, "text": "Blah straight to hospital"}]},
+                         {"n": 9, "t": 2.25, "partial": "", "lines": [{"start": 1.5, "end": 2.0, "text": "See you next week"}]}],
+              "stop": {"t": 3.0, "last_live": [], "lines": [], "raw": []}}
+    live = build_page("live", [piece(0.1, 1.0, "Blah straight to hospital"), piece(1.5, 2.0, "See you next week")], REF)
+    found = waits.waits(result, REF, live)
+    assert [r["first_word_matched"] for r in found["lines"]] == [False, True]
+    assert found["first_word_unmatched"] == 1 and found["never_shown"] == 1 and found["to_first"]["n"] == 0
+    assert found["to_final"]["n"] == 2                                                # the wait to final still counts both

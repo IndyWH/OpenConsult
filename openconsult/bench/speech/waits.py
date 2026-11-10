@@ -2,7 +2,8 @@
 12), and the count of the signs of the check for missing speech, from a
 stored result. The clock of a result is the clock of the feed: a piece is
 fed when its sound has ended. The wait to first shown runs from the start
-of a line's sound, the wait to final from its end."""
+of a line's sound, the wait to final from its end. The wait to first shown
+is as the details of 5e define it again."""
 
 from __future__ import annotations
 
@@ -21,16 +22,17 @@ def _holds(partial: str, words: list[str]) -> bool:
     return any(tokens[i:i + len(words)] == words for i in range(len(tokens) - len(words) + 1))
 
 
-def first_shown(pieces: list[dict], arrived_at: int, words: list[str]) -> float | None:
-    """The moment the line's first words showed in the text not yet
-    final: the earliest stored piece, back from the one before it
-    arrived, whose partial holds them; None when they never showed."""
-    shown = None
-    for piece in sorted((p for p in pieces if p["n"] < arrived_at), key=lambda p: -p["n"]):
-        if not _holds(piece["partial"], words):
-            break
-        shown = piece["t"]
-    return shown
+def first_shown(pieces: list[dict], arrived_at: int, words: list[str], start_s: float = 0.0) -> float | None:
+    """The moment the line's first words showed in the text not yet final
+    (the details of 5e): the earliest stored piece, at or after the line's
+    own start and before the piece that made the line final, whose partial
+    holds them; None when they never showed. A piece before the line's
+    start that holds the same words belongs to an earlier phrase, which is
+    what gave the readings below zero of part two."""
+    for piece in sorted((p for p in pieces if p["n"] < arrived_at), key=lambda p: p["n"]):
+        if piece["t"] >= start_s and _holds(piece["partial"], words):
+            return piece["t"]
+    return None
 
 
 def live_lines(result: dict) -> list[dict]:
@@ -64,13 +66,19 @@ def waits(result: dict, reference: Reference, line_page: Page | None = None,
     true times: the true start against the first line of a speech and the
     true end against its last. A line belongs to the speech of its first
     heard word (the details of part one, as corrected on 11 Oct 2026)."""
-    rows, offset = [], 0
+    rows, offset, unmatched = [], 0, 0
     for line in live_lines(result):
         words = normalise(line["text"], reference.joinable)
-        shown = first_shown(result["pieces"], line["n"], words[:SHOWN_WORDS]) if words else None
+        # A line whose first word is not matched to the reference is left out
+        # of the wait to first shown, and counted (the details of 5e).
+        first_matched = line_page is None or (bool(words) and line_page.kind_of.get(offset) == "heard")
+        shown = first_shown(result["pieces"], line["n"], words[:SHOWN_WORDS], float(line["start"])) \
+            if words and first_matched else None
+        unmatched += bool(words) and not first_matched
         row = {"text": line["text"], "start": line["start"], "end": line["end"], "t_final": line["t"],
                "to_final": round(line["t"] - line["end"], 3), "t_first": shown,
-               "to_first": round(shown - line["start"], 3) if shown is not None else None}
+               "to_first": round(shown - line["start"], 3) if shown is not None else None,
+               "first_word_matched": bool(first_matched)}
         speech = _speech_of_line(words, line_page, reference, offset)
         offset += len(words)
         if speech is not None:
@@ -79,7 +87,8 @@ def waits(result: dict, reference: Reference, line_page: Page | None = None,
     _true_waits(rows, true_times or {})
     return {"lines": rows, "to_final": _typical([r["to_final"] for r in rows]),
             "to_first": _typical([r["to_first"] for r in rows if r["to_first"] is not None]),
-            "never_shown": sum(1 for r in rows if r["to_first"] is None),
+            "never_shown": sum(1 for r in rows if r["to_first"] is None and r["first_word_matched"]),
+            "first_word_unmatched": unmatched,
             "to_final_true": _typical([r["to_final_true"] for r in rows if "to_final_true" in r]),
             "to_first_true": _typical([r["to_first_true"] for r in rows if "to_first_true" in r])}
 

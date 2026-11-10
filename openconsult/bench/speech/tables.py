@@ -254,7 +254,7 @@ def page_table(arm: str, name: str, page: dict) -> list[str]:
     if "wait" in page:
         wait = page["wait"]
         lines.append(f"- The wait: to final {_typ(wait['to_final'])}; to first shown {_typ(wait['to_first'])}; "
-                     f"never shown {wait['never_shown']}"
+                     f"never shown {wait['never_shown']}; first word not matched, left out {wait.get('first_word_unmatched', 0)}"
                      + (f"; to final from the true end {_typ(wait['to_final_true'])}" if wait["to_final_true"]["n"] else "")
                      + (f"; to first shown from the true start {_typ(wait['to_first_true'])}" if wait.get("to_first_true", {}).get("n") else "")
                      + ".")
