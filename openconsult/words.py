@@ -203,6 +203,9 @@ CLOCK_OVER = "Over the intended time."
 MODEL_LINE = "Speech: {speech}. Language model: {model} on {engine} {version}."
 SPEECH_STOPPED = "The speech choice has stopped: {reason} The recording goes on."
 MIC_REFUSED = "The microphone could not be opened: {reason}"
+# Spec 15.9, ruling 32: said at Start when the browser does not give the rate asked. A draft.
+RATE_NOT_GIVEN = ("This browser did not give sound at 48,000 samples a second ({found}). This consultation may not be "
+                  "transcribed: stop it and try a current Chrome, Edge, Firefox or Safari.")
 SOCKET_LOST = "The connection to OpenConsult was lost. Trying again."
 SOCKET_BACK = "Connected again."
 # The earlier-notes panel (15.11 ruling 4). Drafts.

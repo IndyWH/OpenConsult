@@ -67,6 +67,8 @@
     }
   }
 
+  const ASKED_RATE = 48000;
+
   async function startMicrophone() {
     let stream;
     try {
@@ -76,7 +78,20 @@
       say(WORDS.MIC_REFUSED.replace('{reason}', error && error.message ? error.message : String(error)));
       return;
     }
-    const context = new AudioContext();
+    // The page always asks for 48,000 samples a second (spec 15.9, ruling
+    // 32): the browser converts when the microphone or the speakers run at
+    // another rate. A browser that does not give it is said at once, not
+    // found out at Stop; nothing is tried at another rate.
+    let context, source;
+    try {
+      context = new AudioContext({sampleRate: ASKED_RATE});
+      source = context.createMediaStreamSource(stream);
+    } catch (error) {
+      say(WORDS.RATE_NOT_GIVEN.replace('{found}', error && error.message ? error.message : String(error)));
+      stream.getTracks().forEach(function (track) { track.stop(); });
+      return;
+    }
+    if (context.sampleRate !== ASKED_RATE) say(WORDS.RATE_NOT_GIVEN.replace('{found}', String(context.sampleRate)));
     if (context.state === 'suspended') await context.resume();
     const applied = stream.getAudioTracks()[0].getSettings();
     window.capture = {
@@ -90,7 +105,7 @@
     const worklet = new AudioWorkletNode(context, 'pcm-forwarder');
     const pieceSamples = Math.round(context.sampleRate * pieceSeconds);
     worklet.port.onmessage = function (event) { if (!stopped) enqueue(toInt16(event.data), pieceSamples); };
-    context.createMediaStreamSource(stream).connect(worklet);
+    source.connect(worklet);
     window.stopMicrophone = function () {
       stopped = true;
       worklet.disconnect();

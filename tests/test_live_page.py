@@ -49,3 +49,22 @@ def test_R15_15_6_the_live_page_holds_the_guideline_pane_and_its_script_in_its_o
         assert "words." + name in script and name in SCRIPT_WORDS
     state = app.state.parts.running[1].page_state()["guidelines"]
     assert state["state"] == "no_corpus" and words.GUIDELINE_NO_CORPUS in page
+
+
+def test_ruling_32_the_live_page_asks_the_browser_for_48000_samples_a_second(started):
+    # 15.9 ruling 32: every sound context of the page is made at the rate asked, and none without it.
+    app, client, worker = started
+    script = client.get("/static/live.js").text
+    assert "const ASKED_RATE = 48000;" in script
+    assert script.count("new AudioContext(") == 1 and "new AudioContext({sampleRate: ASKED_RATE})" in script
+
+
+def test_ruling_32_and_7_a_browser_that_does_not_give_the_rate_is_told_at_start_and_nothing_is_tidied(started):
+    # Ruling 32: the sentence is one of the page's own words, said where the context is made or its rate differs.
+    # Ruling 7: the three switches are still asked off; a change of rate is not tidying.
+    app, client, worker = started
+    script = client.get("/static/live.js").text
+    assert "RATE_NOT_GIVEN" in SCRIPT_WORDS and script.count("WORDS.RATE_NOT_GIVEN") == 2
+    assert "48,000" in words.RATE_NOT_GIVEN and "{found}" in words.RATE_NOT_GIVEN
+    assert "context.sampleRate !== ASKED_RATE" in script
+    assert "echoCancellation: false, noiseSuppression: false, autoGainControl: false" in script
