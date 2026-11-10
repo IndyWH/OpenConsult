@@ -61,7 +61,11 @@ def poll(http: Http, key: str, job: dict) -> tuple[str, str]:
         return "failed", f"the job could not be read: HTTP {answer.status}"
     if status == "running":
         return "waiting", ""
-    return ("done", "") if status == "done" else ("failed", f"the job ended as {status}")
+    if status == "done":
+        # The job's own record holds the settings the service took; the transcript's metadata repeats only some.
+        job["config"] = ((answer.json() or {}).get("job") or {}).get("config")
+        return "done", ""
+    return "failed", f"the job ended as {status}"
 
 
 def fetch(http: Http, key: str, job: dict) -> tuple[dict | None, str | None]:
@@ -77,14 +81,22 @@ def counted_s(reply: dict) -> float | None:
     return None if duration is None else float(duration)
 
 
-def applied(reply: dict) -> tuple[dict, str | None]:
+def applied(reply: dict, job: dict | None = None) -> tuple[dict, str | None]:
     """What the service says it applied, and the reason the result is not
-    the arm's when the model or the medical domain differ."""
+    the arm's when the model or the medical domain differ. The settings
+    the service took are in the job's own record. The transcript's
+    metadata names the model and, on 10 Nov 2026, no domain: that is kept
+    as it came (domain_in_transcript), so the report can say that the
+    reply itself does not prove the medical domain."""
+    taken = (((job or {}).get("config") or {}).get("transcription_config")) or {}
     used = ((reply.get("metadata") or {}).get("transcription_config")) or {}
     model = used.get("model") or used.get("operating_point")
-    found = {"model": model, "domain": used.get("domain"), "diarization": used.get("diarization")}
-    if model != MODEL or used.get("domain") != DOMAIN:
-        return found, f"the service answered with the model {model} and the domain {used.get('domain')}, not {MODEL} and {DOMAIN}"
+    found = {"model": model, "domain": taken.get("domain"), "diarization": used.get("diarization"),
+             "model_taken": taken.get("model") or taken.get("operating_point"), "domain_in_transcript": used.get("domain"),
+             "adapted": ((reply.get("metadata") or {}).get("language_pack_info") or {}).get("adapted")}
+    if model != MODEL or found["model_taken"] != MODEL or taken.get("domain") != DOMAIN:
+        return found, (f"the service answered with the model {model} and holds the model {found['model_taken']} and the domain "
+                       f"{taken.get('domain')}, not {MODEL} and {DOMAIN}")
     return found, None
 
 

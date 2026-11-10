@@ -35,7 +35,7 @@ class MadeUpSpeechmatics:
         results.append({"type": "punctuation", "start_time": t, "end_time": t, "is_eos": True,
                         "alternatives": [{"content": ".", "confidence": 1.0, "speaker": "S2"}]})
         return {"format": "2.9", "job": {"id": "job-1", "data_name": "x", "duration": 7},
-                "metadata": {"transcription_config": {"language": "en", "operating_point": self.model, "domain": self.domain,
+                "metadata": {"transcription_config": {"language": "en", "model": self.model, "operating_point": self.model,
                                                       "diarization": "speaker"}},
                 "results": results}
 
@@ -57,7 +57,11 @@ class MadeUpSpeechmatics:
                 return _json(404, {"code": 404}) if self.after_delete == "gone" else \
                     _json(200, {"job": {"id": "job-1", "status": "deleted", "data_name": "x", "duration": 7}})
             self.runs -= 1
-            return _json(200, {"job": {"id": "job-1", "status": "running" if self.runs >= 0 else "done"}})
+            # As the service answered on 10 Nov 2026: the job's own record holds the settings it took, the domain
+            # among them; the transcript's metadata names the model and no domain.
+            config = {"type": "transcription", "transcription_config": {"language": "en", "model": self.model, "diarization": "speaker",
+                                                                        **({"domain": self.domain} if self.domain else {})}}
+            return _json(200, {"job": {"id": "job-1", "status": "running" if self.runs >= 0 else "done", "config": config}})
         if path.startswith("/jobs/job-1/transcript"):
             if self.deleted and self.after_delete != "words":
                 return _json(404, {"code": 404})

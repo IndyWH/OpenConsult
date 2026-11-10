@@ -135,6 +135,10 @@ def test_ruling_28_the_result_is_kept_then_the_job_is_deleted_and_asked_for_agai
     assert [line["speaker"] for line in lines] == (["S1", "S2"] if service is speechmatics_upload else ["A", "B"])
     assert lines[0]["start"] == 1.0 and lines[0]["end"] < lines[1]["start"] and lines[0]["confidence"] == 0.9
     assert result["arm"] == service.ARM and result["stamp"]["model"] == service.MODEL and result["loudness"]["dbfs"]
+    # What the service says it applied is kept; for one service the settings are in the job's own record.
+    assert up["applied"]["model"] == service.MODEL and up["applied"]["domain"] == service.DOMAIN
+    if service is speechmatics_upload:
+        assert up["applied"]["domain_in_transcript"] is None and up["applied"]["model_taken"] == "enhanced"
     # The key is in no part of the result (the keys).
     assert MADE_UP_KEY not in json.dumps(result)
 

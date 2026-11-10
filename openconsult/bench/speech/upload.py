@@ -204,7 +204,7 @@ def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, descri
                 else:
                     upload["reply"] = reply
                     upload["counted_s"] = service.counted_s(reply)
-                    upload["applied"], problem = service.applied(reply)
+                    upload["applied"], problem = service.applied(reply, job)
                     lines = service.lines_of(reply)
                     if problem:
                         failed("model", problem)

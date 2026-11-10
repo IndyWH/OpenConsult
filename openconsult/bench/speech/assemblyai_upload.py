@@ -83,7 +83,7 @@ def counted_s(reply: dict) -> float | None:
     return None if duration is None else float(duration)
 
 
-def applied(reply: dict) -> tuple[dict, str | None]:
+def applied(reply: dict, job: dict | None = None) -> tuple[dict, str | None]:
     model = reply.get("speech_model_used") or reply.get("speech_model")
     found = {"model": model, "domain": reply.get("domain"), "speaker_labels": reply.get("speaker_labels"),
              "warnings": (reply.get("metadata") or {}).get("warnings")}
