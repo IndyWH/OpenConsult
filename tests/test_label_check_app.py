@@ -80,3 +80,18 @@ def test_5e_eight_kinds_of_page_whisperx_with_v1s_line_has_a_page_at_stop_of_its
               ("speechmatics_upload", "one"): {"failure": None}, ("nemotron", "one"): {"failure": {"at": "feed"}}}
     assert [arm for arm, _, _ in calls.pages_for_calls(stored, None, None)] == ["speechmatics_upload", "whisperx_pyannote",
                                                                                "whisperx_v1_line"]
+
+
+def test_5e_the_bench_command_takes_every_job_of_the_calls_by_name(monkeypatch):
+    # The command line names the label check as the app sends it; a job the bench does not have is refused by the parser.
+    import pytest
+
+    from openconsult.bench import cli
+    from openconsult.bench.speech import commands2
+    seen = []
+    monkeypatch.setattr(commands2, "speech_calls", lambda *a, **k: seen.append(a[3]) or 0)
+    for job in calls.JOB_KINDS:
+        assert cli.main(["speech-calls", "--out", "o", "--recordings", "r", "--scripts", "s", "--job", job]) == 0
+    assert seen == list(calls.JOB_KINDS)
+    with pytest.raises(SystemExit):
+        cli.main(["speech-calls", "--out", "o", "--recordings", "r", "--scripts", "s", "--job", "no_such_job"])

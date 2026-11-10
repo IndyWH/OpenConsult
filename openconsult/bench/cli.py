@@ -23,6 +23,7 @@ from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.shared import commands as shared_commands
 from openconsult.bench.speech import commands as speech_commands
+from openconsult.bench.speech import calls as speech_calls
 from openconsult.bench.speech import commands2 as speech_commands2
 from openconsult.bench.speech.arms import ARMS
 from openconsult.bench.writer import Refused, ResultWriter
@@ -450,7 +451,8 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--out", required=True, help="the results folder of speech-run; the calls' results go under it")
     p.add_argument("--recordings", required=True, help="the folder holding recordings.json")
     p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
-    p.add_argument("--job", required=True, choices=["label_check", "drug_name", "note", "script_note"], help="the job to run")
+    p.add_argument("--job", required=True, choices=list(speech_calls.JOB_KINDS),
+                   help="the job to run; label_check_app is the label check as the app sends it (5e)")
     p.add_argument("--round", type=int, help="the round of the notes, 1 or 2")
     p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
     p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
