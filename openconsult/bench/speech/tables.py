@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from openconsult.bench.speech import marks, waits
+from openconsult.bench.speech import alba, marks, waits
 from openconsult.bench.speech.banked import Recording, sha256_of
 from openconsult.bench.speech.pages import Page, build_page, live_pieces, pages_of
 from openconsult.bench.speech.reference import Reference, agreement, build, names_as_cut, safety_nets_as_cut
@@ -86,6 +86,9 @@ def score_page(arm: str, page: Page, live: Page | None, result: dict, reference:
         # line finds its speech and the true times serve every arm (fix two).
         line_page = page if page.name == "live" else build_page("live", live_pieces(result), reference)
         scored["wait"] = waits.waits(result, reference, line_page, true_times)
+        if result.get("upload") is None:
+            # The line for Alba (ruling 29): a live arm only; a whole recording sent at Stop has no live text.
+            scored["alba"] = alba.speeches_of(result, reference, line_page)
     if true_times:
         scored["times"] = waits.exactness_made(page, reference, true_times, slack)
     scored["hard"] = {"passages_without_sign": sum(1 for p in scored["passages"] if not p["sign"]),
