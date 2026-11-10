@@ -10,7 +10,7 @@ Built and run in one session on 10 Nov 2026 under the owner's approval of
 the plan. THE FIGURES COUNT: three recordings of 21 Oct 2026, real voices
 (545, 355 and 387 s). Nothing of 5e is built into the app but the opening
 commit (R31). The tables are stage5e-tables3 in the private log folder;
-the private report was not yet written when this entry was made.
+the private report is STAGE5E_REPORT.md beside them.
 
 The spec, committed once, not a character changed: 233ec9b (sha256
 66469965...). The stage prompt is e56af10 (stage-prompts/STAGE_05E.md).
