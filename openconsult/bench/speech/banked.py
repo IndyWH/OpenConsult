@@ -62,6 +62,12 @@ class Recording:
         """Whether the list says this recording's sound may go to the service."""
         return service in self.consent.get("cloud", [])
 
+    def cloud_whole_allowed(self, service: str) -> bool:
+        """Whether the list says the whole recording may be sent once to the
+        service's upload service (spec 15.9, rulings 28 and 31). Said apart
+        from the live stream: a list that does not say it means no."""
+        return service in (self.consent.get("cloud_whole") or [])
+
     @property
     def folder(self) -> Path:
         return self.path.parent
@@ -85,7 +91,9 @@ def _check_entry(entry: dict) -> None:
         raise BadList(f"{entry['name']}: consent must say tests_on_this_computer true and list the cloud services")
     if int(entry["speakers"]) < 1:
         raise BadList(f"{entry['name']}: the number of speakers is 1 or more")
-    if entry.get("voice_only") and (int(entry["speakers"]) != 1 or consent.get("cloud")):
+    if not isinstance(consent.get("cloud_whole", []), list):
+        raise BadList(f"{entry['name']}: consent.cloud_whole lists the services the whole recording may go to")
+    if entry.get("voice_only") and (int(entry["speakers"]) != 1 or consent.get("cloud") or consent.get("cloud_whole")):
         raise BadList(f"{entry['name']}: a recording of the doctor's voice alone has one speaker and goes to no cloud service")
     if entry.get("doctor_voice") is not None and not isinstance(entry["doctor_voice"], str):
         raise BadList(f"{entry['name']}: doctor_voice names a listed recording, or is null")

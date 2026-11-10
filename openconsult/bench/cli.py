@@ -338,6 +338,19 @@ def cmd_speech_run(args) -> int:
                                       key_folder=Path(args.key_folder) if args.key_folder else None)
 
 
+def cmd_speech_upload(args) -> int:
+    from openconsult.bench.speech import upload_commands
+    if args.held:
+        return upload_commands.speech_upload_held(args.service, Path(args.key_folder), [Path(o) for o in args.held],
+                                                  Path(args.out), say=say)
+    if not args.gate and not args.recordings:
+        say("STOP: speech-upload needs --recordings, or --gate, or --held")
+        return 2
+    return upload_commands.speech_upload(args.service, Path(args.key_folder), Path(args.out),
+                                         Path(args.recordings) if args.recordings else None, args.recording,
+                                         gate=args.gate, say=say)
+
+
 def cmd_speech_selftest(args) -> int:
     return speech_commands.speech_selftest(args.choice, Path(args.data_folder), Path(args.key_folder), say=say)
 
@@ -466,6 +479,15 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--started-file", help="5d: a file written when the feed begins, with the moment")
     p.add_argument("--pause-at-stop", help="5d: a folder where stop.wanted is written before Stop, which then waits for stop.go")
     p.add_argument("--key-folder", help="5e: for a cloud arm, the folder whose .env holds its key; read inside the process, never written")
+    p = sub.add_parser("speech-upload")
+    p.set_defaults(fn=cmd_speech_upload)
+    p.add_argument("--service", required=True, choices=["speechmatics", "assemblyai"], help="the service's upload service, at its EU address")
+    p.add_argument("--key-folder", required=True, help="the folder whose .env holds the key; read inside the process, never written")
+    p.add_argument("--out", required=True, help="the results folder; with --held, the file the answers are written to")
+    p.add_argument("--recordings", help="the folder holding recordings.json and the recordings")
+    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
+    p.add_argument("--gate", action="store_true", help="send the self-test's clip, read it, delete it and prove it gone")
+    p.add_argument("--held", nargs="*", help="result folders whose jobs are asked for once more, with the service's own list")
     p = sub.add_parser("speech-selftest")
     p.set_defaults(fn=cmd_speech_selftest)
     p.add_argument("--choice", required=True, choices=["speechmatics", "assemblyai"], help="the cloud choice")

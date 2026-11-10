@@ -847,6 +847,20 @@ BENCH_CALLS_DONE = "Made {made} calls, {failed} failed; {kept} results were alre
 BENCH_NEEDS_FILE = "The results of part two are here, so {option} is needed: {what}."
 BENCH_SCORED_TWO = "Scored part two as well: {pages} pages, {calls} calls, {voice} voice results."
 
+# The pass at Stop of a cloud service, the bench's alone (15.9, ruling 28; the details of 5e). Drafts.
+BENCH_UPLOAD_SENDING = "Sending {name} whole to {service}, at {address}."
+BENCH_UPLOAD_RESULT = "{service} gave its result after {seconds} s; it counted {counted} s of sound."
+BENCH_UPLOAD_GONE = "Deleted at {service}, and asked again: {answer}."
+BENCH_UPLOAD_NOT_PROVEN = ("STOP: the upload of {name} to {service} could not be proven deleted: {answer}. "
+                           "Nothing more is sent.")
+BENCH_NO_WHOLE_CONSENT = "The recording {name} may not be sent whole to {service}: its consent does not say so."
+BENCH_UPLOAD_NO_KEY = "{service} needs --key-folder, the folder whose .env holds {name}."
+BENCH_UPLOAD_GATE_PASSED = "The gate call to {service} passed: the clip came back, was deleted, and is gone."
+BENCH_UPLOAD_GATE_FAILED = "The gate call to {service} did not pass: {heard} of the clip's {of} words came back. It was deleted."
+BENCH_UPLOAD_HELD = "{service}: {jobs} jobs asked for again, {held} still held. Written: {path}"
+ARM_SPEECHMATICS_UPLOAD = "Speechmatics, whole recording"
+ARM_ASSEMBLYAI_UPLOAD = "AssemblyAI, whole recording"
+
 # The test of 5d: the three models together on one card (spec 15.9, the
 # details of 5d). Said in the terminal by openconsult-bench. Drafts for the owner.
 EMBED_BUILDING = "Building the environment of EmbeddingGemma 2 in {folder}. This takes a few minutes."
