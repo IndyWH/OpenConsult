@@ -847,6 +847,9 @@ BENCH_CALLS_DONE = "Made {made} calls, {failed} failed; {kept} results were alre
 BENCH_NEEDS_FILE = "The results of part two are here, so {option} is needed: {what}."
 BENCH_SCORED_TWO = "Scored part two as well: {pages} pages, {calls} calls, {voice} voice results."
 
+# The voice cut from the recordings (15.9, ruling 33). Drafts.
+BENCH_VOICE_CUT = "The voice {voice} was cut from {name}: {seconds} s in {stretches} stretches."
+BENCH_VOICE_OWN = "The voice {voice} was cut from {name} itself, and is never used on its own recording."
 # The pass at Stop of a cloud service, the bench's alone (15.9, ruling 28; the details of 5e). Drafts.
 BENCH_UPLOAD_SENDING = "Sending {name} whole to {service}, at {address}."
 BENCH_UPLOAD_RESULT = "{service} gave its result after {seconds} s; it counted {counted} s of sound."

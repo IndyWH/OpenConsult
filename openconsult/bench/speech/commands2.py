@@ -39,9 +39,10 @@ from openconsult.speech.choices import WHISPERX_PYANNOTE
 
 def speech_voice(out: Path, recordings_folder: Path, data_folder: Path, names: list[str] | None,
                  arms: list[str] | None, say: Callable = print, make_worker: Callable | None = None,
-                 now: Callable = dt.datetime.now) -> int:
+                 now: Callable = dt.datetime.now, voice_name: str | None = None) -> int:
     """The voice method on the stored pages at Stop under out/results; the
-    results under out/voice."""
+    results under out/voice. voice_name (ruling 33) tells the run which
+    listed voice to learn; without it, the voice each recording names."""
     try:
         listed = banked.load_list(recordings_folder)
     except banked.BadList as bad:
@@ -57,13 +58,14 @@ def speech_voice(out: Path, recordings_folder: Path, data_folder: Path, names: l
     try:
         for arm, name, _ in chosen:
             recording = banked.named(listed, name)
-            if recording.doctor_voice is None or writer.exists(arm, name):
+            told = voice_name or recording.doctor_voice
+            if told is None or writer.exists(arm, voice.chain_of(name, voice_name)):
                 continue
-            heard = banked.named(listed, recording.doctor_voice)
+            heard = banked.named(listed, told)
             if not heard.voice_only:
                 say(words.BENCH_VOICE_NEEDS_VOICE_ONLY.format(name=name, voice=heard.name))
                 return 4
-            needs_worker = True
+            needs_worker = needs_worker or heard.entry.get("cut_of") != name
     except banked.NotListed as missing:
         say(words.BENCH_NOT_LISTED.format(name=missing))
         return 3
@@ -73,7 +75,7 @@ def speech_voice(out: Path, recordings_folder: Path, data_folder: Path, names: l
     start = make_worker or voice.make_worker
     run = voice.VoiceRun(lambda: start(data_folder))
     try:
-        summary = voice.run_pages(listed, chosen, writer, run, say=say, now=now)
+        summary = voice.run_pages(listed, chosen, writer, run, say=say, now=now, voice_name=voice_name)
     except (banked.RecordingChanged, banked.NotListed) as changed:
         say(words.BENCH_RECORDING_CHANGED.format(name=str(changed).split(":")[0], reason=changed))
         return 3
@@ -179,3 +181,62 @@ def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path],
     say(words.BENCH_CALLS_DONE.format(made=len(summary["run"]) + len(summary["failed"]), failed=len(summary["failed"]),
                                       kept=len(summary["kept"])))
     return 5 if summary["failed"] else 0
+
+
+def speech_voice_cut(out: Path, recordings_folder: Path, script_folders: list[Path], write: Path,
+                     names: list[str] | None = None, say: Callable = print) -> int:
+    """The doctor's voice cut from each recording that has a page of
+    WhisperX at Stop under out/results (ruling 33): one WAV for each, and
+    one file of what was cut, times and counts only. Never where
+    recordings are kept, never over a file that exists."""
+    import json
+
+    from openconsult.bench.speech import sound, voicecut
+    from openconsult.bench.speech.reference import build
+    try:
+        listed = banked.load_list(recordings_folder)
+    except banked.BadList as bad:
+        say(words.BENCH_BAD_LIST.format(reason=bad))
+        return 3
+    write = Path(write)
+    try:
+        ResultWriter(write, forbidden=(REPO, paths.default_data_folder(), *banked.folders_of(listed)))   # a check of the folder only
+    except Refused as refused:
+        say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
+        return 6
+    listing = write / "voice_cuts.json"
+    if listing.exists():
+        say(words.BENCH_WRITE_EXISTS.format(path=listing))
+        return 6
+    results, cuts = ResultWriter(out).read_all(), {}
+    for recording in listed:
+        result = results.get((WHISPERX_PYANNOTE.name, recording.name))
+        if recording.voice_only or (names and recording.name not in names) or result is None or result.get("failure"):
+            continue
+        try:
+            banked.check_file(recording)
+            reference = build(tables.find_script(recording, [Path(f) for f in script_folders]), recording.last_speech,
+                              recording.read_differently)
+        except (banked.RecordingChanged, tables.ScriptNotFound) as bad:
+            say(words.BENCH_BAD_LIST.format(reason=bad))
+            return 3
+        found = voicecut.stretches_of(voicecut.timed_tokens(result, reference), reference)
+        kept = voicecut.taken(found)
+        name = f"voice_{recording.name}"
+        target = write / f"{name}.wav"
+        if target.exists():
+            say(words.BENCH_WRITE_EXISTS.format(path=target))
+            return 6
+        write.mkdir(parents=True, exist_ok=True)
+        data = voicecut.cut(sound.read_wav(recording.path, recording.rate), recording.rate, kept)
+        target.write_bytes(data)
+        cuts[name] = {"file": target.name, "sha256": banked.sha256_of(target), "cut_of": recording.name,
+                      "source_sha256": recording.sha256, "rate": recording.rate, "seconds_of_voice": voicecut.seconds_of(kept),
+                      "length_s": round(voicecut.seconds_of(kept) + 2 * voicecut.EDGE_SILENCE_S, 3), "stretches_found": len(found),
+                      "stretches": kept, "thin": voicecut.seconds_of(kept) < voicecut.THIN_S,
+                      "rule": {"least_words": voicecut.LEAST_WORDS, "clear_s": voicecut.CLEAR_S, "wanted_s": voicecut.WANTED_S}}
+        say(words.BENCH_VOICE_CUT.format(voice=name, name=recording.name, seconds=cuts[name]["seconds_of_voice"],
+                                         stretches=len(kept)))
+    write.mkdir(parents=True, exist_ok=True)
+    listing.write_text(json.dumps({"voices": cuts}, indent=1), encoding="utf-8", newline="\n")
+    return 0

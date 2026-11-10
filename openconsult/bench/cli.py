@@ -364,7 +364,12 @@ def cmd_speech_score(args) -> int:
 
 def cmd_speech_voice(args) -> int:
     return speech_commands2.speech_voice(Path(args.out), Path(args.recordings), Path(args.data_folder), args.recording,
-                                         args.arm, say=say)
+                                         args.arm, say=say, voice_name=args.voice)
+
+
+def cmd_speech_voice_cut(args) -> int:
+    return speech_commands2.speech_voice_cut(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts],
+                                             Path(args.write), args.recording, say=say)
 
 
 def cmd_speech_drugs(args) -> int:
@@ -466,6 +471,14 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--data-folder", required=True, help="the data folder whose WhisperX environment runs the voice worker")
     p.add_argument("--recording", nargs="*", help="only these recordings, by name")
     p.add_argument("--arm", nargs="*", help="only these arms")
+    p.add_argument("--voice", help="5e: the listed voice to learn, cut from another recording; never used on its own")
+    p = sub.add_parser("speech-voice-cut")
+    p.set_defaults(fn=cmd_speech_voice_cut)
+    p.add_argument("--out", required=True, help="the results folder of speech-run, with the pages of WhisperX at Stop")
+    p.add_argument("--recordings", required=True, help="the folder holding recordings.json and the recordings")
+    p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
+    p.add_argument("--write", required=True, help="where the voices and voice_cuts.json go; never where recordings are kept")
+    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
     p = sub.add_parser("speech-fetch")
     p.set_defaults(fn=cmd_speech_fetch)
     p.add_argument("--data-folder", required=True, help="the data folder whose Nemotron environment fetches the tied pair's model")

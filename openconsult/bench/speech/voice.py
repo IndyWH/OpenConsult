@@ -140,25 +140,39 @@ def pages_to_run(results: dict, names: list[str] | None, arms: list[str] | None)
     return found
 
 
+def chain_of(name: str, voice_name: str | None) -> str:
+    """A page has one result for each voice it was read with (5e): the
+    source is in the result's name, so neither is written over."""
+    return name if voice_name is None else f"{name}--from-{voice_name}"
+
+
 def run_pages(listed: list[banked.Recording], chosen: list[tuple[str, str, dict]], writer: ResultWriter,
-              run: VoiceRun, say: Callable = print, now: Callable = dt.datetime.now) -> dict:
+              run: VoiceRun, say: Callable = print, now: Callable = dt.datetime.now, voice_name: str | None = None) -> dict:
     """Each page: the voice learnt once per listed voice, the lines scored,
     the result written; the plain not-run record where the list names no
-    voice. A failure is kept as failed and the next page runs."""
-    done, kept, not_run, failed = [], [], [], []
+    voice. With voice_name given (ruling 33), every page is read with that
+    voice, but never a page of the recording the voice was cut from. A
+    failure is kept as failed and the next page runs."""
+    done, kept, not_run, failed, own = [], [], [], [], []
     for arm, name, result in chosen:
-        if writer.exists(arm, name):
-            say(words.BENCH_RESULT_EXISTS.format(arm=arm, name=name))
+        chain = chain_of(name, voice_name)
+        if writer.exists(arm, chain):
+            say(words.BENCH_RESULT_EXISTS.format(arm=arm, name=chain))
             kept.append((arm, name))
             continue
         recording = banked.named(listed, name)
         lines = model_lines.lines_of(pages.stop_pieces(result))
-        if recording.doctor_voice is None:
+        told = voice_name or recording.doctor_voice
+        if told is None:
             say(words.BENCH_VOICE_NOT_RUN.format(name=name))
-            writer.write(arm, name, result_of(arm, recording, None, lines, None, None, {}, now(), not_run=NOT_RUN))
+            writer.write(arm, chain, result_of(arm, recording, None, lines, None, None, {}, now(), not_run=NOT_RUN))
             not_run.append((arm, name))
             continue
-        voice = banked.named(listed, recording.doctor_voice)
+        voice = banked.named(listed, told)
+        if voice.entry.get("cut_of") == recording.name:
+            say(words.BENCH_VOICE_OWN.format(voice=voice.name, name=name))
+            own.append((arm, name))
+            continue
         try:
             banked.check_file(voice)
             banked.check_file(recording)
@@ -168,11 +182,11 @@ def run_pages(listed: list[banked.Recording], chosen: list[tuple[str, str, dict]
                 learnt = run.learn(voice)
             say(words.BENCH_VOICE_SCORING.format(arm=arm, name=name))
             scored = run.score(recording, lines)
-            writer.write(arm, name, result_of(arm, recording, voice, lines, scored, learnt, run.info, now()))
+            writer.write(arm, chain, result_of(arm, recording, voice, lines, scored, learnt, run.info, now()))
             done.append((arm, name))
         except WorkerGone as gone:
             say(words.BENCH_FAILED.format(arm=arm, name=name, at="voice", detail=gone.detail))
-            writer.write(arm, name, result_of(arm, recording, voice, lines, None, None, run.info, now(),
-                                              failure={"failure": gone.kind, "detail": gone.detail}))
+            writer.write(arm, chain, result_of(arm, recording, voice, lines, None, None, run.info, now(),
+                                               failure={"failure": gone.kind, "detail": gone.detail}))
             failed.append((arm, name))
-    return {"run": done, "kept": kept, "not_run": not_run, "failed": failed}
+    return {"run": done, "kept": kept, "not_run": not_run, "failed": failed, "own": own}
