@@ -135,7 +135,7 @@ def test_5e_the_cell_for_alba_says_yes_or_no_as_a_reading_with_its_counts():
     cell = tables5e._alba_cell(alba.summary(rows))
     assert cell.startswith("yes (a reading; by the sound: typical 0.4 s; 1 of 1 within 0.8 s by the sound; 0 of 1 final only after")
     late = tables5e._alba_cell(alba.summary([dict(rows[0], after_reply=True)]))
-    assert late.startswith("no (a reading; by the sound: typical late s") and tables5e._alba_cell(None) == "no live text"
+    assert late.startswith("no (a reading; by the sound: typical: late; ") and tables5e._alba_cell(None) == "no live text"
 
 
 def test_R31_nothing_of_5e_is_built_into_the_app():

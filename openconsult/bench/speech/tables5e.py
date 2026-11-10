@@ -307,8 +307,8 @@ def _alba_cell(found: dict | None) -> str:
         return "no live text"
     serves, way = found["serves"], found["by_sound"]
     within = way["within"].get(str(alba.SERVES_WITHIN_S), 0)
-    typical = "late" if serves["typical"] is None and serves["judged"] else serves["typical"]
-    return (f"{'yes' if serves['yes'] else 'no'} (a reading; by {serves['by']}: typical {typical} s; "
+    typical = "typical: late" if serves["typical"] is None and serves["judged"] else f"typical {serves['typical']} s"
+    return (f"{'yes' if serves['yes'] else 'no'} (a reading; by {serves['by']}: {typical}; "
             f"{within} of {way['n']} within {alba.SERVES_WITHIN_S} s by the sound; "
             f"{found['after_reply']} of {found['speeches']} final only after the reply began)")
 
