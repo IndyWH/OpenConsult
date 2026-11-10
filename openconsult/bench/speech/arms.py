@@ -14,6 +14,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from openconsult import words
+from openconsult.settings import keys
 from openconsult.speech import environment
 from openconsult.speech.choices import (ASSEMBLYAI, NEMOTRON, NEMOTRON_TIME_SLACK_S, SPEECHMATICS, WHISPERX_PYANNOTE,
                                         Choice)
@@ -58,9 +59,25 @@ ARMS: dict[str, Arm] = {
 }
 
 
-def door_for(arm: Arm, data_folder: Path, environ=os.environ) -> Door:
+def door_for(arm: Arm, data_folder: Path, environ=os.environ, key_folder: Path | None = None) -> Door:
     """The arm's door: the app's own for a choice; for an arm of the bench
-    its worker file run by the environment's Python, with no key."""
+    its worker file run by the environment's Python, with no key. With a
+    key folder given, a cloud arm's key is read from that folder's key
+    file alone, by the one module that reads keys: not from the data
+    folder and not from the process environment, so the bench can work in
+    a data folder that holds no key and no copy of one is ever made."""
+    if arm.worker_script is None and arm.cloud and key_folder is not None:
+        choice = arm.choice
+
+        def key() -> str | None:
+            return keys.read_key(choice.key, Path(key_folder), {})
+
+        return Door(choice,
+                    make_worker=lambda: Worker(environment.worker_command(data_folder, choice),
+                                               log_path=environment.log_path(data_folder, choice),
+                                               env=environment.worker_env(environ, choice.key, key())),
+                    installed=lambda: environment.installed(data_folder, choice),
+                    key_present=lambda: key() is not None)
     if arm.worker_script is None:
         return make_door(data_folder, arm.choice, environ)
     command = [str(environment.python(data_folder, arm.environment_of)), str(arm.worker_script)]

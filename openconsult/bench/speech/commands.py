@@ -24,8 +24,9 @@ REPO = Path(openconsult.__file__).resolve().parents[1]
 # Exit codes: 3 the list or a file, 4 consent, 5 a failed result, 6 a folder, 7 an environment, 8 a script.
 
 
-def forbidden_for(data_folder: Path, recordings: list[banked.Recording]) -> tuple[Path, ...]:
-    return (REPO, paths.default_data_folder(), Path(data_folder), *banked.folders_of(recordings))
+def forbidden_for(data_folder: Path, recordings: list[banked.Recording], key_folder: Path | None = None) -> tuple[Path, ...]:
+    extra = (Path(key_folder),) if key_folder is not None else ()
+    return (REPO, paths.default_data_folder(), Path(data_folder), *extra, *banked.folders_of(recordings))
 
 
 def speech_fetch(data_folder: Path, say: Callable = print, run: Callable = subprocess.run) -> int:
@@ -49,7 +50,10 @@ def speech_fetch(data_folder: Path, say: Callable = print, run: Callable = subpr
 
 def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: Path, names: list[str] | None,
                say: Callable = print, make_door: Callable[[Arm, Path], object] = door_for,
-               sleep=None, clock=None, started_file: Path | None = None, pause_at_stop: Path | None = None) -> int:
+               sleep=None, clock=None, started_file: Path | None = None, pause_at_stop: Path | None = None,
+               key_folder: Path | None = None) -> int:
+    """key_folder (5e): where a cloud arm's key file lies, apart from the
+    data folder of the workers; nothing is ever written there."""
     arm = ARMS[arm_name]
     try:
         listed = banked.load_list(recordings_folder)
@@ -66,7 +70,7 @@ def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: P
             say(words.BENCH_VOICE_ONLY_REFUSED.format(name=recording.name))
             return 3
     try:
-        writer = ResultWriter(out, forbidden=forbidden_for(data_folder, listed))
+        writer = ResultWriter(out, forbidden=forbidden_for(data_folder, listed, key_folder))
     except Refused as refused:
         say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
         return 6
@@ -76,7 +80,9 @@ def speech_run(recordings_folder: Path, arm_name: str, data_folder: Path, out: P
     extra = {k: v for k, v in (("sleep", sleep), ("clock", clock), ("started_file", started_file),
                                ("pause_at_stop", pause_at_stop)) if v is not None}
     try:
-        summary = replay.run_many(arm, chosen, lambda: make_door(arm, data_folder), writer, say=say, **extra)
+        build = (lambda: make_door(arm, data_folder, key_folder=key_folder)) if key_folder is not None \
+            else (lambda: make_door(arm, data_folder))
+        summary = replay.run_many(arm, chosen, build, writer, say=say, **extra)
     except banked.RecordingChanged as changed:
         say(words.BENCH_RECORDING_CHANGED.format(name=str(changed).split(":")[0], reason=changed))
         return 3
@@ -131,3 +137,19 @@ def speech_score(out: Path, recordings_folder: Path, script_folders: list[Path],
         say(words.BENCH_SCORED_TWO.format(pages=sum(len(r["arms"]) for r in scored["part_two"]["recordings"].values()),
                                           calls=len(call_results), voice=len(voice_results)))
     return 0
+
+
+def speech_selftest(choice_name: str, data_folder: Path, key_folder: Path, say: Callable = print,
+                    make_door: Callable = door_for, sleep=None) -> int:
+    """The app's own self-test of a choice (D46), behind a door whose key
+    comes from the key folder: the clip through the door, the result
+    stored in the data folder given, as the app's command stores it."""
+    import time
+
+    from openconsult import cli
+    if Path(data_folder).resolve() in (Path(key_folder).resolve(), paths.default_data_folder().resolve()):
+        say(words.BENCH_FOLDER_REFUSED.format(place=data_folder))
+        return 6
+    return cli.self_test(Path(data_folder), ARMS[choice_name].choice, say,
+                         lambda folder, choice: make_door(ARMS[choice.name], folder, key_folder=key_folder),
+                         sleep or time.sleep)

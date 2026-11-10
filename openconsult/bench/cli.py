@@ -334,7 +334,12 @@ def cmd_speech_run(args) -> int:
     return speech_commands.speech_run(Path(args.recordings), args.arm, Path(args.data_folder), Path(args.out),
                                       args.recording, say=say,
                                       started_file=Path(args.started_file) if args.started_file else None,
-                                      pause_at_stop=Path(args.pause_at_stop) if args.pause_at_stop else None)
+                                      pause_at_stop=Path(args.pause_at_stop) if args.pause_at_stop else None,
+                                      key_folder=Path(args.key_folder) if args.key_folder else None)
+
+
+def cmd_speech_selftest(args) -> int:
+    return speech_commands.speech_selftest(args.choice, Path(args.data_folder), Path(args.key_folder), say=say)
 
 
 def cmd_speech_score(args) -> int:
@@ -460,6 +465,12 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--recording", nargs="*", help="only these recordings, by name")
     p.add_argument("--started-file", help="5d: a file written when the feed begins, with the moment")
     p.add_argument("--pause-at-stop", help="5d: a folder where stop.wanted is written before Stop, which then waits for stop.go")
+    p.add_argument("--key-folder", help="5e: for a cloud arm, the folder whose .env holds its key; read inside the process, never written")
+    p = sub.add_parser("speech-selftest")
+    p.set_defaults(fn=cmd_speech_selftest)
+    p.add_argument("--choice", required=True, choices=["speechmatics", "assemblyai"], help="the cloud choice")
+    p.add_argument("--data-folder", required=True, help="the bench's data folder, where the result is stored")
+    p.add_argument("--key-folder", required=True, help="the folder whose .env holds the key; read inside the process, never written")
     p = sub.add_parser("speech-score")
     p.set_defaults(fn=cmd_speech_score)
     p.add_argument("--out", required=True, help="the results folder of speech-run")
