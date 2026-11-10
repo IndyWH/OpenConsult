@@ -99,3 +99,15 @@ def test_ruling_29_yes_when_the_typical_wait_by_the_sound_is_within_the_first_fi
     late = alba.summary(rows)
     assert late["serves"]["yes"] is False and late["serves"]["typical"] is None and late["after_reply"] == 2
     assert alba.WITHIN_S == (0.8, 1.5, 3.0) and alba.SERVES_WITHIN_S == 0.8
+
+
+def test_ruling_29_a_pause_inside_a_short_reply_of_the_doctor_is_not_taken_for_the_end_of_the_patients_speech():
+    # Found on the run of 5e: the patient ends at 41.4, the doctor answers two words from 42.3 and pauses at 43.0.
+    # With a second of slack on the choice's times the search runs past the reply's start; the pause inside the
+    # reply begins after the reply's own line and is not the patient's.
+    result = result_of([(43.3, line(38.0, 41.3, "In my lower back, and it goes down one leg.")),
+                        (46.0, line(42.3, 44.5, "Any numbness between the legs?"))],
+                       quiet=[(41.4, 42.3), (43.0, 43.6)], slack=1.0)
+    row = rows_of(result)[0]
+    assert row["end_sound"] == 41.4 and row["by_sound"] == 1.9
+    assert row["after_reply"] is True                         # final at 43.3, the reply began at 42.3 by the sound

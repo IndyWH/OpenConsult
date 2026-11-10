@@ -83,8 +83,11 @@ def speeches_of(result: dict, reference: Reference, live_page: Page) -> list[dic
             continue
         row["end_choice"] = last["end"]
         row["by_choice"] = round(last["t"] - last["end"], 3)
-        bound = (reply_line["start"] if reply_line is not None else last["end"] + 3.0) + slack
-        runs = quiet_runs(windows, window_s, (last["start"] + last["end"]) / 2 - slack, bound)
+        reply_at = reply_line["start"] if reply_line is not None else last["end"] + 3.0
+        bound = reply_at + slack
+        # Only a pause that begins before the reply's own line: a pause inside a short reply is not the patient's.
+        runs = [run for run in quiet_runs(windows, window_s, (last["start"] + last["end"]) / 2 - slack, bound)
+                if run[0] <= reply_at]
         reply_began = reply_line["start"] if reply_line is not None else None
         if runs:
             # The last pause before the reply: a pause inside the patient's sentence never moves the end back.
