@@ -163,8 +163,6 @@ def score_all(results: dict, voice_results: dict, call_results: dict, listed: li
         script_notes = script_note_counts(recording.name, recording, reference, entry, call_results, key_facts, drugs)
         rec = {"script": recording.script_key, "machine_voices": recording.machine_voices, "script_notes": script_notes, "arms": {}}
         for arm, result in sorted(pages_at_stop.items()):
-            if arm in calls.SHARES_STOP:
-                continue
             rec["arms"][arm] = score_page(arm, recording.name, result, recording, reference, entry, pages_at_stop,
                                           voice_results, call_results, key_facts, drugs, script_notes)
         scored["recordings"][recording.name] = rec

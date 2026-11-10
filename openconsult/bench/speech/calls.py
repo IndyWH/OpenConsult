@@ -5,8 +5,13 @@ from the scripts. Each page's lines are those of model_lines; each call
 goes through the door's own record; each result is one file that holds
 what was sent, what came back, and how the call ended. A result that
 exists is never asked for again, and a call that fails is kept as failed.
-The pages are those at Stop of every arm but WhisperX with v1's line,
-which shares its pass at Stop (ruling 3)."""
+The pages are those at Stop of every arm (the details of 5e: eight kinds
+of page; WhisperX with v1's line has a page at Stop of its own). The
+label check has two readings (5e): label_check_app sends the lines at
+Stop as the app sends them today, each line the choice gave as one
+numbered line, through the app's own function; label_check is the
+bench's own, on the lines of part two. The same prompt file, frame and
+limits for both; a page the limits cannot take is kept as failed."""
 
 from __future__ import annotations
 
@@ -18,10 +23,11 @@ from openconsult import words
 from openconsult.bench.speech import banked, jobs, marks, model_lines, pages, tables, who
 from openconsult.bench.speech.reference import Reference, build
 from openconsult.bench.writer import ResultWriter
+from openconsult.consult import labels
 from openconsult.llm.door import Door
 
-JOB_KINDS = ("label_check", "drug_name", "note", "script_note")
-SHARES_STOP = ("whisperx_v1_line",)
+JOB_KINDS = ("label_check_app", "label_check", "drug_name", "note", "script_note")
+LABEL_JOBS = ("label_check_app", "label_check")
 SCRIPT_ARM = "script"
 
 
@@ -32,7 +38,7 @@ def chain_name(arm: str, name: str, round_n: int | None) -> str:
 def pages_for_calls(results: dict, names: list[str] | None, arms: list[str] | None) -> list[tuple[str, str, dict]]:
     found = []
     for (arm, name), result in sorted(results.items()):
-        if arm in SHARES_STOP or result.get("failure") or (names and name not in names) or (arms and arm not in arms):
+        if result.get("failure") or (names and name not in names) or (arms and arm not in arms):
             continue
         found.append((arm, name, result))
     return found
@@ -43,6 +49,9 @@ def prepare(job: str, result: dict | None, reference: Reference) -> dict:
     if job == "script_note":
         turns = model_lines.script_turns(reference)
         return {"turns": turns, "roles": {}, "user": model_lines.turns_text(turns, {})}
+    if job == "label_check_app":
+        rows = app_rows(result)
+        return {"lines": rows, "user": labels.lines_text(rows)}
     lines = model_lines.lines_of(pages.stop_pieces(result))
     if job in ("label_check", "drug_name"):
         return {"lines": lines, "user": model_lines.lines_text(lines)}
@@ -52,14 +61,22 @@ def prepare(job: str, result: dict | None, reference: Reference) -> dict:
     return {"lines": lines, "turns": turns, "roles": roles, "user": model_lines.turns_text(turns, roles)}
 
 
+def app_rows(result: dict) -> list[dict]:
+    """The lines at Stop as the app writes them (consult/stop.py): each
+    line the choice gave is one row, numbered from 1 in order. Nothing is
+    joined and nothing is split."""
+    return [{"n": n, "speaker": line.get("speaker"), "start": float(line["start"]), "end": float(line["end"]),
+             "text": str(line["text"])} for n, line in enumerate(result["stop"]["lines"], start=1)]
+
+
 def one_call(door: Door, job: str, prepared: dict) -> dict:
     """The call, and the checks on its reply that the details ask for."""
-    asked = jobs.ask(door, "note" if job == "script_note" else job, prepared["user"])
+    asked = jobs.ask(door, {"script_note": "note", "label_check_app": "label_check"}.get(job, job), prepared["user"])
     record: dict = {"call": asked}
     # A call that failed is failed, not refused: its checks are not run.
-    if job == "label_check":
-        labels, refusal = jobs.check_labels(asked["answer"], len(prepared["lines"])) if asked["ok"] else (None, None)
-        record.update(labels={str(n): label for n, label in labels.items()} if labels else None, refusal=refusal)
+    if job in LABEL_JOBS:
+        found, refusal = jobs.check_labels(asked["answer"], len(prepared["lines"])) if asked["ok"] else (None, None)
+        record.update(labels={str(n): label for n, label in found.items()} if found else None, refusal=refusal)
     elif job == "drug_name":
         kept, dropped = jobs.check_doubtful(asked["answer"], prepared["lines"]) if asked["ok"] else ([], [])
         record.update(kept=kept, dropped=dropped)

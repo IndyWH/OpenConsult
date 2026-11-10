@@ -147,7 +147,9 @@ def test_R31_the_bench_command_names_speech_voice_and_the_app_cannot_reach_it(tm
     assert cli.main(["speech-voice", "--out", str(tmp_path / "o"), "--recordings", str(tmp_path / "r"),
                      "--data-folder", str(tmp_path / "d"), "--recording", "one", "--arm", "nemotron"]) == 0
     assert seen[0][3] == ["one"] and seen[0][4] == ["nemotron"]
-    assert voice.SHARES_STOP == ("whisperx_v1_line",)
+    # The details of 5e: eight kinds of page; WhisperX with v1's line has a page at Stop of its own and is read too.
+    stored = {("whisperx_v1_line", "one"): {"failure": None}, ("nemotron", "one"): {"failure": {"at": "open"}}}
+    assert [(arm, name) for arm, name, _ in voice.pages_to_run(stored, None, None)] == [("whisperx_v1_line", "one")]
 
 
 def test_the_list_holds_the_voice_alone_and_who_it_belongs_to(tmp_path):

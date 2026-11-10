@@ -38,9 +38,7 @@ NOT_DOCTOR_DISTANCE_AT = CLUSTER_THRESHOLD + BAND      # above this: not the doc
 LEAST_LINE_S = 1.0
 # The worker scores a whole page in one request: the models' own time.
 REQUEST_TIMEOUT_S = 600.0
-# The pages the method reads: the page at Stop of every arm but the one that
-# shares its pass at Stop with WhisperX (ruling 3; the details).
-SHARES_STOP = ("whisperx_v1_line",)
+# The pages the method reads: the page at Stop of every arm (the details of 5e: eight kinds of page).
 NOT_RUN = "the list names no recording of the doctor's voice alone"
 
 
@@ -134,7 +132,7 @@ def result_of(arm: str, recording: banked.Recording, voice: banked.Recording | N
 def pages_to_run(results: dict, names: list[str] | None, arms: list[str] | None) -> list[tuple[str, str, dict]]:
     found = []
     for (arm, name), result in sorted(results.items()):
-        if arm in SHARES_STOP or result.get("failure") or (names and name not in names) or (arms and arm not in arms):
+        if result.get("failure") or (names and name not in names) or (arms and arm not in arms):
             continue
         found.append((arm, name, result))
     return found
