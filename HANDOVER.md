@@ -4,6 +4,50 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-13. Stage 5e2: a second look at AssemblyAI on its updated medical mode
+
+Run on 13 Nov 2026 under the owner's approval of the plan and Cowork's
+review of it (15.9, ruling 35). THE FIGURES COUNT: the three recordings of
+21 Oct 2026, the settings of 10 Nov, not one changed. No code of the app
+or the bench changed, and no test. The spec is e4c5c14 (sha256
+ac50fcbc...), the stage prompt 3520e14 (stage-prompts/STAGE_05E2.md). The
+private report is STAGE5E2_REPORT.md in the log folder, its tables
+stage5e2-tables and stage5e2-tables-b beside it.
+
+The run. AssemblyAI alone: 6 live results in two rounds and 3 uploads,
+none failed; 57 calls on vLLM, none failed; scored twice, the same byte
+for byte. Every upload deleted and proven gone, and asked for again with
+the gate's clip (4 transcripts): nothing held. That the uploaded sound
+file itself is gone, no answer of the service proves. The engine was
+found down and left down. Nothing went to another host; no key was read
+by the build model. About 0.66 dollars by the page's price.
+
+For the patient, beside 10 Nov. A drug written as another real drug:
+live 3 on 10 Nov, 3 in round one today and 4 in round two, both notes
+holding it each time; the whole recording 0 on both days. Drug names
+caught of 61: live 56, then 57 and 57; whole 61 and 61. Words under the
+wrong speaker by the choice: live 257 on all three pages, whole 0.
+Patient speeches that run on into the doctor's words: 29 of 49 on every
+live page. No passage missing with no sign and no word where nobody
+spoke, on any page.
+
+What it cannot say. Every reply names the same model, mode, domain and
+API version as on 10 Nov, and the service's pages give the update a day
+and no hour, so a reply cannot tell the old mode from the updated one.
+The two live pages of today differ from each other in 5 places of about
+2,480 words, and from 10 Nov in 4: as much as each other.
+
+Flags. The service's page now advises two longer silence settings for
+medical sound; the bench sends neither, and they were not tried. On 10
+Nov's live page one more drug's name stands that the scoring did not
+count as a drug written as another; not changed. The build model removed
+a byte-code cache folder in the log folder that may not have been its
+own. The suite is 881 tests in 74 s, over the target of one minute.
+
+Made untrue: nothing in the repo. The spec's line that the default cloud
+speech service waits for this run is Cowork's to write on the owner's
+ruling.
+
 ## 2026-11-10. Stage 5e: the speech bench on three new recordings, both passes of the two cloud services
 
 Built and run in one session on 10 Nov 2026 under the owner's approval of
