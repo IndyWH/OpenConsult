@@ -4,6 +4,84 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-13. Stage 6c: the parts missed their first mark, so the build at Stop was not made
+
+Run on 13 Nov 2026 under the owner's approval of the plan and Cowork's
+review of it. The spec is bb74d01 (sha256 cf560f65...), the stage prompt
+0fc4c52 (stage-prompts/STAGE_06C.md). The private report is
+STAGE6C_REPORT.md in the log folder, with STAGE6C_PARTS.md, the plan and
+its review beside it. The step has three acts: the bench of parts
+against whole, the build, the bench of Claude Haiku. The first act
+missed P1, so by the details of the step the run stopped there.
+
+For the patient. Nothing changes on any page. At Stop the app still
+asks which speaker was you and still runs the check of who spoke by
+itself, as before this run. No drug name is marked. Rulings 37 and 39
+of 15.9 and 18 to 23 of 15.10 are not built.
+
+The bench of parts against whole. The local model on vLLM 0.31.0,
+digest 2096d38d..., proven the same engine and model as the stored whole
+reading of 5e. The 24 stored pages of 5e, each cut in two with the
+app's own function, the part size half the page rounded up, 10 lines
+carried: 48 calls, all answered, none cut (the longest reply 1,168
+tokens of 3,000; a call 3.7 s typical, 6.2 s the slowest). Counted
+twice from the stored results, the same byte for byte.
+- P1, every part answers and no reply is refused on each page whose
+  whole reply was taken: MISSED. 4 part replies were refused by the
+  app's own check, on 3 pages; 2 of those pages are among the 23
+  judged. Each refused reply named every line it was sent; three gave a
+  line number twice, one gave a number one past the last line.
+- P2, words under the wrong speaker in parts no more than whole plus one
+  word in 200: held as counted, 394 against 598, the line 693. That sum
+  is kind to the parts, because a page not taken counts no word as
+  wrong. On the 21 pages both readings were taken on: 394 in parts
+  against 383 whole, the line 470.
+By kind of page, words under the wrong speaker whole and in parts:
+AssemblyAI live 215 and none taken (0 of 3 pages; whole 2 of 3);
+AssemblyAI whole recording 20 and 2; Nemotron 48 and 50; the tied pair
+37 and 35; Speechmatics live 61 and 84; Speechmatics whole recording 63
+and 79; the WhisperX choice 77 and 72. The local figures of the plan,
+read from the stored results and checked by Cowork: 598 words under the
+wrong speaker on the 23 pages judged; drug names 93 marked of 122
+written wrongly, 27 marks on a word written rightly, 3 entries dropped.
+
+What it cannot say. Halves of a page of six to nine minutes are a
+harder test than the app's parts of 120 lines: no page of 5e has more
+than 160 joined lines, so the app would have cut none of them. All four
+refusals are on one kind of page, the kind with the longest lines, whose
+whole reading was refused on one page of three in 5e for the same
+reason. Whether a part of 120 lines on a truly long page is refused as
+often, no page of the bank can show.
+
+What stands in the repo. Two commits of code, 951147b and cbe2cf3:
+consult/joined.py holds the rule for the lines a model reads, moved
+from the bench unchanged, and the cut and the merge of a page in parts;
+the bench gains the job label_check_parts and the command
+speech-stop-marks. No page of the app, no table and no prompt file
+changed: the drug-name files did not move. Not built: all of Part 3,
+the mend of the gate's refusal after a restart that the plan review
+asked for, and the bench of Claude Haiku. Nothing was sent to any
+service, no key was read by the build model, and the run cost nothing.
+The two jobs are not offered in cloud mode: they are not built.
+
+Flags. The cut and the merge in consult/joined.py are reached by the
+bench alone until the owner rules (R31): said here, not removed. The
+first try of the bench command was refused before any call, because
+speech-calls needs a data folder apart from its results folder. The
+record of connections began with the plan; three runs of the suite and
+one private script ran before it. Every name in the record is this
+machine. In the log folder one file not of this run changed while the
+run waited for approval, at the second Cowork's review was written; the
+engine script's own log changed by one start and one stop. The engine
+was found down and left down. After a restart at the note stage the
+Stop thread does not remember the gate's refusal; not mended. The suite
+is 890 tests in 74 s, over the target of one minute.
+
+Made untrue: CLAUDE.md's bench lines, put right in this commit. The
+details of step 6c in the spec read as if the parts pass; that is
+Cowork's to write on the owner's ruling. The README and the home page
+stay true: the check of who spoke still runs at Stop.
+
 ## 2026-11-13. Stage 5e2: a second look at AssemblyAI on its updated medical mode
 
 Run on 13 Nov 2026 under the owner's approval of the plan and Cowork's
@@ -398,98 +476,3 @@ tier at 1.5 times the price is to be tested after this run. For 5e,
 the owner's idea, said on 6 Nov and his to rule on: a local speech model
 on a laptop processor for the live stream, the final transcription and
 the diarization in the cloud after Stop.
-
-
-## 2026-11-06. Run 9a: the cloud kind built, the bench of Ollama cloud stopped at its first call
-
-Built in one session on 6 Nov 2026 under the plan review of Cowork
-(five points; all are in). Run 9a is the bench of 15.13 rulings 4 and 8:
-Gemma 4 31B on Ollama cloud through the door on every bench the local
-model has run, report only, nothing offered on any page (R31). The
-cloud kind of the bench was built and committed; the one-case trial of
-the run prompt's rule 10 failed its first call, so no bench ran, and
-the run stops here for the owner's ruling. The plan, the trial's file
-and the report are STAGE9A_PLAN.md, STAGE9A_TRIAL.md and
-STAGE9A_REPORT.md in the private log folder.
-
-The spec, committed once, not a character changed: bebfcd2 (sha256
-3aab9a83...; 15.13 whole and the small dated additions). The run prompt
-is 6b8afde (stage-prompts/STAGE_09A.md).
-
-The cloud kind (commit 234ee26; bench/ollama_cloud.py, the bench's
-alone, as 3b's bench reached llama.cpp before 3c): a subclass of the
-local Ollama engine, so the request body is byte for byte the local
-one but the model tag (proven on the stored records: the trial's one
-request against the 28 Oct arm's for the same call, equal in every
-field but model); the service's own address over https and no other
-(an address that is not the expected one is refused before any
-connection); the key in the Authorization header alone, read by the one
-key module from the folder --key-folder names, inside the process,
-never from the command line, never in a log, a stamp, a result or a
-row (a test with a made key); the record holds the service's version,
-the tag and the digest it gives, or the line no digest given by the
-service (R20); after 401, 402, 403 or 429 the engine sends nothing
-more, the chain in progress is written apart under stopped so that a
-later run redoes it and the whole chains stand, and the command exits
-11; a 500 or a timeout is an ordinary failed call (R30; 10.4). The
-app's engines and its order of choosing do not know the kind (a test,
-and the fresh-Python test of 3b). The door gains one read-only property,
-stopped, which the app never reads. The example settings file names
-OLLAMA_API_KEY with no value. The run, repeat, letters and guideline
-commands take --key-folder. Twenty tests, each named for what it pins.
-
-The service's list, read on 6 Nov 2026 with the key in-process and
-nothing of ours sent: gemma4:31b, digest 221b330d11a8 (the service's
-twelve-character form), modified 2 Apr 2026; its version page 0.0.0.
-
-The trial (rule 10): case 01, three chains at temperature 0, the two
-calls sent together, 09:35 UTC. The engine and the model were reached
-and recorded. The bench's one unmeasured first call (the alarm, case
-01, first point) came back in 959 ms, HTTP 200, 722 tokens read (the
-local count for the same call is 722) and 123 written, no thinking
-field and no thinking text; the door judged it bad_form, the reply is
-not JSON, and the bench stopped before any chain, as it has since
-stage 3 when the first call fails. Read privately from the record: the
-content is a JSON object wrapped in a markdown fence, and inside the
-fence the urgent actions are plain strings where the form asks for
-objects with an action and a reason. So the service did not apply the
-request's format schema as a local Ollama does (0 bad_form in the 3,797
-calls of the 28 Oct arm with the same requests). The three conditions
-for going on: no call failed, not met (1 of 1); the estimate under 10
-dollars, about 1.33 on the local benches' token counts, not measured;
-thinking off, met. Cost of the run: one call, 0.00015 dollars. Nothing
-else was sent to the service.
-
-Not changed, because each is the owner's call and not the bench's: the
-door still refuses an answer that does not fit its form (R30), for the
-cloud as for every engine; no fence is unwrapped; no request to the
-service differs from the local one (rule 4; 15.8 ruling 1). Whether
-the service honours the format field at all, only as a hint, or in
-another shape is for Cowork to check on the service's own page before
-the next run, which the run prompt's rule 3 kept this run from reading.
-No bench ran, so no mark was judged, no seed test, no seconds of a
-pass, no letter for the owner's reading; the vLLM engine was found down
-and left down; the card was not touched.
-
-The suite: 790 tests (770 before), green three times before the last
-commit, none skipped. The private word check printed nothing before
-every commit. Size targets: no function over 80 lines; no file over 600
-but words.py, the standing exception. CLAUDE.md 99 lines. Nothing
-pushed. The folders of the run in the private log folder:
-stage9a-trial (the one call's record), stage9a-data-letters and
-stage9a-data-guideline (copies of 8a's and 8b's data folders, unused),
-stage9a-recount-8a (the fourth bench of 8a counted again by today's
-code: A M1 12, M2 9, M3 9, M4 13, M5 13; B all 13; C M5 12, the rest
-13; D all 13, as the run prompt gives them), and the scripts
-stage9a-record-check.py, stage9a-request-compare.py,
-stage9a-search-compare.py, stage9a-seed-check.py and
-stage9a-trial-figures.py, ready for the next run.
-
-What this run has made untrue: CLAUDE.md's line 7 of How a stage runs
-and its bench lines, fixed in this commit (15.13 ruling 1; the kind);
-the plan's items 3 to 8 and the run prompt's PART 3 from the trial on,
-which did not happen; nothing in README (it names no bench kind and no
-language model key). What 9b's brainstorm should know: the kind, the
-key folder and the stop rule are in place and tested; the one open
-question is the answer form on the service, and until it is settled a
-cloud consultation would fail every pass.
