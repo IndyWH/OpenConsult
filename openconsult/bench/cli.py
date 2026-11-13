@@ -25,6 +25,7 @@ from openconsult.bench.shared import commands as shared_commands
 from openconsult.bench.speech import commands as speech_commands
 from openconsult.bench.speech import calls as speech_calls
 from openconsult.bench.speech import commands2 as speech_commands2
+from openconsult.bench.speech import stop_marks
 from openconsult.bench.speech.arms import ARMS
 from openconsult.bench.writer import Refused, ResultWriter
 from openconsult.db import open_database
@@ -519,6 +520,7 @@ def add_speech_commands(sub) -> None:
     p.add_argument("--key-facts", help="the key-fact file, needed when the results of part two are there")
     p.add_argument("--drug-list", help="the drug list, needed when the results of part two are there")
     p.add_argument("--counting", action="store_true", help="5e: the figures count (the new recordings); adds the tables of 5e")
+    stop_marks.add_command(sub, say)       # 6c: the marks of the parts and of a cloud model, its parser beside its command
 
 
 def add_cloud_arguments(sub) -> None:

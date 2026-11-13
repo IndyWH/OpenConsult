@@ -9,13 +9,19 @@ The pages are those at Stop of every arm (the details of 5e: eight kinds
 of page; WhisperX with v1's line has a page at Stop of its own). The
 label check has two readings (5e): label_check_app sends the lines at
 Stop as the app sends them today, each line the choice gave as one
-numbered line, through the app's own function; label_check is the
-bench's own, on the lines of part two. The same prompt file, frame and
-limits for both; a page the limits cannot take is kept as failed."""
+numbered line, as the app sent them until 6c; label_check is the
+bench's own, on the lines of part two, which the app reads too since 6c.
+The same prompt file, frame and limits for both; a page the limits
+cannot take is kept as failed. The parts reading (15.10, the details of
+step 6c: The bench of parts against whole) is label_check_parts: every
+page cut in two with the app's own function, the part size half the
+page rounded up, each part a call of its own; every part is sent, also
+after one has failed, so that each is counted."""
 
 from __future__ import annotations
 
 import datetime as dt
+import math
 from pathlib import Path
 from typing import Callable
 
@@ -23,10 +29,10 @@ from openconsult import words
 from openconsult.bench.speech import banked, jobs, marks, model_lines, pages, tables, who
 from openconsult.bench.speech.reference import Reference, build
 from openconsult.bench.writer import ResultWriter
-from openconsult.consult import labels
+from openconsult.consult import joined, labels
 from openconsult.llm.door import Door
 
-JOB_KINDS = ("label_check_app", "label_check", "drug_name", "note", "script_note")
+JOB_KINDS = ("label_check_app", "label_check", "label_check_parts", "drug_name", "note", "script_note")
 LABEL_JOBS = ("label_check_app", "label_check")
 SCRIPT_ARM = "script"
 
@@ -53,6 +59,9 @@ def prepare(job: str, result: dict | None, reference: Reference) -> dict:
         rows = app_rows(result)
         return {"lines": rows, "user": labels.lines_text(rows)}
     lines = model_lines.lines_of(pages.stop_pieces(result))
+    if job == "label_check_parts":
+        parts = joined.cut(lines, whole=0, part=math.ceil(len(lines) / 2), overlap=joined.OVERLAP_LINES)
+        return {"lines": lines, "parts": parts, "user": [model_lines.lines_text(joined.numbered(part)) for part in parts]}
     if job in ("label_check", "drug_name"):
         return {"lines": lines, "user": model_lines.lines_text(lines)}
     page = who.line_page(lines, reference)
@@ -71,6 +80,8 @@ def app_rows(result: dict) -> list[dict]:
 
 def one_call(door: Door, job: str, prepared: dict) -> dict:
     """The call, and the checks on its reply that the details ask for."""
+    if job == "label_check_parts":
+        return parts_calls(door, prepared)
     asked = jobs.ask(door, {"script_note": "note", "label_check_app": "label_check"}.get(job, job), prepared["user"])
     record: dict = {"call": asked}
     # A call that failed is failed, not refused: its checks are not run.
@@ -83,6 +94,27 @@ def one_call(door: Door, job: str, prepared: dict) -> dict:
     else:
         record.update(note=asked["answer"] if asked["ok"] else None)
     return record
+
+
+def parts_calls(door: Door, prepared: dict) -> dict:
+    """One call for each part, each reply checked by the app's check, and
+    the labels of the page from every part or from none (joined.merge).
+    The record's call is the parts together: failed when any part failed."""
+    asked, found = [], []
+    for part, user in zip(prepared["parts"], prepared["user"]):
+        call = jobs.ask(door, "label_check", user)
+        labels, refusal = jobs.check_labels(call["answer"], len(part["lines"])) if call["ok"] else (None, None)
+        found.append(labels)
+        asked.append({"k": part["k"], "overlap": part["overlap"], "lines": [line["n"] for line in part["lines"]], "call": call,
+                      "labels": {str(n): label for n, label in labels.items()} if labels else None, "refusal": refusal})
+    merged = joined.merge(prepared["parts"], found)
+    failed = next((a["call"] for a in asked if not a["call"]["ok"]), None)
+    total = lambda key: sum(a["call"][key] or 0 for a in asked)   # noqa: E731
+    together = {"job": asked[0]["call"]["job"], "ok": failed is None, "failure": failed["failure"] if failed else None,
+                "detail": failed["detail"] if failed else None, "wall_ms": total("wall_ms"),
+                "prompt_tokens": total("prompt_tokens"), "output_tokens": total("output_tokens")}
+    return {"call": together, "parts": asked, "labels": {str(n): label for n, label in merged.items()} if merged else None,
+            "refusal": next((a["refusal"] for a in asked if a["refusal"]), None)}
 
 
 def run_calls(door: Door, job: str, round_n: int | None, listed: list[banked.Recording], results: dict,
