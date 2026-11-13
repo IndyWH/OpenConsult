@@ -15,41 +15,11 @@ from openconsult.bench.speech.reference import Reference
 # the owner's word) live in the app's note module since 6b, where the app
 # sends them too (spec 5.1; 15.10 ruling 5).
 from openconsult.consult.note import DOCTOR, PATIENT, UNKNOWN
+# The rule for the lines lives where the app reads it too since 6c (spec 5.1; 15.10, the details of step 6c).
+from openconsult.consult.joined import JOIN_GAP_S, SENTENCE_END, ends_sentence, lines_of  # noqa: F401 - the bench's names
 
-SENTENCE_END = (".", "?", "!")
-# Two neighbouring pieces are joined when less than this lies between them.
-JOIN_GAP_S = 1.0
 HEADING = "TRANSCRIPT:"
 ROLE_OF = {"DOCTOR": DOCTOR, "PATIENT": PATIENT}
-
-
-def ends_sentence(text: str) -> bool:
-    stripped = text.rstrip()
-    return bool(stripped) and stripped[-1] in SENTENCE_END
-
-
-def lines_of(pieces: list[dict]) -> list[dict]:
-    """Lines {n, speaker, start, end, text, pieces} from the smallest timed
-    pieces {start, end, text, speaker}, numbered from 1. Two neighbours join
-    when the first does not end a sentence, both carry the same label (two
-    with no speaker carry the same label), and less than JOIN_GAP_S lies
-    between them."""
-    lines: list[dict] = []
-    for index, piece in enumerate(pieces):
-        text = str(piece["text"]).strip()
-        if not text:
-            continue
-        last = lines[-1] if lines else None
-        joins = (last is not None and not ends_sentence(last["text"]) and last["speaker"] == piece.get("speaker")
-                 and float(piece["start"]) - last["end"] < JOIN_GAP_S)
-        if joins:
-            last["text"] += " " + text
-            last["end"] = max(last["end"], float(piece["end"]))
-            last["pieces"].append(index)
-        else:
-            lines.append({"n": len(lines) + 1, "speaker": piece.get("speaker"), "start": float(piece["start"]),
-                          "end": float(piece["end"]), "text": text, "pieces": [index]})
-    return lines
 
 
 def turns_of(lines: list[dict]) -> list[dict]:
