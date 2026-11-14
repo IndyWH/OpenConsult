@@ -377,3 +377,26 @@ def test_6d_ruling_11_R15_draft_the_note_again_shows_a_second_time_under_the_row
     raw, _ = page_of(client)
     assert DRAFT_OFF not in raw and 'id="draft-rows"' not in raw and 'id="drug-rows"' not in raw
     c.close()
+
+
+def test_6d_review_point_5_the_page_tells_its_script_what_may_be_done_with_words_typed_and_not_yet_ticked(tmp_path, clock, machine):
+    # Each row is a form of its own, so a press on one tick loads the page again; the script keeps the words typed into
+    # the other rows in the browser's own store and puts them back. The app decides what the store may do and says so on
+    # the page; the suite has no browser, so what the script then does is seen in a browser and not asserted here.
+    engine = HeldEngine({"note": [NOTE], "drug_name": [REPLY], "label_check": [said("doctor", "patient", "doctor")]})
+    app, client, c = reviewed(tmp_path, clock, machine, engine, page=PAGE)
+    raw, _ = page_of(client)
+    assert 'data-path="/consultations/1" data-consultation="1" data-kept="open"' in raw and '<script src="/static/kept.js"></script>' in raw
+    assert 'class="doubted-field" size="11" data-mark="1"' in row(raw, 1) and 'data-mark="2"' in row(raw, 2)   # which row a kept word belongs to
+    script = client.get("/static/kept.js")
+    assert script.status_code == 200 and "sessionStorage" in script.text and "fetch(" not in script.text and "XMLHttpRequest" not in script.text
+    # A row that is ticked has no field, so nothing can be put back into it.
+    assert tick(client, 1, words="met for min", press="settle").status_code == 303 and "data-mark" not in row(page_of(client)[0], 1)
+    # While a check of who spoke runs the store is left alone; once the page is approved everything kept is dropped.
+    assert client.post("/consultations/1/who-check").status_code == 303 and engine.entered.wait(20)
+    assert 'data-kept="wait"' in client.get("/consultations/1").text
+    engine.release.set()
+    app.state.parts.who_checks.wait(1, 20)
+    assert 'data-kept="open"' in client.get("/consultations/1").text
+    assert client.post("/consultations/1/note/approve").status_code == 303 and 'data-kept="drop"' in client.get("/consultations/1").text
+    c.close()

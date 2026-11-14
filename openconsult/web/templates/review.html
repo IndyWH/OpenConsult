@@ -11,7 +11,7 @@
 {%- endmacro %}
 {% block head %}<link rel="stylesheet" href="/static/print.css" media="print">{% endblock %}
 {% block main %}
-<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}">
+<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}" data-kept="{{ kept_words }}">
 <script id="words" type="application/json">{{ words_json|safe }}</script>
 <script id="player-data" type="application/json">{{ player_json|safe }}</script>
 <script id="marks" type="application/json">{{ marks_json|safe }}</script>
@@ -206,6 +206,7 @@
 <script src="/static/use.js"></script>
 <script src="/static/alarmdialog.js"></script>
 <script src="/static/review.js"></script>
+<script src="/static/kept.js"></script>
 <script src="/static/letters.js"></script>
 <script src="/static/player.js"></script>
 {% endblock %}

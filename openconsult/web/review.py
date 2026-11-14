@@ -215,6 +215,9 @@ def page_data(p, row: dict) -> dict:
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
             "lines": lines, "warnings": warnings, "who_check": who, "drug_head": drug["head"], "drug_marks": drug["marks"],
+            # What the page script may do with words typed into a row and not yet ticked (kept.js): put them back, wait
+            # while a check of who spoke runs, or drop them once the page is read-only for good.
+            "kept_words": "wait" if who["running"] else "drop" if state["approval"] else "open",
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
