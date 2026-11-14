@@ -183,7 +183,8 @@ def page_data(p, row: dict) -> dict:
     gate_reason = " ".join(w["detail"] or words.WARNING_SENTENCES.get(w["kind"], "") for w in warning_rows if w["kind"] in GATE_REFUSALS)
     choice = CHOICES.get(row["speech_choice"])
     state = note_state(p, row, gate_refused)
-    # The drug-name marks (ruling 20): their rows head the warnings and count on Approve; their sentences are not counted.
+    # The doubted drug names (rulings 20, 26 and 28): their rows head the warnings; one that is not settled counts on
+    # Approve; the sentences above them are not counted.
     drug = drug_marks.review_data(p.consultations, cid, lines)
     warnings = drug["rows"] + warning_lines(warning_rows, lines, choice.title if choice else row["speech_choice"])
     if gate_refused:
@@ -196,8 +197,9 @@ def page_data(p, row: dict) -> dict:
         state.update(entries_read_only=True, transcript_read_only=True, entries_reason=words.CHECK_RUNNING,
                      transcript_reason=words.CHECK_RUNNING, draft_reason=words.CHECK_RUNNING,
                      approve_reason=words.CHECK_RUNNING, refuse_reason=words.CHECK_RUNNING)
-    player = player_data(row, lines, warnings, p.settings.data_folder)
-    counted = len(warnings) + (1 if state["speakers_changed"] else 0)        # the line of ruling 18 counts as one warning on Approve
+    player = player_data(row, lines, warnings + [{"kind": "drug_mark", **m} for m in drug["marks"]], p.settings.data_folder)
+    # On Approve: each warning, each doubted name that is not settled (ruling 28), and the line of ruling 18 as one.
+    counted = len(warnings) + drug["open"] + (1 if state["speakers_changed"] else 0)
     pass_rows = p.consultations.passes(cid)
     differentials = note.last_shown_differentials(pass_rows)
     marks = alarms.review_marks(pass_rows, [d.get("condition") for d in differentials if isinstance(d, dict)])
@@ -207,7 +209,7 @@ def page_data(p, row: dict) -> dict:
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
-            "lines": lines, "warnings": warnings, "who_check": who, "drug_head": drug["head"],
+            "lines": lines, "warnings": warnings, "who_check": who, "drug_head": drug["head"], "drug_marks": drug["marks"],
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
@@ -343,12 +345,14 @@ async def edit_line(request: Request, consultation_id: int, n: int, user=Depends
     label, text = fields.get("label", ""), fields.get("text", "").strip()
     if label not in LABELS:
         return review_page(request, user, consultation_id, refused=(control, words.PICK_LABEL))
-    if not text:
+    # A line that holds words is never emptied here. One a drug-name correction left with no words may stay empty,
+    # so that its speaker can still be set (the plan review of 6d, point 1).
+    if not text and line["text"].strip():
         return review_page(request, user, consultation_id, refused=(control, words.ENTRY_EMPTY))
     if text != line["text"]:
         p.consultations.set_line_words(consultation_id, n, text)
         p.audit.record("transcript.edited", f"consultation {consultation_id}: line {n}")
-        # A doubted name typed over: its mark goes from the page and stays in the record (ruling 20).
+        # A doubted name typed over here: a mark whose words are gone leaves the page and stays in the record (ruling 20).
         drug_marks.after_edit(p.consultations, consultation_id, n)
     if label != line["label"]:
         p.consultations.set_line_label(consultation_id, n, label)
@@ -375,6 +379,44 @@ async def undo_label(request: Request, consultation_id: int, n: int, user=Depend
         return review_page(request, user, consultation_id, refused=(control, words.NOT_CHANGED_BY_CHECK))
     p.audit.record("label.undone", f"consultation {consultation_id}: line {n} back to {before}")
     raise Redirect(f"/consultations/{consultation_id}")
+
+
+@router.post("/consultations/{consultation_id}/marks/{mark_id}")
+async def tick_mark(request: Request, consultation_id: int, mark_id: int, user=Depends(guards.logged_in)):
+    """The row of a doubted drug name, the one place to settle it (rulings
+    26 and 28). A press on a tick that is not ticked keeps what the field
+    holds: where the words differ from those on the line, the line is
+    corrected by the function its own box uses; then the mark is settled,
+    with the time. A press on a ticked tick opens it again; the line keeps
+    what was typed. The button says which press it is, so a press from a
+    stale page never turns a mark the wrong way. The note is never
+    corrected by this: Draft the note again is offered, never run."""
+    p = parts(request)
+    row = final_row(request, consultation_id)
+    data = page_data(p, row)
+    control = f"tick-{mark_id}"
+    mark = next((m for m in p.consultations.drug_marks(consultation_id) if m["id"] == mark_id), None)
+    if mark is None:
+        raise Redirect(f"/consultations/{consultation_id}#warnings")      # no such row on the page
+    if data["transcript_read_only"]:
+        return review_page(request, user, consultation_id, refused=(control, data["transcript_reason"]))
+    fields = await form_fields(request)
+    back, where = f"/consultations/{consultation_id}#drug-mark-{mark_id}", f"consultation {consultation_id}: line {mark['heard_first']}"
+    if fields.get("press") == "open":
+        if mark["settled_at"] is not None:
+            p.consultations.settle_mark(mark_id, settled=False)
+            p.audit.record("drug_name.opened", where)
+        raise Redirect(back)
+    if mark["settled_at"] is not None:
+        raise Redirect(back)                                              # ticked already: its words are locked
+    typed = fields.get("words", mark["standing"]).strip()
+    if not typed:
+        return review_page(request, user, consultation_id, refused=(control, words.ENTRY_EMPTY))
+    if typed != mark["standing"]:
+        drug_marks.correct(p.consultations, p.audit, consultation_id, mark, typed)
+    p.consultations.settle_mark(mark_id)
+    p.audit.record("drug_name.settled", where)
+    raise Redirect(back)
 
 
 @router.post("/consultations/{consultation_id}/delete")

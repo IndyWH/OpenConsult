@@ -74,7 +74,8 @@ def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_
                                   changes=[(1, "doctor", "patient")], named_twice=0, dropped=0)
     if p.consultations.drug_call(1) is None:
         p.consultations.add_drug_call(1, None, "answered", None, 1, 0)
-    p.consultations.add_drug_mark(1, p.consultations.drug_call(1)["id"], 1, "made", "made-up drug", [1], [{"line": 1, "first": 0, "last": 4}])
+    made = p.consultations.add_drug_mark(1, p.consultations.drug_call(1)["id"], 1, "made", "made-up drug", [1], [{"line": 1, "first": 0, "last": 4}])
+    p.consultations.settle_mark(made)                                    # 6d: a settled mark goes with the rest (the details, The record)
     before = rows_of(p.db, 1)
     assert before["speaker_check"] == 1 and before["speaker_check_change"] == 1 and before["drug_name_call"] == 1 and before["drug_mark"] >= 1
     assert before["letter"] == 2 and before["letter_edit"] == 1 and before["letter_approval"] == 1 and before["referral_item"] == 2

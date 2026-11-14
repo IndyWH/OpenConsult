@@ -32,10 +32,12 @@ ROLE_WORDS = {"doctor": DOCTOR, "patient": PATIENT, "unsure": UNKNOWN}
 def turns_of(rows: list[dict]) -> list[dict]:
     """Turns {n, label, text, lines} from the numbered transcript rows in
     order: neighbouring lines of the same label join, numbered from 0 as
-    v1 numbered them and as the bench's turns_of does."""
+    v1 numbered them and as the bench's turns_of does. A line that a
+    drug-name correction left with no words is left out, so no turn is
+    made of empty lines and no model reads an empty line (step 6d)."""
     turns: list[dict] = []
     for row in rows:
-        if row.get("n") is None:
+        if row.get("n") is None or not str(row["text"]).strip():
             continue
         if turns and turns[-1]["label"] == row["label"]:
             turns[-1]["text"] += " " + row["text"]

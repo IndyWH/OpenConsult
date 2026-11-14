@@ -15,6 +15,7 @@ from tests.test_review_page import NOTE, engine_with
 from tests.test_who_check import reviewed
 
 NAMED = "made-up drug"       # in both drugs the made-up reply names
+OLD_WARNING = "may be a drug name that was misheard"    # the sentence of the warning until the row of ruling 26 took its place
 SIGN = "Drug name to check"  # the sign that stood on the note entries until ruling 27 took it off; its word is gone from the file of words
 
 
@@ -39,10 +40,11 @@ def test_rulings_20_27_a_mark_shows_in_its_two_places_no_note_entry_carries_a_si
     assert 'name="text" value="I take met for min twice a day and met for min at night.' in raw       # the words stand as they were heard
     # Two: the warnings. The sentence that counts the marks and the line that is always shown head them; one row for each mark.
     warnings = part(raw, 'id="warnings"', 'id="alarms"')
-    assert warnings.index(words.DRUG_MARKED.format(count=2)) < warnings.index(words.DRUG_NOT_PROVEN) < warnings.index('<ul class="panel-list">')
-    first, second = words.WARN_DRUG_MARK.format(n=1, heard="take for"), words.WARN_DRUG_MARK.format(n=3, heard="met for min")
+    assert warnings.index(words.DRUG_MARKED.format(count=2)) < warnings.index(words.DRUG_NOT_PROVEN) < warnings.index('<ul class="panel-list drug-rows"')
+    first, second = 'id="drug-mark-2"', 'id="drug-mark-1"'                # the row of the name heard on lines 1 and 2, then the one on line 3
     assert warnings.index(first) < warnings.index(second) < warnings.index(words.WARN_CONFIDENCE_NOT_MEASURED.split(":")[0])
-    assert warnings.count('data-kind="drug_mark"') == 2 and 'class="play-line cite" data-line="3">' + words.PLAY_FROM_LINE in warnings
+    assert warnings.count('data-kind="drug_mark"') == 2 and 'class="play-stretch row-play" data-start="1.0" data-end="1.6"' in warnings
+    assert 'value="take for"' in warnings and 'value="met for min"' in warnings and OLD_WARNING not in page       # the row itself shows the words
     # Ruling 27: no note entry carries a sign of a doubted name, also not the entry that draws on a marked line and wrote another word.
     subjective = part(raw, 'id="section-subjective"', 'id="section-objective"')
     assert "met for min" not in subjective and "made up history [1]" in subjective                    # the entry cites line 3 and wrote another word
@@ -69,7 +71,7 @@ def test_rulings_27_4_no_sign_of_a_doubted_name_is_on_the_page_in_the_copy_text_
     assert sign not in approved and words.CHECK_THIS_NAME not in approved and NAMED not in approved
     raw, page = page_of(client)
     assert '<span class="line-text">I take <mark class="doubted">met for min</mark> twice a day and <mark class="doubted">met for min</mark> at night.' in raw
-    assert words.WARN_DRUG_MARK.format(n=3, heard="met for min") in page and sign not in page
+    assert 'id="drug-mark-1" data-kind="drug_mark" data-settled="no"' in raw and 'value="met for min"' in raw and sign not in page       # the rows show, as they stood
     assert words.DRUG_NOT_PROVEN in page and NAMED not in page and NAMED not in client.get("/consultations/1/note.txt").text
     c.close()
 
@@ -105,12 +107,13 @@ def test_rulings_11_20_R15_approve_is_never_blocked_and_its_count_holds_each_sta
     # The count with no mark is the page's own warnings; the sentences at the head add nothing to it.
     app, client, c = reviewed(tmp_path / "none", clock, machine, engine_with(drug_name=[{"doubtful": []}]), page=PAGE)
     raw, _ = page_of(client)
-    base = raw.count('<li class="warning"')
+    base = raw.count('<li class="warning"')                                        # a row of a doubted name is not one of these
     assert count_on_approve(raw) == (words.WARNING_ONE if base == 1 else words.WARNINGS_COUNT.format(count=base))     # the head is not counted
     c.close()
     app, client, c = reviewed(tmp_path / "marks", clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
     raw, _ = page_of(client)
-    assert raw.count('<li class="warning"') == base + 2 and count_on_approve(raw) == words.WARNINGS_COUNT.format(count=base + 2)
+    assert raw.count('<li class="warning"') == base and raw.count('<li class="drug-row"') == 2                    # two marks, neither settled
+    assert count_on_approve(raw) == words.WARNINGS_COUNT.format(count=base + 2)
     assert 'id="approve" aria-describedby="approve-refusal" disabled' not in raw                      # a mark never blocks Approve
     assert client.post("/consultations/1/note/approve").status_code == 303 and app.state.parts.notes.approval(1) is not None
     c.close()
@@ -141,9 +144,9 @@ def test_rulings_11_20_a_mark_typed_over_goes_from_its_two_places_stays_in_the_r
     typed = "I take a made-up name twice a day and a made-up name at night."
     assert client.post("/consultations/1/lines/3", data={"label": "patient", "text": typed}).status_code == 303
     raw, page = page_of(client)
-    assert "met for min" not in part(raw, 'id="line-3"', 'id="line-4"') and words.WARN_DRUG_MARK.format(n=3, heard="met for min") not in page
+    assert "met for min" not in part(raw, 'id="line-3"', 'id="line-4"') and 'id="drug-mark-1"' not in raw
     assert SIGN not in page and words.DRUG_MARKED_ONE in page                                        # one mark stands: the one across lines 1 and 2
-    assert words.WARN_DRUG_MARK.format(n=1, heard="take for") in page
+    assert 'id="drug-mark-2"' in raw and 'value="take for"' in raw
     record = p.consultations.drug_marks(1, every=True)
     assert [(m["heard"], m["cleared_at"] is not None) for m in record] == [("take for", False), ("met for min", True)]
     assert record[1]["meant"] == "a made-up drug"

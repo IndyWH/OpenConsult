@@ -14,6 +14,8 @@ for the app and the bench (spec 5.1)."""
 
 from __future__ import annotations
 
+import re
+
 from openconsult import words
 from openconsult.consult import joined
 from openconsult.consult.consultations import Consultations
@@ -60,28 +62,35 @@ def _holds(words: list[str], part: list[str]) -> bool:
     return bool(part) and any(words[i:i + len(part)] == part for i in range(len(words) - len(part) + 1))
 
 
-def places_of(heard: str, page_lines: list[int], text_of: dict[int, str]) -> list[dict]:
-    """Every place the heard words stand on a joined line, as places in the
-    lines of the page it holds: {line, first, last}, the letters
+def occurrences_of(words: str, page_lines: list[int], text_of: dict[int, str]) -> list[list[dict]]:
+    """Every place the words stand on a joined line, each as its pieces in
+    the lines of the page it holds: {line, first, last}, the letters
     text[first:last] of that line. The joined line is its lines' words
     with one space between, so a place is on one line or runs over
-    neighbours, one piece on each. Empty when the words do not stand
-    there letter for letter."""
-    spans, at = [], 0
+    neighbours, one piece on each. A line left with no words holds no
+    place. Empty when the words do not stand there letter for letter."""
+    spans, held, at = [], [], 0
     for n in page_lines:
         raw = str(text_of[n])
-        words = raw.strip()
-        spans.append((n, at, at + len(words), len(raw) - len(raw.lstrip())))
-        at += len(words) + 1
-    whole = " ".join(str(text_of[n]).strip() for n in page_lines)
-    places, start = [], whole.find(heard) if heard else -1
+        words_of_line = raw.strip()
+        if not words_of_line:
+            continue
+        spans.append((n, at, at + len(words_of_line), len(raw) - len(raw.lstrip())))
+        held.append(words_of_line)
+        at += len(words_of_line) + 1
+    whole = " ".join(held)
+    found, start = [], whole.find(words) if words else -1
     while start >= 0:
-        end = start + len(heard)
-        for n, first, last, indent in spans:
-            if start < last and end > first:
-                places.append({"line": n, "first": max(start, first) - first + indent, "last": min(end, last) - first + indent})
-        start = whole.find(heard, end)
-    return places
+        end = start + len(words)
+        found.append([{"line": n, "first": max(start, first) - first + indent, "last": min(end, last) - first + indent}
+                      for n, first, last, indent in spans if start < last and end > first])
+        start = whole.find(words, end)
+    return found
+
+
+def places_of(words: str, page_lines: list[int], text_of: dict[int, str]) -> list[dict]:
+    """Every piece of every place the words stand, in order."""
+    return [piece for pieces in occurrences_of(words, page_lines, text_of) for piece in pieces]
 
 
 def run(door: Door, rows: Consultations, audit: Audit, consultation_id: int) -> None:
@@ -128,6 +137,66 @@ def after_edit(rows: Consultations, consultation_id: int, n: int) -> int:
     return cleared
 
 
+# ------------------------------------------- the doctor types the right name
+
+def _put(text: str, first: int, last: int, typed: str) -> str:
+    """The letters text[first:last] replaced by the typed words, or taken
+    out: then one of the two spaces the piece leaves goes, and a space
+    left at an end of the line goes. No other letter changes."""
+    left, right = text[:first], text[last:]
+    if typed:
+        return left + typed + right
+    if not left.strip():
+        return right.lstrip()
+    if not right.strip():
+        return left.rstrip()
+    return left + (right[1:] if left.endswith(" ") and right.startswith(" ") else right)
+
+
+def corrected(typed: str, mark: dict, text_of: dict[int, str]) -> dict[int, str]:
+    """The lines that change when the doctor types over a mark's words as
+    they stand, {line: its new words} (ruling 26; the details of step 6d:
+    What the field changes). At every place the words stand, the typed
+    words replace the piece on the first line and the pieces on the later
+    lines are taken out. No line is removed or given a new number, and no
+    word that nobody spoke or typed is written into a line (15.9 ruling
+    1); a later line can be left with no words."""
+    cuts: dict[int, list[tuple[int, int, str]]] = {}
+    for pieces in occurrences_of(mark["standing"], mark["page_lines"], text_of):
+        for k, piece in enumerate(pieces):
+            cuts.setdefault(piece["line"], []).append((piece["first"], piece["last"], typed if k == 0 else ""))
+    changed = {}
+    for n, line_cuts in cuts.items():
+        text = str(text_of[n])
+        for first, last, put in sorted(line_cuts, reverse=True):
+            text = _put(text, first, last, put)
+        if text != text_of[n]:
+            changed[n] = text
+    return changed
+
+
+def correct(rows: Consultations, audit: Audit, consultation_id: int, mark: dict, typed: str) -> list[int]:
+    """The typed words into the lines, by the function the line's own box
+    uses: for each line that changes one edit of the kind words with the
+    words before, and the audit line, so Draft the note again is offered
+    (ruling 11). The mark's words as they stand become the typed words and
+    it is found where they now are; every other mark on those lines is
+    found again or cleared, as after an edit in the line's box. The words
+    heard and the drug the model named are never changed and never read.
+    The lines changed."""
+    text_of = {r["n"]: r["text"] for r in rows.transcript_lines(consultation_id) if r["n"] is not None}
+    changed = corrected(typed, mark, text_of)
+    if not changed:
+        raise RuntimeError("the mark's words do not stand on its lines")
+    for n in sorted(changed):
+        rows.set_line_words(consultation_id, n, changed[n])
+        audit.record("transcript.edited", f"consultation {consultation_id}: line {n}")
+    text_of.update(changed)
+    rows.set_mark_places(mark["id"], places_of(typed, mark["page_lines"], text_of), standing=typed)
+    after_edit(rows, consultation_id, min(changed))
+    return sorted(changed)
+
+
 # ------------------------------------------------ the marks on the review page
 
 def spans_of(marks: list[dict]) -> dict[int, list[tuple[int, int]]]:
@@ -148,35 +217,86 @@ def spans_of(marks: list[dict]) -> dict[int, list[tuple[int, int]]]:
     return found
 
 
+def row_of(mark: dict, by_number: dict[int, dict]) -> dict:
+    """The row of a doubted name (rulings 26 and 28; the plan review,
+    points 2 and 6). The words of the lines the name was heard on, and of
+    any other line of its joined line where its words now stand, as
+    pieces: the words as they stand are the field at their first place,
+    and every other place that would take the typed words is shown
+    highlighted, so nothing on a line changes that the row did not show.
+    Line {n} and the play stretch are read from the lines the name was
+    heard on, never from typed words: the row can always play the whole
+    name. The drug the model named is never read here."""
+    text_of = {n: line["text"] for n, line in by_number.items()}
+    on = [place["line"] for place in mark["places"]]
+    low, high = min([mark["heard_first"]] + on), max([mark["heard_last"]] + on)
+    shown = [n for n in mark["page_lines"] if low <= n <= high and n in text_of]
+    cuts: dict[int, list[tuple[int, int, str]]] = {}
+    for k, pieces in enumerate(occurrences_of(mark["standing"], [n for n in mark["page_lines"] if n in text_of], text_of)):
+        for j, piece in enumerate(pieces):
+            kind = "later" if j else ("field" if k == 0 else "also")
+            cuts.setdefault(piece["line"], []).append((piece["first"], piece["last"], kind))
+    segments: list[dict] = []
+    for n in shown:
+        text, at = str(text_of[n]).strip(), 0
+        indent = len(str(text_of[n])) - len(str(text_of[n]).lstrip())
+        if not text:
+            continue
+        if segments:
+            segments.append({"kind": "plain", "text": " "})
+        for first, last, kind in sorted(cuts.get(n, [])):
+            first, last = first - indent, last - indent
+            segments.append({"kind": "plain", "text": text[at:first]})
+            if kind != "later":          # a later piece of the same place is held in the field, which shows the whole words
+                segments.append({"kind": kind, "text": mark["standing"]})
+            at = last
+        segments.append({"kind": "plain", "text": text[at:]})
+    joined_up: list[dict] = []
+    for segment in (s for s in segments if s["text"]):
+        if joined_up and segment["kind"] == "plain" == joined_up[-1]["kind"]:
+            # Where a later piece is held in the field, the space that joined the lines is in the field's words too.
+            joined_up[-1]["text"] = re.sub(" {2,}", " ", joined_up[-1]["text"] + segment["text"])
+        else:
+            joined_up.append(dict(segment))
+    first_line, last_line = by_number.get(mark["heard_first"]), by_number.get(mark["heard_last"])
+    return {"id": mark["id"], "n": mark["heard_first"], "settled": mark["settled_at"] is not None, "standing": mark["standing"],
+            "size": max(len(mark["standing"]), 4), "segments": joined_up,
+            "start_s": first_line["start_s"] if first_line else None, "end_s": last_line["end_s"] if last_line else None}
+
+
 def review_data(rows: Consultations, consultation_id: int, lines: list[dict]) -> dict:
     """What the review page shows of the marks, in their two places
-    (rulings 20 and 27). On each line: the doubted words, and the line's
-    words cut at them. The warnings: the sentences that head them, which
-    are not counted, and one row for each mark that stands, or one for a
-    call that failed; each row counts on Approve and none blocks it. No
-    note entry carries a sign: a sign pointed the doctor's hand to the
-    note, which is the wrong place to correct (ruling 27). Nothing when
+    (rulings 20, 26, 27 and 28). The warnings: the sentences that head
+    them, which are not counted; one row for each mark an edit has not
+    cleared, settled or not, in the order the names were heard; or one
+    warning for a call that failed. A mark that is not settled counts on
+    Approve and none blocks it. On each line: the words a mark that is not
+    settled doubts, and the line's words cut at them; a settled mark shows
+    no highlight. No note entry carries a sign (ruling 27). Nothing when
     the call has not run (a consultation from before 6c, or a gate that
     refused). The drug the model named is never read here."""
     call = rows.drug_call(consultation_id)
     for line in lines:
         line["doubted"], line["segments"] = [], [(line["text"], False)]
     if call is None:
-        return {"head": [], "rows": []}
+        return {"head": [], "rows": [], "marks": [], "open": 0}
     if call["outcome"] != "answered":
-        return {"head": [], "rows": [{"kind": "drug_names_failed", "start_s": None, "end_s": None, "line_n": None,
-                                      "text": words.DRUG_CHECK_FAILED.format(reason=call["reason"] or "")}]}
+        failed = {"kind": "drug_names_failed", "start_s": None, "end_s": None, "line_n": None,
+                  "text": words.DRUG_CHECK_FAILED.format(reason=call["reason"] or "")}
+        return {"head": [], "rows": [failed], "marks": [], "open": 0}
     marks = rows.drug_marks(consultation_id)
-    spans = spans_of(marks)
+    standing = [m for m in marks if m["settled_at"] is None]
+    spans = spans_of(standing)
     for line in lines:
         text, at, segments = line["text"], 0, []
         for first, last in spans.get(line["n"], []):
             segments += [(text[at:first], False), (text[first:last], True)]
             at = last
         line["segments"] = [s for s in segments + [(text[at:], False)] if s[0]]
-        line["doubted"] = [piece for piece, marked in line["segments"] if marked]
+        line["doubted"] = [{"piece": text[place["first"]:place["last"]], "mark": m["id"]}
+                           for m in standing for place in m["places"] if place["line"] == line["n"]]
     counted = (words.DRUG_MARKED.format(count=len(marks)) if len(marks) > 1 else words.DRUG_MARKED_ONE if marks
                else words.DRUG_MARKED_NONE)
-    return {"head": [counted, words.DRUG_NOT_PROVEN],
-            "rows": [{"kind": "drug_mark", "start_s": None, "end_s": None, "line_n": m["first_line"],
-                      "text": words.WARN_DRUG_MARK.format(n=m["first_line"], heard=m["heard"])} for m in marks]}
+    by_number = {line["n"]: line for line in lines}
+    return {"head": [counted, words.DRUG_NOT_PROVEN], "rows": [], "marks": [row_of(m, by_number) for m in marks],
+            "open": len(standing)}

@@ -94,10 +94,23 @@
   <div class="pane-head"><h2>{{ words.WARNINGS }}</h2></div>
   <div class="pane-body">
     {% for sentence in drug_head %}<p class="statement drug-head">{{ sentence }}</p>{% endfor %}
+    {# The row of a doubted drug name, the one place to hear it, correct it and settle it (rulings 26 and 28): a form of
+       its own that works with no script. Line n, the words with the doubted words as a field, play, the tick. #}
+    {% if drug_marks %}<ul class="panel-list drug-rows" id="drug-rows">{% for m in drug_marks %}
+      <li class="drug-row" id="drug-mark-{{ m.id }}" data-kind="drug_mark" data-settled="{{ 'yes' if m.settled else 'no' }}">
+        <form method="post" action="/consultations/{{ cid }}/marks/{{ m.id }}" class="drug-row-form">
+          <button type="button" class="cite row-line" data-line="{{ m.n }}">{{ words.DRUG_ROW_LINE.format(n=m.n) }}</button>
+          <span class="row-words">{% for s in m.segments %}{% if s.kind == "plain" %}{{ s.text }}{% elif m.settled %}<span class="settled-words">{{ s.text }}</span>{% elif s.kind == "field" %}<input name="words" value="{{ s.text }}" class="doubted-field" size="{{ m.size }}" data-mark="{{ m.id }}" autocomplete="off" aria-label="{{ words.DRUG_FIELD_NAME.format(n=m.n) }}"{% if transcript_read_only %} readonly{% endif %}>{% else %}<mark class="doubted">{{ s.text }}</mark>{% endif %}{% endfor %}</span>
+          {% if player.available and m.start_s is not none and m.end_s is not none %}<button type="button" class="play-stretch row-play" data-start="{{ m.start_s }}" data-end="{{ m.end_s }}" aria-label="{{ words.PLAY_LINE }}" title="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
+          {% set tick_name = (words.TICK_SETTLED_READ_ONLY if m.settled else words.TICK_OPEN_READ_ONLY) if transcript_read_only else (words.TICK_SETTLED if m.settled else words.TICK_OPEN) %}
+          <button class="tick {{ 'ticked' if m.settled else 'not-ticked' }}" id="tick-{{ m.id }}" name="press" value="{{ 'open' if m.settled else 'settle' }}" aria-pressed="{{ 'true' if m.settled else 'false' }}" aria-label="{{ tick_name }}" title="{{ tick_name }}" aria-describedby="tick-{{ m.id }}-refusal"{% if transcript_read_only %} aria-disabled="true"{% endif %}>{% if m.settled %}&#10004;{% else %}&#10003;{% endif %}</button>
+          {{ refusal("tick-" ~ m.id) }}
+        </form>
+      </li>{% endfor %}</ul>{% endif %}
     {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
       {% elif player.available and w.line_n %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}">{{ words.PLAY_FROM_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
-    {% else %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
+    {% elif not drug_marks %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
     <h3 class="mark" id="alarms">{{ words.ALARMS }}</h3>
     {% if alarms %}<ul class="panel-list">{% for a in alarms %}<li class="alarm-line" data-key="{{ a.key }}" data-n="{{ a.n }}">{{ a.text }}
       {% if player.available and a.start_s is not none %}<button type="button" class="play-at" data-start="{{ a.start_s }}">{{ words.PLAY_FROM_ALARM }}</button>{% endif %}</li>{% endfor %}</ul>
@@ -146,11 +159,13 @@
         {{ refusal("save-line-" ~ line.n) }}
       </form>
       {# The doubted words of the line, beside its field, where nothing can be highlighted (ruling 20). #}
-      {% for piece in line.doubted %}<span class="doubted-word"><mark class="doubted">{{ piece }}</mark> <span class="mark">{{ words.CHECK_THIS_NAME }}</span></span>{% endfor %}
+      {% for d in line.doubted %}<span class="doubted-word"><mark class="doubted">{{ d.piece }}</mark> <span class="mark">{{ words.CHECK_THIS_NAME }}</span></span>{% endfor %}
       {% if line.changed_by_check %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form">
         <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
       {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
       {% endif %}
+      {# A line a drug-name correction left with no words: it keeps its number, speaker and sound (the plan review of 6d, point 1). #}
+      {% if not line.text %}<span class="mark no-words">{{ words.LINE_NO_WORDS }}</span>{% endif %}
       {% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}
       {% if line.changed_by_check %}<span class="mark"> ({{ words.LABEL_CHANGED }})</span>{% endif %}
       {% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}

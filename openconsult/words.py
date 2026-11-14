@@ -258,16 +258,26 @@ WARN_LOW_CONFIDENCE = "Line {n} is low confidence ({score})."
 WARN_CONFIDENCE_NOT_MEASURED = "Confidence was not measured: {choice} gives no score."
 WARN_LABEL_CHECK_REFUSED = "The check of who spoke was refused: {reason}. No label was changed by it."
 WARN_LABEL_CHECK_FAILED = "The check of who spoke did not run: {reason} No label was changed by it."
-# The drug-name marks on the review page (15.10 ruling 20; 15.9 ruling 39). The owner's sentences, letter for letter.
+# The drug-name marks on the review page (15.10 rulings 20, 26 and 28; 15.9 ruling 39). The owner's sentences, letter for letter.
 CHECK_THIS_NAME = "Check this name"
-WARN_DRUG_MARK = "Line {n}: {heard} may be a drug name that was misheard."
-DRUG_MARKED = "The language model marked {count} drug names it doubts. Press a marked line to hear the word, then type the name."
 DRUG_MARKED_NONE = "The language model marked no drug name on this page."
 DRUG_NOT_PROVEN = ("A drug name with no mark is not proven right. The model can miss a misheard name, most of all when one real "
                    "drug is written for another. Check every drug name in the note before you approve.")
 DRUG_CHECK_FAILED = "The check of drug names did not run: {reason} No drug name is marked."
-# A draft, for the owner to correct (the details of step 6c, The sentences).
-DRUG_MARKED_ONE = "The language model marked 1 drug name it doubts. Press the marked line to hear the word, then type the name."
+# The row of a doubted name (the details of step 6d, The sentences). Drafts, for the owner to correct on screen.
+DRUG_MARKED = ("The language model marked {count} drug names it doubts. Play each one. If the name is wrong, type the right name "
+               "over it. Then tick it.")
+DRUG_MARKED_ONE = "The language model marked 1 drug name it doubts. Play it. If the name is wrong, type the right name over it. Then tick it."
+DRUG_ROW_LINE = "Line {n}"
+TICK_OPEN = "Tick this name when it is right"
+TICK_SETTLED = "Ticked as right. Press to open it again"
+PLAY_LINE = "Play this line"
+# Drafts of the build, accepted as drafts by the plan review: the field's name for a screen reader, the tick's name on
+# a read-only page, where no press can change it, and the line a correction left with no words.
+DRUG_FIELD_NAME = "The doubted words on line {n}"
+TICK_SETTLED_READ_ONLY = "Ticked as right."
+TICK_OPEN_READ_ONLY = "Not ticked."
+LINE_NO_WORDS = "No words are left on this line. They were part of a drug name that was corrected."
 # Above the note when the check, or an Undo of it, changed who spoke after the note was written (15.10 ruling 18). The owner's.
 NOTE_SPEAKERS_CHANGED = "Who spoke has changed since this note was written. Draft the note again to write it from the speakers as they stand now."
 # The who-spoke check on the review page (15.10 ruling 19; 15.9 ruling 37). The owner's sentences, letter for letter.
@@ -699,6 +709,8 @@ EVENTS = {
     "label.set": "Speaker label set by the doctor",
     "label.undone": "The check's change of a speaker label undone by the doctor",
     "drug_names.checked": "The drug names checked at Stop",
+    "drug_name.settled": "A doubted drug name ticked",
+    "drug_name.opened": "A doubted drug name opened again",
     "speakers.check_asked": "The check of who spoke asked for",
     "speakers.check_ended": "The check of who spoke ended",
     "speakers.check_undone_all": "Every change of the check undone by the doctor",
