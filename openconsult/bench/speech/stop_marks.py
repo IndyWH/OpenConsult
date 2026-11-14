@@ -31,6 +31,10 @@ WORDS_FOR_ONE = 200
 TAKEN, REFUSED, FAILED = "taken", "refused", "failed"
 COUNTS = ("right", "wrong", "unsure", "nowhere")
 RULE_COUNTS = ("named_twice", "dropped", "made_unsure_lines", "made_unsure_words")
+# The second round of a cloud model's drug-name call (15.10 ruling 30): the same pages asked again, stored under their
+# own names, and what the two rounds are set beside each other by.
+SECOND_ROUND = 2
+ROUND_COUNTS = ("entries", "names", "right_words")
 
 
 RULE = "15.10 ruling 24"
@@ -115,7 +119,7 @@ def model_readings(arm: str, name: str, whole: dict, parts: dict, drug: dict, li
 
 
 def score_all(stored: dict, local: dict, local_whole: dict, local_parts: dict, cloud: dict | None,
-              listed: list[banked.Recording], script_folders: list[Path], marks_file: dict) -> dict:
+              listed: list[banked.Recording], script_folders: list[Path], marks_file: dict, second_round: bool = False) -> dict:
     """Every page of the stored results with each reading there is, the
     sums by kind of page, and the marks."""
     rows = []
@@ -131,8 +135,59 @@ def score_all(stored: dict, local: dict, local_whole: dict, local_parts: dict, c
                "local": model_readings(arm, name, local_whole, local_parts, local, lines, page, reference, occurrences)}
         if cloud is not None:
             row["cloud"] = model_readings(arm, name, cloud, cloud, cloud, lines, page, reference, occurrences)
+            again = cloud.get(("drug_name", f"{arm}--{name}--r{SECOND_ROUND}")) if second_round else None
+            if again is not None:
+                row["cloud_round_2"] = {"drug": drug_reading(again, page, occurrences)}
+                first = cloud.get(("drug_name", f"{arm}--{name}"))
+                if first is not None:
+                    row["rounds"] = same_in_both(marked_by(first, page, occurrences), marked_by(again, page, occurrences))
         rows.append(row)
-    return {"rule": RULE, "pages": rows, "kinds": by_kind(rows), "marks": marks_of(rows)}
+    scored = {"rule": RULE, "pages": rows, "kinds": by_kind(rows), "marks": marks_of(rows)}
+    if any("rounds" in r for r in rows):
+        scored["rounds"] = rounds_of(rows)
+    return scored
+
+
+def marked_by(record: dict, page, occurrences: list[dict]) -> dict:
+    """What a round of the drug-name call marked, to set beside the other
+    round: its kept entries (the line and the words, letter for letter),
+    the drug names written wrongly that it marked, and the page words
+    written rightly that it marked."""
+    counted = doubt.by_model(page, record.get("kept") or [], occurrences)
+    marked_words = {m["word"] for m in counted["marks"]}
+    return {"entries": {(int(e["line"]), str(e["heard"])) for e in record.get("kept") or []},
+            "names": {i for i, occ in enumerate(occurrences)
+                      if not occ["caught"] and occ["page_words"] and any(w in marked_words for w in occ["page_words"])},
+            "right_words": {m["word"] for m in counted["marks"] if m["place"] == "word_right"}}
+
+
+def same_in_both(first: dict, second: dict) -> dict:
+    """Counts only: for each of the three, in the first round, in the
+    second, the same in both, and in one round alone."""
+    return {what: {"first": len(first[what]), "second": len(second[what]), "same": len(first[what] & second[what]),
+                   "first_alone": len(first[what] - second[what]), "second_alone": len(second[what] - first[what])}
+            for what in ROUND_COUNTS}
+
+
+def rounds_of(rows: list[dict]) -> dict:
+    """The two rounds of a cloud model's drug-name call, for the report
+    only (15.10 ruling 30: the marks are judged on the first round): each
+    round's figures, and how many marks are the same in both, over all
+    the pages and by kind of page."""
+    def sums(chosen: list[dict]) -> dict:
+        found: dict = {"pages": len(chosen)}
+        for name, model in (("first", "cloud"), ("second", "cloud_round_2")):
+            drugs = [r[model]["drug"] for r in chosen]
+            found[name] = {"answered": sum(1 for d in drugs if d["ok"]), "marked": sum(d["marked"] for d in drugs),
+                           "word_right": sum(d["places"]["word_right"] for d in drugs), "kept": sum(d["kept"] for d in drugs),
+                           "dropped": sum(d["dropped"] for d in drugs)}
+        found["written_wrongly"] = sum(r["cloud"]["drug"]["written_wrongly"] for r in chosen)
+        for what in ROUND_COUNTS:
+            found[what] = {key: sum(r["rounds"][what][key] for r in chosen) for key in ("first", "second", "same", "first_alone", "second_alone")}
+        found["names"]["neither"] = found["written_wrongly"] - found["names"]["same"] - found["names"]["first_alone"] - found["names"]["second_alone"]
+        return found
+    both = [r for r in rows if "rounds" in r]
+    return {"all": sums(both), "kinds": {arm: sums([r for r in both if r["arm"] == arm]) for arm in sorted({r["arm"] for r in both})}}
 
 
 def _taken(rows: list[dict], model: str, name: str) -> list[dict]:
@@ -167,7 +222,16 @@ def marks_of(rows: list[dict]) -> dict:
             "holds": parts_wrong + parts_made <= whole_wrong + whole_made + allowance, "whole_made_unsure_words": whole_made,
             "parts_made_unsure_words": parts_made, "whole_wrong": whole_wrong + whole_made, "parts_wrong": parts_wrong + parts_made,
             "line": whole_wrong + whole_made + allowance}
-    if any("cloud" in r for r in rows):
+    if not any("cloud" in r for r in rows):
+        return marks
+    # A cloud model is judged on the jobs its folder holds a reading of: the drug-name call alone gives D1 to D3 alone
+    # (15.10 ruling 30), and no mark of who spoke is made up for want of a reading.
+    who_read = any(r["cloud"][name]["present"] for r in rows for name in ("whole", "parts"))
+    drug_read = any(r["cloud"]["drug"]["present"] for r in rows)
+    drugs = {model: [r[model]["drug"] for r in rows if r[model]["drug"]["present"]] for model in ("local", "cloud")}
+    total = lambda model, key: sum(d[key] for d in drugs[model])   # noqa: E731
+    right = lambda model: sum(d["places"]["word_right"] for d in drugs[model])   # noqa: E731
+    if who_read:
         in_parts = _taken(rows, "local", "parts")
         missed_whole = [_page(r) for r in judged if r["cloud"]["whole"].get("state") != TAKEN]
         missed_parts = [_page(r) for r in in_parts if r["cloud"]["parts"].get("state") != TAKEN]
@@ -176,19 +240,17 @@ def marks_of(rows: list[dict]) -> dict:
         whole = {"local": _wrong(judged, "local", "whole"), "cloud": _wrong(judged, "cloud", "whole")}
         parts = {"local": _wrong(in_parts, "local", "parts"), "cloud": _wrong(in_parts, "cloud", "parts")}
         marks["H2"] = {"holds": whole["cloud"] <= whole["local"] and parts["cloud"] <= parts["local"], "whole": whole, "parts": parts}
-        drugs = {model: [r[model]["drug"] for r in rows if r[model]["drug"]["present"]] for model in ("local", "cloud")}
-        total = lambda model, key: sum(d[key] for d in drugs[model])   # noqa: E731
-        right = lambda model: sum(d["places"]["word_right"] for d in drugs[model])   # noqa: E731
+    if drug_read:
         marks["D1"] = {"holds": len(drugs["cloud"]) == len(rows) and all(d["ok"] for d in drugs["cloud"]),
                        "answered": sum(1 for d in drugs["cloud"] if d["ok"]), "pages": len(rows)}
         marks["D2"] = {"holds": total("cloud", "marked") >= total("local", "marked"), "local": total("local", "marked"),
                        "cloud": total("cloud", "marked"), "written_wrongly": total("local", "written_wrongly")}
         marks["D3"] = {"holds": right("cloud") <= right("local"), "local": right("local"), "cloud": right("cloud")}
-        marks["invents_nothing"] = {
-            model: {"label_entries_with_more_than_a_number_and_a_label": sum(
-                        r[model][name].get("other_keys", 0) for r in rows for name in ("whole", "parts")),
-                    "drug_entries_dropped": total(model, "dropped"), "drug_entries_kept": total(model, "kept")}
-            for model in ("local", "cloud")}
+    marks["invents_nothing"] = {
+        model: {**({"label_entries_with_more_than_a_number_and_a_label": sum(
+                        r[model][name].get("other_keys", 0) for r in rows for name in ("whole", "parts"))} if who_read else {}),
+                **({"drug_entries_dropped": total(model, "dropped"), "drug_entries_kept": total(model, "kept")} if drug_read else {})}
+        for model in ("local", "cloud")}
     return marks
 
 
@@ -239,20 +301,23 @@ def as_markdown(scored: dict) -> str:
         lines.append(f"- Invents nothing: {json.dumps(marks['invents_nothing'])}")
     models = [m for m in ("local", "cloud") if any(m in row for row in scored["pages"])]
     for model in models:
-        lines += ["", f"## Who spoke, by page: {model}", "",
-                  "| Page | Lines | Words | Whole | Right | Wrong | Unsure | Named twice | Dropped | Parts | Right | Wrong | Unsure | Named twice | Dropped |",
-                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
-        lines += [f"| {_page(r)} | {r['lines']} | {r['words']} | {_cells(r[model]['whole'])} | {_cells(r[model]['parts'])} |"
-                  for r in scored["pages"]]
-        lines += ["", f"## Who spoke, by kind of page: {model}", "",
-                  "| Kind | Pages | Words | Whole taken | Wrong | Unsure | Of them made unsure by the rule | Named twice | Dropped "
-                  "| Parts taken | Wrong | Unsure | Of them made unsure by the rule | Named twice | Dropped |",
-                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        who = ["", f"## Who spoke, by page: {model}", "",
+               "| Page | Lines | Words | Whole | Right | Wrong | Unsure | Named twice | Dropped | Parts | Right | Wrong | Unsure | Named twice | Dropped |",
+               "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        who += [f"| {_page(r)} | {r['lines']} | {r['words']} | {_cells(r[model]['whole'])} | {_cells(r[model]['parts'])} |"
+                for r in scored["pages"]]
+        who += ["", f"## Who spoke, by kind of page: {model}", "",
+                "| Kind | Pages | Words | Whole taken | Wrong | Unsure | Of them made unsure by the rule | Named twice | Dropped "
+                "| Parts taken | Wrong | Unsure | Of them made unsure by the rule | Named twice | Dropped |",
+                "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for kind, found in scored["kinds"].items():
             whole, parts = found.get(f"{model}_whole"), found.get(f"{model}_parts")
             cell = lambda s: (f"{s[TAKEN]} | {s['wrong']} | {s['unsure']} | {s['made_unsure_words']} | {s['named_twice']} | {s['dropped']}"   # noqa: E731
                               if s else "not run | | | | | ")
-            lines.append(f"| {kind} | {found['pages']} | {found['words']} | {cell(whole)} | {cell(parts)} |")
+            who.append(f"| {kind} | {found['pages']} | {found['words']} | {cell(whole)} | {cell(parts)} |")
+        # A model with no reading of who spoke (a cloud model benched on the drug names alone) gets no table of it.
+        if any(r[model][name]["present"] for r in scored["pages"] for name in ("whole", "parts")):
+            lines += who
         lines += ["", f"## Drug names, by kind of page: {model}", "",
                   "| Kind | Answered | Written wrongly | Marked | Marks on a word written rightly | On another word written wrongly "
                   "| Where nothing was spoken | Dropped |", "|---|---|---|---|---|---|---|---|"]
@@ -261,6 +326,17 @@ def as_markdown(scored: dict) -> str:
             if drug:
                 lines.append(f"| {kind} | {drug['answered']} | {drug['written_wrongly']} | {drug['marked']} | {drug['word_right']} | "
                              f"{drug['other_word_wrong']} | {drug['nowhere']} | {drug['dropped']} |")
+    if "rounds" in scored:
+        lines += ["", "## The two rounds of the drug-name call", "",
+                  "| Kind | Pages | Answered: round one | two | Written wrongly | Marked: one | two | in both | in round one alone "
+                  "| in round two alone | in neither | Marks on a word written rightly: one | two | the same words | Entries kept: one | two "
+                  "| the same in both | Dropped: one | two |", "|" + "---|" * 19]
+        for kind, found in list(scored["rounds"]["kinds"].items()) + [("All", scored["rounds"]["all"])]:
+            one, two, names, right, entries = found["first"], found["second"], found["names"], found["right_words"], found["entries"]
+            lines.append(f"| {kind} | {found['pages']} | {one['answered']} | {two['answered']} | {found['written_wrongly']} | {one['marked']} | "
+                         f"{two['marked']} | {names['same']} | {names['first_alone']} | {names['second_alone']} | {names['neither']} | "
+                         f"{one['word_right']} | {two['word_right']} | {right['same']} | {one['kept']} | {two['kept']} | {entries['same']} | "
+                         f"{one['dropped']} | {two['dropped']} |")
     return "\n".join(lines) + "\n"
 
 
@@ -271,11 +347,14 @@ def _calls(folder: Path | None) -> dict:
 
 
 def speech_stop_marks(local: Path, parts: Path | None, cloud: Path | None, whole: Path | None, recordings_folder: Path,
-                      script_folders: list[Path], marks_path: Path, write: Path, say: Callable = print) -> int:
+                      script_folders: list[Path], marks_path: Path, write: Path, say: Callable = print,
+                      second_round: bool = False) -> int:
     """The one command: the pages and the local readings under local, the
     local parts reading under parts, a cloud model's readings under cloud
-    (whole: the local whole reading when it was run again). The tables go
-    under write, never over a file. Reads only what is stored."""
+    (whole: the local whole reading when it was run again; second_round:
+    the cloud model's drug-name call asked a second time is counted too,
+    for the report). The tables go under write, never over a file. Reads
+    only what is stored."""
     try:
         listed = banked.load_list(recordings_folder)
     except banked.BadList as bad:
@@ -290,7 +369,7 @@ def speech_stop_marks(local: Path, parts: Path | None, cloud: Path | None, whole
     marks_file = json.loads(Path(marks_path).read_text(encoding="utf-8"))
     try:
         scored = score_all(stored, _calls(local), _calls(whole or local), _calls(parts), _calls(cloud) if cloud else None, listed,
-                           [Path(f) for f in script_folders], marks_file)
+                           [Path(f) for f in script_folders], marks_file, second_round=second_round)
         written = tables.write(Path(write), scored, as_markdown(scored))
     except NotThePage as call:
         say(words.BENCH_NOT_THE_PAGE.format(call=call))
@@ -316,6 +395,8 @@ def add_command(sub, say: Callable) -> None:
     p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
     p.add_argument("--marks", required=True, help="the file of drug names, test names and safety nets")
     p.add_argument("--write", required=True, help="where scores.json and report.md go; never written over")
+    p.add_argument("--second-round", action="store_true", help="also count the second round of the drug-name call under --cloud")
     path = lambda value: Path(value) if value else None   # noqa: E731
     p.set_defaults(fn=lambda a: speech_stop_marks(Path(a.local), path(a.parts), path(a.cloud), path(a.whole), Path(a.recordings),
-                                                  [Path(f) for f in a.scripts], Path(a.marks), Path(a.write), say=say))
+                                                  [Path(f) for f in a.scripts], Path(a.marks), Path(a.write), say=say,
+                                                  second_round=a.second_round))

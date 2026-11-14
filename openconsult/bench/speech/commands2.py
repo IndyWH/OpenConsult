@@ -227,7 +227,7 @@ def add_calls_command(sub, say: Callable) -> None:
     p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
     p.add_argument("--job", required=True, choices=list(calls.JOB_KINDS),
                    help="the job to run; label_check_app is the label check as the app sent it until 6c; label_check_parts reads each page in two parts")
-    p.add_argument("--round", type=int, help="the round of the notes, 1 or 2")
+    p.add_argument("--round", type=int, help="the round, 1 or 2: of the notes, or 2 for the drug-name call asked a second time")
     p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
     p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
     p.add_argument("--kind", choices=sorted(KINDS), default="ollama",

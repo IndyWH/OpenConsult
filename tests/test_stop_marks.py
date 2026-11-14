@@ -88,9 +88,9 @@ def test_6c_the_parts_reading_cuts_each_page_in_two_with_the_apps_function_sends
     assert stored["said"][-1] == words.BENCH_CALLS_DONE.format(made=0, failed=0, kept=3)
 
 
-def marks_run(stored, write, **folders):
+def marks_run(stored, write, second_round=False, **folders):
     return stop_marks.speech_stop_marks(folders["local"], folders.get("parts"), folders.get("cloud"), None, stored["folder"],
-                                        [stored["scripts"]], stored["marks"], write, say=stored["said"].append)
+                                        [stored["scripts"]], stored["marks"], write, say=stored["said"].append, second_round=second_round)
 
 
 def test_6c_the_marks_are_counted_from_the_stored_results_alone_twice_the_same_bytes_and_never_over_a_file(stored, tmp_path):
@@ -300,3 +300,73 @@ def test_6c_ruling_22_speech_calls_takes_the_claude_kind_with_the_models_name_an
     assert run("label_check", where=stopped) == 11 and len(messages(server)) == 13
     assert said[-2].startswith("STOP: ") and "written apart" in said[-2]
     assert ResultWriter(stopped / "calls").read_all() == {} and len(list((stopped / "calls" / "results" / "label_check" / "stopped").glob("*.json"))) == 1
+
+
+class DrugEngine(FakeEngine):
+    """Answers each drug-name call with the entries its script holds for that call, in the order the calls arrive."""
+
+    def __init__(self, entries):
+        super().__init__(script=[])
+        self.entries = list(entries)
+
+    def chat(self, call):
+        self.calls.append(call)
+        return self.chat_item(call, {"doubtful": self.entries[len(self.calls) - 1]})
+
+
+def test_6d_ruling_30_the_drug_name_call_alone_gives_D1_to_D3_alone_and_a_second_round_is_stored_apart_and_set_beside_the_first(stored, tmp_path):
+    # The bench of Claude Sonnet (15.10 rulings 25 and 30; the details of step 6d): the drug-name call alone, then the same
+    # pages a second time for the report. Made-up replies; what code counts is asserted, never what a model would say.
+    local, cloud = tmp_path / "local", tmp_path / "cloud"
+    calls_into(stored, local, LabelsEngine(), ["label_check", "drug_name"])
+    hit, miss = {"line": 1, "heard": "metformin", "meant": "metformin"}, {"line": 1, "heard": "zzz", "meant": ""}
+    engine = DrugEngine([[hit], [hit], [hit], [], [], [hit, miss]])            # asked again, two pages say nothing
+    shutil.copytree(stored["out"] / "results", cloud / "results")
+    door = Door(engine, ModelCalls(open_database(cloud / "calls" / "calls.db")), GEMMA_4_QAT)
+
+    def ask(round_n):
+        return commands2.speech_calls(cloud, stored["folder"], [stored["scripts"]], "drug_name", round_n, stored["data"],
+                                      say=stored["said"].append, make_door=lambda p: door)
+    assert ask(None) == 0 and len(engine.calls) == 3
+    # The second round goes under names of its own, never over the first; a result that is there is never asked for again (10.4).
+    assert ask(2) == 0 and len(engine.calls) == 6 and ask(2) == 0 and ask(None) == 0 and len(engine.calls) == 6
+    results = ResultWriter(cloud / "calls").read_all()
+    assert sorted(results) == sorted([("drug_name", p) for p in PAGES] + [("drug_name", p + "--r2") for p in PAGES])
+    assert all(results[("drug_name", p)]["round"] is None and results[("drug_name", p + "--r2")]["round"] == 2 for p in PAGES)
+    assert all(results[("drug_name", p)]["user"] == results[("drug_name", p + "--r2")]["user"] for p in PAGES)     # the same text, asked twice
+    # Counted with no second round: the drug-name marks alone, and no mark of who spoke made up for want of a reading.
+    assert marks_run(stored, tmp_path / "w1", local=local, cloud=cloud) == 0
+    scored = json.loads((tmp_path / "w1" / "scores.json").read_text(encoding="utf-8"))
+    marks = scored["marks"]
+    assert {"D1", "D2", "D3", "invents_nothing"} <= set(marks) and not {"H1", "H2", "P1", "P2"} & set(marks) and "rounds" not in scored
+    assert marks["D1"] == {"holds": True, "answered": 3, "pages": 3}
+    assert set(marks["invents_nothing"]["cloud"]) == {"drug_entries_dropped", "drug_entries_kept"} == set(marks["invents_nothing"]["local"])
+    report = (tmp_path / "w1" / "report.md").read_text(encoding="utf-8")
+    assert "## Who spoke, by page: cloud" not in report and "## Drug names, by kind of page: cloud" in report
+    assert "## Who spoke, by page: local" in report and "The two rounds" not in report and "- H1" not in report
+    # With the second round: the marks are judged on round one alone and stand as they were; the rounds are set side by side.
+    assert marks_run(stored, tmp_path / "w2", second_round=True, local=local, cloud=cloud) == 0
+    assert marks_run(stored, tmp_path / "w3", second_round=True, local=local, cloud=cloud) == 0
+    for name in ("scores.json", "report.md"):
+        assert (tmp_path / "w2" / name).read_bytes() == (tmp_path / "w3" / name).read_bytes()
+    again = json.loads((tmp_path / "w2" / "scores.json").read_text(encoding="utf-8"))
+    assert again["marks"] == marks
+    kept = {chain: {(e["line"], e["heard"]) for e in results[("drug_name", chain)]["kept"]} for _, chain in results}
+    first, second = [kept[p] for p in PAGES], [kept[p + "--r2"] for p in PAGES]
+    rounds = again["rounds"]["all"]
+    assert rounds["pages"] == 3 and rounds["first"]["answered"] == rounds["second"]["answered"] == 3
+    assert rounds["entries"] == {"first": sum(map(len, first)), "second": sum(map(len, second)),
+                                 "same": sum(len(a & b) for a, b in zip(first, second)),
+                                 "first_alone": sum(len(a - b) for a, b in zip(first, second)),
+                                 "second_alone": sum(len(b - a) for a, b in zip(first, second))}
+    assert rounds["entries"]["first"] >= 2 and rounds["entries"]["first_alone"] >= 1 and rounds["entries"]["second_alone"] == 0   # a mark of round one that round two did not make
+    dropped = lambda pages: sum(len(results[("drug_name", p)]["dropped"]) for p in pages)   # noqa: E731
+    assert (rounds["first"]["dropped"], rounds["second"]["dropped"]) == (dropped(PAGES), dropped([p + "--r2" for p in PAGES])) and rounds["second"]["dropped"] >= 1
+    names = rounds["names"]
+    assert names["same"] + names["first_alone"] == names["first"] == rounds["first"]["marked"] == marks["D2"]["cloud"]
+    assert names["same"] + names["second_alone"] == names["second"] == rounds["second"]["marked"]
+    assert names["neither"] == rounds["written_wrongly"] - names["same"] - names["first_alone"] - names["second_alone"] >= 0
+    assert sorted(again["rounds"]["kinds"]) == ["nemotron", "nemotron_tied_pair", "whisperx_pyannote"]
+    assert sum(k["entries"]["same"] for k in again["rounds"]["kinds"].values()) == rounds["entries"]["same"]
+    report = (tmp_path / "w2" / "report.md").read_text(encoding="utf-8")
+    assert "## The two rounds of the drug-name call" in report and "| All | 3 | 3 | 3 |" in report and "metformin" not in report   # counts, never a word of a page
