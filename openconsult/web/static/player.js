@@ -1,36 +1,50 @@
-// The player (spec 8.8; D51). The browser's own controls give play, pause,
-// the bar and the time. This script adds the presses: a line plays from its
-// start and is marked while it plays; a warning plays its stretch and stops
-// at its end; the loudness strip is drawn from the stored loudness and a
-// press on it seeks there. Every figure comes from the app's player data;
-// no state is worked out here beyond which line holds the current time.
+// The player (spec 8.8; D51; 15.10 ruling 29). The browser's own controls
+// give play, pause, the bar and the time. This script adds the presses: a
+// line plays from its start to its end and stops, and is marked while it
+// plays; a warning plays its stretch and stops at its end; the alarm's press
+// and a press on the loudness strip play on. The strip is drawn from the
+// stored loudness. Every figure comes from the app: each button carries its
+// own start and end, and the player data the rest. No state is worked out
+// here beyond which line holds the current time and where a press stops.
 (function () {
   const audio = document.getElementById('audio');
   const data = document.getElementById('player-data');
   if (!audio || !data) return;
   const player = JSON.parse(data.textContent);
-  let stopAt = null;
+  let from = 0;
+  let stopAt = null;      // where a pressed line or stretch ends; null when the sound plays on
+  let watching = false;
 
+  function stopIfReached() {
+    if (stopAt === null) return;
+    const t = audio.currentTime;
+    // Moved away with the player's own bar: its controls play on as before.
+    if (t < from - 0.25 || t > stopAt + 0.75) { stopAt = null; return; }
+    if (t >= stopAt) { stopAt = null; audio.pause(); }
+  }
+  function watch() {
+    stopIfReached();
+    watching = stopAt !== null;
+    if (watching) window.requestAnimationFrame(watch);           // closer than the browser's own time events, a quarter second apart
+  }
   function playFrom(start, end) {
-    stopAt = end === undefined ? null : end;
+    from = start;
+    stopAt = (end === undefined || Number.isNaN(end) || end <= start) ? null : end;
     audio.currentTime = start;
     audio.play();
+    if (stopAt !== null && !watching) { watching = true; window.requestAnimationFrame(watch); }
   }
-  document.querySelectorAll('button.play-line').forEach(function (button) {
-    button.addEventListener('click', function () {
-      const line = player.lines.find(function (l) { return String(l.n) === button.dataset.line; });
-      if (line) playFrom(line.start_s);
-    });
+  // A pause with the player's own control before the end: the next play is the player's own and plays on.
+  audio.addEventListener('pause', function () { if (stopAt !== null && audio.currentTime < stopAt) stopAt = null; });
+  document.querySelectorAll('button.play-line, button.play-stretch').forEach(function (button) {
+    button.addEventListener('click', function () { playFrom(Number(button.dataset.start), Number(button.dataset.end)); });
   });
   document.querySelectorAll('button.play-at').forEach(function (button) {
     button.addEventListener('click', function () { playFrom(Number(button.dataset.start)); });
   });
-  document.querySelectorAll('button.play-stretch').forEach(function (button) {
-    button.addEventListener('click', function () { playFrom(Number(button.dataset.start), Number(button.dataset.end)); });
-  });
   audio.addEventListener('timeupdate', function () {
     const t = audio.currentTime;
-    if (stopAt !== null && t >= stopAt) { audio.pause(); stopAt = null; }
+    stopIfReached();
     document.querySelectorAll('.line.playing').forEach(function (line) { line.classList.remove('playing'); });
     const line = player.lines.find(function (l) { return t >= l.start_s && t < l.end_s; });
     if (line) { const node = document.getElementById('line-' + line.n); if (node) node.classList.add('playing'); }

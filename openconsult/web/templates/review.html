@@ -115,7 +115,7 @@
     {% else %}{{ refusal("draft-rows") }}{% endif %}
     {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
-      {% elif player.available and w.line_n %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}">{{ words.PLAY_FROM_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
+      {% elif player.available and w.line_n and w.line_start_s is not none %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}" data-start="{{ w.line_start_s }}" data-end="{{ w.line_end_s }}">{{ words.PLAY_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
     {% elif not drug_marks %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
     <h3 class="mark" id="alarms">{{ words.ALARMS }}</h3>
     {% if alarms %}<ul class="panel-list">{% for a in alarms %}<li class="alarm-line" data-key="{{ a.key }}" data-n="{{ a.n }}">{{ a.text }}
@@ -156,7 +156,7 @@
     {% for line in lines %}
     <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}">
       <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
-      {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" aria-label="{{ words.PLAY_FROM_LINE }}">&#9654;</button>{% endif %}
+      {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" aria-label="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
       {% if transcript_read_only %}<span class="line-text">{% for piece, doubted in line.segments %}{% if doubted %}<mark class="doubted">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</span>{% if line.doubted %}<span class="mark doubted-word"> ({{ words.CHECK_THIS_NAME }})</span>{% endif %}{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
       {% else %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}" class="line-form">
         <select name="label" aria-label="{{ words.SPEAKER_WORD.format(n=line.n) }}">{% for value, word in words.LABEL_WORDS.items() %}<option value="{{ value }}"{% if value == line.label %} selected{% endif %}>{{ word }}</option>{% endfor %}</select>

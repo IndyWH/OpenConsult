@@ -3,6 +3,7 @@ R18; V1_LESSONS 5.2) and the printed page (ruling 4; the plan review,
 point 3). Made sound; made-up doors."""
 
 import json
+import re
 
 from openconsult import words
 from openconsult.web.review import STRIP_COLUMNS, player_data, strip_of
@@ -55,7 +56,7 @@ def test_8_8_the_page_has_the_player_the_presses_and_the_strip_and_when_the_reco
     assert '<audio id="audio" controls' in raw and 'src="/consultations/1/recording"' in raw
     assert '<canvas id="strip"' in raw and 'id="player-data"' in raw and '/static/player.js' in raw
     assert raw.count('class="play-line cite" data-line="') >= 3          # each line, and the no-speaker warning
-    assert words.PLAY_FROM_LINE in raw and client.get("/static/player.js").status_code == 200
+    assert words.PLAY_LINE in raw and client.get("/static/player.js").status_code == 200
     data = json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])
     assert data["available"] and [line["n"] for line in data["lines"]] == [1, 2] and data["length_s"] == 2.0
     assert words.AUDIO_GONE.split("{")[0] not in text_of(client.get("/consultations/1"))
@@ -82,3 +83,25 @@ def test_ruling_4_the_printed_page_is_the_note_alone(tmp_path, clock, machine):
     for mark in ('id="differentials"', 'id="controls"', 'id="warnings"', 'id="transcript"', 'id="model-line"', 'class="entry-form no-print"',
                  'class="entry-text print-only"', 'class="statement print-keep"', 'class="pane note print-keep"'):
         assert mark in raw, mark
+
+
+def test_ruling_29_every_press_that_plays_a_line_carries_that_lines_start_and_its_end_to_stop_at_and_the_alarms_press_no_end(tmp_path, clock, machine):
+    # As built for 8.8 a pressed line played to the end of the recording, and the pause was far up the page (15.10 ruling 29).
+    # The app gives each press its stretch on the button itself; the script plays it and stops. The alarm's press plays on.
+    app, client, c = reviewed(tmp_path, clock, machine)
+    raw = client.get("/consultations/1").text
+    data = json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])
+    times = {line["n"]: (line["start_s"], line["end_s"]) for line in data["lines"]}
+    presses = re.findall(r'<button type="button" class="play-line cite" data-line="(\d+)" data-start="([^"]*)" data-end="([^"]*)"', raw)
+    assert len(presses) == raw.count('class="play-line') >= 3                    # on the transcript and in the warnings: none without its end
+    for n, start, end in presses:
+        assert (float(start), float(end)) == times[int(n)] and float(end) > float(start)
+    assert {int(n) for n, _, _ in presses} == set(times)
+    in_warnings = raw.split('id="warnings"')[1].split('id="transcript"')[0]
+    assert 'class="play-line cite"' in in_warnings and ">" + words.PLAY_LINE + "</button>" in in_warnings
+    assert "Play from here" not in text_of(client.get("/consultations/1")) and "Play from here" not in raw     # the name that became untrue
+    assert raw.count(f'aria-label="{words.PLAY_LINE}"') == len(times)
+    # The alarm's Play from where it fired carries a start and no end; a warning's stretch keeps its own end.
+    alarm = re.findall(r'<button type="button" class="play-at"([^>]*)>', raw)
+    assert alarm and all("data-start=" in a and "data-end" not in a for a in alarm) and words.PLAY_FROM_ALARM in raw
+    c.close()

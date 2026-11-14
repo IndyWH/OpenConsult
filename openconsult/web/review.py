@@ -187,6 +187,11 @@ def page_data(p, row: dict) -> dict:
     # Approve; the sentences above them are not counted.
     drug = drug_marks.review_data(p.consultations, cid, lines)
     warnings = drug["rows"] + warning_lines(warning_rows, lines, choice.title if choice else row["speech_choice"])
+    # A press that plays a line plays that line and stops (ruling 29): each warning that names a line carries its start and end.
+    by_number = {line["n"]: line for line in lines}
+    for w in warnings:
+        held = by_number.get(w["line_n"])
+        w["line_start_s"], w["line_end_s"] = (held["start_s"], held["end_s"]) if held else (None, None)
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
     who = who_check.page_state(p.consultations, cid, state["transcript_read_only"], bool(lines))

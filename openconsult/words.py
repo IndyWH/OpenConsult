@@ -271,7 +271,7 @@ DRUG_MARKED_ONE = "The language model marked 1 drug name it doubts. Play it. If 
 DRUG_ROW_LINE = "Line {n}"
 TICK_OPEN = "Tick this name when it is right"
 TICK_SETTLED = "Ticked as right. Press to open it again"
-PLAY_LINE = "Play this line"
+PLAY_LINE = "Play this line"                # every press that plays a line: it plays that line and stops (ruling 29)
 # Drafts of the build, accepted as drafts by the plan review: the field's name for a screen reader, the tick's name on
 # a read-only page, where no press can change it, and the line a correction left with no words.
 DRUG_FIELD_NAME = "The doubted words on line {n}"
@@ -423,7 +423,6 @@ BACK_TO_REVIEW = "Back to the review page"
 LETTER_MODEL_LINE = "Language model: {model} on {engine} {version}."
 # The player (spec 8.8; D51). Drafts.
 PLAYER = "The recording"
-PLAY_FROM_LINE = "Play from here"
 PLAY_STRETCH = "Play this stretch"
 LOUDNESS = "Loudness along the recording. Press to go there."
 AUDIO_GONE = "The recording from {date} is no longer on this computer."
