@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 9
+VERSION = 10
 
 MIGRATIONS = {
     1: """
@@ -557,5 +557,22 @@ INSERT INTO speaker_check_change (check_id, line_n, label_before, label_after)
     JOIN speaker_check s ON s.consultation_id = t.consultation_id
     WHERE t.changed_by_check = 1 AND t.n IS NOT NULL
     ORDER BY t.consultation_id, t.n;
+""",
+    # Step 6d (spec 15.10, rulings 26 and 28 and the details of the step: The
+    # record; the plan review, point 2): a mark gains the words as they now
+    # stand on the line, which begin as the words heard; the time it was
+    # settled, empty when it is not; and the first and the last line it was
+    # heard on, which are never found again from typed words, so that its
+    # row can always play the whole name. The words heard never change. A
+    # version 9 folder comes forward with every row: each mark stands as it
+    # was heard, none is settled, and its lines are those its places hold.
+    10: """
+ALTER TABLE drug_mark ADD COLUMN standing TEXT NOT NULL DEFAULT '';
+UPDATE drug_mark SET standing = heard;
+ALTER TABLE drug_mark ADD COLUMN settled_at TEXT;
+ALTER TABLE drug_mark ADD COLUMN heard_first INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE drug_mark ADD COLUMN heard_last INTEGER NOT NULL DEFAULT 0;
+UPDATE drug_mark SET heard_first = first_line,
+    heard_last = COALESCE((SELECT MAX(json_extract(j.value, '$.line')) FROM json_each(drug_mark.places) AS j), first_line);
 """,
 }

@@ -93,3 +93,25 @@ def test_6c_a_mark_is_stored_with_its_places_found_in_the_order_of_the_page_and_
     assert [m["id"] for m in found.drug_marks(cid)] == [late]
     kept = found.drug_marks(cid, every=True)
     assert [m["id"] for m in kept] == [early, late] and kept[0]["cleared_at"] is not None and kept[0]["meant"] == ""
+
+
+def test_6d_a_mark_keeps_the_words_heard_and_the_lines_it_was_heard_on_while_its_words_as_they_stand_and_its_tick_change(rows):
+    # Rulings 26 and 28, the details of step 6d: The record; the plan review, point 2.
+    found, cid = rows
+    call = found.add_drug_call(cid, None, "answered", None, kept=2, dropped=0)
+    late = found.add_drug_mark(cid, call, 2, "made up 4", "a made-up drug", [3, 4], [{"line": 4, "first": 0, "last": 9}])
+    early = found.add_drug_mark(cid, call, 1, "up 1 made", "", [1, 2], [{"line": 1, "first": 5, "last": 9}, {"line": 2, "first": 0, "last": 4}])
+    first = found.drug_marks(cid)[0]
+    assert (first["id"], first["standing"], first["settled_at"], first["heard_first"], first["heard_last"]) == (early, "up 1 made", None, 1, 2)
+    # The doctor types the name over the words: they stand on line 2 alone now, and the mark is found there.
+    found.set_mark_places(early, [{"line": 2, "first": 3, "last": 10}], standing="made-up")
+    typed = found.drug_marks(cid)[0]
+    assert (typed["heard"], typed["standing"], typed["first_line"], typed["heard_first"], typed["heard_last"]) == ("up 1 made", "made-up", 2, 1, 2)
+    assert [m["id"] for m in found.drug_marks(cid)] == [early, late]                     # the order of the page as heard never moves
+    # The tick: settled with the time, opened again with none; places found again without typed words leave them as they are.
+    found.settle_mark(early)
+    assert found.drug_marks(cid)[0]["settled_at"] is not None and found.drug_marks(cid)[1]["settled_at"] is None
+    found.set_mark_places(early, [{"line": 2, "first": 0, "last": 7}])
+    assert (found.drug_marks(cid)[0]["standing"], found.drug_marks(cid)[0]["settled_at"] is not None) == ("made-up", True)
+    found.settle_mark(early, settled=False)
+    assert found.drug_marks(cid)[0]["settled_at"] is None and found.drug_marks(cid)[0]["meant"] == ""

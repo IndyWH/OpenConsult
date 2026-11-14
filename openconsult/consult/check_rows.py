@@ -113,24 +113,35 @@ class CheckRows:
 
     def add_drug_mark(self, consultation_id: int, drug_call_id: int, joined_line: int, heard: str, meant: str,
                       page_lines: list[int], places: list[dict]) -> int:
+        on = [place["line"] for place in places]
         cursor = self._db.execute(
-            "INSERT INTO drug_mark (consultation_id, drug_name_call_id, joined_line, heard, meant, page_lines, places, first_line) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            "INSERT INTO drug_mark (consultation_id, drug_name_call_id, joined_line, heard, meant, page_lines, places, first_line, "
+            "standing, heard_first, heard_last) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (consultation_id, drug_call_id, int(joined_line), heard, meant, json.dumps(page_lines), json.dumps(places),
-             min(place["line"] for place in places)))
+             min(on), heard, min(on), max(on)))
         return int(cursor.lastrowid)
 
     def drug_marks(self, consultation_id: int, every: bool = False) -> list[dict]:
-        """The marks that stand, in the order of the page. every: the
-        record, the cleared ones too. After Approve the transcript is
-        read-only, so the marks that stand are those that stood at Approve."""
-        rows = self._db.query("SELECT * FROM drug_mark WHERE consultation_id = ? ORDER BY first_line, id", (consultation_id,))
+        """The marks that stand, settled or not, in the order of the page as
+        they were heard, which a correction never moves. every: the record,
+        the cleared ones too. After Approve the transcript is read-only, so
+        the marks that stand are those that stood at Approve."""
+        rows = self._db.query("SELECT * FROM drug_mark WHERE consultation_id = ? ORDER BY heard_first, id", (consultation_id,))
         found = [{**dict(r), "page_lines": json.loads(r["page_lines"]), "places": json.loads(r["places"])} for r in rows]
         return found if every else [m for m in found if m["cleared_at"] is None]
 
-    def set_mark_places(self, mark_id: int, places: list[dict]) -> None:
+    def set_mark_places(self, mark_id: int, places: list[dict], standing: str | None = None) -> None:
+        """Where the mark's words stand now; with standing, the words the
+        doctor typed over them (ruling 26). The words heard and the lines
+        they were heard on are never written again."""
         self._db.execute("UPDATE drug_mark SET places = ?, first_line = ? WHERE id = ?",
                          (json.dumps(places), min(place["line"] for place in places), mark_id))
+        if standing is not None:
+            self._db.execute("UPDATE drug_mark SET standing = ? WHERE id = ?", (standing, mark_id))
+
+    def settle_mark(self, mark_id: int, settled: bool = True) -> None:
+        """The tick (ruling 28): settled with the time, or opened again."""
+        self._db.execute("UPDATE drug_mark SET settled_at = ? WHERE id = ?", (self._now() if settled else None, mark_id))
 
     def clear_mark(self, mark_id: int) -> None:
         self._db.execute("UPDATE drug_mark SET cleared_at = ? WHERE id = ?", (self._now(), mark_id))

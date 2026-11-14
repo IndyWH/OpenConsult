@@ -319,7 +319,7 @@ def test_6_5_a_version_8_database_with_its_checked_labels_comes_forward_to_9(tmp
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 9
+    assert new.version() == schema.VERSION          # through 9 and on to today's version
     assert {"speaker_check", "speaker_check_change", "drug_name_call", "drug_mark", "transcript_edit"} <= set(new.tables())
     assert "transcript_edit_9" not in new.tables() and Users(new, Audit(new)).verify("example-password")
     assert [(r["id"], r["kind"]) for r in new.query("SELECT * FROM transcript_edit")] == [(2, "swap")]
@@ -338,4 +338,34 @@ def test_6_5_a_version_8_database_with_its_checked_labels_comes_forward_to_9(tmp
     assert new.query_one("SELECT COUNT(*) AS n FROM transcript_line")["n"] == 7 and new.query_one("SELECT COUNT(*) AS n FROM model_call")["n"] == 5
     with pytest.raises(sqlite3.DatabaseError):
         new.execute("INSERT INTO speaker_check (consultation_id, asked_at, outcome, parts, joined_lines) VALUES (1, 't', 'half', 1, 1)")
+    new.close()
+
+
+def test_6_5_a_version_9_database_with_its_drug_marks_comes_forward_to_10(tmp_path, monkeypatch):
+    # The owner's real database is at version 9 (step 6c2), with consultations whose drug names were marked at Stop.
+    # Step 6d (15.10 rulings 26 and 28, the details: The record; the plan review, point 2): every row comes forward;
+    # each mark stands as it was heard, none is settled, and the lines it was heard on are those its places hold.
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 9)
+    old = open_database(path)
+    assert old.version() == 9 and "standing" not in [r["name"] for r in old.query("PRAGMA table_info(drug_mark)")]
+    old.execute("INSERT INTO patient (name, date_of_birth, sex, created_at) VALUES ('Made-up', '1990-01-01', 'F', 't')")
+    old.execute("INSERT INTO consultation (patient_id, started_at, intended_minutes, speech_choice, engine, model_tag, "
+                "speakers_given, state, doctor_speaker, patient_name, patient_date_of_birth, patient_sex) "
+                "VALUES (1, 't', 15, 'nemotron', 'vllm', 'tag', 2, 'final', 'S1', 'Made-up', '1990-01-01', 'F')")
+    old.execute("INSERT INTO drug_name_call (consultation_id, at, outcome, kept, dropped) VALUES (1, 't', 'answered', 3, 0)")
+    mark = ("INSERT INTO drug_mark (consultation_id, drug_name_call_id, joined_line, heard, meant, page_lines, places, first_line, cleared_at) "
+            "VALUES (1, 1, ?, ?, 'a made-up drug', ?, ?, ?, ?)")
+    old.execute(mark, (1, "made up", "[1, 2]", '[{"line": 1, "first": 5, "last": 9}, {"line": 2, "first": 0, "last": 2}]', 1, None))
+    old.execute(mark, (2, "up made", "[3]", '[{"line": 3, "first": 0, "last": 7}]', 3, None))
+    old.execute(mark, (3, "gone", "[4, 5]", '[{"line": 5, "first": 0, "last": 4}]', 5, "t9"))       # cleared by an edit in 6c
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 10 == schema.VERSION
+    marks = [dict(r) for r in new.query("SELECT * FROM drug_mark ORDER BY id")]
+    assert [(m["heard"], m["standing"], m["settled_at"], m["heard_first"], m["heard_last"], m["cleared_at"]) for m in marks] == [
+        ("made up", "made up", None, 1, 2, None), ("up made", "up made", None, 3, 3, None), ("gone", "gone", None, 5, 5, "t9")]
+    assert [(m["meant"], m["places"], m["first_line"]) for m in marks][1] == ("a made-up drug", '[{"line": 3, "first": 0, "last": 7}]', 3)
+    assert new.query_one("SELECT COUNT(*) AS n FROM drug_name_call")["n"] == 1
     new.close()

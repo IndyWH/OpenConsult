@@ -109,17 +109,17 @@ def run(door: Door, rows: Consultations, audit: Audit, consultation_id: int) -> 
 
 
 def after_edit(rows: Consultations, consultation_id: int, n: int) -> int:
-    """After the doctor edits the words of line n: a mark whose words
-    still stand on its lines letter for letter is found again in the new
-    words; one whose words no longer stand there is cleared, and stays in
-    the record with the time. The call is never made again. The count of
-    marks cleared."""
+    """After the doctor edits the words of line n: a mark whose words, as
+    they now stand, are still on its lines letter for letter is found
+    again in the new words and keeps its state, settled or not; one whose
+    words no longer stand there is cleared, and stays in the record with
+    the time. The call is never made again. The count of marks cleared."""
     text_of = {r["n"]: r["text"] for r in rows.transcript_lines(consultation_id) if r["n"] is not None}
     cleared = 0
     for mark in rows.drug_marks(consultation_id):
         if n not in mark["page_lines"]:
             continue
-        places = places_of(mark["heard"], mark["page_lines"], text_of)
+        places = places_of(mark["standing"], mark["page_lines"], text_of)
         if places:
             rows.set_mark_places(mark["id"], places)
         else:
