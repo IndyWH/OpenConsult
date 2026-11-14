@@ -257,6 +257,17 @@ WARN_LOW_CONFIDENCE = "Line {n} is low confidence ({score})."
 WARN_CONFIDENCE_NOT_MEASURED = "Confidence was not measured: {choice} gives no score."
 WARN_LABEL_CHECK_REFUSED = "The check of who spoke was refused: {reason}. No label was changed by it."
 WARN_LABEL_CHECK_FAILED = "The check of who spoke did not run: {reason} No label was changed by it."
+# The drug-name marks on the review page (15.10 ruling 20; 15.9 ruling 39). The owner's sentences, letter for letter.
+CHECK_THIS_NAME = "Check this name"
+WARN_DRUG_MARK = "Line {n}: {heard} may be a drug name that was misheard."
+DRUG_SIGN = "Drug name to check: line {n}"
+DRUG_MARKED = "The language model marked {count} drug names it doubts. Press a marked line to hear the word, then type the name."
+DRUG_MARKED_NONE = "The language model marked no drug name on this page."
+DRUG_NOT_PROVEN = ("A drug name with no mark is not proven right. The model can miss a misheard name, most of all when one real "
+                   "drug is written for another. Check every drug name in the note before you approve.")
+DRUG_CHECK_FAILED = "The check of drug names did not run: {reason} No drug name is marked."
+# A draft, for the owner to correct (the details of step 6c, The sentences).
+DRUG_MARKED_ONE = "The language model marked 1 drug name it doubts. Press the marked line to hear the word, then type the name."
 # The who-spoke check on the review page (15.10 ruling 19; 15.9 ruling 37). The owner's sentences, letter for letter.
 CHECK_WHO_SPOKE = "Check who spoke"
 CHECK_WHO_SPOKE_LINE = ("The language model reads the transcript and changes the speaker where the words point to the other person. "

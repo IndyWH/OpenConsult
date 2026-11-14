@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import alarms, deletion, gate, note, who_check
+from openconsult.consult import alarms, deletion, drug_marks, gate, note, who_check
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -178,8 +178,10 @@ def page_data(p, row: dict) -> dict:
     gate_refused = any(w["kind"] in GATE_REFUSALS for w in warning_rows)
     gate_reason = " ".join(w["detail"] or words.WARNING_SENTENCES.get(w["kind"], "") for w in warning_rows if w["kind"] in GATE_REFUSALS)
     choice = CHOICES.get(row["speech_choice"])
-    warnings = warning_lines(warning_rows, lines, choice.title if choice else row["speech_choice"])
     state = note_state(p, row, gate_refused)
+    # The drug-name marks (ruling 20): their rows head the warnings and count on Approve; their sentences are not counted.
+    drug = drug_marks.review_data(p.consultations, cid, lines, state["entries"])
+    warnings = drug["rows"] + warning_lines(warning_rows, lines, choice.title if choice else row["speech_choice"])
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
     who = who_check.page_state(p.consultations, cid, state["transcript_read_only"], bool(lines))
@@ -200,7 +202,7 @@ def page_data(p, row: dict) -> dict:
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
-            "lines": lines, "warnings": warnings, "who_check": who,
+            "lines": lines, "warnings": warnings, "who_check": who, "drug_head": drug["head"],
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
@@ -341,6 +343,8 @@ async def edit_line(request: Request, consultation_id: int, n: int, user=Depends
     if text != line["text"]:
         p.consultations.set_line_words(consultation_id, n, text)
         p.audit.record("transcript.edited", f"consultation {consultation_id}: line {n}")
+        # A doubted name typed over: its mark goes from the page and stays in the record (ruling 20).
+        drug_marks.after_edit(p.consultations, consultation_id, n)
     if label != line["label"]:
         p.consultations.set_line_label(consultation_id, n, label)
         p.audit.record("label.set", f"consultation {consultation_id}: line {n} to {label}")

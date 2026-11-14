@@ -14,6 +14,7 @@ for the app and the bench (spec 5.1)."""
 
 from __future__ import annotations
 
+from openconsult import words
 from openconsult.consult import joined
 from openconsult.consult.consultations import Consultations
 from openconsult.llm.door import Door, Result
@@ -125,3 +126,63 @@ def after_edit(rows: Consultations, consultation_id: int, n: int) -> int:
             rows.clear_mark(mark["id"])
             cleared += 1
     return cleared
+
+
+# ------------------------------------------------ the marks on the review page
+
+def spans_of(marks: list[dict]) -> dict[int, list[tuple[int, int]]]:
+    """By line: the stretches of its letters that a standing mark doubts,
+    in order, overlapping ones as one."""
+    found: dict[int, list[tuple[int, int]]] = {}
+    for mark in marks:
+        for place in mark["places"]:
+            found.setdefault(place["line"], []).append((place["first"], place["last"]))
+    for n, spans in found.items():
+        merged: list[tuple[int, int]] = []
+        for first, last in sorted(spans):
+            if merged and first <= merged[-1][1]:
+                merged[-1] = (merged[-1][0], max(merged[-1][1], last))
+            else:
+                merged.append((first, last))
+        found[n] = merged
+    return found
+
+
+def review_data(rows: Consultations, consultation_id: int, lines: list[dict], entries: list[dict]) -> dict:
+    """What the review page shows of the marks, in their three places
+    (ruling 20). On each line: the doubted words, and the line's words
+    cut at them. The warnings: the sentences that head them, which are
+    not counted, and one row for each mark that stands, or one for a call
+    that failed; each row counts on Approve and none blocks it. On each
+    note entry: the first line of every mark whose lines the entry cites,
+    so the sign is set by the line and not by the word, and shows when
+    the note wrote the name differently. Nothing when the call has not
+    run (a consultation from before 6c, or a gate that refused). The drug
+    the model named is never read here."""
+    call = rows.drug_call(consultation_id)
+    for line in lines:
+        line["doubted"], line["segments"] = [], [(line["text"], False)]
+    for entry in entries:
+        entry["drug_signs"] = []
+    if call is None:
+        return {"head": [], "rows": []}
+    if call["outcome"] != "answered":
+        return {"head": [], "rows": [{"kind": "drug_names_failed", "start_s": None, "end_s": None, "line_n": None,
+                                      "text": words.DRUG_CHECK_FAILED.format(reason=call["reason"] or "")}]}
+    marks = rows.drug_marks(consultation_id)
+    spans = spans_of(marks)
+    for line in lines:
+        text, at, segments = line["text"], 0, []
+        for first, last in spans.get(line["n"], []):
+            segments += [(text[at:first], False), (text[first:last], True)]
+            at = last
+        line["segments"] = [s for s in segments + [(text[at:], False)] if s[0]]
+        line["doubted"] = [piece for piece, marked in line["segments"] if marked]
+    for entry in entries:
+        cited = set(entry["lines"])
+        entry["drug_signs"] = sorted({m["first_line"] for m in marks if cited & {place["line"] for place in m["places"]}})
+    counted = (words.DRUG_MARKED.format(count=len(marks)) if len(marks) > 1 else words.DRUG_MARKED_ONE if marks
+               else words.DRUG_MARKED_NONE)
+    return {"head": [counted, words.DRUG_NOT_PROVEN],
+            "rows": [{"kind": "drug_mark", "start_s": None, "end_s": None, "line_n": m["first_line"],
+                      "text": words.WARN_DRUG_MARK.format(n=m["first_line"], heard=m["heard"])} for m in marks]}

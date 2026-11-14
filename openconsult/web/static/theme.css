@@ -116,6 +116,11 @@ button.stop { margin-top: 0; font-size: 1.05rem; padding: .6rem 1.6rem; }
 .model-line { color: var(--ink-faint); font-size: .8rem; margin-top: 1rem; }
 .spinner { width: .9rem; height: .9rem; border: 2px solid var(--line); border-top-color: var(--plum); border-radius: 50%; animation: spin 1s linear infinite; margin-left: auto; }
 .spinner[hidden] { display: none; }
+/* A drug name the language model doubts (15.10 ruling 20): the words as heard, never a guess. */
+mark.doubted { background: #FBE7B0; color: inherit; padding: 0 .15rem; border-radius: 2px; }
+.doubted-word { margin-left: .4rem; }
+.drug-head { margin: 0 0 .4rem; }
+.cite.drug-sign { font-weight: 600; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .alarm-fired { color: var(--red); font-weight: 600; }
 .alarm-no-action { color: var(--red); }

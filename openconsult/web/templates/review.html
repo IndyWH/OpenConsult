@@ -46,6 +46,8 @@
           {{ refusal("entry-" ~ entry.id) }}
         </form><span class="entry-text print-only">{{ entry.text }}</span>{% endif %}
         {% for n in entry.lines %}<button type="button" class="cite no-print" data-line="{{ n }}" aria-label="{{ words.SHOW_LINE.format(n=n) }}">[{{ n }}]</button>{% endfor %}
+        {# The sign of a doubted drug name (ruling 20): set by the line the entry cites, on the page only, never in the copy text or the print. #}
+        {% for n in entry.drug_signs %}<button type="button" class="cite drug-sign no-print" data-line="{{ n }}">{{ words.DRUG_SIGN.format(n=n) }}</button>{% endfor %}
         {% if entry.uncited %}<span class="mark uncited no-print">({{ words.ENTRY_UNCITED }})</span>{% endif %}
       </div>
       {% endfor %}
@@ -92,6 +94,7 @@
 <section class="pane no-print" id="warnings">
   <div class="pane-head"><h2>{{ words.WARNINGS }}</h2></div>
   <div class="pane-body">
+    {% for sentence in drug_head %}<p class="statement drug-head">{{ sentence }}</p>{% endfor %}
     {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
       {% elif player.available and w.line_n %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}">{{ words.PLAY_FROM_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
@@ -136,13 +139,15 @@
     <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}">
       <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
       {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" aria-label="{{ words.PLAY_FROM_LINE }}">&#9654;</button>{% endif %}
-      {% if transcript_read_only %}<span class="line-text">{{ line.text }}</span>{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
+      {% if transcript_read_only %}<span class="line-text">{% for piece, doubted in line.segments %}{% if doubted %}<mark class="doubted">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</span>{% if line.doubted %}<span class="mark doubted-word"> ({{ words.CHECK_THIS_NAME }})</span>{% endif %}{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
       {% else %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}" class="line-form">
         <select name="label" aria-label="{{ words.SPEAKER_WORD.format(n=line.n) }}">{% for value, word in words.LABEL_WORDS.items() %}<option value="{{ value }}"{% if value == line.label %} selected{% endif %}>{{ word }}</option>{% endfor %}</select>
         <input name="text" value="{{ line.text }}" class="line-text">
         <button id="save-line-{{ line.n }}" aria-describedby="save-line-{{ line.n }}-refusal">{{ words.SAVE_LINE }}</button>
         {{ refusal("save-line-" ~ line.n) }}
       </form>
+      {# The doubted words of the line, beside its field, where nothing can be highlighted (ruling 20). #}
+      {% for piece in line.doubted %}<span class="doubted-word"><mark class="doubted">{{ piece }}</mark> <span class="mark">{{ words.CHECK_THIS_NAME }}</span></span>{% endfor %}
       {% if line.changed_by_check %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form">
         <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
       {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
