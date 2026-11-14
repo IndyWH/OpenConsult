@@ -7,7 +7,9 @@ three calls of stage 8. The reader proves itself by rebuilding: the
 parts it reads must give the user text byte for byte through the
 builder, or the call is shown whole, marked not taken apart, with the
 reason, never guessed at. The prompt is given by its file name and hash
-only; nothing here holds its text. Nothing here writes."""
+only; nothing here holds its text. The reply of the drug-name call is
+shown with the drug the model named left out of every entry (15.10
+rulings 6 and 23): no guess is shown anywhere. Nothing here writes."""
 
 from __future__ import annotations
 
@@ -16,7 +18,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from openconsult.consult import labels, note as note_module, referral_note
+from openconsult.consult import drug_marks, labels, note as note_module, referral_note
 from openconsult.consult.messages import Patient, alarm_message, assessment_message, patient_line, with_background, with_patient
 from openconsult.guidelines import summary
 from openconsult.llm.jobs import JOBS
@@ -29,6 +31,7 @@ NOT_JSON, NO_USER_TEXT, NO_PATIENT_LINE, FRAME_NOT_FOUND, REBUILD_DIFFERS, UNKNO
 # The prompt file today against the hash the call was made with.
 SAME, DIFFERS, NONE = "same", "differs", "none"
 NUMBERED = re.compile(r"^\[(\d+)\] (.*)$")
+LINES_KINDS = ("label_check", "drug_name")      # the calls that read numbered lines with no speaker
 TURN = re.compile(r"^\[(\d+)\] (Doctor|Patient|Unknown): (.*)$")
 
 
@@ -52,6 +55,7 @@ class Seen:
     answer: str | None          # the model's answer, word for word
     prompt: dict                # name, hash, today (same, differs or none)
     row: dict | None = None     # the referencing row
+    withheld: str | None = None  # what of the reply is not shown: NAMED_DRUG, or UNREADABLE for a reply shown not at all
 
 
 # ------------------------------------------------------ the request's texts
@@ -105,6 +109,23 @@ def answer_of(reply: str | None) -> str | None:
 
 
 PROMPT_WITHHELD = "[the prompt's words, not shown]"
+NAMED_DRUG, UNREADABLE = "named_drug", "unreadable"
+
+
+def drug_answer(answer: str | None) -> tuple[str | None, str | None]:
+    """The reply of the drug-name call as the page shows it (ruling 23):
+    each entry's line and the words heard, the named drug taken out. A
+    reply that cannot be read as its form (cut at its limit, or not its
+    form) could hold a named drug in its raw text, so it is not shown at
+    all. The stored reply is never changed."""
+    if answer is None:
+        return None, None
+    try:
+        entries = json.loads(answer)["doubtful"]
+        shown = [{"line": entry["line"], "heard": entry["heard"]} for entry in entries]
+    except (ValueError, KeyError, TypeError):
+        return None, UNREADABLE
+    return json.dumps({"doubtful": shown}, ensure_ascii=False, indent=1), NAMED_DRUG
 
 
 def whole_text(request: str, user: str | None) -> str:
@@ -243,16 +264,17 @@ def read_pass_call(kind: str, user: str, row: dict, call: dict) -> tuple[list[Pa
 
 
 def read_lines_call(kind: str, user: str) -> tuple[list[Part], str | None]:
-    """The label check and the note: the frame around the numbered lines or
-    the turns; no patient line (D3) and no block; rebuilt through the
-    builders of labels.py and note.py from the lines read back."""
+    """The label check, the drug-name call and the note: the frame around
+    the numbered lines or the turns; no patient line (D3) and no block;
+    rebuilt through the builders of labels.py, drug_marks.py and note.py
+    from the lines read back."""
     values = unfill(loader.frame(kind), user, ("transcript",))
     if values is None:
         return [], FRAME_NOT_FOUND
     text = values["transcript"]
-    if kind == "label_check":
+    if kind in LINES_KINDS:
         rows = [{"n": int(m.group(1)), "text": m.group(2)} for m in (NUMBERED.match(line) for line in text.split("\n")) if m]
-        rebuilt = labels.lines_text(rows)
+        rebuilt = labels.lines_text(rows) if kind == "label_check" else drug_marks.lines_text(rows)
     else:
         by_word = {word: label for label, word in note_module.ROLE_WORDS.items()}
         turns = [{"n": int(m.group(1)), "label": by_word[m.group(2)], "text": m.group(3)}
@@ -260,7 +282,7 @@ def read_lines_call(kind: str, user: str) -> tuple[list[Part], str | None]:
         rebuilt = note_module.turns_text(turns)
     if rebuilt != user:
         return [], REBUILD_DIFFERS
-    return [frame_part(kind), Part("lines" if kind == "label_check" else "turns", text)], None
+    return [frame_part(kind), Part("lines" if kind in LINES_KINDS else "turns", text)], None
 
 
 def read_note_call(kind: str, user: str, row: dict, call: dict, reference: dict | None) -> tuple[list[Part], str | None]:
@@ -306,7 +328,7 @@ def read_guideline_call(user: str, row: dict, call: dict, answer: dict | None) -
 def read_parts(kind: str, user: str, row: dict, call: dict, reference: dict | None) -> tuple[list[Part], str | None]:
     if kind in ("alarm", "assessment"):
         return read_pass_call(kind, user, row, call)
-    if kind in ("label_check", "note"):
+    if kind in LINES_KINDS or kind == "note":
         return read_lines_call(kind, user)
     if kind in ("referrals", "letter"):
         return read_note_call(kind, user, row, call, reference)
@@ -324,6 +346,9 @@ def references(consultations, notes, letters, sources, consultation_id: int) -> 
         for column, kind in (("alarm_call_id", "alarm"), ("assessment_call_id", "assessment")):
             if pass_row[column] is not None:
                 found[pass_row[column]] = ({"kind": kind, "pass_n": pass_row["n"]}, pass_row)
+    drug_call = consultations.drug_call(consultation_id)
+    if drug_call is not None and drug_call["call_id"] is not None:
+        found[drug_call["call_id"]] = ({"kind": "drug_name"}, drug_call)
     for draft in notes.drafts(consultation_id):
         if draft["call_id"] is not None:
             found[draft["call_id"]] = ({"kind": "note", "n": draft["n"], "asked_by": draft["asked_by"]}, draft)
@@ -348,8 +373,11 @@ def seen_call(call: dict, row: dict, named: tuple[dict, dict] | None) -> Seen:
     if reason is None:
         parts, reason = read_parts(call["job"], user, row, call, reference)
     shown = {key: value for key, value in call.items() if key not in ("request", "reply")}
+    answer, withheld = answer_of(call["reply"]), None
+    if call["job"] == "drug_name":
+        answer, withheld = drug_answer(answer)
     return Seen(shown, call["job"], name, parts, reason is None, reason, whole_text(call["request"], user),
-                answer_of(call["reply"]), prompt_of(call["job"], call["prompt_sha256"]), reference)
+                answer, prompt_of(call["job"], call["prompt_sha256"]), reference, withheld)
 
 
 def calls_of(consultations, notes, letters, sources, consultation_id: int) -> list[Seen]:

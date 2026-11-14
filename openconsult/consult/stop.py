@@ -5,7 +5,9 @@ recording is closed (live.py). Two: the door's stop gives the final
 lines, written as the choice gave them. Three: the app asks which
 speaker was you and waits, with no limit; its answer sets the labels.
 Four: the two checks for missing speech run on the stored lines and the
-stored loudness. Five: the gate. Then the note is drafted unless the
+stored loudness. Five: the gate. Six: the language model reads the
+final transcript once and marks the drug names it doubts (15.9 ruling
+39), unless the gate refused. Seven: the note is drafted unless the
 gate refused (6b; rulings 3 and 8), from the labels as the answer set
 them, and the review page is shown. The check of who spoke does not run
 here: it made well labelled pages worse, so the doctor asks for it on
@@ -20,14 +22,14 @@ import math
 import statistics
 from datetime import datetime
 
-from openconsult.consult import gate, note, opus, speakers
+from openconsult.consult import drug_marks, gate, note, opus, speakers
 from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
 from openconsult.patients.patients import PatientRow
 from openconsult.speech.lines import Line
 
-STAGES = ("speech", "who_spoke", "checks", "gate", "note")
+STAGES = ("speech", "who_spoke", "checks", "gate", "drug_name", "note")
 # A consultation found at a restart in the stage that Stop no longer has goes on
 # from the checks for missing speech, with no check of who spoke (15.9 ruling 37).
 STAGE_GONE = {"label_check": "checks"}
@@ -71,8 +73,18 @@ def judge(c: Consultation) -> None:
     c.final.refused = verdict.refused
 
 
+def drug_names(c: Consultation) -> None:
+    """Six: the drug-name call, on every final transcript whichever speech
+    choice made it (ruling 21); not when the gate refused, which is read
+    from the stored warnings; and once: a call that has its row is never
+    made again, also after a restart (10.4)."""
+    if gate.refused_in(c.rows.warnings(c.id)) or c.rows.drug_call(c.id) is not None:
+        return
+    drug_marks.run(c.llm, c.rows, c.audit, c.id)
+
+
 def draft_note(c: Consultation) -> None:
-    """The note, the last stage before final, unless the gate
+    """Seven: the note, the last stage before final, unless the gate
     refused (ruling 8; R3). The three figures of 6a are taken first, so
     Stop to final keeps its meaning; the note's seconds are a fourth."""
     c.final.figures = figures(c)
@@ -86,8 +98,8 @@ def draft_note(c: Consultation) -> None:
     c.final.figures["note_s"] = round(c.timer() - started, 2)
 
 
-STEPS_AFTER = {"checks": checks, "gate": judge, "note": draft_note}
-NEXT = {"checks": "gate", "gate": "note", "note": None}
+STEPS_AFTER = {"checks": checks, "gate": judge, "drug_name": drug_names, "note": draft_note}
+NEXT = {"checks": "gate", "gate": "drug_name", "drug_name": "note", "note": None}
 
 
 # ------------------------------------------------------- two: the lines

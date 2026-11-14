@@ -139,10 +139,11 @@ def test_5e_the_cell_for_alba_says_yes_or_no_as_a_reading_with_its_counts():
 
 
 def test_R31_nothing_of_5e_is_built_into_the_app():
-    # No pass at Stop, no voice method, no way of spotting a drug name, no new job and no new choice in the app.
+    # No pass at Stop, no voice method and no new choice in the app. The one way of spotting a drug name that
+    # earned its place, the language model's, was built later, in step 6c, on the owner's ruling 39 of 15.9: its job is the one new name.
     from openconsult.llm.jobs import JOBS
     from openconsult.speech.choices import CHOICES
-    assert sorted(JOBS) == ["alarm", "assessment", "guideline", "label_check", "letter", "note", "referrals"]
+    assert sorted(JOBS) == ["alarm", "assessment", "drug_name", "guideline", "label_check", "letter", "note", "referrals"]
     assert sorted(CHOICES) == ["assemblyai", "nemotron", "speechmatics", "whisperx_pyannote"]
     assert all(choice.declares.second_transcript is False for name, choice in CHOICES.items() if choice.key)
     import openconsult

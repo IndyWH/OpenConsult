@@ -51,6 +51,12 @@ APPROVED_BYTES = {
     "guideline.frame": "4b07fd0dac1086c318c416c94a4fcebc1b41b857cb86bb1ff735fd15363f07e9",
     "guideline.passage": "c1bcff2265bdd94c9121c407fde08b33895e6d761167aa6630451f0ce5958227",
     "guideline.form": "a3fd2e5d0991fde7c0fcfcf6547bd68c9ff7d5c60bcce5fefd9930836872da9c",
+    # The prompt for a doubtful drug name (15.9 ruling 18) and its form, moved byte for byte from the
+    # bench's folder in 6c, and its frame, whose bytes are the label check's (15.10, the details of step 6c).
+    "drug_name": "89fcdc35d7a6ea4ddf7cd9e1b7e96c3118fd7810013e857bd83f6bc7c3939963",
+    "drug_name.form": "4574f7e5c6da63a82e9a67299d4fa3b76fefe84ac7dac1dfc3f5faa575f505b8",
+    "drug_name.frame": "44f10e089af2ab4b4df272002604d35b0a678df6472949b193ba183bac1e0637",
+    "label_check.frame": "44f10e089af2ab4b4df272002604d35b0a678df6472949b193ba183bac1e0637",
 }
 
 

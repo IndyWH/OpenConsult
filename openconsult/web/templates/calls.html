@@ -57,6 +57,7 @@
       <div class="part" data-source="whole"><pre>{{ c.whole }}</pre></div>
       {% endif %}
       <h3 class="mark">{{ words.CAME_BACK_HEADING }}</h3>
+      {% if c.answer_note %}<p class="mark" id="named-drug-{{ c.id }}">{{ c.answer_note }}</p>{% endif %}
       <div class="part" data-source="reply"><pre>{{ c.answer }}</pre></div>
       <p class="mark">{{ c.prompt }}</p>
       {% if c.tokens %}<p class="mark">{{ c.tokens }}</p>{% endif %}

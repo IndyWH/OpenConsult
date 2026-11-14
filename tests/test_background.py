@@ -115,7 +115,7 @@ def test_8_4_D24_R4_the_two_calls_get_the_block_only_while_the_switch_is_on_and_
     block = block_for(p.notes, 1, on.started_at, 2)
     assert block.startswith(HEADING) and on.background == block and off.background is None
     calls = p.consultations.model_calls(2)
-    assert sorted({call["job"] for call in calls}) == ["alarm", "assessment", "label_check", "note"]
+    assert sorted({call["job"] for call in calls}) == ["alarm", "assessment", "drug_name", "label_check", "note"]
     for call in calls:
         user = json.loads(call["request"])["user"]
         if call["job"] in ("alarm", "assessment"):

@@ -2,8 +2,9 @@
 prompt file, its answer form, the frames around the transcript, its
 limit on length, its limit on time, and what happens when it fails.
 Stage 3 filled two; stage 6a added the label check (15.9 ruling 17;
-15.10 ruling 7); stage 6b adds the note (15.10 rulings 3, 5 and 8); the
-others of spec 10.2 arrive with their stages."""
+15.10 ruling 7); stage 6b adds the note (15.10 rulings 3, 5 and 8);
+step 6c the drug-name call; the others of spec 10.2 arrive with their
+stages."""
 
 from __future__ import annotations
 
@@ -51,6 +52,15 @@ JOBS = {
         max_tokens=3000, timeout_s=120.0,
         on_failure="The labels stand as the who-spoke answer set them; the final page says the check "
                    "did not run and why. Nothing is asked a second time.",
+    ),
+    # The drug-name call at Stop (15.9 rulings 18 and 39; 15.10 rulings 20 and 21). The bench's longest
+    # reply was 1,237 tokens of its 1,500 on a page of nine minutes, so a longer page would pass 1,500:
+    # 3,000, and the bench's 90 s (its slowest call 6.6 s). The bench reads both from here (spec 5.1).
+    "drug_name": Job(
+        name="drug_name", prompt="drug_name", form="drug_name", frames=("drug_name",),
+        max_tokens=3000, timeout_s=90.0,
+        on_failure="The review page says the check of drug names did not run and why, and that no drug name is marked. "
+                   "Nothing is asked a second time, and no control asks again.",
     ),
     # The two calls of 8a (15.12, rulings 2, 3 and 8; R30). Design choices
     # until the bench measures them: the list's reply is a reasoning under

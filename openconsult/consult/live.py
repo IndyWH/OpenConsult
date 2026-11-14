@@ -37,7 +37,7 @@ SPEAKERS = 2          # the doctor and the patient (ruling 9)
 WITHIN, OVER = "within", "over"
 LIVE, STOPPING, FINAL = "live", "stopping", "final"
 # The named in-progress states a spinner may show (V1_LESSONS 5.3).
-SPINNING = ("speech_starting", "pass_running", "speech", "checks", "gate", "note")
+SPINNING = ("speech_starting", "pass_running", "speech", "checks", "gate", "drug_name", "note")
 # The moment after the who-spoke answer and before the Stop thread moves
 # the stage on: the page shows it as its own named state, so the question
 # never stands on screen with the answer taken (15.12 ruling 28; R15).

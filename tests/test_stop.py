@@ -8,6 +8,7 @@ asserted, only what code does with a reply's numbers and labels."""
 import hashlib
 import json
 import time
+from pathlib import Path
 
 import pytest
 
@@ -102,7 +103,7 @@ def test_15_9_ruling_17_the_label_check_prompt_is_one_file_with_the_approved_byt
     assert loader.APPROVED_BYTES["label_check"] == bench_jobs.PROMPT_SHA256["label_check"]
     assert bench_jobs.prompt_bytes("label_check") == loader.prompt_bytes("label_check")       # the bench reads the same file
     assert bench_jobs.form_of("label_check") == loader.form("label_check")
-    assert not (bench_jobs.PROMPTS / "label_check.prompt.txt").exists()
+    assert not (Path(bench_jobs.__file__).parent / "prompts").exists()      # the bench has no prompts folder of its own (6c)
     job = app_jobs.job("label_check")
     assert (job.max_tokens, job.timeout_s, job.prompt, job.form) == (3000, 120.0, "label_check", "label_check")
     # The text the app sends is the bench's text, word for word, for a made-up page.
@@ -313,7 +314,7 @@ def test_the_note_is_drafted_at_the_end_of_stop_after_the_gate_with_its_stamp_an
     try:
         stop.answer(c, "S1")
         assert until(lambda: c.state == FINAL)
-        assert stop.STAGES[-1] == "note" and stop.NEXT["gate"] == "note" and "note" in SPINNING
+        assert stop.STAGES[-1] == "note" and stop.NEXT["gate"] == "drug_name" and stop.NEXT["drug_name"] == "note" and "note" in SPINNING
         draft = r.notes.current_draft(c.id)
         assert (draft["n"], draft["asked_by"], draft["entries_total"], draft["entries_cited"], draft["refused"], draft["failure"]) == (
             1, "stop", 3, 2, 0, None)

@@ -3,6 +3,7 @@
 made-up engine stands behind the door; every reply here is made up."""
 
 import hashlib
+from pathlib import Path
 import json
 
 import pytest
@@ -83,7 +84,7 @@ def test_R20_R30_a_bench_call_is_recorded_under_its_own_job_with_the_prompts_has
     assert rows[drug["call_id"]]["job"] == "bench_drug_name" and rows[drug["call_id"]]["outcome"] == "ok"
     assert note["failure"] == "too_long" and "3000" in note["detail"] and rows[note["call_id"]]["outcome"] == "too_long"
     assert slow["failure"] == "too_slow" and rows[slow["call_id"]]["outcome"] == "too_slow"
-    assert [(c.max_tokens, c.timeout_s) for c in engine.calls] == [(3000, 120.0), (1500, 90.0), (3000, 120.0), (3000, 120.0)]
+    assert [(c.max_tokens, c.timeout_s) for c in engine.calls] == [(3000, 120.0), (3000, 90.0), (3000, 120.0), (3000, 120.0)]   # the drug name's are the app's since 6c
     assert label["prompt_tokens"] == 50 and label["output_tokens"] == 20 and label["wall_ms"] >= 0
     for call in engine.calls:
         assert (call.context, call.think, call.temperature, call.seed) == (16384, False, 0.0, 42)   # the app's own settings
@@ -95,23 +96,33 @@ def test_5_1_the_bench_note_job_reads_the_apps_prompt_frame_form_and_limits():
     assert jobs.PROMPT_SHA256["note"] == loader.APPROVED_BYTES["note"]
     assert jobs.prompt_bytes("note") == loader.prompt_bytes("note") and jobs.prompt_text("note") == loader.prompt("note")
     assert jobs.form_of("note") == loader.form("note")
-    assert not (jobs.PROMPTS / "note.prompt.txt").exists() and not (jobs.PROMPTS / "note.form.json").exists()
-    assert (jobs.PROMPTS / "drug_name.prompt.txt").exists() and (jobs.PROMPTS / "drug_name.form.json").exists()
+    assert not (Path(jobs.__file__).parent / "prompts").exists()          # the bench has no prompts folder of its own (6c)
     job = app_jobs.job("note")
     assert (jobs.JOBS["note"].max_tokens, jobs.JOBS["note"].timeout_s) == (job.max_tokens, job.timeout_s) == (3000, 120.0)
+
+
+def test_5_1_6c_the_bench_drug_name_job_reads_the_apps_prompt_form_and_limits():
+    # One prompt in one file (the details of step 6c, What is reused): the two files moved byte for byte to the app's folder.
+    assert jobs.FOLDER_OF["drug_name"] is loader.FOLDER and jobs.PROMPT_SHA256["drug_name"] == loader.APPROVED_BYTES["drug_name"]
+    assert jobs.prompt_bytes("drug_name") == loader.prompt_bytes("drug_name") and jobs.prompt_text("drug_name") == loader.prompt("drug_name")
+    assert jobs.form_of("drug_name") == loader.form("drug_name")
+    job = app_jobs.job("drug_name")
+    assert (jobs.JOBS["drug_name"].max_tokens, jobs.JOBS["drug_name"].timeout_s) == (job.max_tokens, job.timeout_s) == (3000, 90.0)
+    from openconsult.consult import drug_marks
+    assert jobs.check_doubtful is drug_marks.check_doubtful                     # one function for the app and the bench
 
 
 def test_R31_the_three_jobs_are_not_in_the_apps_table(record):
     # Stage 6a built the label check in the app's table under its own name
     # (15.10 ruling 7); the bench's three names stay out of it.
-    # Stage 6b built the note there too (15.10 ruling 3); the drug name stays the bench's.
-    for name in ("bench_label_check", "bench_drug_name", "bench_note", "drug_name"):
+    # Stage 6b built the note there too (15.10 ruling 3), and step 6c the drug-name call (15.9 ruling 39).
+    for name in ("bench_label_check", "bench_drug_name", "bench_note"):
         with pytest.raises(KeyError):
             app_jobs.job(name)
     door, engine = door_with(record, [])
     with pytest.raises(KeyError):
         door.ask("bench_note", "words")
-    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "guideline", "label_check", "letter", "note", "referrals"] and engine.calls == []   # 8a adds the two letter calls, 8b the summary
+    assert sorted(app_jobs.JOBS) == ["alarm", "assessment", "drug_name", "guideline", "label_check", "letter", "note", "referrals"] and engine.calls == []   # 8a adds the two letter calls, 8b the summary, 6c the drug names
 
 
 def test_R31_nothing_of_the_app_names_part_two():

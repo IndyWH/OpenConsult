@@ -34,13 +34,17 @@ ASSESSMENT = {"reasoning": "made up",
               "questions_to_ask": ["A made-up question?"], "signs_to_check": ["a made-up sign"]}
 
 
+NO_DOUBT = {"doubtful": []}
+
+
 class FakeEngine:
     """Answers from a script. A list is answered in order of arrival; a
     dict holds a list for each job, because the two calls of a pass
     arrive on two threads (3c). An item is a Reply, an exception to
     raise, or a dict or string that becomes a complete reply. With no
     script, or when a job's list runs out, it answers every alarm
-    quietly and every assessment with the made-up list."""
+    quietly, every drug-name call with an empty list, and every other
+    call with the made-up assessment."""
 
     name = "made-up"
     address = "http://made-up"
@@ -57,7 +61,7 @@ class FakeEngine:
 
     def chat(self, call: Call) -> Reply:
         self.calls.append(call)
-        usual = ALARM_QUIET if call.job == "alarm" else ASSESSMENT
+        usual = ALARM_QUIET if call.job == "alarm" else NO_DOUBT if call.job == "drug_name" else ASSESSMENT
         if self.script is None:
             item = usual
         elif isinstance(self.script, dict):

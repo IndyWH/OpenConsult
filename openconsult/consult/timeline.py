@@ -22,7 +22,7 @@ LONG_FACTOR = 2
 FINAL_PRECISION_S = 1.0
 # The kinds drawn as rows of the band, in this order; a kind not here
 # (the referral list, a letter) comes after final and is listed apart.
-ROW_ORDER = ("alarm", "assessment", "guideline", "label_check", "note")
+ROW_ORDER = ("alarm", "assessment", "guideline", "label_check", "drug_name", "note")
 FINAL_EVENT = "consultation.final"
 
 

@@ -78,7 +78,11 @@ def call_row(found: seen_module.Seen) -> dict:
             "not_taken_apart": None if found.taken_apart else words.NOT_TAKEN_APART.format(
                 reason=words.NOT_TAKEN_APART_REASONS.get(found.reason, found.reason)),
             "whole": None if found.taken_apart else found.user_text,
-            "answer": found.answer if found.answer is not None else words.NO_REPLY}
+            # The drug-name call (15.10 ruling 23): the named drug is left out and one line says so; a reply
+            # that could not be read as its form is not shown at all.
+            "answer_note": words.DRUG_NAMED_NOT_SHOWN if found.withheld == seen_module.NAMED_DRUG else None,
+            "answer": (words.DRUG_REPLY_NOT_SHOWN if found.withheld == seen_module.UNREADABLE
+                       else found.answer if found.answer is not None else words.NO_REPLY)}
 
 
 def lead_words(lead: tuple[int, str]) -> str:

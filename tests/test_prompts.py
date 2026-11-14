@@ -43,7 +43,7 @@ def test_15_8_rulings_41_and_42_the_prompt_sent_is_the_specs_approved_wording():
 def test_15_8_ruling_43_no_prompt_or_frame_holds_a_double_quote():
     # The model was shown the habit that cuts its reasoning (ruling 16); now it is not.
     words = [p for p in loader.every_prompt_file() if p.suffix == ".txt"]
-    assert len(words) == 20     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a); the letters' two prompts, two frames and the withheld line (8a); the summary prompt, its frame and its passage layout (8b)
+    assert len(words) == 22     # two prompts and three frames of stage 3; the label check's and the note's prompt and frame (6a, 6b); the background's three (7a); the letters' two prompts, two frames and the withheld line (8a); the summary prompt, its frame and its passage layout (8b); the drug name's prompt and frame (6c)
     for path in words:
         assert '"' not in _words(path), path.name
     assert '"' in 'a "quoted" word'   # the twin
@@ -84,7 +84,7 @@ def test_R13_no_prompt_file_names_a_country():
     countries = [c.strip() for c in _words(Path(__file__).parent / "countries.txt").splitlines() if c.strip()]
     assert len(countries) > 150
     files = loader.every_prompt_file()
-    assert len(files) == 27     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a), the letters' seven (8a), the summary's four (8b)
+    assert len(files) == 30     # stage 3's seven, the label check's and the note's prompt, frame and form (6a, 6b), the background's three (7a), the letters' seven (8a), the summary's four (8b), the drug name's three (6c)
     for path in files:
         text = _words(path).lower()
         for country in countries:

@@ -227,6 +227,7 @@ STAGE_LINES = {
     "answered": "Your answer is taken. Checking for missing speech.",
     "checks": "Checking for missing speech.",
     "gate": "Checking the transcript.",
+    "drug_name": "Checking the drug names.",
     "note": "Drafting the note.",
 }
 STOP_ALREADY = "Stop was pressed. The transcript is being finished."
@@ -592,6 +593,7 @@ LEAD_WORDS = {"seconds": ("1 second", "{n} seconds"), "minutes": ("1 minute", "{
               "hours": ("1 hour", "{n} hours"), "days": ("1 day", "{n} days")}
 CALLS_HEADING = "The calls, in time order"
 CALL_KINDS = {"alarm": "pass {n}, the alarm", "assessment": "pass {n}, the assessment", "label_check": "the label check",
+              "drug_name": "the check of drug names",
               "note": "note draft {n}, {asked}", "referrals": "the referral list", "letter": "letter {n}, {specialty}",
               "guideline": "guideline summary after pass {n}"}
 CALL_ASKED_BY = {"stop": "at Stop", "draft": "by Draft the note", "again": "by Draft again"}
@@ -605,6 +607,7 @@ CALL_SEARCH_MS = "The search before this call took {ms} ms."
 CALL_FAILURE = "Failure: {detail}"
 CALL_TOKENS = "Tokens: {read} read, {written} written."
 KIND_WORDS = {"alarm": "alarm", "assessment": "assessment", "guideline": "guideline summary", "label_check": "label check",
+              "drug_name": "check of drug names",
               "note": "note", "referrals": "referral list", "letter": "letter"}
 WENT_IN_HEADING = "What went in, by source"
 SOURCE_LABELS = {"patient_line": "The patient line, written by code from the details the consultation ran with",
@@ -622,6 +625,9 @@ PASSAGE_SENT = "[{n}] {title}, {publisher}{trail}; similarity {similarity}{cited
 PASSAGE_TRAIL = ": {trail}"
 PASSAGE_CITED = "; cited"
 CAME_BACK_HEADING = "What came back, word for word"
+# The drug-name call's reply (15.10 rulings 6 and 23). Drafts, for the owner to correct.
+DRUG_NAMED_NOT_SHOWN = "The drug the model named is kept in the record and is not shown on this page."
+DRUG_REPLY_NOT_SHOWN = "The reply could not be read as its form, so it is not shown on this page. It is kept in the record."
 NO_REPLY = "Nothing came back."
 PROMPT_LINE_SAME = "Prompt: {name}, sha256 {hash}. The file of that name in the repository today has the same hash."
 PROMPT_LINE_DIFFERS = "Prompt: {name}, sha256 {hash}. The file of that name in the repository today differs."
@@ -678,6 +684,7 @@ EVENTS = {
     "transcript.edited": "Transcript words edited by the doctor",
     "label.set": "Speaker label set by the doctor",
     "label.undone": "The check's change of a speaker label undone by the doctor",
+    "drug_names.checked": "The drug names checked at Stop",
     "speakers.check_asked": "The check of who spoke asked for",
     "speakers.check_ended": "The check of who spoke ended",
     "speakers.check_undone_all": "Every change of the check undone by the doctor",
