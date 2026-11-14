@@ -19,16 +19,25 @@ This branch is where OpenConsult v2.0 is being built.
   asks the browser for sound at 48,000 samples a second and says so when
   the browser does not give it; the sound is
   recorded as the microphone gives it and kept as Opus after Stop; at Stop
-  the app asks which speaker was the doctor, checks who spoke each line
-  with the language model, checks for missing speech against the sound,
-  drafts the note from the transcript with every entry's line numbers
-  checked by code, and shows the review page: the draft note first, each
-  entry editable and each line number a press that shows the line, the
-  model's last differentials beside the assessment and marked as not part
-  of the note, Approve with the counts of warnings and alarms, Refuse, the
-  warnings and the alarms each a press from the sound, and the transcript
-  with a player for the recording, where a word or a speaker can be
-  corrected and the note drafted again. An approved note is read-only and
+  the app asks which speaker was the doctor, checks for missing speech
+  against the sound, has the language model read the final transcript
+  once and mark the drug names it doubts, drafts the note from the
+  transcript with every entry's line numbers checked by code, and shows
+  the review page: the draft note first, each entry editable and each
+  line number a press that shows the line, the model's last differentials
+  beside the assessment and marked as not part of the note, Approve with
+  the counts of warnings and alarms, Refuse, the warnings and the alarms
+  each a press from the sound, and the transcript with a player for the
+  recording, where a word or a speaker can be corrected and the note
+  drafted again. A doubted drug name is shown in three places, on its
+  line, as a warning and on every note entry that draws on that line,
+  always as the words that were heard and never as a guess, and one line
+  says that a name with no mark is not proven right. The check of who
+  spoke no longer runs by itself: one control on the review page, Check
+  who spoke, asks the language model for it, every change is marked and
+  can be undone one line at a time or all at once, and the page says so
+  above the note when who spoke has changed since the note was written.
+  An approved note is read-only and
   audited; the copy gives the note alone. After Approve, a Referral
   letters section lists the referrals the note states and, under a line
   saying they are the model's suggestions and not advice, the ones it

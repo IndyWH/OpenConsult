@@ -3,6 +3,170 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-11-07. Run 9d: Claude Haiku 5.5 through the door on all four benches; 7b passed, stage 3, the letters and the summaries missed, every failed call a list limit
+
+Built and run in one session on 7 Nov 2026 under Cowork's plan review
+(four points; all are in). Run 9d is 15.13 rulings 14 to 17: Claude
+Haiku 5.5 benched on every job after one gate call of its own, report
+only, nothing on any page (R31). The gate, the plan, the trial and the
+report are STAGE9D_GATE.md, STAGE9D_PLAN.md, STAGE9D_TRIAL.md and
+STAGE9D_REPORT.md in the private log folder.
+
+The spec, committed once, not a character changed: 3567994 (sha256
+6a622d74...). The run prompt is 0aeb21c (stage-prompts/STAGE_09D.md).
+
+The gate (four calls, the last passed): the service demands every
+object marked as taking no other property, does not hold maxItems, and
+refuses the temperature field on its API version 2026-10-21 (its words:
+temperature: Extra inputs are not permitted); thinking off by its own
+field was taken. The form and the service's own instruction add 391
+tokens to the alarm call; Claude adds an instruction of its own whose
+words are not published (ruling 16). The owner's word at the plan: no
+temperature is sent, so all thirteen chains sample at the service's
+default; the list limits are held by the door alone.
+
+The kinds (bd28624, cab1088): what the two cloud kinds share is in
+bench/cloud.py (the address rule, the stop, the registry's shape).
+bench/claude.py is a class of its own on the door's joint in the
+Messages API shape: the system message in the system field, the user
+message in messages, the form in output_config.format as a copy with
+every object marked and maxItems off (the door checks the whole form),
+thinking disabled, the job's max_tokens; no temperature, no seed, none
+of the local arm's sampling values; the key in the x-api-key header
+alone, read from the key folder's .env by the one module; the record
+holds engine claude, engine_version "anthropic-version 2026-10-21", the
+tag and the line "no digest given by the service" (a later run cannot
+be proven the same build); the rate kept by the service's reply headers
+with no second send, a 429 a failed call and three in a row a stop;
+401, 403 or a credit message stop the run with the chain written
+apart. 15 tests, each named for its rule; the suite 820.
+
+The trial met its three conditions (61 of 61 ok, 2.23 dollars
+estimated, thinking off). The benches 20:17 to 23:06 UTC, no stop, no
+wait for the rate, the proof of the words 0 parts differing on each:
+- Stage 3: missed by the scorer on H6, H7 and T18; held on the words.
+  72 alarm replies of 1,743 listed 4 or 5 urgent actions where the form
+  allows 3 and the door refused them; in the emergency cases that fails
+  the chain, so 55 chains of 208 failed. In every one the alarm had
+  fired on an accepted reply or on the refused one (all 72 said time
+  critical); no male case named a female term on any accepted reply. The
+  495 case 5.27 s median (mark 6.0, held) and 8.61 slowest (8.0,
+  missed). S12 0 on every routine case (the local 9 on one).
+- 7b: passed, the same four lines as the local and the host; 24 refused
+  alarm replies failed no chain.
+- 8a: missed on M1 of A, C and D (15 letters of 65 refused for 5 or
+  more paragraphs against the form's 4), M2 and M3 of A, M3 of B, M2
+  and M3 of D (13 placeholders in 12 letters, the check's number rule).
+  No unit the note does not give, no line number, no citation into
+  Assessment. On case A the check replaced the one sentence that said
+  ibuprofen was stopped in 9 letters of 13, so the page reads her as
+  still on it (the local 0, the host 4), and in 2 of those the sentence
+  held every change of the plan, so the page gives the old doses of
+  gliclazide and losartan as current. Nothing reached the page that the
+  local's list did not hold; 4 marked lines against 49 and 31.
+- 8b: the searches matched 9a2's 15 of 15 before any summary call. G1
+  and G3 held in every chain; G2 missed on five queries (Q03 12, Q04 7,
+  Q05 6, Q07 8, Q12 1 of 13; the local missed Q07 1 and Q12 11).
+
+The wait and the cost: a pass sent together 4.6 s median over stage 3
+(the local 2.8, the host 6.5), 8.6 s slowest, 0 of 1,742 over 10 s (the
+host 241); a summary call 1.9 s. The whole run 2.13 dollars by the
+tokens (4,438 calls, 8.46 million read, 2.57 million written); a
+15-minute consultation about 8 cents (Cowork's estimate 4.6, the host
+3.2); the owner reads the service's own figure on his usage page.
+Thinking in 0 of 4,438 replies; 0 cut replies; the three A chains gave
+the same reply in 0 of 16 cases, as the local and the host.
+
+Every failed call of the run (108 in the benches) is a list limit the
+forms carry and the service does not hold; the prompt names no number.
+The owner said in chat that the check should accept more than three and
+that a brainstorm with Cowork follows; nothing was changed in this run.
+
+Untrue now: nothing in the repo but CLAUDE.md's bench line, fixed with
+this entry. For the owner's three rulings (the default cloud model, the
+letters, Alba in cloud mode) and the brainstorm on the list limits, the
+report's last section.
+
+## 2026-11-06. Run 9a2: Gemma 4 26B on DeepInfra through the door on all four benches; stage 3, 7b and 8b passed, the letters missed
+
+Built and run in one session on 6 Nov 2026 under Cowork's plan review
+(four points; all are in). Run 9a2 is 15.13 ruling 11: the host of the
+cloud Gemma 4 is DeepInfra if one gate call passes, benched as rulings 4
+and 8 say, report only, nothing on any page (R31). The gate, the plan,
+the trial and the report are STAGE9A2_GATE.md, STAGE9A2_PLAN.md,
+STAGE9A2_TRIAL.md and STAGE9A2_REPORT.md in the private log folder.
+
+The spec, committed once, not a character changed: adf27e9 (sha256
+858a6815...). The run prompt is 6532985 (stage-prompts/STAGE_09A2.md).
+
+The kind (deec370; bench/deepinfra.py, the bench's alone): a subclass of
+the app's chat engine, so the request body is the vLLM arm's, the six
+sampling fields included (proven on the stored records against the
+local vLLM runs: 0 parts differing on every bench run); the host's own
+address over https and no other; the key in the Authorization header
+alone, read from the key folder's .env by the one module and written
+nowhere; the host gives no version and no digest, so the record holds
+the two lines that say so with the date and the model field of every
+reply. A later run cannot be proven to be the same build. 401, 402, 403
+and 429 stop the run with the chain written apart. Ollama cloud's kind
+was taken out (7cd68f7; ruling 11). 12 tests, each named for its rule.
+
+The gate passed on try (a), the request as the chat engine sends it: the
+form's JSON, no thinking, 723 tokens read as on vLLM. The trial met its
+three conditions (61 of 61 ok, 0.80 dollars estimated, thinking off).
+
+The benches, the host beside the local vLLM, the host being the local
+model's size at another precision than the local build:
+- Stage 3: passed on the model's words. Every hard mark the local held,
+  held; the routine scripts fired on 0 chains (the local 9 on one case).
+  One failed call of the run's 4,729, a chain of case 10 at 0.5 whose
+  assessment got no answer within the app's 60 s; the scorer reads that
+  chain as a miss of H6 and H7, the rule of the run does not. The two
+  time marks of the 495 case missed: a pass 6.64 s median (the mark 6.0;
+  the local 2.94) and 34.38 at the slowest (8.0; 4.07).
+- 7b: passed, the same four lines as the local, A2 missed both ways in
+  the same manner.
+- 8a: missed, on A M2, A M3 and D M3. The model writes the two blood
+  results of case A with units the note does not give (12 letters of 13;
+  the local 1), the check puts the placeholder in their place, 0 units
+  reach the page. One stale fact on the page: the medicine the Plan
+  stops given as taken in 3 letters of 13 at 0.5 (the local's fourth
+  bench 0, its first 12). No kind reached the page that the local's
+  list did not hold; the dermatology letter opens with the skin 13 of
+  13 (the local 1). The two letters for the owner's reading are in
+  STAGE9A2_LETTERS.md, private.
+- 8b: passed. The run first stopped at the searches, as the plan says
+  on any difference from 8b's stored run: the searches send the local's
+  passages on 14 of 15 queries, and on one made query two of six differ,
+  because three documents of the bench's own data folder were removed
+  and loaded again on 29 Oct after 8b's bench ran (the same files; new
+  ids and vectors); 8b's stored search rows also carry its first
+  matcher's right passages, not the re-matched ones. The owner ruled in
+  chat that the summaries run on the corpus as it stands, that query
+  reported as not like for like. G1 13 of 13 on all twelve real queries
+  and G3 13 of 13 on all three made ones, as the local; G2 (under 150
+  words) 13 on ten, the two the local missed held in more chains (Q07 9
+  against 1, Q12 12 against 11); covered 13 of 13 on every real query.
+
+The wait and the cost: a pass sent together 6.5 s median over stage 3
+(the local 2.8), 60 s at the slowest; 36 passes of 1,889 over 20 s, the
+host's queue; a summary call 4.5 s median (the local about 1.2). The
+whole run 0.80 dollars by the tokens and 0.80 by the host's own
+estimated_cost; a 15-minute consultation about 3.2 US cents (ruling 4's
+count scaled, beside the estimate of 3 to 5). Thinking in 0 of 4,729
+replies. The seed: the same reply at every pass on the
+three chains at temperature 0 in 0 of 16 cases, as the local vLLM arm.
+No engine stopped or started; the card 18 MiB throughout.
+
+Untrue now: nothing in the repo but CLAUDE.md's bench line, fixed with
+this entry. For 9b: 8b's stored search rows and the corpus of
+stage8b-data are not what its bench ran with (above); every reply
+carries the host's service_tier field, and the owner has said a faster
+tier at 1.5 times the price is to be tested after this run. For 5e,
+the owner's idea, said on 6 Nov and his to rule on: a local speech model
+on a laptop processor for the live stream, the final transcription and
+the diarization in the cloud after Stop.
+
 ## 2026-11-06. Run 9a: the cloud kind built, the bench of Ollama cloud stopped at its first call
 
 Built in one session on 6 Nov 2026 under the plan review of Cowork
