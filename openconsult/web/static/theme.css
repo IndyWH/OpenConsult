@@ -119,6 +119,10 @@ button.stop { margin-top: 0; font-size: 1.05rem; padding: .6rem 1.6rem; }
 /* A drug name the language model doubts (15.10 ruling 20): the words as heard, never a guess. */
 mark.doubted { background: #FBE7B0; color: inherit; padding: 0 .15rem; border-radius: 2px; }
 .doubted-word { margin-left: .4rem; }
+/* Beside the line's box the doubted words are a press that goes to their row in the warnings (step 6d). */
+a.doubted-word { text-decoration: none; }
+a.doubted-word .mark { text-decoration: underline; }
+.draft-rows { margin: .2rem 0 .8rem; }
 .drug-head { margin: 0 0 .4rem; }
 /* The row of a doubted drug name (15.10 rulings 26 and 28): line, words, play, tick. The field looks like the
    highlighted words until it takes the cursor; then it is a box to type in. With no style sheet it is a text field. */

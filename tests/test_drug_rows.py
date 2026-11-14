@@ -333,3 +333,47 @@ def test_6d_review_point_7_nothing_presses_on_a_read_only_page_and_the_rows_show
     assert '<mark class="doubted">take</mark>' in part(raw, 'id="line-1"', 'id="line-2"') and "doubted" not in part(raw, 'id="line-3"', 'id="line-4"')
     assert slot_text(text_of(client.get("/consultations/1")), "tick-1") == ""
     c.close()
+
+
+def test_6d_beside_the_lines_box_the_doubted_words_are_a_press_that_goes_to_the_row_and_nothing_to_type_in(tmp_path, clock, machine):
+    app, client, c = reviewed(tmp_path, clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
+    raw, _ = page_of(client)
+    line_three = part(raw, 'id="line-3"', 'id="line-4"')
+    link = '<a class="doubted-word" href="#drug-mark-1"><mark class="doubted">met for min</mark> <span class="mark">' + words.CHECK_THIS_NAME + "</span></a>"
+    assert line_three.count(link) == 2 and line_three.count("<input") == 1                       # the line's own box, and nothing else to type in
+    assert 'href="#drug-mark-2"><mark class="doubted">take</mark>' in part(raw, 'id="line-1"', 'id="line-2"')
+    assert 'href="#drug-mark-2"><mark class="doubted">for</mark>' in part(raw, 'id="line-2"', 'id="line-3"')
+    assert 'id="drug-mark-1"' in raw and 'id="drug-mark-2"' in raw                               # where each press goes
+    # A settled mark shows none.
+    assert tick(client, 1, words="met for min", press="settle").status_code == 303
+    raw, _ = page_of(client)
+    assert "doubted-word" not in part(raw, 'id="line-3"', 'id="line-4"') and 'href="#drug-mark-2"' in part(raw, 'id="line-1"', 'id="line-2"')
+    c.close()
+
+
+def test_6d_ruling_11_R15_draft_the_note_again_shows_a_second_time_under_the_rows_only_when_the_first_is_offered(tmp_path, clock, machine):
+    engine = engine_with(drug_name=[REPLY], note=[NOTE, NOTE])
+    app, client, c = reviewed(tmp_path, clock, machine, engine, page=PAGE)
+    p = app.state.parts
+    raw, _ = page_of(client)
+    assert DRAFT_OFF in raw and 'id="draft-rows"' not in raw                                    # nothing edited: neither can act, the second is not shown
+    stale = client.post("/consultations/1/note/draft", data={"where": "rows"})                 # a press from a stale page answers under the rows
+    assert stale.status_code == 400 and slot_text(text_of(stale), "draft-rows") == words.DRAFT_AGAIN_NEEDS_EDIT and len(engine.calls_for("note")) == 1
+    assert tick(client, 1, words=TYPED, press="settle").status_code == 303
+    raw, _ = page_of(client)
+    warnings = part(raw, 'id="warnings"', 'id="alarms"')
+    assert DRAFT_OFF not in raw and warnings.count('id="draft-rows"') == 1
+    assert warnings.rindex('class="drug-row"') < warnings.index('id="draft-rows"') < warnings.index('data-kind="confidence_not_measured"')
+    assert 'action="/consultations/1/note/draft" id="draft-rows-form"' in warnings and ">" + words.DRAFT_AGAIN + "</button>" in warnings
+    assert len(engine.calls_for("note")) == 1                                                  # never by itself
+    assert client.post("/consultations/1/note/draft", data={"where": "rows"}).status_code == 303
+    assert len(engine.calls_for("note")) == 2 and len(p.notes.drafts(1)) == 2 and len(engine.calls_for("drug_name")) == 1    # one press, one draft
+    raw, _ = page_of(client)
+    assert DRAFT_OFF in raw and 'id="draft-rows"' not in raw
+    c.close()
+    # With no row, an edit by hand offers the control at the top alone.
+    app, client, c = reviewed(tmp_path / "none", clock, machine, engine_with(drug_name=[{"doubtful": []}]), page=PAGE)
+    assert client.post("/consultations/1/lines/4", data={"label": "doctor", "text": "Tell me a little more."}).status_code == 303
+    raw, _ = page_of(client)
+    assert DRAFT_OFF not in raw and 'id="draft-rows"' not in raw and 'id="drug-rows"' not in raw
+    c.close()

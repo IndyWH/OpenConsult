@@ -259,7 +259,9 @@ async def draft(request: Request, consultation_id: int, user=Depends(guards.logg
     row = final_row(request, consultation_id)
     data = page_data(p, row)
     if data["draft_reason"]:
-        return review_page(request, user, consultation_id, refused=("draft", data["draft_reason"]))
+        # The same control stands a second time under the rows of the doubted names: a refusal answers where the press was (R15).
+        control = "draft-rows" if (await form_fields(request)).get("where") == "rows" else "draft"
+        return review_page(request, user, consultation_id, refused=(control, data["draft_reason"]))
     note.draft(p.door, p.consultations, p.notes, p.audit, consultation_id, data["asked_by"])
     raise Redirect(f"/consultations/{consultation_id}")
 

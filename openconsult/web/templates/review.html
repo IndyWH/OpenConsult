@@ -107,6 +107,12 @@
           {{ refusal("tick-" ~ m.id) }}
         </form>
       </li>{% endfor %}</ul>{% endif %}
+    {# Draft the note again, where the doctor is (the details of step 6d; R15): the same control a second time under
+       the rows, only when the one at the top can act. One press, one draft, never by itself. #}
+    {% if drug_marks and not draft_reason %}<form method="post" action="/consultations/{{ cid }}/note/draft" id="draft-rows-form" class="draft-rows">
+      <input type="hidden" name="where" value="rows">
+      <button id="draft-rows" aria-describedby="draft-rows-refusal">{{ draft_control }}</button>{{ refusal("draft-rows") }}</form>
+    {% else %}{{ refusal("draft-rows") }}{% endif %}
     {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
       {% elif player.available and w.line_n %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}">{{ words.PLAY_FROM_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
@@ -158,8 +164,8 @@
         <button id="save-line-{{ line.n }}" aria-describedby="save-line-{{ line.n }}-refusal">{{ words.SAVE_LINE }}</button>
         {{ refusal("save-line-" ~ line.n) }}
       </form>
-      {# The doubted words of the line, beside its field, where nothing can be highlighted (ruling 20). #}
-      {% for d in line.doubted %}<span class="doubted-word"><mark class="doubted">{{ d.piece }}</mark> <span class="mark">{{ words.CHECK_THIS_NAME }}</span></span>{% endfor %}
+      {# The doubted words of the line, beside its box: a press that goes to the name's row in the warnings, where it is corrected (the details of step 6d). #}
+      {% for d in line.doubted %}<a class="doubted-word" href="#drug-mark-{{ d.mark }}"><mark class="doubted">{{ d.piece }}</mark> <span class="mark">{{ words.CHECK_THIS_NAME }}</span></a>{% endfor %}
       {% if line.changed_by_check %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form">
         <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
       {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
