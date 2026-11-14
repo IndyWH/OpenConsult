@@ -1,4 +1,4 @@
-"""The drug-name marks on the review page (spec 15.10 rulings 4, 6, 11, 20
+"""The drug-name marks on the review page (spec 15.10 rulings 4, 6, 11, 20, 27
 and 21 and the details of step 6c: The marks on the review page, When the
 doctor types over; 15.9 ruling 39; R15). A made-up page and made-up
 replies; a made-up name stands for the drug the model named, which no
@@ -15,6 +15,7 @@ from tests.test_review_page import NOTE, engine_with
 from tests.test_who_check import reviewed
 
 NAMED = "made-up drug"       # in both drugs the made-up reply names
+SIGN = "Drug name to check"  # the sign that stood on the note entries until ruling 27 took it off; its word is gone from the file of words
 
 
 def page_of(client):
@@ -26,7 +27,7 @@ def part(raw: str, start: str, end: str) -> str:
     return html.unescape(raw.split(start, 1)[1].split(end, 1)[0])
 
 
-def test_ruling_20_a_mark_shows_in_its_three_places_and_the_line_that_a_name_with_no_mark_is_not_proven_right(tmp_path, clock, machine):
+def test_rulings_20_27_a_mark_shows_in_its_two_places_no_note_entry_carries_a_sign_and_a_name_with_no_mark_is_not_proven_right(tmp_path, clock, machine):
     app, client, c = reviewed(tmp_path, clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
     raw, page = page_of(client)
     # One: in the transcript, the doubted words on their line with the words Check this name; the line plays at a press.
@@ -42,27 +43,25 @@ def test_ruling_20_a_mark_shows_in_its_three_places_and_the_line_that_a_name_wit
     first, second = words.WARN_DRUG_MARK.format(n=1, heard="take for"), words.WARN_DRUG_MARK.format(n=3, heard="met for min")
     assert warnings.index(first) < warnings.index(second) < warnings.index(words.WARN_CONFIDENCE_NOT_MEASURED.split(":")[0])
     assert warnings.count('data-kind="drug_mark"') == 2 and 'class="play-line cite" data-line="3">' + words.PLAY_FROM_LINE in warnings
-    # Three: in the note, every entry that draws on a marked line carries the sign, set by the line and not by the word.
+    # Ruling 27: no note entry carries a sign of a doubted name, also not the entry that draws on a marked line and wrote another word.
     subjective = part(raw, 'id="section-subjective"', 'id="section-objective"')
-    assert words.DRUG_SIGN.format(n=3) in subjective and 'class="cite drug-sign no-print" data-line="3"' in subjective
-    assert "met for min" not in subjective and "made up history [1]" in subjective                    # the note wrote another word: the sign still shows
-    assessment = part(raw, 'id="section-assessment"', 'id="differentials"')
-    assert assessment.count(words.DRUG_SIGN.format(n=1)) == 1 and words.DRUG_SIGN.format(n=2) not in page   # one sign, the mark's first line
-    assert words.DRUG_SIGN.split("{")[0] not in part(raw, 'id="section-plan"', 'id="controls"')         # an entry that cites no marked line
+    assert "met for min" not in subjective and "made up history [1]" in subjective                    # the entry cites line 3 and wrote another word
+    note = part(raw, 'id="note"', 'id="controls"')
+    assert SIGN not in page and "drug-sign" not in raw and "doubted" not in note and words.CHECK_THIS_NAME not in note
     # No guess is shown anywhere (ruling 6): not on the page, and so not in its print; not in the copy text.
     assert NAMED not in page and NAMED not in client.get("/consultations/1/note.txt").text
     assert NAMED in [m["meant"] for m in app.state.parts.consultations.drug_marks(1)][1]             # kept in the record
     c.close()
 
 
-def test_ruling_20_ruling_4_the_sign_is_on_the_page_only_never_in_the_copy_text_or_the_approved_text(tmp_path, clock, machine):
+def test_rulings_27_4_no_sign_of_a_doubted_name_is_on_the_page_in_the_copy_text_or_in_the_approved_text(tmp_path, clock, machine):
     app, client, c = reviewed(tmp_path, clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
     p = app.state.parts
-    sign = words.DRUG_SIGN.split("{")[0]
+    sign = SIGN
     copy = client.get("/consultations/1/note.txt").text
     assert sign not in copy and words.CHECK_THIS_NAME not in copy and "made up history" in copy
     raw, _ = page_of(client)
-    assert raw.count('class="cite drug-sign no-print"') == 2                                            # the print's style sheet leaves them out
+    assert sign not in text_of(client.get("/consultations/1")) and "drug-sign" not in raw                         # ruling 27: no entry carries one
     assert 'id="warnings"' in raw and 'class="pane no-print" id="warnings"' in raw
     # Approve is never blocked by a mark; the approved text holds the note alone; the page then shows the marks that stood at Approve.
     assert client.post("/consultations/1/note/approve").status_code == 303
@@ -70,7 +69,7 @@ def test_ruling_20_ruling_4_the_sign_is_on_the_page_only_never_in_the_copy_text_
     assert sign not in approved and words.CHECK_THIS_NAME not in approved and NAMED not in approved
     raw, page = page_of(client)
     assert '<span class="line-text">I take <mark class="doubted">met for min</mark> twice a day and <mark class="doubted">met for min</mark> at night.' in raw
-    assert words.WARN_DRUG_MARK.format(n=3, heard="met for min") in page and words.DRUG_SIGN.format(n=3) in page
+    assert words.WARN_DRUG_MARK.format(n=3, heard="met for min") in page and sign not in page
     assert words.DRUG_NOT_PROVEN in page and NAMED not in page and NAMED not in client.get("/consultations/1/note.txt").text
     c.close()
 
@@ -92,7 +91,7 @@ def test_ruling_20_the_head_of_the_warnings_for_many_marks_for_one_and_for_none_
     p.db.execute("DELETE FROM drug_mark WHERE consultation_id = 1")
     p.db.execute("DELETE FROM drug_name_call WHERE consultation_id = 1")
     raw, page = page_of(client)
-    for sentence in (words.DRUG_NOT_PROVEN, words.DRUG_MARKED_NONE, words.CHECK_THIS_NAME, words.DRUG_SIGN.split("{")[0]):
+    for sentence in (words.DRUG_NOT_PROVEN, words.DRUG_MARKED_NONE, words.CHECK_THIS_NAME, SIGN):
         assert sentence not in page
     assert 'class="doubted"' not in raw and 'data-kind="drug_mark"' not in raw
     c.close()
@@ -134,7 +133,7 @@ def test_ruling_20_R30_a_failed_drug_name_call_is_said_plainly_counts_as_one_war
     c.close()
 
 
-def test_rulings_11_20_a_mark_typed_over_goes_from_its_three_places_stays_in_the_record_and_draft_again_does_not_ask_the_model_again(tmp_path, clock, machine):
+def test_rulings_11_20_a_mark_typed_over_goes_from_its_two_places_stays_in_the_record_and_draft_again_does_not_ask_the_model_again(tmp_path, clock, machine):
     engine = engine_with(drug_name=[REPLY], note=[NOTE, NOTE])
     app, client, c = reviewed(tmp_path, clock, machine, engine, page=PAGE)
     p = app.state.parts
@@ -143,8 +142,8 @@ def test_rulings_11_20_a_mark_typed_over_goes_from_its_three_places_stays_in_the
     assert client.post("/consultations/1/lines/3", data={"label": "patient", "text": typed}).status_code == 303
     raw, page = page_of(client)
     assert "met for min" not in part(raw, 'id="line-3"', 'id="line-4"') and words.WARN_DRUG_MARK.format(n=3, heard="met for min") not in page
-    assert words.DRUG_SIGN.format(n=3) not in page and words.DRUG_MARKED_ONE in page                 # one mark stands: the one across lines 1 and 2
-    assert words.WARN_DRUG_MARK.format(n=1, heard="take for") in page and words.DRUG_SIGN.format(n=1) in page
+    assert SIGN not in page and words.DRUG_MARKED_ONE in page                                        # one mark stands: the one across lines 1 and 2
+    assert words.WARN_DRUG_MARK.format(n=1, heard="take for") in page
     record = p.consultations.drug_marks(1, every=True)
     assert [(m["heard"], m["cleared_at"] is not None) for m in record] == [("take for", False), ("met for min", True)]
     assert record[1]["meant"] == "a made-up drug"
@@ -153,7 +152,7 @@ def test_rulings_11_20_a_mark_typed_over_goes_from_its_three_places_stays_in_the
     assert client.post("/consultations/1/note/draft").status_code == 303
     assert len(engine.calls_for("drug_name")) == 1 and len(engine.calls_for("note")) == 2 and "a made-up name" in engine.calls_for("note")[1].user
     raw, page = page_of(client)
-    assert words.DRUG_MARKED_ONE in page and words.DRUG_SIGN.format(n=1) in page                    # the marks belong to the transcript
+    assert words.DRUG_MARKED_ONE in page and SIGN not in page                                       # the marks belong to the transcript
     # An edit that leaves the doubted words standing keeps the mark where the words now are.
     assert client.post("/consultations/1/lines/1", data={"label": "doctor", "text": "So what do you take"}).status_code == 303
     assert p.consultations.drug_marks(1)[0]["places"][0] == {"line": 1, "first": 15, "last": 19}

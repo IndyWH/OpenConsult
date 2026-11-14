@@ -261,7 +261,6 @@ WARN_LABEL_CHECK_FAILED = "The check of who spoke did not run: {reason} No label
 # The drug-name marks on the review page (15.10 ruling 20; 15.9 ruling 39). The owner's sentences, letter for letter.
 CHECK_THIS_NAME = "Check this name"
 WARN_DRUG_MARK = "Line {n}: {heard} may be a drug name that was misheard."
-DRUG_SIGN = "Drug name to check: line {n}"
 DRUG_MARKED = "The language model marked {count} drug names it doubts. Press a marked line to hear the word, then type the name."
 DRUG_MARKED_NONE = "The language model marked no drug name on this page."
 DRUG_NOT_PROVEN = ("A drug name with no mark is not proven right. The model can miss a misheard name, most of all when one real "

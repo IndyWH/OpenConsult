@@ -184,7 +184,7 @@ def page_data(p, row: dict) -> dict:
     choice = CHOICES.get(row["speech_choice"])
     state = note_state(p, row, gate_refused)
     # The drug-name marks (ruling 20): their rows head the warnings and count on Approve; their sentences are not counted.
-    drug = drug_marks.review_data(p.consultations, cid, lines, state["entries"])
+    drug = drug_marks.review_data(p.consultations, cid, lines)
     warnings = drug["rows"] + warning_lines(warning_rows, lines, choice.title if choice else row["speech_choice"])
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)

@@ -120,7 +120,6 @@ button.stop { margin-top: 0; font-size: 1.05rem; padding: .6rem 1.6rem; }
 mark.doubted { background: #FBE7B0; color: inherit; padding: 0 .15rem; border-radius: 2px; }
 .doubted-word { margin-left: .4rem; }
 .drug-head { margin: 0 0 .4rem; }
-.cite.drug-sign { font-weight: 600; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .alarm-fired { color: var(--red); font-weight: 600; }
 .alarm-no-action { color: var(--red); }

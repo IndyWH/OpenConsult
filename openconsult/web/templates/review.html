@@ -47,8 +47,6 @@
           {{ refusal("entry-" ~ entry.id) }}
         </form><span class="entry-text print-only">{{ entry.text }}</span>{% endif %}
         {% for n in entry.lines %}<button type="button" class="cite no-print" data-line="{{ n }}" aria-label="{{ words.SHOW_LINE.format(n=n) }}">[{{ n }}]</button>{% endfor %}
-        {# The sign of a doubted drug name (ruling 20): set by the line the entry cites, on the page only, never in the copy text or the print. #}
-        {% for n in entry.drug_signs %}<button type="button" class="cite drug-sign no-print" data-line="{{ n }}">{{ words.DRUG_SIGN.format(n=n) }}</button>{% endfor %}
         {% if entry.uncited %}<span class="mark uncited no-print">({{ words.ENTRY_UNCITED }})</span>{% endif %}
       </div>
       {% endfor %}

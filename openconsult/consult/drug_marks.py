@@ -148,22 +148,19 @@ def spans_of(marks: list[dict]) -> dict[int, list[tuple[int, int]]]:
     return found
 
 
-def review_data(rows: Consultations, consultation_id: int, lines: list[dict], entries: list[dict]) -> dict:
-    """What the review page shows of the marks, in their three places
-    (ruling 20). On each line: the doubted words, and the line's words
-    cut at them. The warnings: the sentences that head them, which are
-    not counted, and one row for each mark that stands, or one for a call
-    that failed; each row counts on Approve and none blocks it. On each
-    note entry: the first line of every mark whose lines the entry cites,
-    so the sign is set by the line and not by the word, and shows when
-    the note wrote the name differently. Nothing when the call has not
-    run (a consultation from before 6c, or a gate that refused). The drug
-    the model named is never read here."""
+def review_data(rows: Consultations, consultation_id: int, lines: list[dict]) -> dict:
+    """What the review page shows of the marks, in their two places
+    (rulings 20 and 27). On each line: the doubted words, and the line's
+    words cut at them. The warnings: the sentences that head them, which
+    are not counted, and one row for each mark that stands, or one for a
+    call that failed; each row counts on Approve and none blocks it. No
+    note entry carries a sign: a sign pointed the doctor's hand to the
+    note, which is the wrong place to correct (ruling 27). Nothing when
+    the call has not run (a consultation from before 6c, or a gate that
+    refused). The drug the model named is never read here."""
     call = rows.drug_call(consultation_id)
     for line in lines:
         line["doubted"], line["segments"] = [], [(line["text"], False)]
-    for entry in entries:
-        entry["drug_signs"] = []
     if call is None:
         return {"head": [], "rows": []}
     if call["outcome"] != "answered":
@@ -178,9 +175,6 @@ def review_data(rows: Consultations, consultation_id: int, lines: list[dict], en
             at = last
         line["segments"] = [s for s in segments + [(text[at:], False)] if s[0]]
         line["doubted"] = [piece for piece, marked in line["segments"] if marked]
-    for entry in entries:
-        cited = set(entry["lines"])
-        entry["drug_signs"] = sorted({m["first_line"] for m in marks if cited & {place["line"] for place in m["places"]}})
     counted = (words.DRUG_MARKED.format(count=len(marks)) if len(marks) > 1 else words.DRUG_MARKED_ONE if marks
                else words.DRUG_MARKED_NONE)
     return {"head": [counted, words.DRUG_NOT_PROVEN],
