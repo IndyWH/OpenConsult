@@ -29,10 +29,18 @@ This branch is where OpenConsult v2.0 is being built.
   the counts of warnings and alarms, Refuse, the warnings and the alarms
   each a press from the sound, and the transcript with a player for the
   recording, where a word or a speaker can be corrected and the note
-  drafted again. A doubted drug name is shown in three places, on its
-  line, as a warning and on every note entry that draws on that line,
-  always as the words that were heard and never as a guess, and one line
-  says that a name with no mark is not proven right. The check of who
+  drafted again; a pressed line plays that line and stops. A doubted
+  drug name is a row among the warnings, the one place to deal with it:
+  the line's words with the doubted words as a field, a play button for
+  the stretch it was heard on, and a tick. The doctor plays it, types
+  the right name over a wrong one, and ticks it; the tick also settles a
+  name that was heard rightly, and a second press opens it again. The
+  correction goes into the transcript line and the note is then drafted
+  again with one press, never corrected in place, because the right drug
+  can change the clinical picture. A name is always shown as the words
+  that were heard, never as a guess; no sign stands on the note entries;
+  and one line says that a name with no mark is not proven right. The
+  check of who
   spoke no longer runs by itself: one control on the review page, Check
   who spoke, asks the language model for it, every change is marked and
   can be undone one line at a time or all at once, and the page says so
@@ -181,6 +189,30 @@ times the host's, was not weighed against a patient's wait. The owner
 also ruled that Alba's auto mode is offered wherever the language model
 answers fast enough and the transcription is live, which the cloud model
 meets on these figures, pending its own auto-mode bench.
+
+**Two more jobs at Stop, 13 and 14 November.** The build at Stop gave
+the language model two more jobs, so Claude Haiku 5.5 has now run six
+benches: the four above, the check of who spoke, and the marks on drug
+names it doubts, both on the text of 24 stored pages from three
+recordings. It passed the check of who spoke: 576 words left under the
+wrong speaker against the local model's 682 on whole pages, and 551
+against 643 on pages read in parts. On the drug names it answered every
+call and marked 94 of the 122 names written wrongly against the local
+model's 93, but it missed the third mark: 244 marks on a word that was
+written rightly against 27. Marks that are mostly noise teach a doctor
+to pass over them, so the check of who spoke is offered in cloud mode
+with Claude Haiku and the drug-name marks are not. On 14 November the
+next model up, Claude Sonnet 5.5, was benched on the drug-name call
+alone, on the same 24 pages, 48 calls, each page asked twice. Every call
+answered. On the first asking, which is the one judged, it marked 108 of
+the 122 names written wrongly, 15 more than the local model, and made 32
+marks on a word written rightly against a line of 27: the third mark
+missed by 5. On the second asking it marked 111 names and made 19 such
+marks. Of its 139 entries, 127 were the same both times. Code dropped 2
+entries whose words did not stand on their line, against the local
+model's 3. Whether the drug-name marks are offered in cloud mode with
+Claude Sonnet waits for the owner's ruling; nothing is built for cloud
+mode yet, and until then a doctor in cloud mode gets no drug-name marks.
 
 What this comparison cannot say: which model picks the better
 differential or asks the better next question. The four benches measure

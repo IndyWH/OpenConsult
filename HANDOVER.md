@@ -4,6 +4,130 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-14. Step 6d: a doubted drug name is corrected and ticked at its warning; Claude Sonnet benched on the drug names, two marks held and the third missed by 5
+
+Run on 14 Nov 2026 under the owner's approval of the plan and Cowork's
+review of it (twelve points; all are in). The spec is 1b9a678 (sha256
+f8a75a3b...), the stage prompt 1f6cee0 (stage-prompts/STAGE_06D.md).
+The private report is STAGE6D_REPORT.md in the log folder, with the
+plan and its review beside it. Thirteen commits, none pushed.
+
+For the patient. In the room run of 14 Nov the mark led the doctor to
+a wrong drug in the note, and then the page led his hand to the wrong
+place twice. Now each doubted drug name is one row among the warnings,
+and the row is where he works: he plays the line, types the right name
+over a wrong one, and ticks it. The tick also settles a name that was
+heard rightly, and a second press opens it again. The correction goes
+into the transcript line; the note is then drafted again with one
+press, shown a second time under the rows, and is never corrected in
+place, because the right drug can change the clinical picture. No sign
+stands on the note entries any more. A pressed line plays that line
+and stops. No guess is shown anywhere; the drug the model named stays
+in the record.
+
+The build (15.10 rulings 26 to 29 and the details of step 6d).
+- Tables of version 10: a mark gains its words as they now stand
+  (they begin as the words heard, which never change), the time it was
+  settled, and the first and last line it was heard on. A version 9
+  folder comes forward with every row, none settled.
+- The row is a form of its own and works with no script: Line n, the
+  words with the doubted words as a field, play, the tick. The field
+  looks like the highlighted words until it takes the cursor.
+- The tick keeps what the field holds. Where the words differ the line
+  is corrected by the function its own box uses: the edit, the audit
+  line, Draft the note again offered. A settled mark shows no
+  highlight on its line and is not counted on Approve; its row stays.
+- Words in more than one place are all corrected, and every such
+  place is highlighted in the row before the press. Words over two
+  lines go on the first; the piece on a later line is taken out.
+- A line left with no words stays, with its number, speaker, times and
+  sound, and says so beside its box. Its box may be saved empty so
+  that its speaker can be set; a line that holds words is still never
+  emptied there. The note's turns leave it out, and the check of who
+  spoke already did: no model reads an empty line. For a page with no
+  empty line the note's text is the bytes it was, pinned by its sha256.
+- The row never shrinks: play and Line n are read from the lines the
+  name was heard on, never from typed words.
+- The tick is never told by colour alone: a thin tick in an empty ring
+  with a broken edge, 3.6 to 1 on the pane, or a heavy tick on a
+  filled disc with a dark whole edge; its name, its title and
+  aria-pressed say the state.
+- Words typed into one row and not yet ticked are kept by a small page
+  script when another row is ticked, in the browser's own store, never
+  sent; dropped when ticked, at Approve and when the tab closes.
+- Read-only (after Approve, and while a check of who spoke runs): the
+  field cannot be typed in and a press is answered at the row.
+- Every press that plays a line carries its start and end; the alarm's
+  press and the player's own controls play on.
+The suite is 948 tests in 80 s, none skipped; the start check passes.
+
+Seen in a browser by the build model, on a made-up consultation of
+the suite served on this machine: typed words survived another row's
+tick and were then posted and dropped; a pressed line stopped within
+20 ms of its end; after a pause or a move with the player's own
+controls the sound played on; the alarm's press played on. Two mends
+came of it (the player's own bar told by the seeking event; the stop
+set by a timer). Not seen: greyscale or forced colours by eye; the
+states were read from the computed styles.
+
+The bench of Claude Sonnet 5.5 on the drug-name call alone (rulings 25
+and 30): the 24 stored pages as text, each asked twice, 48 calls, all
+answered, none cut, none failed, 124,060 tokens read and 8,494
+written, 0.33 dollars at 2 and 10 a million, 130 s, no wait for the
+rate. For this model the kind switches thinking off with the service's
+own field between_tools (the type disabled is refused); no reply holds
+a thinking block. Counted twice, the same bytes. Judged on the first
+round, beside the local model and Claude Haiku:
+- D1 HOLDS: 24 of 24 (24, 24).
+- D2 HOLDS: 108 of the 122 names written wrongly marked (93, 94).
+- D3 MISSED BY 5: 32 marks on a word written rightly against a line
+  of 27 (27, 244).
+- Entries dropped by code: 2 of 141 (3 of 130, 6 of 182).
+- On the pages of the default cloud speech service, live: 1 of 2 names
+  marked (0, 1), 6 marks on a right word (4, 30).
+- The second round, for the report: 111 names, 19 marks on a right
+  word, which is under the line. Of 139 entries 127 are the same in
+  both rounds; all 108 names of round one are marked again; of the 32
+  right words 9 are marked again.
+- Read as a doubter: no name the local model marked did Sonnet miss
+  (93 both, 15 Sonnet alone, 14 neither). By entries, 8 mark only
+  right words against the local model's 6 (Haiku 37). 11 of the 32
+  stand on a drug name of the script written rightly, and 11 come from
+  two long entries on one kind of page. Where it named a drug on a
+  name written wrongly it was wrong 2 times of 108 (3 of 93; Haiku 30
+  of 94). The app shows no named drug.
+THE DRUG-NAME MARKS IN CLOUD MODE WAIT FOR THE OWNER'S RULING. No word
+of a prompt was changed, nothing was run again, and nothing is built
+for cloud mode: the Claude kind is the bench's alone.
+
+What left the machine: the text of the 24 pages, to the Claude service
+and to no other host, as the approved prompt, one message and the form
+in each of 48 requests, proven from the stored requests; the same
+bytes the local model and Claude Haiku were sent. The private word
+check on that text before the first call: 0. No key was read by the
+build model. No engine was started.
+
+Flags. The suite cannot run a page script (no browser, no script
+engine), so the kept-words script is pinned on the page's side only
+and was run in a browser by hand. Two tests were restated for the new
+table version and the press's new name; five for the row and the signs; none
+weakened. Two stray commands of mine ran outside the record of
+connections and did nothing; one run of the suite met a temporary file
+of mine and was run again. words.py is 945 lines,
+over the target as before. The oldest entry here, run 9d2, moved to
+the archive.
+
+Made untrue, and put right in this commit: CLAUDE.md's run and bench
+lines, the README's account of a doubted drug name and its dated
+section on the cloud model. Not mine to write, in the spec: the
+headline of 15.10 ruling 6 (press the line and type the name); the
+details of step 6d where the plan review changed them (the request the
+kind sends today; the row read from the lines the mark stands on);
+15.13 ruling 24, which speaks of four benches. No help page exists.
+
+Next: the owner's ruling on the drug-name marks in cloud mode; and his
+room run of 6d, with Check who spoke carried from 6c.
+
 ## 2026-11-14. Step 6c2: the reply's rule changed, the count again held, the build at Stop made; Claude Haiku passed who spoke and missed one mark on drug names
 
 Run on 14 Nov 2026 under the owner's approval of the short plan and
@@ -350,80 +474,3 @@ the connect screen (ruling 21); for 9c the control's disabled reason
 Open for the owner: the rule on model-specific prompt lines (ruling 22)
 waits for a real complaint; Alba in cloud mode is ruled (ruling 23).
 
-## 2026-11-08. Run 9d2: the door accepts any list length, the letter check marks instead of removing, the effort tested, Claude Haiku 5.5 benched again; stage 3 and 7b passed, the letters and the summaries missed, no call failed
-
-Built and run in one session on 8 Nov 2026 under Cowork's plan review
-(one point: the effort test in four rounds). Run 9d2 is 15.13 rulings
-19 to 22. The plan, the effort file, the report and the letters are
-STAGE9D2_PLAN.md, STAGE9D2_EFFORT.md, STAGE9D2_REPORT.md and
-STAGE9D2_LETTERS.md in the private log folder.
-
-The spec, committed once, not a character changed: 739b45a (sha256
-292ec7cb...). The run prompt is e050afc (stage-prompts/STAGE_09D2.md).
-
-The two rules (4e64e09, ea4634d). The door checks the shape and the
-fields of a reply and never refuses for the count of a list's items:
-forms.misfit dropped its maxItems judgement, minItems stands, and the
-alarm form lost its one line, maxItems 3 on urgent_actions, the only
-change in the prompts folder since 15898f5; the other forms keep their
-numbers as targets and the Claude kind's wire copy still takes them off.
-The letter check's number rule marks instead of removing: a sentence
-whose only failure is a figure the cited lines do not give stays as
-written in a fourth state, marked, not grounded, shown again under its
-paragraph with the words figure not in the note, please check, in no
-text that leaves the page (the copy, the approval, an edit's
-text_before); the counts, check_detail and the audit line gain the
-figures to check; the bench's M3 reads a marked sentence's number as the
-model's and the table counts letters with one. The effort setting
-(c3747cf): --effort on the bench command, the Claude kind's alone, sent
-in output_config when named; engine_version holds it on every call
-("anthropic-version 2026-10-21, effort default"). 5 tests added, one
-rewritten; the suite 825.
-
-The effort test (four rounds of case 01, 244 calls, 0.12 dollars):
-pooled, a pass 4,404 ms at the default and 4,376 at low, the two default
-rounds 96 ms apart; 2.1 per cent fewer tokens written at low; the form
-held in all, no thinking, no failed call, H6 and H7 held in every
-round; the one field proven over every request. The owner chose the
-default.
-
-The benches 09:22 to 12:21 UTC, no stop, no wait for the rate, the
-proof of the words 0 parts differing on each, the form as sent equal to
-the wire copy of the files as they stand:
-- Stage 3: passed on every hard, soft and time mark (T17 5.13 s, T18
-  7.61 s; S12 0 on every routine case). 0 failed calls, 0 failed chains
-  (run 9d 72 and 55). 119 of 1,898 alarm replies listed four or five
-  urgent actions, largest 5, all accepted; the assessment's lists never
-  crossed their targets.
-- 7b: passed, the same four lines as this computer, the host and 9d; 0
-  failed calls (9d 24 refused).
-- 8a: missed on M3 of A (13 of 13 letters marked: the paracetamol
-  frequency written as words where the note's line writes qds, 2 also
-  the unchanged doses cited to lines lacking them) and C (one opening
-  sentence's duration) and on M5 of D (one list of 13 named one
-  referral of two). M1 and M2 held on every case (9d missed M1 on three
-  and M2 on two); 0 failed calls, 0 refused, 1 placeholder in 65
-  letters (the model's own), 16 letters of five or six paragraphs
-  accepted. On A every page now says ibuprofen was stopped and names
-  the new doses with the change (13 of 13; 9d 9 stale, 2 wrong); the
-  mark stands beside the stop sentence in 13 letters.
-- 8b: the searches matched 9a2's 15 of 15. G1 and G3 held; G2 missed on
-  four queries (Q04 5, Q05 4, Q07 9, Q12 2 of 13; 9d five; this computer
-  two).
-
-The wait and the cost: a pass 4.5 s median over stage 3 (this computer
-2.8, the host 6.5, 9d 4.6), 12.8 s slowest, 1 of 1,898 over 10 s; the
-alarm call 2.2 s. The benches 2.27 dollars by the tokens (4,685 calls,
-9.04 million read, 2.73 million written), the whole run 2.39; a
-15-minute consultation about 9 cents by stage 3's fuller ratios (9d
-8.2); the owner reads the service's own figure on his usage page.
-Thinking in 0 of 4,929 replies; the three A chains the same in 0 of 16
-cases. Sizes: no function over 80 (cli.main 78 after the cloud options
-moved to a helper); words.py 872 lines, over 600 as before this run.
-
-Made untrue: STAGE9D2_PLAN's sizes and its two-arm effort test; CLAUDE.md's
-bench line (edited here). Open for the owner: Alba in cloud mode
-(ruling 13) and the rule on model-specific lines (ruling 22), the
-candidates the summaries' length on four queries, the fifth paragraph
-in 16 of 65 letters, and the number-word figure the check marks on A.
-Cowork's README section (ruling 21) comes with the next run.
