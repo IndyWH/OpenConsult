@@ -143,17 +143,34 @@ def test_the_exact_text_sent_for_a_small_made_up_page_for_each_of_the_three_jobs
     assert note.form == json.loads((loader.FOLDER / "note.form.json").read_text(encoding="utf-8"))   # the app's file (6b)
 
 
-def test_ruling_17_a_label_check_that_misses_repeats_or_invents_a_line_is_refused_whole():
-    labels, refusal = jobs.check_labels(GOOD_LABELS, 4)
-    assert labels == {1: "doctor", 2: "patient", 3: "unsure", 4: "patient"} and refusal is None
+def test_15_10_ruling_24_a_line_named_twice_is_unsure_or_keeps_its_one_label_a_number_off_the_page_is_dropped_and_a_missed_line_refuses():
+    none = {"named_twice": 0, "dropped": 0, "made_unsure": []}
+    assert jobs.check_labels(GOOD_LABELS, 4) == ({1: "doctor", 2: "patient", 3: "unsure", 4: "patient"}, None, none)
+    # A line that is not named still refuses the whole reply: its label would have to be guessed (15.9 ruling 17).
     missed = {"lines": GOOD_LABELS["lines"][:3]}
-    assert jobs.check_labels(missed, 4) == (None, {"reason": "refused", "missing": [4], "repeated": [], "unknown": []})
-    repeated = {"lines": GOOD_LABELS["lines"] + [{"line": 2, "label": "doctor"}]}
-    assert jobs.check_labels(repeated, 4)[1]["repeated"] == [2]
-    invented = {"lines": GOOD_LABELS["lines"] + [{"line": 5, "label": "doctor"}]}
-    assert jobs.check_labels(invented, 4)[1]["unknown"] == [5]
-    assert jobs.check_labels(None, 4) == (None, {"reason": "no answer"})
-    assert jobs.check_labels({"lines": [{"line": 0, "label": "doctor"}]}, 1)[1]["unknown"] == [0]
+    assert jobs.check_labels(missed, 4) == (None, {"reason": "refused", "missing": [4]}, none)
+    # Named twice with two labels: the line holds both speakers, so it is unsure and the reply is taken.
+    two_labels = {"lines": GOOD_LABELS["lines"] + [{"line": 2, "label": "doctor"}]}
+    assert jobs.check_labels(two_labels, 4) == ({1: "doctor", 2: "unsure", 3: "unsure", 4: "patient"}, None,
+                                                {"named_twice": 1, "dropped": 0, "made_unsure": [2]})
+    # Named twice with one label: it takes that label. Three times with two labels: unsure, and counted once.
+    one_label = {"lines": GOOD_LABELS["lines"] + [{"line": 2, "label": "patient"}, {"line": 1, "label": "patient"},
+                                                  {"line": 1, "label": "doctor"}]}
+    assert jobs.check_labels(one_label, 4) == ({1: "unsure", 2: "patient", 3: "unsure", 4: "patient"}, None,
+                                               {"named_twice": 2, "dropped": 0, "made_unsure": [1]})
+    # A number that is not a line of the page is dropped, each entry counted, and the reply is taken.
+    off_the_page = {"lines": GOOD_LABELS["lines"] + [{"line": 5, "label": "doctor"}, {"line": 0, "label": "doctor"},
+                                                     {"line": 5, "label": "patient"}]}
+    assert jobs.check_labels(off_the_page, 4) == ({1: "doctor", 2: "patient", 3: "unsure", 4: "patient"}, None,
+                                                  {"named_twice": 0, "dropped": 3, "made_unsure": []})
+    # The twin: dropping a number never stands in for a line; a reply of numbers off the page alone is refused.
+    assert jobs.check_labels({"lines": [{"line": 0, "label": "doctor"}]}, 1) == (
+        None, {"reason": "refused", "missing": [1]}, {"named_twice": 0, "dropped": 1, "made_unsure": []})
+    # A refused reply keeps its counts too; a call with no answer has none to count.
+    both = {"lines": GOOD_LABELS["lines"][:2] + [{"line": 2, "label": "doctor"}, {"line": 9, "label": "doctor"}]}
+    assert jobs.check_labels(both, 4) == (None, {"reason": "refused", "missing": [3, 4]},
+                                          {"named_twice": 1, "dropped": 1, "made_unsure": [2]})
+    assert jobs.check_labels(None, 4) == (None, {"reason": "no answer"}, none)
 
 
 def test_ruling_18_a_doubtful_name_whose_heard_words_are_not_on_its_line_is_dropped_and_counted():

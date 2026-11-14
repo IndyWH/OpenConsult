@@ -1,8 +1,10 @@
 """The parts reading of the bench and the marks of step 6c (spec 15.10,
-ruling 22 and the details of step 6c: The bench of parts against whole,
-The bench of Claude Haiku; R18; V1_LESSONS 9.4). A made-up voice worker
-and a made-up language model; every reply is made up."""
+rulings 22 and 24, the details of step 6c: The bench of parts against
+whole, The bench of Claude Haiku, and of 6c2: The count again; R18;
+V1_LESSONS 9.4). A made-up voice worker and a made-up language model;
+every reply is made up."""
 
+import json
 import math
 import re
 import shutil
@@ -78,6 +80,10 @@ def test_6c_the_parts_reading_cuts_each_page_in_two_with_the_apps_function_sends
     assert not failed["call"]["ok"] and failed["call"]["failure"] == "too_slow" and failed["labels"] is None      # all or nothing
     assert failed["parts"][0]["labels"] is None and failed["parts"][1]["labels"] is not None                    # the second part answered, and is counted
     assert whole["call"]["ok"] and sorted(int(n) for n in whole["labels"]) == [ln["n"] for ln in whole["lines"]]
+    # 15.10 ruling 24: each part and the page keep the counts of the reply; a part with no answer has none.
+    none = {"named_twice": 0, "dropped": 0, "made_unsure": []}
+    assert [p["counts"] for p in failed["parts"]] == [None, none] and failed["counts"] == none
+    assert [p["counts"] for p in whole["parts"]] == [none, none] and whole["counts"] == none
     assert calls_into(stored, tmp_path / "parts", engine, ["label_check_parts"]) == [0] and len(engine.calls) == 6
     assert stored["said"][-1] == words.BENCH_CALLS_DONE.format(made=0, failed=0, kept=3)
 
@@ -102,9 +108,9 @@ def test_6c_the_marks_are_counted_from_the_stored_results_alone_twice_the_same_b
     assert marks_run(stored, tmp_path / "w1", local=local, parts=parts, cloud=cloud) == 6      # never over a file
     for place in (commands.REPO / "x", tmp_path / "owner-data" / "o", stored["folder"] / "o"):
         assert marks_run(stored, place, local=local, parts=parts) == 6 and not place.exists()   # R18
-    import json
     scored = json.loads((tmp_path / "w1" / "scores.json").read_text(encoding="utf-8"))
     marks, rows = scored["marks"], {f"{r['arm']} {r['recording']}": r for r in scored["pages"]}
+    assert scored["rule"] == "15.10 ruling 24"
     # A page whose whole reply was not taken is reported and not judged.
     assert marks["judged"] == 1 and marks["not_judged"] == ["nemotron one", "nemotron_tied_pair one"]
     assert [rows[p]["local"]["whole"]["state"] for p in sorted(rows)] == ["failed", "refused", "taken"]
@@ -131,6 +137,9 @@ def test_6c_the_marks_are_counted_from_the_stored_results_alone_twice_the_same_b
     assert marks["invents_nothing"]["cloud"]["label_entries_with_more_than_a_number_and_a_label"] == 0
     report = (tmp_path / "w1" / "report.md").read_text(encoding="utf-8")
     assert "- P1: holds." in report and "| whisperx_pyannote one |" in report and "chest" not in report     # counts, never a word of a page
+    assert words.BENCH_STOP_MARKS_RULE.format(rule="15.10 ruling 24") in report and "| Named twice | Dropped |" in report
+    assert (judged["local"]["whole"]["named_twice"], judged["local"]["whole"]["dropped"], judged["local"]["parts"]["made_unsure_words"]) == (0, 0, 0)
+    assert marks["P2_if_made_unsure_were_wrong"]["holds"] == marks["P2"]["holds"]                           # no line was made unsure here
     # A cloud model whose every call fails misses H1 and D1, by the page.
     assert marks_run(stored, tmp_path / "w3", local=local, parts=parts, cloud=dead) == 0
     missed = json.loads((tmp_path / "w3" / "scores.json").read_text(encoding="utf-8"))["marks"]
@@ -139,6 +148,77 @@ def test_6c_the_marks_are_counted_from_the_stored_results_alone_twice_the_same_b
     # Without the parts and the cloud folders the marks that need them are not made up.
     assert marks_run(stored, tmp_path / "w4", local=local) == 0
     assert set(json.loads((tmp_path / "w4" / "scores.json").read_text(encoding="utf-8"))["marks"]) == {"judged", "judged_words", "not_judged"}
+
+
+def stored_call(folder, job, chain, change):
+    """One stored result of a call read, changed and written back: the test's hand on what is stored."""
+    path = folder / "calls" / "results" / job / f"{chain}.json"
+    record = json.loads(path.read_text(encoding="utf-8"))
+    change(record)
+    path.write_text(json.dumps(record), encoding="utf-8")
+    return record
+
+
+def test_6c2_the_count_again_judges_every_stored_reply_afresh_and_never_reads_the_stored_labels_or_refusals(stored, tmp_path):
+    # The prompt of 6c2, change 2; the details of 6c2, The count again; 15.10 ruling 24.
+    local, parts = tmp_path / "local", tmp_path / "parts"
+    calls_into(stored, local, LabelsEngine(), ["label_check", "drug_name"])
+    calls_into(stored, parts, LabelsEngine(), ["label_check_parts"])
+    assert marks_run(stored, tmp_path / "w1", local=local, parts=parts) == 0
+    first = json.loads((tmp_path / "w1" / "scores.json").read_text(encoding="utf-8"))
+    assert first["marks"]["judged"] == 3 and first["marks"]["P1"]["holds"]
+
+    # The stored labels and refusals, written by the rule of their day, are made wrong everywhere: no byte of the tables changes.
+    def spoil(record):
+        for found in [record] + record.get("parts", []):
+            found["labels"], found["refusal"] = {n: "unsure" for n in (found["labels"] or {})}, {"reason": "refused", "missing": [1]}
+    for chain in PAGES:
+        stored_call(local, "label_check", chain, spoil)
+        stored_call(parts, "label_check_parts", chain, spoil)
+    assert marks_run(stored, tmp_path / "w2", local=local, parts=parts) == 0
+    for name in ("scores.json", "report.md"):
+        assert (tmp_path / "w1" / name).read_bytes() == (tmp_path / "w2" / name).read_bytes()
+
+    # Ruling 24 on stored replies. Page one, whole: line 1 named again with another label, and a number off the page.
+    def twice_and_off(record):
+        record["call"]["answer"]["lines"] += [{"line": 1, "label": "patient"}, {"line": 99, "label": "doctor"}]
+    stored_call(local, "label_check", PAGES[0], twice_and_off)
+    # Page one, in parts: in the second part its first new line is named again with another label (it is made unsure),
+    # and its first carried line too (counted as named twice, but its label comes from the part before).
+    def in_a_part(record):
+        second = record["parts"][1]
+        new_line = second["overlap"] + 1
+        given = {e["line"]: e["label"] for e in second["call"]["answer"]["lines"]}
+        other = lambda n: "patient" if given[n] == "doctor" else "doctor"   # noqa: E731
+        second["call"]["answer"]["lines"] += [{"line": new_line, "label": other(new_line)}, {"line": 1, "label": other(1)},
+                                              {"line": 0, "label": "doctor"}]
+    record = stored_call(parts, "label_check_parts", PAGES[0], in_a_part)
+    assert record["parts"][1]["overlap"] >= 1
+    # Page two, in parts: the first part's reply misses its last line. All or nothing: the page is refused, though the other part is taken.
+    stored_call(parts, "label_check_parts", PAGES[1], lambda r: r["parts"][0]["call"]["answer"]["lines"].pop())
+    assert marks_run(stored, tmp_path / "w3", local=local, parts=parts) == 0
+    scored = json.loads((tmp_path / "w3" / "scores.json").read_text(encoding="utf-8"))
+    rows = {f"{r['arm']}--{r['recording']}": r["local"] for r in scored["pages"]}
+    before = {f"{r['arm']}--{r['recording']}": r["local"] for r in first["pages"]}
+    one, was = rows[PAGES[0]], before[PAGES[0]]
+    assert (one["whole"]["state"], one["whole"]["named_twice"], one["whole"]["dropped"], one["whole"]["made_unsure_lines"]) == ("taken", 1, 1, 1)
+    assert one["whole"]["made_unsure_words"] > 0 and one["whole"]["unsure"] == was["whole"]["unsure"] + one["whole"]["made_unsure_words"]
+    assert one["whole"]["right"] + one["whole"]["wrong"] == was["whole"]["right"] + was["whole"]["wrong"] - one["whole"]["made_unsure_words"]
+    assert (one["parts"]["state"], one["parts"]["named_twice"], one["parts"]["dropped"], one["parts"]["made_unsure_lines"]) == ("taken", 2, 1, 1)
+    assert (one["parts"]["parts"], one["parts"]["parts_answered"], one["parts"]["parts_refused"]) == (2, 2, 0)
+    two = rows[PAGES[1]]
+    assert (two["parts"]["state"], two["parts"]["parts_answered"], two["parts"]["parts_refused"]) == ("refused", 2, 1)
+    assert two["parts"]["right"] == two["parts"]["wrong"] == 0 and two["parts"]["unsure"] > 0            # no label is taken from either part
+    assert scored["marks"]["P1"] == {"holds": False, "pages_missed": [PAGES[1].replace("--", " ")]} and scored["marks"]["judged"] == 3
+    made = scored["marks"]["P2_if_made_unsure_were_wrong"]
+    assert (made["whole_made_unsure_words"], made["parts_made_unsure_words"]) == (one["whole"]["made_unsure_words"], one["parts"]["made_unsure_words"])
+    assert made["parts_wrong"] == scored["marks"]["P2"]["parts_wrong"] + made["parts_made_unsure_words"]
+    assert scored["kinds"]["nemotron"]["local_whole"]["named_twice"] == 1 and scored["kinds"]["nemotron"]["local_parts"]["dropped"] == 1
+
+    # The proof before the count: a stored call whose text is not the page's text stops the count, and nothing is written.
+    stored_call(parts, "label_check_parts", PAGES[2], lambda r: r["user"].__setitem__(0, r["user"][0] + " more"))
+    assert marks_run(stored, tmp_path / "w4", local=local, parts=parts) == 9 and not (tmp_path / "w4").exists()
+    assert stored["said"][-1] == words.BENCH_NOT_THE_PAGE.format(call="label_check_parts on whisperx_pyannote, one")
 
 
 def test_6c_the_bench_command_names_the_parts_reading_and_the_marks(tmp_path, monkeypatch):

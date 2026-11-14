@@ -5,7 +5,11 @@ parts, and the drug-name call, each page counted by the bench's own
 counting of 5e (who.count, doubt.by_model) against the script: for the
 local model, and for a cloud model beside it. P1 and P2 judge the parts
 against the whole on the local model; H1, H2 and D1 to D3 hold a cloud
-model to the local model's own line. Counts only: no word of a page."""
+model to the local model's own line. Every stored reply is judged afresh
+by the app's own check as it stands today (15.10 ruling 24; the details
+of 6c2: The count again): the labels and the refusal stored with a
+result were worked out by the rule of their day and are never read.
+Counts only: no word of a page."""
 
 from __future__ import annotations
 
@@ -14,32 +18,76 @@ from pathlib import Path
 from typing import Callable
 
 from openconsult import words
-from openconsult.bench.speech import banked, doubt, model_lines, pages, tables, who
+from openconsult.bench.speech import banked, calls, doubt, model_lines, pages, tables, who
 from openconsult.bench.speech.commands import REPO
 from openconsult.bench.speech.reference import build
 from openconsult.bench.writer import Refused, ResultWriter
+from openconsult.consult import joined
+from openconsult.consult.labels import check_labels
 from openconsult.settings import paths
 
 # P2: the parts may leave one more word under the wrong speaker for every this many words on the pages judged.
 WORDS_FOR_ONE = 200
 TAKEN, REFUSED, FAILED = "taken", "refused", "failed"
 COUNTS = ("right", "wrong", "unsure", "nowhere")
+RULE_COUNTS = ("named_twice", "dropped", "made_unsure_lines", "made_unsure_words")
 
 
-def reading(record: dict | None, lines: list[dict], page, reference) -> dict:
-    """One reading of the label check on a page: how it ended, its words
-    under the right speaker, the wrong speaker and unsure, and for a
-    reading in parts how many parts answered and how many were refused."""
+RULE = "15.10 ruling 24"
+
+
+class NotThePage(Exception):
+    """A stored call whose text is not the text built again from the stored page."""
+
+
+def judge(record: dict, lines: list[dict], in_parts: bool) -> tuple[str, dict[int, str] | None, dict]:
+    """A stored reading judged afresh: how it ended, the labels of the
+    page or none, and the counts of ruling 24. The page is cut again as
+    the bench cut it and each stored reply goes through the app's check;
+    first the stored text of every call is proven to be the text built
+    again from the page, byte for byte."""
+    parts = calls.halves(lines) if in_parts else [{"k": 1, "lines": lines, "overlap": 0}]
+    asked = [p["call"] for p in record["parts"]] if in_parts else [record["call"]]
+    user = [model_lines.lines_text(joined.numbered(part)) for part in parts]
+    if (record["user"] if in_parts else [record["user"]]) != user or len(asked) != len(parts):
+        raise NotThePage(f"{record.get('job')} on {record.get('arm')}, {record.get('recording')}")
+    found = [check_labels(call["answer"], len(part["lines"])) if call["ok"] else None for part, call in zip(parts, asked)]
+    answered = [(part, f) for part, f in zip(parts, found) if f is not None]
+    counts = {"named_twice": sum(f[2]["named_twice"] for _, f in answered), "dropped": sum(f[2]["dropped"] for _, f in answered),
+              "parts": len(parts), "parts_answered": len(answered), "parts_refused": sum(1 for _, f in answered if f[0] is None)}
+    if len(answered) < len(parts):
+        return FAILED, None, {**counts, "made_unsure": []}
+    labels = joined.merge(parts, [f[0] for f in found])
+    # A line made unsure is counted from the part its label is taken from, never from a part that carried it.
+    made_unsure = sorted(part["lines"][i - 1]["n"] for part, f in answered for i in f[2]["made_unsure"] if i > part["overlap"])
+    return (TAKEN if labels is not None else REFUSED), labels, {**counts, "made_unsure": made_unsure if labels is not None else []}
+
+
+def words_on(page, lines: list[dict], numbers: list[int]) -> int:
+    """The words that stand on these lines where something was spoken: the
+    words who.count counts as unsure because of them."""
+    on = set(numbers)
+    return sum(1 for word in range(len(page.words))
+               if page.spoken_of.get(word) is not None and lines[page.word_piece[word]]["n"] in on)
+
+
+def reading(record: dict | None, lines: list[dict], page, reference, in_parts: bool = False) -> dict:
+    """One reading of the label check on a page: how it ended by today's
+    rule, its words under the right speaker, the wrong speaker and unsure,
+    the lines named twice and the numbers dropped in its replies, the
+    words on lines the rule made unsure, and for a reading in parts how
+    many parts answered and how many were refused."""
     if record is None:
         return {"present": False}
-    labels = {int(n): label for n, label in record["labels"].items()} if record.get("labels") else None
-    state = FAILED if not record["call"]["ok"] else REFUSED if labels is None else TAKEN
+    state, labels, counts = judge(record, lines, in_parts)
+    made_unsure = counts.pop("made_unsure")
     found = {"present": True, "state": state, **who.count(page, reference, labels, lines),
+             "named_twice": counts["named_twice"], "dropped": counts["dropped"], "made_unsure_lines": len(made_unsure),
+             "made_unsure_words": words_on(page, lines, made_unsure),
              "other_keys": sum(1 for answer in _answers(record) for entry in (answer or {}).get("lines", [])
                                if set(entry) - {"line", "label"})}
-    if "parts" in record:
-        found.update(parts=len(record["parts"]), parts_answered=sum(1 for p in record["parts"] if p["call"]["ok"]),
-                     parts_refused=sum(1 for p in record["parts"] if p["refusal"]))
+    if in_parts:
+        found.update(parts=counts["parts"], parts_answered=counts["parts_answered"], parts_refused=counts["parts_refused"])
     return found
 
 
@@ -62,7 +110,7 @@ def drug_reading(record: dict | None, page, occurrences: list[dict]) -> dict:
 def model_readings(arm: str, name: str, whole: dict, parts: dict, drug: dict, lines, page, reference, occurrences) -> dict:
     chain = f"{arm}--{name}"
     return {"whole": reading(whole.get(("label_check", chain)), lines, page, reference),
-            "parts": reading(parts.get(("label_check_parts", chain)), lines, page, reference),
+            "parts": reading(parts.get(("label_check_parts", chain)), lines, page, reference, in_parts=True),
             "drug": drug_reading(drug.get(("drug_name", chain)), page, occurrences)}
 
 
@@ -84,15 +132,15 @@ def score_all(stored: dict, local: dict, local_whole: dict, local_parts: dict, c
         if cloud is not None:
             row["cloud"] = model_readings(arm, name, cloud, cloud, cloud, lines, page, reference, occurrences)
         rows.append(row)
-    return {"pages": rows, "kinds": by_kind(rows), "marks": marks_of(rows)}
+    return {"rule": RULE, "pages": rows, "kinds": by_kind(rows), "marks": marks_of(rows)}
 
 
 def _taken(rows: list[dict], model: str, name: str) -> list[dict]:
     return [r for r in rows if model in r and r[model][name].get("state") == TAKEN]
 
 
-def _wrong(rows: list[dict], model: str, name: str) -> int:
-    return sum(r[model][name].get("wrong", 0) for r in rows)
+def _wrong(rows: list[dict], model: str, name: str, key: str = "wrong") -> int:
+    return sum(r[model][name].get(key, 0) for r in rows)
 
 
 def _page(row: dict) -> str:
@@ -113,6 +161,12 @@ def marks_of(rows: list[dict]) -> dict:
         marks["P1"] = {"holds": not missed, "pages_missed": missed}
         marks["P2"] = {"holds": parts_wrong <= whole_wrong + allowance, "whole_wrong": whole_wrong, "parts_wrong": parts_wrong,
                        "allowance": allowance, "line": whole_wrong + allowance}
+        # For the owner to see, and no part of the mark: the same sum with the words on lines made unsure counted as wrong.
+        whole_made, parts_made = (_wrong(judged, "local", name, "made_unsure_words") for name in ("whole", "parts"))
+        marks["P2_if_made_unsure_were_wrong"] = {
+            "holds": parts_wrong + parts_made <= whole_wrong + whole_made + allowance, "whole_made_unsure_words": whole_made,
+            "parts_made_unsure_words": parts_made, "whole_wrong": whole_wrong + whole_made, "parts_wrong": parts_wrong + parts_made,
+            "line": whole_wrong + whole_made + allowance}
     if any("cloud" in r for r in rows):
         in_parts = _taken(rows, "local", "parts")
         missed_whole = [_page(r) for r in judged if r["cloud"]["whole"].get("state") != TAKEN]
@@ -150,9 +204,9 @@ def by_kind(rows: list[dict]) -> dict:
             for name in ("whole", "parts"):
                 found = row.get(model, {}).get(name, {})
                 if found.get("present"):
-                    sums = kind.setdefault(f"{model}_{name}", {TAKEN: 0, **{c: 0 for c in COUNTS}})
+                    sums = kind.setdefault(f"{model}_{name}", {TAKEN: 0, **{c: 0 for c in COUNTS + RULE_COUNTS}})
                     sums[TAKEN] += found["state"] == TAKEN
-                    for count in COUNTS:
+                    for count in COUNTS + RULE_COUNTS:
                         sums[count] += found[count]
             drug = row.get(model, {}).get("drug", {})
             if drug.get("present"):
@@ -170,14 +224,14 @@ def by_kind(rows: list[dict]) -> dict:
 
 def _cells(found: dict) -> str:
     if not found.get("present"):
-        return "not run | | | "
-    return f"{found['state']} | {found['right']} | {found['wrong']} | {found['unsure']}"
+        return "not run | | | | | "
+    return f"{found['state']} | {found['right']} | {found['wrong']} | {found['unsure']} | {found['named_twice']} | {found['dropped']}"
 
 
 def as_markdown(scored: dict) -> str:
-    marks, lines = scored["marks"], ["# The marks of step 6c, from the stored results", ""]
+    marks, lines = scored["marks"], ["# The marks of step 6c, from the stored results", "", words.BENCH_STOP_MARKS_RULE.format(rule=scored["rule"]), ""]
     lines.append(f"Pages judged: {marks['judged']}, {marks['judged_words']} words. Not judged: {', '.join(marks['not_judged']) or 'none'}.")
-    for name in ("P1", "P2", "H1", "H2", "D1", "D2", "D3"):
+    for name in ("P1", "P2", "P2_if_made_unsure_were_wrong", "H1", "H2", "D1", "D2", "D3"):
         if name in marks:
             rest = ", ".join(f"{key} {value}" for key, value in marks[name].items() if key != "holds")
             lines.append(f"- {name}: {'holds' if marks[name]['holds'] else 'MISSED'}. {rest}")
@@ -186,14 +240,18 @@ def as_markdown(scored: dict) -> str:
     models = [m for m in ("local", "cloud") if any(m in row for row in scored["pages"])]
     for model in models:
         lines += ["", f"## Who spoke, by page: {model}", "",
-                  "| Page | Lines | Words | Whole | Right | Wrong | Unsure | Parts | Right | Wrong | Unsure |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+                  "| Page | Lines | Words | Whole | Right | Wrong | Unsure | Named twice | Dropped | Parts | Right | Wrong | Unsure | Named twice | Dropped |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         lines += [f"| {_page(r)} | {r['lines']} | {r['words']} | {_cells(r[model]['whole'])} | {_cells(r[model]['parts'])} |"
                   for r in scored["pages"]]
         lines += ["", f"## Who spoke, by kind of page: {model}", "",
-                  "| Kind | Pages | Words | Whole taken | Wrong | Unsure | Parts taken | Wrong | Unsure |", "|---|---|---|---|---|---|---|---|---|"]
+                  "| Kind | Pages | Words | Whole taken | Wrong | Unsure | Of them made unsure by the rule | Named twice | Dropped "
+                  "| Parts taken | Wrong | Unsure | Of them made unsure by the rule | Named twice | Dropped |",
+                  "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for kind, found in scored["kinds"].items():
             whole, parts = found.get(f"{model}_whole"), found.get(f"{model}_parts")
-            cell = lambda s: f"{s[TAKEN]} | {s['wrong']} | {s['unsure']}" if s else "not run | | "   # noqa: E731
+            cell = lambda s: (f"{s[TAKEN]} | {s['wrong']} | {s['unsure']} | {s['made_unsure_words']} | {s['named_twice']} | {s['dropped']}"   # noqa: E731
+                              if s else "not run | | | | | ")
             lines.append(f"| {kind} | {found['pages']} | {found['words']} | {cell(whole)} | {cell(parts)} |")
         lines += ["", f"## Drug names, by kind of page: {model}", "",
                   "| Kind | Answered | Written wrongly | Marked | Marks on a word written rightly | On another word written wrongly "
@@ -234,6 +292,9 @@ def speech_stop_marks(local: Path, parts: Path | None, cloud: Path | None, whole
         scored = score_all(stored, _calls(local), _calls(whole or local), _calls(parts), _calls(cloud) if cloud else None, listed,
                            [Path(f) for f in script_folders], marks_file)
         written = tables.write(Path(write), scored, as_markdown(scored))
+    except NotThePage as call:
+        say(words.BENCH_NOT_THE_PAGE.format(call=call))
+        return 9
     except tables.ScriptNotFound as missing:
         say(words.BENCH_BAD_LIST.format(reason=missing))
         return 8

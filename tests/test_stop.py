@@ -111,18 +111,31 @@ def test_ruling_7_a_changed_label_is_marked_and_a_refused_or_failed_check_change
         assert not [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")]
     finally:
         r.close()
-    # The twin: a reply that misses a line, repeats one or names one that is not there is refused whole.
-    for bad, detail in [({"lines": CHECK["lines"][:3]}, "missing 4"),
-                        ({"lines": CHECK["lines"] + [{"line": 2, "label": "doctor"}]}, "repeated 2"),
-                        ({"lines": CHECK["lines"] + [{"line": 9, "label": "doctor"}]}, "unknown 9")]:
-        r, c = room_stopped(tmp_path / detail.replace(" ", "_"), clock, check=bad)
+    # The twin: a reply that misses a line is refused whole and changes nothing (15.9 ruling 17, what stands of it).
+    r, c = room_stopped(tmp_path / "missing_4", clock, check={"lines": CHECK["lines"][:3]})
+    try:
+        stop.answer(c, "S2")
+        assert until(lambda: c.state == FINAL)
+        final = r.rows.transcript_lines(c.id)
+        assert [(x["label"], x["changed_by_check"]) for x in final] == [("patient", 0), ("doctor", 0), ("unsure", 0), ("patient", 0)]
+        warning = [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")][0]
+        assert warning["kind"] == "label_check_refused" and warning["detail"] == "missing 4"
+    finally:
+        r.close()
+    # 15.10 ruling 24: a line named again with another label is shown unsure and not marked, its label as it stood,
+    # and the reply is taken; a number that is not on the page is dropped and the reply is taken as if it were not there.
+    for name, extra, line_two in [("two_labels", {"line": 2, "label": "doctor"}, ("doctor", 0, 1)),
+                                  ("off_the_page", {"line": 9, "label": "doctor"}, ("patient", 1, 0))]:
+        r, c = room_stopped(tmp_path / name, clock, check={"lines": CHECK["lines"] + [extra]})
         try:
+            before = [x["text"] for x in r.rows.transcript_lines(c.id)]
             stop.answer(c, "S2")
             assert until(lambda: c.state == FINAL)
             final = r.rows.transcript_lines(c.id)
-            assert [(x["label"], x["changed_by_check"]) for x in final] == [("patient", 0), ("doctor", 0), ("unsure", 0), ("patient", 0)]
-            warning = [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")][0]
-            assert warning["kind"] == "label_check_refused" and detail in warning["detail"]
+            assert [(x["label"], x["changed_by_check"], x["unsure"]) for x in final] == [
+                ("doctor", 1, 0), line_two, ("patient", 0, 1), ("patient", 0, 1)]
+            assert not [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")]
+            assert [x["text"] for x in final] == before                # a reply taken by this rule changes no word
         finally:
             r.close()
     # A call that fails: the labels stand, the warning says why, nothing is asked twice.
@@ -134,6 +147,22 @@ def test_ruling_7_a_changed_label_is_marked_and_a_refused_or_failed_check_change
         assert all(x["label"] == "unsure" and x["unsure"] for x in r.rows.transcript_lines(c.id))
         assert [w["kind"] for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")] == ["label_check_failed"]
         assert len(r.engine.calls_for("label_check")) == 1
+    finally:
+        r.close()
+
+
+def test_15_10_ruling_24_the_apps_run_gives_back_the_two_counts_with_a_reply_taken_and_with_a_reply_refused(tmp_path, clock):
+    twice_and_off = {"lines": CHECK["lines"] + [{"line": 2, "label": "doctor"}, {"line": 9, "label": "doctor"}]}
+    refused = {"lines": CHECK["lines"][:3] + [{"line": 3, "label": "doctor"}, {"line": 0, "label": "doctor"}, {"line": 7, "label": "doctor"}]}
+    r = Room(tmp_path, clock, engine=FakeEngine({"label_check": [twice_and_off, refused]}))
+    try:
+        rows = [{"n": n, "text": text} for n, text in enumerate(["made up one", "made up two", "made up three", "made up four"], start=1)]
+        found, outcome = labels.run(r.consultation.llm, rows, r.consultation.id)
+        assert found == {1: "doctor", 2: "unsure", 3: "patient", 4: "unsure"}
+        assert (outcome["outcome"], outcome["named_twice"], outcome["dropped"]) == ("ok", 1, 1)
+        found, outcome = labels.run(r.consultation.llm, rows, r.consultation.id)
+        assert found is None and (outcome["outcome"], outcome["detail"], outcome["named_twice"], outcome["dropped"]) == ("refused", "missing 4", 1, 2)
+        assert [row["text"] for row in rows] == ["made up one", "made up two", "made up three", "made up four"]
     finally:
         r.close()
 

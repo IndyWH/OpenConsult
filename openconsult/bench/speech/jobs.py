@@ -9,8 +9,9 @@ has a form that code holds and a limit on its length and on its time. A
 call goes through the one door to language models with the door's own
 record, and never enters the app's table of jobs. The checks on a reply
 that the details ask for are plain functions here: a label check that
-misses, repeats or invents a line is refused whole; a doubtful name whose
-heard words do not stand on its line is dropped and counted."""
+misses a line is refused whole, by the app's own rule (15.10 ruling 24);
+a doubtful name whose heard words do not stand on its line is dropped
+and counted."""
 
 from __future__ import annotations
 

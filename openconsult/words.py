@@ -844,6 +844,8 @@ BENCH_CALL_ASKING = "Asking the model: {job} on {arm}, {name}{round}."
 BENCH_CALL_FAILED = "The call for {job} on {arm}, {name} failed: {failure}: {detail} The failure is kept."
 BENCH_CALL_REFUSED = "The reply for {job} on {arm}, {name} was refused: {reason} No label changes."
 BENCH_CALLS_DONE = "Made {made} calls, {failed} failed; {kept} results were already there."
+BENCH_NOT_THE_PAGE = "The stored call for {call} was not made from the page as it is stored, so nothing was counted."
+BENCH_STOP_MARKS_RULE = "Every reply is judged by the rule of {rule}."
 BENCH_NEEDS_FILE = "The results of part two are here, so {option} is needed: {what}."
 BENCH_SCORED_TWO = "Scored part two as well: {pages} pages, {calls} calls, {voice} voice results."
 

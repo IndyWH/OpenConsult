@@ -60,7 +60,7 @@ def prepare(job: str, result: dict | None, reference: Reference) -> dict:
         return {"lines": rows, "user": labels.lines_text(rows)}
     lines = model_lines.lines_of(pages.stop_pieces(result))
     if job == "label_check_parts":
-        parts = joined.cut(lines, whole=0, part=math.ceil(len(lines) / 2), overlap=joined.OVERLAP_LINES)
+        parts = halves(lines)
         return {"lines": lines, "parts": parts, "user": [model_lines.lines_text(joined.numbered(part)) for part in parts]}
     if job in ("label_check", "drug_name"):
         return {"lines": lines, "user": model_lines.lines_text(lines)}
@@ -86,8 +86,8 @@ def one_call(door: Door, job: str, prepared: dict) -> dict:
     record: dict = {"call": asked}
     # A call that failed is failed, not refused: its checks are not run.
     if job in LABEL_JOBS:
-        found, refusal = jobs.check_labels(asked["answer"], len(prepared["lines"])) if asked["ok"] else (None, None)
-        record.update(labels={str(n): label for n, label in found.items()} if found else None, refusal=refusal)
+        found, refusal, counts = jobs.check_labels(asked["answer"], len(prepared["lines"])) if asked["ok"] else (None, None, None)
+        record.update(labels={str(n): label for n, label in found.items()} if found else None, refusal=refusal, counts=counts)
     elif job == "drug_name":
         kept, dropped = jobs.check_doubtful(asked["answer"], prepared["lines"]) if asked["ok"] else ([], [])
         record.update(kept=kept, dropped=dropped)
@@ -103,10 +103,11 @@ def parts_calls(door: Door, prepared: dict) -> dict:
     asked, found = [], []
     for part, user in zip(prepared["parts"], prepared["user"]):
         call = jobs.ask(door, "label_check", user)
-        labels, refusal = jobs.check_labels(call["answer"], len(part["lines"])) if call["ok"] else (None, None)
+        labels, refusal, counts = jobs.check_labels(call["answer"], len(part["lines"])) if call["ok"] else (None, None, None)
         found.append(labels)
         asked.append({"k": part["k"], "overlap": part["overlap"], "lines": [line["n"] for line in part["lines"]], "call": call,
-                      "labels": {str(n): label for n, label in labels.items()} if labels else None, "refusal": refusal})
+                      "labels": {str(n): label for n, label in labels.items()} if labels else None, "refusal": refusal,
+                      "counts": counts})
     merged = joined.merge(prepared["parts"], found)
     failed = next((a["call"] for a in asked if not a["call"]["ok"]), None)
     total = lambda key: sum(a["call"][key] or 0 for a in asked)   # noqa: E731
@@ -114,7 +115,25 @@ def parts_calls(door: Door, prepared: dict) -> dict:
                 "detail": failed["detail"] if failed else None, "wall_ms": total("wall_ms"),
                 "prompt_tokens": total("prompt_tokens"), "output_tokens": total("output_tokens")}
     return {"call": together, "parts": asked, "labels": {str(n): label for n, label in merged.items()} if merged else None,
-            "refusal": next((a["refusal"] for a in asked if a["refusal"]), None)}
+            "refusal": next((a["refusal"] for a in asked if a["refusal"]), None), "counts": page_counts(prepared["parts"], asked)}
+
+
+def halves(lines: list[dict]) -> list[dict]:
+    """A page cut in two with the app's own function, the part size half
+    the page rounded up: the parts reading of the bench."""
+    return joined.cut(lines, whole=0, part=math.ceil(len(lines) / 2), overlap=joined.OVERLAP_LINES)
+
+
+def page_counts(parts: list[dict], asked: list[dict]) -> dict | None:
+    """The counts of ruling 24 for a page read in parts: the two counts
+    summed over the replies that came back, and the lines of the page made
+    unsure, each from the part its label is taken from (never a carried
+    line). None when no part answered."""
+    answered = [(part, a["counts"]) for part, a in zip(parts, asked) if a["counts"] is not None]
+    if not answered:
+        return None
+    return {"named_twice": sum(c["named_twice"] for _, c in answered), "dropped": sum(c["dropped"] for _, c in answered),
+            "made_unsure": sorted(part["lines"][i - 1]["n"] for part, c in answered for i in c["made_unsure"] if i > part["overlap"])}
 
 
 def run_calls(door: Door, job: str, round_n: int | None, listed: list[banked.Recording], results: dict,
