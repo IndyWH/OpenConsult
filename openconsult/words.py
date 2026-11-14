@@ -83,8 +83,9 @@ HOME_SO_FAR = (
     "and talk; the words appear live with the differentials, the alarm, the differential the alarm names marked red, "
     "and a quiet clock; at Stop it asks which speaker was you, checks for missing speech, marks the drug names "
     "the language model doubts, drafts the note with its line numbers checked, keeps the recording as Opus, and "
-    "shows the review page: the note, the last differentials of the model beside the assessment, the warnings and "
-    "the alarms, the transcript with its player and the control Check who spoke; you correct, draft again, copy "
+    "shows the review page: the note, the last differentials of the model beside the assessment, the warnings, where "
+    "you play each doubted drug name, type the right name over a wrong one and tick it, the alarms, the transcript "
+    "with its player and the control Check who spoke; you correct, draft again, copy "
     "and approve. Corrections to a patient never "
     "rewrite an earlier consultation; recordings are deleted after the retention days; Delete really deletes."
 )

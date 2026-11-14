@@ -1,16 +1,18 @@
 """The drug names the language model doubts (spec 15.9 rulings 18 and 39;
-15.10 rulings 6, 20, 21 and 23 and the details of step 6c: The drug-name
-call at Stop, A mark, When the doctor types over). A medicine name that
-speech recognition wrote wrongly is the error most likely to harm. At
-Stop, after the gate, the model reads the final transcript once, as the
-joined lines of joined.py, and points at the names it doubts: the line
-and the words exactly as they stand. Code keeps an entry only when its
-words stand on its line letter for letter. Each kept entry is a mark,
-stored with the places its words stand in the lines of the page. The
-drug the model thinks was meant is stored and shown on no page the
-doctor works on: no guess is ever shown (ruling 6). The words of the
-transcript are never changed by a mark. One function checks the reply
-for the app and the bench (spec 5.1)."""
+15.10 rulings 6, 20, 21, 23 and 26 to 28 and the details of steps 6c and
+6d). A medicine name that speech recognition wrote wrongly is the error
+most likely to harm. At Stop, after the gate, the model reads the final
+transcript once, as the joined lines of joined.py, and points at the
+names it doubts: the line and the words exactly as they stand. Code
+keeps an entry only when its words stand on its line letter for letter.
+Each kept entry is a mark, stored with the places its words stand in the
+lines of the page. On the review page each mark is a row where the
+doctor hears the name, types the right one over it and ticks it as
+settled; only what the doctor types changes a line, by the function the
+line's own box uses, and the note is then drafted again, never corrected
+in place. The drug the model thinks was meant is stored and shown on no
+page the doctor works on: no guess is ever shown (ruling 6). One
+function checks the reply for the app and the bench (spec 5.1)."""
 
 from __future__ import annotations
 
