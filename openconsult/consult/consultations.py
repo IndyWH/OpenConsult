@@ -19,7 +19,7 @@ from openconsult.patients.audit import Clock, now_local
 from openconsult.speech.lines import Line
 
 STATES = ("live", "stopping", "final")
-STOP_STAGES = ("who_spoke", "label_check", "checks", "gate", "note")
+STOP_STAGES = ("who_spoke", "checks", "gate", "note")
 EDIT_KINDS = ("words", "label", "undo", "swap", "check")
 SWAPPED = {"doctor": "patient", "patient": "doctor"}
 LABELS = ("doctor", "patient", "unsure")

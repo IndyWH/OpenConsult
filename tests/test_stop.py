@@ -1,5 +1,7 @@
-"""Stop in order (spec 15.10, Stop in order; rulings 7 and 14; 15.9
-rulings 4 and 17; R2; V1_LESSONS 1.7, 1.12, 2.2; 10.4; review point 3).
+"""Stop in order (spec 15.10, the details of step 6c: Stop, in order, as it
+now stands; ruling 7; 15.9 rulings 17 and 37; R2; V1_LESSONS 1.7, 1.12,
+2.2; 10.4; review point 3). The check of who spoke no longer runs at
+Stop: its tests are in test_who_check.py.
 Made-up doors, made-up replies; the words a model would say are never
 asserted, only what code does with a reply's numbers and labels."""
 
@@ -64,7 +66,7 @@ def room_stopped(tmp_path, clock, check=CHECK, worker=None, engine=None):
     return r, c
 
 
-def test_ruling_7_who_spoke_is_asked_once_waits_without_limit_and_the_check_runs_after_the_answer(tmp_path, clock):
+def test_ruling_7_15_9_ruling_37_who_spoke_is_asked_once_waits_without_limit_and_no_check_of_who_spoke_runs_at_stop(tmp_path, clock):
     r, c = room_stopped(tmp_path, clock)
     try:
         # The lines at Stop are written as the choice gave them, labels unsure until the answer (1.7).
@@ -81,88 +83,16 @@ def test_ruling_7_who_spoke_is_asked_once_waits_without_limit_and_the_check_runs
         assert until(lambda: c.state == FINAL)
         assert r.audit.lines()[1].event == "speakers.answered" or any(l.event == "speakers.answered" for l in r.audit.lines())
         assert r.rows.get(c.id)["doctor_speaker"] == "S1"
-        # The check ran after the answer, on the numbered lines with no labels, in the words of the details.
-        call = r.engine.calls_for("label_check")[0]
-        assert call.user == model_lines.lines_text([{"n": n, "text": t} for n, t in enumerate(
-            ["What brings you in today?", "A pain in my chest.", "Yes.", "Tell me more."], start=1)])
-        assert call.system == loader.prompt("label_check") and "S1" not in call.user
+        # 15.9 ruling 37: no check of who spoke is called at Stop; the labels are those the answer set, and not one word differs.
+        assert r.engine.calls_for("label_check") == [] and "label_check" not in [row["job"] for row in r.rows.model_calls(c.id)]
         final = r.rows.transcript_lines(c.id)
         assert [(x["n"], x["label"], x["changed_by_check"], x["unsure"]) for x in final] == [
-            (1, "doctor", 0, 0),        # the answer and the check agree: the label stands
-            (2, "patient", 0, 0),
-            (3, "patient", 0, 1),       # no first reading: the check's label, still shown unsure (ruling 14)
-            (4, "doctor", 0, 1)]        # the check said unsure: shown unsure, the label as it stood
-        assert [x["text"] for x in final] == [x["text"] for x in rows]     # not one word differs
-        assert r.rows.model_calls(c.id)[-1]["job"] == "label_check"
-    finally:
-        r.close()
-
-
-def test_ruling_7_a_changed_label_is_marked_and_a_refused_or_failed_check_changes_nothing(tmp_path, clock):
-    swapped = {"lines": [{"line": 1, "label": "patient"}, {"line": 2, "label": "doctor"}, {"line": 3, "label": "unsure"},
-                         {"line": 4, "label": "patient"}]}
-    r, c = room_stopped(tmp_path, clock, check=swapped)
-    try:
-        stop.answer(c, "S1")
-        assert until(lambda: c.state == FINAL)
-        final = r.rows.transcript_lines(c.id)
-        assert [(x["label"], x["changed_by_check"], x["unsure"]) for x in final] == [
-            ("patient", 1, 0), ("doctor", 1, 0), ("unsure", 0, 1), ("patient", 1, 0)]
-        assert not [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")]
-    finally:
-        r.close()
-    # The twin: a reply that misses a line is refused whole and changes nothing (15.9 ruling 17, what stands of it).
-    r, c = room_stopped(tmp_path / "missing_4", clock, check={"lines": CHECK["lines"][:3]})
-    try:
-        stop.answer(c, "S2")
-        assert until(lambda: c.state == FINAL)
-        final = r.rows.transcript_lines(c.id)
-        assert [(x["label"], x["changed_by_check"]) for x in final] == [("patient", 0), ("doctor", 0), ("unsure", 0), ("patient", 0)]
-        warning = [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")][0]
-        assert warning["kind"] == "label_check_refused" and warning["detail"] == "missing 4"
-    finally:
-        r.close()
-    # 15.10 ruling 24: a line named again with another label is shown unsure and not marked, its label as it stood,
-    # and the reply is taken; a number that is not on the page is dropped and the reply is taken as if it were not there.
-    for name, extra, line_two in [("two_labels", {"line": 2, "label": "doctor"}, ("doctor", 0, 1)),
-                                  ("off_the_page", {"line": 9, "label": "doctor"}, ("patient", 1, 0))]:
-        r, c = room_stopped(tmp_path / name, clock, check={"lines": CHECK["lines"] + [extra]})
-        try:
-            before = [x["text"] for x in r.rows.transcript_lines(c.id)]
-            stop.answer(c, "S2")
-            assert until(lambda: c.state == FINAL)
-            final = r.rows.transcript_lines(c.id)
-            assert [(x["label"], x["changed_by_check"], x["unsure"]) for x in final] == [
-                ("doctor", 1, 0), line_two, ("patient", 0, 1), ("patient", 0, 1)]
-            assert not [w for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")]
-            assert [x["text"] for x in final] == before                # a reply taken by this rule changes no word
-        finally:
-            r.close()
-    # A call that fails: the labels stand, the warning says why, nothing is asked twice.
-    from openconsult.llm.engine import EngineTimeout
-    r, c = room_stopped(tmp_path / "failed", clock, engine=FakeEngine({"label_check": [EngineTimeout("no answer")]}))
-    try:
-        stop.answer(c, speakers.CANNOT_TELL)
-        assert until(lambda: c.state == FINAL)
-        assert all(x["label"] == "unsure" and x["unsure"] for x in r.rows.transcript_lines(c.id))
-        assert [w["kind"] for w in r.rows.warnings(c.id) if w["kind"].startswith("label_check")] == ["label_check_failed"]
-        assert len(r.engine.calls_for("label_check")) == 1
-    finally:
-        r.close()
-
-
-def test_15_10_ruling_24_the_apps_run_gives_back_the_two_counts_with_a_reply_taken_and_with_a_reply_refused(tmp_path, clock):
-    twice_and_off = {"lines": CHECK["lines"] + [{"line": 2, "label": "doctor"}, {"line": 9, "label": "doctor"}]}
-    refused = {"lines": CHECK["lines"][:3] + [{"line": 3, "label": "doctor"}, {"line": 0, "label": "doctor"}, {"line": 7, "label": "doctor"}]}
-    r = Room(tmp_path, clock, engine=FakeEngine({"label_check": [twice_and_off, refused]}))
-    try:
-        rows = [{"n": n, "text": text} for n, text in enumerate(["made up one", "made up two", "made up three", "made up four"], start=1)]
-        found, outcome = labels.run(r.consultation.llm, rows, r.consultation.id)
-        assert found == {1: "doctor", 2: "unsure", 3: "patient", 4: "unsure"}
-        assert (outcome["outcome"], outcome["named_twice"], outcome["dropped"]) == ("ok", 1, 1)
-        found, outcome = labels.run(r.consultation.llm, rows, r.consultation.id)
-        assert found is None and (outcome["outcome"], outcome["detail"], outcome["named_twice"], outcome["dropped"]) == ("refused", "missing 4", 1, 2)
-        assert [row["text"] for row in rows] == ["made up one", "made up two", "made up three", "made up four"]
+            (1, "doctor", 0, 0),        # S1, the speaker the doctor picked
+            (2, "patient", 0, 0),       # the other speaker
+            (3, "unsure", 0, 1),        # no speaker from the choice: unsure, never guessed (15.9 ruling 4)
+            (4, "doctor", 0, 0)]
+        assert [x["text"] for x in final] == [x["text"] for x in rows]
+        assert r.rows.check_runs(c.id) == [] and "label_check" not in stop.STAGES and "label_check" not in SPINNING
     finally:
         r.close()
 
@@ -237,7 +167,8 @@ def test_R2_R15_the_who_spoke_page_asks_once_and_the_answer_is_audited(tmp_path,
     assert events.index("consultation.final") < events.index("speakers.answered") < events.index("consultation.stopped")
     assert "Stop to final" in app.state.parts.audit.lines()[0].detail
     final = text_of(client.get("/consultations/1"))
-    assert words.REVIEW_TITLE in final and "[1] Doctor" in final and "[3] Patient" in final and words.LABEL_UNSURE in final
+    assert words.REVIEW_TITLE in final and "[1] Doctor" in final and "[2] Patient" in final and "[3] Unsure" in final
+    assert words.LABEL_UNSURE in final and app.state.parts.consultations.check_runs(1) == []        # no check of who spoke at Stop
     assert not app.state.parts.logins.consultation_running
     consultation.close()                                     # the Stop thread's conversion step ends before the test does
 
@@ -292,6 +223,41 @@ def test_1_12_a_consultation_left_live_or_stopping_at_a_restart_is_carried_on(tm
 
 
 
+def test_1_12_15_9_ruling_37_a_consultation_left_at_the_stage_of_the_check_goes_on_from_the_checks_for_missing_speech_with_no_check(tmp_path, clock, machine):
+    # The details of step 6c, Stop in order: the stage label_check is gone; one found there at a restart goes on with no check of who spoke.
+    app, client = app_on(tmp_path, clock, machine, MadeUpWorker(live=[LINES]))
+    set_up(client)
+    log_in(client)
+    client.post("/patients", data=PATIENT)
+    client.post("/consultations/start/1", data=TICKS)
+    first = app.state.parts.running[1]
+    first.begin_sound(CAPTURE)
+    first.sound(LOUD)
+    first.stop()
+    assert until(lambda: first.stop_stage == "who_spoke")
+    rows = app.state.parts.consultations
+    # As an app before 6c left it when it closed during the check: the answer taken, its labels set, the stage label_check.
+    rows.set_labels(1, speakers.labels_from_answer(rows.transcript_lines(1), "S1"))
+    rows.set(1, doctor_speaker="S1", stop_stage="label_check")
+    first.close()
+    engine = FakeEngine({"label_check": [CHECK]})
+    doors = {NEMOTRON.name: SpeechDoor(NEMOTRON, make_worker=MadeUpWorker, installed=lambda: True)}
+    app2 = build_app(store.build(tmp_path, PORT), machine=machine, clock=clock, engines={"vllm": FakeEngine(version=None), "ollama": engine}, doors=doors)
+    client2 = browser(app2)
+    resumed = app2.state.parts.running[1]
+    assert resumed.stop_stage == "checks" and resumed.doctor_speaker == "S1"
+    log_in(client2)
+    client2.get("/consultations/1")
+    assert until(lambda: resumed.state == FINAL)
+    rows2 = app2.state.parts.consultations
+    assert engine.calls_for("label_check") == [] and rows2.check_runs(1) == []
+    assert [(x["label"], x["changed_by_check"], x["unsure"]) for x in rows2.transcript_lines(1)] == [
+        ("doctor", 0, 0), ("patient", 0, 0), ("unsure", 0, 1), ("doctor", 0, 0)]
+    assert words.REVIEW_TITLE in text_of(client2.get("/consultations/1"))
+    resumed.close()
+
+
+
 NOTE = {"reasoning": "made up.", "subjective": [{"text": "made up history", "turns": [1]}], "objective": [],
         "assessment": [{"text": "made up impression", "turns": [0, 3]}], "plan": [{"text": "uncited plan", "turns": [9]}]}
 
@@ -313,10 +279,11 @@ def test_the_note_is_drafted_at_the_end_of_stop_after_the_gate_with_its_stamp_an
         assert (draft["engine"], draft["model_tag"], draft["model_digest"]) == ("made-up", "made-up/tag", "d")     # the row's stamp (R20)
         assert draft["prompt_sha256"] == loader.APPROVED_BYTES["note"] and draft["call_id"] == r.rows.model_calls(c.id)[-1]["id"]
         assert draft["transcript"].startswith("TRANSCRIPT:\n[0] Doctor: What brings you in today?\n[1] Patient: A pain in my chest. word")
-        assert draft["transcript"].endswith("Yes.\n[2] Doctor: Tell me more.")   # the check said unsure: the label as it stood (6a)
+        # 15.9 ruling 37: written from the labels as the answer set them; the line with no speaker is a turn of its own.
+        assert draft["transcript"].endswith("\n[2] Unknown: Yes.\n[3] Doctor: Tell me more.") and r.engine.calls_for("label_check") == []
         entries = r.notes.entries(draft["id"])
         assert [(e["section"], e["lines"], e["uncited"]) for e in entries] == [
-            ("subjective", [2, 3], 0), ("assessment", [1], 0), ("plan", [], 1)]      # turn 3 does not exist: three turns
+            ("subjective", [2], 0), ("assessment", [1, 4], 0), ("plan", [], 1)]      # four turns; turn 9 does not exist
         assert "note" in [row["job"] for row in r.rows.model_calls(c.id)] and "The patient is" not in r.engine.calls_for("note")[0].user
         assert c.final.figures["note_s"] is not None and "Note" in r.audit.lines()[0].detail
         assert any(line.event == "note.drafted" for line in r.audit.lines())

@@ -109,6 +109,20 @@
     {% if not transcript_read_only %}<form method="post" action="/consultations/{{ cid }}/lines/swap" id="swap-form" class="swap">
       <button id="swap" aria-describedby="swap-refusal">{{ words.SWAP }}</button>{{ refusal("swap") }}</form>
     {% else %}{{ refusal("swap") }}{% endif %}
+    {# The check of who spoke, asked for here and never run by itself (15.9 ruling 37; 15.10 ruling 19). #}
+    {% if who_check.offered %}<form method="post" action="/consultations/{{ cid }}/who-check" id="check-who-form" class="swap">
+      <button id="check-who" aria-describedby="check-who-refusal">{{ words.CHECK_WHO_SPOKE }}</button>{{ refusal("check-who") }}</form>
+    {% elif who_check.ran and not transcript_read_only %}<span class="swap"><button id="check-who" aria-describedby="check-who-refusal" disabled>{{ words.CHECK_WHO_SPOKE }}</button>{{ refusal("check-who") }}</span>
+    {% else %}{{ refusal("check-who") }}{% endif %}
+  </div>
+  <div class="pane-body who-check" id="who-check">
+    {% if who_check.offered %}<p class="mark" id="check-who-line">{{ words.CHECK_WHO_SPOKE_LINE }}</p>{% endif %}
+    {% if who_check.running %}<p id="check-who-running"><span class="spinner"></span> {{ words.CHECK_RUNNING }}</p>{% endif %}
+    {% if who_check.ran and not transcript_read_only %}<p class="mark reason" id="check-who-ran">{{ words.CHECK_ALREADY_RAN }}</p>{% endif %}
+    {% if who_check.line %}<p class="{{ 'failed' if who_check.failed else 'mark' }}" id="check-who-outcome">{{ who_check.line }}</p>{% endif %}
+    {% if who_check.undo_all %}<form method="post" action="/consultations/{{ cid }}/who-check/undo-all" id="undo-all-form">
+      <button id="undo-all" aria-describedby="undo-all-refusal">{{ words.CHECK_UNDO_ALL }}</button>{{ refusal("undo-all") }}</form>
+    {% else %}{{ refusal("undo-all") }}{% endif %}
   </div>
   <div class="pane-body player" id="player">
     {% if player.available %}

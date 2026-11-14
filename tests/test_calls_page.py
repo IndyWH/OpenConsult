@@ -12,12 +12,26 @@ from tests.conftest import log_in, set_up, text_of
 from tests.fakes import MadeUpEmbedder
 from tests.test_guideline_panel import covered, differentials, load_corpus, three_pass_worker
 from tests.test_guideline_search import axis
-from tests.test_letters_page import approved
+from tests.test_letters_page import LETTER, LIST, NOTE
 from tests.test_review_page import CAPTURE, LOUD, app_on, engine_with, nemotron_doors, reviewed
 from tests.test_start import PATIENT, TICKS
 from tests.test_stop import until
 
 PROMPTS = ("alarm", "assessment", "label_check", "note", "referrals", "letter", "guideline")
+
+
+def checked(app, client):
+    """The check of who spoke asked for on the review page, as a doctor may (15.9 ruling 37), so that its call is on the page."""
+    assert client.post("/consultations/1/who-check").status_code == 303
+    app.state.parts.who_checks.wait(1, 20)
+
+
+def approved(tmp_path, clock, machine):
+    engine = engine_with(note=[NOTE], referrals=[LIST], letter=[LETTER])
+    app, client, c = reviewed(tmp_path, clock, machine, engine)
+    checked(app, client)
+    client.post("/consultations/1/note/approve")
+    return app, client, engine
 
 
 def record_of(p) -> tuple:
@@ -36,6 +50,7 @@ def main_of(raw: str) -> str:
 def test_ruling_28_R2_R18_the_view_is_reached_from_the_review_and_patient_pages_lists_every_call_and_writes_nothing(tmp_path, clock, machine):
     app, client, c = reviewed(tmp_path, clock, machine)
     p = app.state.parts
+    checked(app, client)
     assert 'href="/consultations/1/calls"' in client.get("/consultations/1").text                  # the review page's link
     assert 'href="/consultations/1/calls"' in client.get("/patients/1").text and words.MODEL_SAW_LINK in text_of(client.get("/patients/1"))
     before = record_of(p)

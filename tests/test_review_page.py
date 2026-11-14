@@ -76,7 +76,7 @@ def test_ruling_8_the_review_page_shows_the_warnings_the_labels_and_the_last_pas
     assert words.WARN_NO_SPEAKER.format(n=2) in page                                  # a line with no speaker: flagged
     assert words.WARN_CONFIDENCE_NOT_MEASURED.format(choice=words.ROW_NEMOTRON) in page   # Nemotron gives no score
     assert words.WARN_TOO_SHORT.split("{")[0] not in page                              # 71 words: not too short
-    assert "[1] Doctor" in page and "[2] Patient" in page and words.LABEL_UNSURE in page
+    assert "[1] Doctor" in page and "[2] Unsure" in page and words.LABEL_UNSURE in page   # the labels as the answer set them (15.9 ruling 37)
     assert "Made-up condition A" in page and words.MODELS_DIFFERENTIALS in page       # the last pass's differentials (ruling 4)
     assert words.MODEL_LINE.format(speech=words.ROW_NEMOTRON, model="gemma4:26b-a4b-it-qat", engine="made-up",
                                    version="0.0-made-up") in page
@@ -269,7 +269,7 @@ def test_ruling_11_draft_again_is_offered_only_after_an_edit_and_keeps_the_earli
     assert 'id="draft" aria-describedby="draft-refusal" disabled' in raw and words.DRAFT_AGAIN_NEEDS_EDIT in text_of(client.get("/consultations/1"))
     assert refusal_on(text_of(client.post("/consultations/1/note/draft")), "draft") == words.DRAFT_AGAIN_NEEDS_EDIT
     # A word edit: recorded with the words before; then draft again acts, and the next draft reads the new words.
-    assert client.post("/consultations/1/lines/2", data={"label": "patient", "text": "Yes, doctor."}).status_code == 303
+    assert client.post("/consultations/1/lines/2", data={"label": "unsure", "text": "Yes, doctor."}).status_code == 303
     edits = p.consultations.transcript_edits(1)
     assert [(e["kind"], e["line_n"], e["before"], e["after"]) for e in edits] == [("words", 2, "Yes.", "Yes, doctor.")]
     assert p.audit.lines()[0].event == "transcript.edited"
@@ -281,7 +281,7 @@ def test_ruling_11_draft_again_is_offered_only_after_an_edit_and_keeps_the_earli
     assert (second["n"], second["asked_by"], second["last_edit_id"]) == (2, "again", edits[0]["id"]) and second["id"] != first["id"]
     assert p.notes.entries(first["id"])[2]["text"] == "made up plan" and len(p.notes.entries(second["id"])) == 2   # the earlier draft is kept
     sent = app.state.parts.door._engine.calls_for("note")[-1].user
-    assert "Yes, doctor." in sent and "[1] Patient: Yes, doctor." in sent
+    assert "Yes, doctor." in sent and "[1] Unknown: Yes, doctor." in sent
     page = text_of(client.get("/consultations/1"))
     assert words.EARLIER_DRAFTS.format(count=1) in page and "made up plan" not in page.split('id="warnings"')[0]
     assert refusal_on(text_of(client.post("/consultations/1/note/draft")), "draft") == words.DRAFT_AGAIN_NEEDS_EDIT   # never by itself
@@ -291,6 +291,8 @@ def test_ruling_7_a_label_the_check_changed_is_undone_with_one_press_and_a_line_
     swapped = {"lines": [{"line": 1, "label": "patient"}, {"line": 2, "label": "doctor"}]}
     app, client, c = reviewed(tmp_path, clock, machine, engine_with(label_check=[swapped]))
     p = app.state.parts
+    assert client.post("/consultations/1/who-check").status_code == 303           # the check is asked for on this page (15.9 ruling 37)
+    p.who_checks.wait(1, 20)
     lines = p.consultations.transcript_lines(1)
     assert [(l["label"], l["changed_by_check"]) for l in lines] == [("patient", 1), ("doctor", 0)]   # line 2 had no first reading (ruling 14)
     page = text_of(client.get("/consultations/1"))
@@ -298,7 +300,7 @@ def test_ruling_7_a_label_the_check_changed_is_undone_with_one_press_and_a_line_
     assert words.WARNINGS_COUNT.format(count=3) in page                                   # the changed label among the warnings
     assert client.post("/consultations/1/lines/1/undo").status_code == 303
     line = p.consultations.line(1, 1)
-    assert (line["label"], line["changed_by_check"], line["set_by_doctor"], line["unsure"]) == ("doctor", 0, 1, 0)   # the answer's label
+    assert (line["label"], line["changed_by_check"], line["set_by_doctor"], line["unsure"]) == ("doctor", 0, 1, 0)   # the label before the check
     assert p.audit.lines()[0].event == "label.undone" and p.consultations.transcript_edits(1)[-1]["kind"] == "undo"
     page = text_of(client.get("/consultations/1"))
     assert words.LABEL_SET_BY_YOU in page and words.WARN_LABEL_CHANGED.format(n=1, label="Patient") not in page

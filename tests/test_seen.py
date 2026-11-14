@@ -33,7 +33,8 @@ from tests.test_letters_page import LETTER, LIST, NOTE
 from tests.test_review_page import CHECK
 
 TRANSCRIPT = "S1: What brings you in today?\nS2: A pain in my chest."
-ROWS = [{"n": 1, "text": "What brings you in today?"}, {"n": 2, "text": "A pain in my chest."}]
+ROWS = [{"n": 1, "text": "What brings you in today?", "start_s": 0.0, "end_s": 0.5, "raw_speaker": "S1"},
+        {"n": 2, "text": "A pain in my chest.", "start_s": 0.6, "end_s": 1.0, "raw_speaker": "S2"}]
 COVERED = {"covered": True, "summary": "made [1].", "passages_cited": [1]}
 
 

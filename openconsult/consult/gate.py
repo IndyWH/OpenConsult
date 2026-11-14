@@ -54,7 +54,7 @@ def missing_speech(live: list[Line], final: list[Line], windows: list, second_tr
 
 def judge(rows: list[dict], declares: Declares, choice_title: str) -> Verdict:
     """The three rules over the numbered lines as they stand after the
-    label check."""
+    answer to which speaker was you."""
     words = word_count(rows)
     if not rows or words == 0:
         return Verdict(True, [{"kind": "empty"}])

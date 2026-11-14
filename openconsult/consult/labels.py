@@ -1,6 +1,7 @@
 """The label check, as a job of the language model door (spec 15.9,
-rulings 4 and 17; 15.10 rulings 7, 14 and 24). The model reads the lines
-with their numbers and no labels, and gives back numbers and labels
+rulings 4, 17 and 37; 15.10 rulings 7, 14 and 24). The model reads the
+lines of joined.py, a long page in parts, with their numbers and no
+labels, and gives back numbers and labels
 only: the form admits nothing else, so it cannot change a word. Code
 refuses a reply that misses a line, and takes no label from it. A line
 named twice with two labels is unsure, and a number that is not on the
@@ -11,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 
+from openconsult.consult import joined
 from openconsult.llm.door import Door, Result
 from openconsult.prompts import loader
 
@@ -68,19 +70,38 @@ def refusal_words(refusal: dict) -> str:
 
 
 def run(door: Door, rows: list[dict], consultation_id: int) -> tuple[dict[int, str] | None, dict]:
-    """One call for the whole transcript. Returns the labels by line number,
-    or None, and an outcome: ok, refused with its detail, or failed with
-    the door's failure and detail; with a reply that came back, the two
-    counts of ruling 24. The words are proven unchanged."""
+    """The check of one page, as the calls it takes (joined.cut): its
+    joined lines whole, or in parts one after another, each reply through
+    check_labels. Returns the label of every numbered line by its number
+    (a joined line's label goes to every line it holds), or None, and an
+    outcome: ok, refused with its detail, or failed with the door's
+    failure and detail; with the calls made, the parts, the joined lines
+    and the two counts of ruling 24. All or nothing: a part that fails or
+    is refused ends the run, no later part is asked and no label is
+    taken. The words are proven unchanged, and the joined lines are
+    proven to hold the words of the page and no other."""
     numbered = [row for row in rows if row.get("n") is not None]
+    lines = joined.of_rows(numbered)
     before = texts_hash(numbered)
-    result: Result = door.ask("label_check", lines_text(numbered), consultation_id=consultation_id)
-    if before != texts_hash(numbered):
-        raise RuntimeError("a word of the transcript changed during the label check")
-    if not result.ok:
-        return None, {"outcome": "failed", "failure": result.failure, "detail": result.detail, "call_id": result.call_id}
-    labels, refusal, counts = check_labels(result.answer, len(numbered))
-    kept = {"call_id": result.call_id, "named_twice": counts["named_twice"], "dropped": counts["dropped"]}
-    if labels is None:
-        return None, {"outcome": "refused", "detail": refusal_words(refusal), **kept}
-    return labels, {"outcome": "ok", **kept}
+    worded = [{"n": row["n"], "text": str(row["text"]).strip()} for row in numbered if str(row["text"]).strip()]
+    if texts_hash(joined.unjoined(lines, numbered)) != texts_hash(worded):
+        raise RuntimeError("the joined lines do not hold the words of the transcript")
+    parts = joined.cut(lines)
+    outcome = {"call_ids": [], "parts": len(parts), "joined_lines": len(lines), "named_twice": 0, "dropped": 0}
+    found = []
+    for part in parts:
+        result: Result = door.ask("label_check", lines_text(joined.numbered(part)), consultation_id=consultation_id)
+        outcome["call_ids"].append(result.call_id)
+        if before != texts_hash(numbered):
+            raise RuntimeError("a word of the transcript changed during the label check")
+        if not result.ok:
+            return None, {**outcome, "outcome": "failed", "failure": result.failure, "detail": result.detail}
+        labels, refusal, counts = check_labels(result.answer, len(part["lines"]))
+        outcome["named_twice"] += counts["named_twice"]
+        outcome["dropped"] += counts["dropped"]
+        if labels is None:
+            where = f"part {part['k']} of {len(parts)}: " if len(parts) > 1 else ""
+            return None, {**outcome, "outcome": "refused", "detail": where + refusal_words(refusal)}
+        found.append(labels)
+    merged = joined.merge(parts, found) or {}
+    return {n: merged[line["n"]] for line in lines for n in line["page_lines"]}, {**outcome, "outcome": "ok"}

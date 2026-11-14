@@ -59,10 +59,13 @@ class CheckRows:
         return [dict(r) for r in self._db.query("SELECT * FROM speaker_check WHERE outcome = 'running' ORDER BY id")]
 
     def standing_changes(self, consultation_id: int) -> dict[int, dict]:
-        """By line number: the change of a check that still stands (not undone)."""
+        """By line number: the change of a check that still stands: not
+        undone, and its line still marked (a label the doctor has set
+        since by hand is the doctor's, and no Undo touches it)."""
         rows = self._db.query(
             "SELECT ch.* FROM speaker_check_change ch JOIN speaker_check s ON s.id = ch.check_id "
-            "WHERE s.consultation_id = ? AND ch.undone_at IS NULL ORDER BY ch.id", (consultation_id,))
+            "JOIN transcript_line t ON t.consultation_id = s.consultation_id AND t.n = ch.line_n "
+            "WHERE s.consultation_id = ? AND ch.undone_at IS NULL AND t.changed_by_check = 1 ORDER BY ch.id", (consultation_id,))
         return {r["line_n"]: dict(r) for r in rows}
 
     def check_changes(self, run_id: int) -> list[dict]:

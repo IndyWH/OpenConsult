@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 import asyncio
 
 from openconsult.consult import opus, retention, stop
+from openconsult.consult.who_check import WhoChecks
 from openconsult.consult.consultations import Consultations
 from openconsult.consult.letter_rows import Letters
 from openconsult.consult.note_rows import Notes
@@ -41,7 +42,7 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import calls as calls_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, patients as patients_web, review, routes
+from openconsult.web import calls as calls_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, patients as patients_web, review, routes, who_check as who_check_web
 from openconsult.web.first_run import FirstRun
 
 STATIC = Path(__file__).parent / "web" / "static"
@@ -73,6 +74,7 @@ class Parts:
     embedder: object = None                        # the door to the embedding worker, where the room check put it (8b)
     guidelines: Guidelines = None                  # the panel's service: the index, the worker, the door, the floor (8b)
     converter: object = None                       # the recording converter found at start, or None (7a)
+    who_checks: object = None                      # the runs of the who-spoke check asked for on the review page (6c)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
@@ -141,6 +143,9 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         clock=clock,
         finaliser=_finalise,
     )
+    # A check of who spoke left running by the last run is ended as failed: no label had changed (6c).
+    parts.who_checks = WhoChecks(door, parts.consultations, audit)
+    parts.who_checks.sweep()
     # A consultation left live or stopping by the last run goes on (review point 3).
     for consultation in stop.sweep(parts):
         consultation.on_final = consult._on_final(parts)
@@ -151,7 +156,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
     app.mount("/static", StaticFiles(directory=STATIC), name="static")
-    for module in (routes, consult, live, review, patients_web, letters_web, guidelines_web, calls_web):
+    for module in (routes, consult, live, review, who_check_web, patients_web, letters_web, guidelines_web, calls_web):
         app.include_router(module.router)
     return app
 
@@ -167,6 +172,7 @@ async def _lifespan(app: FastAPI):
     sweeping = asyncio.create_task(retention.loop(app.state.parts))
     yield
     sweeping.cancel()
+    app.state.parts.who_checks.close()
     for consultation in app.state.parts.running.values():
         consultation.close()
     for door in app.state.parts.doors.values():

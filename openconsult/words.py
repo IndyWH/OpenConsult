@@ -224,8 +224,7 @@ STOPPING_TITLE = "Stopping"
 STAGE_LINES = {
     "speech": "Finishing the transcript.",
     "who_spoke": "Waiting for your answer.",
-    "answered": "Your answer is taken. Checking who spoke each line.",
-    "label_check": "Checking who spoke each line.",
+    "answered": "Your answer is taken. Checking for missing speech.",
     "checks": "Checking for missing speech.",
     "gate": "Checking the transcript.",
     "note": "Drafting the note.",
@@ -257,6 +256,19 @@ WARN_LOW_CONFIDENCE = "Line {n} is low confidence ({score})."
 WARN_CONFIDENCE_NOT_MEASURED = "Confidence was not measured: {choice} gives no score."
 WARN_LABEL_CHECK_REFUSED = "The check of who spoke was refused: {reason}. No label was changed by it."
 WARN_LABEL_CHECK_FAILED = "The check of who spoke did not run: {reason} No label was changed by it."
+# The who-spoke check on the review page (15.10 ruling 19; 15.9 ruling 37). The owner's sentences, letter for letter.
+CHECK_WHO_SPOKE = "Check who spoke"
+CHECK_WHO_SPOKE_LINE = ("The language model reads the transcript and changes the speaker where the words point to the other person. "
+                        "This helps when many lines are under the wrong speaker. It can make a well labelled page worse. "
+                        "Every change is marked and can be undone.")
+CHECK_RUNNING = "Checking who spoke. This can take up to a minute."
+CHECK_CHANGED = "The check changed the speaker on {count} lines. Each one is marked below."
+CHECK_UNDO_ALL = "Undo all the changes of the check"
+CHECK_CHANGED_NONE = "The check changed no speaker."
+CHECK_ALREADY_RAN = "The check of who spoke has already run on this transcript."
+# Drafts, for the owner to correct (the details of step 6c, The sentences; the plan of 6c, drafts 3 and 10).
+CHECK_CHANGED_ONE = "The check changed the speaker on 1 line. It is marked below."
+CHECK_RESTARTED = "OpenConsult was restarted while the check ran."
 WARN_SPEECH_FAILED = "The speech choice failed at Stop: {reason} The transcript is what was heard live."
 WARN_TOO_SHORT = (
     "The transcript holds {words} words, fewer than {least}: too short to hold a consultation. "
@@ -666,6 +678,9 @@ EVENTS = {
     "transcript.edited": "Transcript words edited by the doctor",
     "label.set": "Speaker label set by the doctor",
     "label.undone": "The check's change of a speaker label undone by the doctor",
+    "speakers.check_asked": "The check of who spoke asked for",
+    "speakers.check_ended": "The check of who spoke ended",
+    "speakers.check_undone_all": "Every change of the check undone by the doctor",
     "labels.swapped": "Doctor and patient swapped on every line",
     "referrals.listed": "Referral list made from the approved note",
     "referrals.failed": "Referral list could not be made",

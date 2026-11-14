@@ -1,12 +1,15 @@
-"""Stop, in order (spec 15.10, Stop in order; rulings 7, 8 and 14; 11.5
-rule 2; V1_LESSONS 1.12, 2.2; 10.4). One: the page stopped the
-microphone and the recording is closed (live.py). Two: the door's stop
-gives the final lines, written as the choice gave them. Three: the app
-asks which speaker was you and waits, with no limit. Four: the label
-check runs and its changes are marked. Five: the two checks for missing
-speech run on the stored lines and the stored loudness. Six: the gate.
-Seven: the note is drafted unless the gate refused (6b; rulings 3 and
-8), and the review page is shown. Each step reads the rows, so a
+"""Stop, in order (spec 15.10, the details of step 6c: Stop, in order, as
+it now stands; rulings 7 and 8; 15.9 ruling 37; 11.5 rule 2; V1_LESSONS
+1.12, 2.2; 10.4). One: the page stopped the microphone and the
+recording is closed (live.py). Two: the door's stop gives the final
+lines, written as the choice gave them. Three: the app asks which
+speaker was you and waits, with no limit; its answer sets the labels.
+Four: the two checks for missing speech run on the stored lines and the
+stored loudness. Five: the gate. Then the note is drafted unless the
+gate refused (6b; rulings 3 and 8), from the labels as the answer set
+them, and the review page is shown. The check of who spoke does not run
+here: it made well labelled pages worse, so the doctor asks for it on
+the review page (15.9 ruling 37). Each step reads the rows, so a
 consultation left stopping at a restart goes on from its stage
 (review point 3). A worker that has died is reported plainly."""
 
@@ -17,14 +20,17 @@ import math
 import statistics
 from datetime import datetime
 
-from openconsult.consult import gate, labels, note, opus, speakers
+from openconsult.consult import gate, note, opus, speakers
 from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
 from openconsult.patients.patients import PatientRow
 from openconsult.speech.lines import Line
 
-STAGES = ("speech", "who_spoke", "label_check", "checks", "gate", "note")
+STAGES = ("speech", "who_spoke", "checks", "gate", "note")
+# A consultation found at a restart in the stage that Stop no longer has goes on
+# from the checks for missing speech, with no check of who spoke (15.9 ruling 37).
+STAGE_GONE = {"label_check": "checks"}
 
 
 def finalise(c: Consultation) -> None:
@@ -35,9 +41,6 @@ def finalise(c: Consultation) -> None:
     if c.stop_stage == "who_spoke":
         if not wait_for_answer(c):
             return                       # the app closed while waiting: the stage is kept for the next start
-        c.set_stage("label_check")
-    if c.stop_stage == "label_check":
-        label_check(c)
         c.set_stage("checks")
     for stage, step in STEPS_AFTER.items():
         if c.stop_stage == stage:
@@ -49,7 +52,7 @@ def finalise(c: Consultation) -> None:
 
 
 def checks(c: Consultation) -> None:
-    """Five: the two checks for missing speech on the stored lines and the
+    """Four: the two checks for missing speech on the stored lines and the
     stored loudness (11.5 rule 2)."""
     row = c.rows.get(c.id)
     final = [row_as_line(r) for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
@@ -60,7 +63,7 @@ def checks(c: Consultation) -> None:
 
 
 def judge(c: Consultation) -> None:
-    """Six: the gate (ruling 8)."""
+    """Five: the gate (ruling 8)."""
     rows = [r for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
     verdict = gate.judge(rows, c.speech_door.declares, c.speech_door.choice.title)
     for warning in verdict.warnings:
@@ -69,7 +72,7 @@ def judge(c: Consultation) -> None:
 
 
 def draft_note(c: Consultation) -> None:
-    """Seven: the note, the last stage before final, unless the gate
+    """The note, the last stage before final, unless the gate
     refused (ruling 8; R3). The three figures of 6a are taken first, so
     Stop to final keeps its meaning; the note's seconds are a fourth."""
     c.final.figures = figures(c)
@@ -151,20 +154,7 @@ def answer(c: Consultation, doctor_speaker: str) -> bool:
     return True
 
 
-# ------------------------------------------------- four: the label check
-
-def label_check(c: Consultation) -> None:
-    rows = [r for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
-    if not rows:
-        return
-    found, outcome = labels.run(c.llm, rows, c.id)
-    if found is None:
-        c.rows.add_warning(c.id, f"label_check_{outcome['outcome']}", detail=outcome.get("detail") or outcome.get("failure"))
-        return
-    c.rows.set_labels(c.id, speakers.apply_check(rows, found))
-
-
-# --------------------------------------------------- seven: the final page
+# ------------------------------------------------------- the final page
 
 def show_final(c: Consultation) -> None:
     with c.lock:
@@ -249,7 +239,8 @@ def resume(p, row: dict) -> Consultation:
                      p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes,
                      converter=p.converter, guidelines=p.guidelines)
     c.state = STOPPING
-    c.stop_stage = row["stop_stage"] if row["stop_stage"] in STAGES[1:] else "who_spoke"
+    stage = STAGE_GONE.get(row["stop_stage"], row["stop_stage"])
+    c.stop_stage = stage if stage in STAGES[1:] else "who_spoke"
     c.stopped_at = datetime.fromisoformat(row["stopped_at"]) if row["stopped_at"] else p.clock()
     c.doctor_speaker = row["doctor_speaker"]
     c.speech = type(c.speech)("stopped")

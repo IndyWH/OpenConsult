@@ -108,6 +108,9 @@ def _three_consultations(tmp_path, clock, machine):
 def test_8_4_D24_R4_the_two_calls_get_the_block_only_while_the_switch_is_on_and_the_note_and_the_label_check_never_do(tmp_path, clock, machine):
     app, client, p = _three_consultations(tmp_path, clock, machine)
     on, off = p.running[2], p.running[3]
+    # The check of who spoke is asked for on the review page since 6c (15.9 ruling 37): asked here, so its call is judged too.
+    assert client.post("/consultations/2/who-check").status_code == 303
+    p.who_checks.wait(2, 20)
     assert p.consultations.get(2)["earlier_notes_shown"] == 1 and p.consultations.get(3)["earlier_notes_shown"] == 0
     block = block_for(p.notes, 1, on.started_at, 2)
     assert block.startswith(HEADING) and on.background == block and off.background is None

@@ -167,8 +167,8 @@ def test_5_2_5_3_the_page_state_is_computed_by_code_and_a_spinner_only_for_a_nam
     assert c.stop() and c.page_state()["spinning"] == "speech"
     c.set_stage("who_spoke")
     assert c.page_state()["spinning"] is None                # waiting on the doctor is not a spinner
-    c.set_stage("label_check")
-    assert c.page_state()["spinning"] == "label_check"
+    c.set_stage("checks")
+    assert c.page_state()["spinning"] == "checks"
     c.set_stage(None)
     c.state = FINAL
     assert c.page_state()["spinning"] is None

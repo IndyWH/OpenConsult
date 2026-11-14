@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import alarms, deletion, note, speakers
+from openconsult.consult import alarms, deletion, note, who_check
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -32,6 +32,8 @@ from openconsult.web.pages import form_fields, refuse, render
 
 router = APIRouter()
 GATE_REFUSALS = ("too_short", "empty")
+# A check of who spoke that failed or was refused at Stop before 6c: said at the control from its run, not among the warnings.
+CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
 SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE")
 # The loudness strip is drawn in this many columns, each the loudest of its windows.
@@ -85,10 +87,8 @@ def warning_lines(rows: list[dict], lines: list[dict], choice_title: str) -> lis
         kind, detail = w["kind"], w["detail"] or ""
         if kind == "speech_failed":
             text = words.WARN_SPEECH_FAILED.format(reason=detail) if detail != words.APP_RESTARTED else detail
-        elif kind == "label_check_refused":
-            text = words.WARN_LABEL_CHECK_REFUSED.format(reason=detail)
-        elif kind == "label_check_failed":
-            text = words.WARN_LABEL_CHECK_FAILED.format(reason=detail)
+        elif kind in CHECK_KINDS:
+            continue
         else:
             text = words.WARNING_SENTENCES.get(kind, "{detail}").format(
                 start=w["start_s"], end=w["end_s"], n=w["line_n"], detail=detail, words=detail, score=detail, choice=choice_title)
@@ -182,6 +182,14 @@ def page_data(p, row: dict) -> dict:
     state = note_state(p, row, gate_refused)
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
+    who = who_check.page_state(p.consultations, cid, state["transcript_read_only"], bool(lines))
+    state["transcript_reason"] = words.NOTE_READ_ONLY
+    if who["running"]:
+        # While a run lasts nothing changes under it and no unsaved edit can be lost: no edit field, and every
+        # control that writes answers with the running sentence (ruling 19; ruling 12; R15).
+        state.update(entries_read_only=True, transcript_read_only=True, entries_reason=words.CHECK_RUNNING,
+                     transcript_reason=words.CHECK_RUNNING, draft_reason=words.CHECK_RUNNING,
+                     approve_reason=words.CHECK_RUNNING, refuse_reason=words.CHECK_RUNNING)
     player = player_data(row, lines, warnings, p.settings.data_folder)
     pass_rows = p.consultations.passes(cid)
     differentials = note.last_shown_differentials(pass_rows)
@@ -192,7 +200,7 @@ def page_data(p, row: dict) -> dict:
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
-            "lines": lines, "warnings": warnings,
+            "lines": lines, "warnings": warnings, "who_check": who,
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
@@ -218,6 +226,8 @@ def review_page(request: Request, user, consultation_id: int, refused: tuple | N
         data["refused_line"] = words.REFUSED_LINE.format(date=_when(when)[0], time=_when(when)[1])
     context = dict(user=user, active="new_patient", page_path=f"/consultations/{consultation_id}", timed_by_script=True,
                    words_json=json_words(), **data)
+    if data["who_check"]["running"]:
+        context["refresh_every"] = 1         # the page waits for the run as the stopping page waits for a stage
     if refused:
         return refuse(request, "review.html", refused[0], refused[1], **context)
     return render(request, "review.html", **context)
@@ -303,7 +313,7 @@ async def swap_lines(request: Request, consultation_id: int, user=Depends(guards
     final_row(request, consultation_id)
     data = page_data(p, p.consultations.get(consultation_id))
     if data["transcript_read_only"]:
-        return review_page(request, user, consultation_id, refused=("swap", words.NOTE_READ_ONLY))
+        return review_page(request, user, consultation_id, refused=("swap", data["transcript_reason"]))
     p.consultations.swap_labels(consultation_id)
     p.audit.record("labels.swapped", f"consultation {consultation_id}")
     raise Redirect(f"/consultations/{consultation_id}")
@@ -321,7 +331,7 @@ async def edit_line(request: Request, consultation_id: int, n: int, user=Depends
     if line is None:
         raise Redirect(f"/consultations/{consultation_id}")      # no such control on the page
     if data["transcript_read_only"]:
-        return review_page(request, user, consultation_id, refused=(control, words.NOTE_READ_ONLY))
+        return review_page(request, user, consultation_id, refused=(control, data["transcript_reason"]))
     fields = await form_fields(request)
     label, text = fields.get("label", ""), fields.get("text", "").strip()
     if label not in LABELS:
@@ -339,7 +349,9 @@ async def edit_line(request: Request, consultation_id: int, n: int, user=Depends
 
 @router.post("/consultations/{consultation_id}/lines/{n}/undo")
 async def undo_label(request: Request, consultation_id: int, n: int, user=Depends(guards.logged_in)):
-    """One press puts back the label the who-spoke answer gave (ruling 7)."""
+    """One press puts back the label that stood before the check changed
+    it (ruling 7; the details of step 6c, Undo): not the answer's label,
+    which a Swap may have changed since."""
     p = parts(request)
     row = final_row(request, consultation_id)
     data = page_data(p, row)
@@ -348,12 +360,11 @@ async def undo_label(request: Request, consultation_id: int, n: int, user=Depend
     if line is None:
         raise Redirect(f"/consultations/{consultation_id}")      # no such control on the page
     if data["transcript_read_only"]:
-        return review_page(request, user, consultation_id, refused=(control, words.NOTE_READ_ONLY))
-    if not line["changed_by_check"]:
+        return review_page(request, user, consultation_id, refused=(control, data["transcript_reason"]))
+    before = p.consultations.undo_change(consultation_id, n)
+    if before is None:
         return review_page(request, user, consultation_id, refused=(control, words.NOT_CHANGED_BY_CHECK))
-    answered = speakers.labels_from_answer([line], row["doctor_speaker"] or speakers.CANNOT_TELL)[n]["label"]
-    p.consultations.set_line_label(consultation_id, n, answered, kind="undo")
-    p.audit.record("label.undone", f"consultation {consultation_id}: line {n} back to {answered}")
+    p.audit.record("label.undone", f"consultation {consultation_id}: line {n} back to {before}")
     raise Redirect(f"/consultations/{consultation_id}")
 
 
@@ -370,6 +381,8 @@ async def delete(request: Request, consultation_id: int, user=Depends(guards.log
         raise Redirect("/")
     if row["state"] != "final":
         raise Redirect(f"/consultations/{consultation_id}")
+    if who_check.page_state(p.consultations, consultation_id, False, True)["running"]:
+        return review_page(request, user, consultation_id, refused=("delete", words.CHECK_RUNNING))
     fields = await form_fields(request)
     if fields.get("confirm") != "yes":
         return review_page(request, user, consultation_id, asking_delete=True)
