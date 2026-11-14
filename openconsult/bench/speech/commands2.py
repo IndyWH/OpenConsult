@@ -8,6 +8,7 @@ exists. A failure is kept as failed and counted; nothing is tried again."""
 
 from __future__ import annotations
 
+import dataclasses
 import datetime as dt
 import urllib.error
 import urllib.request
@@ -15,9 +16,11 @@ from pathlib import Path
 from typing import Callable
 
 from openconsult import words
+from openconsult.bench import claude
+from openconsult.bench.cloud import AddressRefused
 from openconsult.bench.speech import banked, calls, druglist, tables, voice
 from openconsult.bench.speech.commands import REPO, forbidden_for
-from openconsult.settings import paths
+from openconsult.settings import keys, paths
 from openconsult.bench.writer import Refused, ResultWriter
 from openconsult.db import open_database
 from openconsult.llm.door import Door
@@ -28,13 +31,39 @@ from openconsult.bench.llamacpp import LlamaCppEngine
 
 # The kinds of engine speech-calls can be pointed at, as the engine bench's
 # run names them (15.8); the note bench of 6b runs on vLLM, the app's engine.
-KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
+# The Claude kind is the bench's alone (15.10 ruling 22; 15.13 rulings 8 and
+# 21; R31): a cloud model runs every bench the local model has run.
+KINDS = {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine, "claude": claude.ClaudeEngine}
+CLOUD_KEYS = {"claude": claude.KEY_NAME}
+STOPPED = 11   # the exit code when the service stopped the run (15.13, run 9a, rule 9)
 from openconsult.llm.record import ModelCalls
 from openconsult.speech import environment
 from openconsult.speech.choices import WHISPERX_PYANNOTE
 
 # Exit codes, as part one's: 3 the list or a file, 4 consent or a voice not marked, 5 a failed result,
-# 6 a folder, 7 an environment.
+# 6 a folder, 7 an environment; 10 a cloud kind with no key or another address, 11 a run the service stopped.
+
+
+def engine_for(kind: str, address: str, key_folder: Path | None, say: Callable):
+    """The engine of the kind, or the code to stop with. A cloud kind takes
+    its key from the key folder's .env, read inside the process by the one
+    key module (7.3 rule 3): never from the command line, and the value is
+    never said, written or copied."""
+    if kind not in CLOUD_KEYS:
+        return KINDS[kind](address)
+    name = CLOUD_KEYS[kind]
+    if key_folder is None:
+        say(words.BENCH_UPLOAD_NO_KEY.format(service=f"The {kind} kind", name=name))
+        return 10
+    key = keys.read_key(name, Path(key_folder))
+    if not key:
+        say(words.BENCH_NO_KEY_FOUND.format(name=name, path=Path(key_folder) / keys.KEY_FILE))
+        return 10
+    try:
+        return KINDS[kind](address, key)
+    except AddressRefused as refused:
+        say(words.BENCH_ADDRESS_REFUSED.format(reason=refused))
+        return 10
 
 
 def speech_voice(out: Path, recordings_folder: Path, data_folder: Path, names: list[str] | None,
@@ -137,11 +166,12 @@ def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path],
                  data_folder: Path | None = None, names: list[str] | None = None, arms: list[str] | None = None,
                  engine_address: str = DEFAULT_ADDRESS, say: Callable = print,
                  make_door: Callable[[Path], Door] | None = None, now: Callable = dt.datetime.now,
-                 engine_kind: str = "ollama") -> int:
+                 engine_kind: str = "ollama", model: str | None = None, key_folder: Path | None = None) -> int:
     """The calls of one job (and round) on the stored pages under out/results;
     the results under out/calls, the record in out/calls/calls.db. The
     engine at the address is of engine_kind; the model is the profile's
-    name for that engine."""
+    name for that engine, or the name given. A cloud kind needs the key
+    folder, which results may not go under."""
     if job not in calls.JOB_KINDS:
         say(words.BENCH_BAD_JOB.format(job=job, jobs=", ".join(calls.JOB_KINDS)))
         return 2
@@ -152,17 +182,20 @@ def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path],
         return 3
     out = Path(out)
     try:
-        writer = ResultWriter(out / "calls", forbidden=forbidden_for(data_folder or out, listed))
+        writer = ResultWriter(out / "calls", forbidden=forbidden_for(data_folder or out, listed, key_folder))
     except Refused as refused:
         say(words.BENCH_FOLDER_REFUSED.format(place=str(refused).split("under ")[-1]))
         return 6
     results = ResultWriter(out).read_all()
+    engine = None if make_door else engine_for(engine_kind, engine_address, key_folder, say)
+    if isinstance(engine, int):
+        return engine
     (out / "calls").mkdir(parents=True, exist_ok=True)
     if make_door:
         door = make_door(out / "calls")
     else:
-        engine = KINDS[engine_kind](engine_address)
         profile = GEMMA_4_QAT.for_engine(engine.name) if engine.name in GEMMA_4_QAT.tags else GEMMA_4_QAT
+        profile = dataclasses.replace(profile, tag=model or profile.tag, engine=engine.name)
         door = Door(engine, ModelCalls(open_database(out / "calls" / "calls.db")), profile)
     version, digest = door.identity()
     if version is None or digest is None:
@@ -180,7 +213,32 @@ def speech_calls(out: Path, recordings_folder: Path, script_folders: list[Path],
         return 8
     say(words.BENCH_CALLS_DONE.format(made=len(summary["run"]) + len(summary["failed"]), failed=len(summary["failed"]),
                                       kept=len(summary["kept"])))
+    if summary.get("stopped"):
+        return STOPPED
     return 5 if summary["failed"] else 0
+
+
+def add_calls_command(sub, say: Callable) -> None:
+    """The parser of speech-calls, kept beside its command."""
+    path = lambda value: Path(value) if value else None   # noqa: E731
+    p = sub.add_parser("speech-calls")
+    p.add_argument("--out", required=True, help="the results folder of speech-run; the calls' results go under it")
+    p.add_argument("--recordings", required=True, help="the folder holding recordings.json")
+    p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
+    p.add_argument("--job", required=True, choices=list(calls.JOB_KINDS),
+                   help="the job to run; label_check_app is the label check as the app sent it until 6c; label_check_parts reads each page in two parts")
+    p.add_argument("--round", type=int, help="the round of the notes, 1 or 2")
+    p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
+    p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
+    p.add_argument("--kind", choices=sorted(KINDS), default="ollama",
+                   help="the kind of engine at that address: ollama, llamacpp, vllm, or claude (the bench's alone, with --key-folder)")
+    p.add_argument("--model", help="the model's name at that engine, where it is not the profile's (the claude kind)")
+    p.add_argument("--key-folder", help="the claude kind: the folder whose .env holds its key; read inside the process, never written")
+    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
+    p.add_argument("--arm", nargs="*", help="only these arms")
+    p.set_defaults(fn=lambda a: speech_calls(Path(a.out), Path(a.recordings), [Path(f) for f in a.scripts], a.job, a.round,
+                                             path(a.data_folder), a.recording, a.arm, engine_address=a.engine, say=say,
+                                             engine_kind=a.kind, model=a.model, key_folder=path(a.key_folder)))
 
 
 def speech_voice_cut(out: Path, recordings_folder: Path, script_folders: list[Path], write: Path,

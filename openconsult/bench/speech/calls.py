@@ -163,6 +163,11 @@ def run_calls(door: Door, job: str, round_n: int | None, listed: list[banked.Rec
                       lines=prepared.get("lines"), turns=prepared.get("turns"), roles=prepared.get("roles"),
                       user=prepared["user"], engine={"version": version, "digest": digest, "tag": door.profile.tag},
                       started_at=now().isoformat(timespec="seconds"))
+        if door.stopped:
+            # Never the model's miss: the result is written apart, to run again, and nothing more is sent (run 9a, rule 9).
+            writer.write_apart(job, chain, record)
+            say(words.BENCH_CALLS_STOPPED.format(reason=door.stopped, job=job, arm=arm, name=name))
+            return {"run": done, "kept": kept, "failed": failed, "stopped": door.stopped}
         path = writer.write(job, chain, record)
         say(words.BENCH_RESULT_WRITTEN.format(path=path))
         if not record["call"]["ok"]:

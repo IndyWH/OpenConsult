@@ -83,13 +83,14 @@ def test_6b_speech_calls_takes_the_kind_of_engine_and_names_the_model_for_it(tmp
     from openconsult.bench.llamacpp import LlamaCppEngine
     from openconsult.llm.ollama import OllamaEngine
     from openconsult.llm.vllm import VllmEngine
-    assert commands2.KINDS == {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine}
+    from openconsult.bench.claude import ClaudeEngine
+    assert commands2.KINDS == {"ollama": OllamaEngine, "llamacpp": LlamaCppEngine, "vllm": VllmEngine, "claude": ClaudeEngine}   # 6c: the Claude kind, the bench's alone
     assert commands2.KINDS["vllm"]("http://127.0.0.1:1").name == "vllm"
     assert GEMMA_4_QAT.for_engine("vllm").tag != GEMMA_4_QAT.for_engine("ollama").tag
     seen = {}
 
     def fake(out, recordings_folder, script_folders, job, round_n, data_folder=None, names=None, arms=None,
-             engine_address="", say=print, make_door=None, now=None, engine_kind="ollama"):
+             engine_address="", say=print, make_door=None, now=None, engine_kind="ollama", model=None, key_folder=None):
         seen.update(kind=engine_kind, address=engine_address)
         return 0
     monkeypatch.setattr(commands2, "speech_calls", fake)

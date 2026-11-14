@@ -23,7 +23,6 @@ from openconsult.bench.repeat import run_repeat
 from openconsult.bench.replay import CHAINS, arm_differs, first_call, run
 from openconsult.bench.shared import commands as shared_commands
 from openconsult.bench.speech import commands as speech_commands
-from openconsult.bench.speech import calls as speech_calls
 from openconsult.bench.speech import commands2 as speech_commands2
 from openconsult.bench.speech import stop_marks
 from openconsult.bench.speech.arms import ARMS
@@ -381,12 +380,6 @@ def cmd_speech_drugs(args) -> int:
                                          data_folder=Path(args.data_folder) if args.data_folder else None)
 
 
-def cmd_speech_calls(args) -> int:
-    return speech_commands2.speech_calls(Path(args.out), Path(args.recordings), [Path(f) for f in args.scripts], args.job,
-                                         args.round, Path(args.data_folder) if args.data_folder else None, args.recording,
-                                         args.arm, engine_address=args.engine, say=say, engine_kind=args.kind)
-
-
 def cmd_shared(args) -> int:
     """The commands of the test of 5d (spec 15.9, the details of 5d)."""
     path = lambda value: Path(value) if value else None  # noqa: E731
@@ -447,20 +440,7 @@ def add_shared_commands(sub) -> None:
 
 def add_speech_commands(sub) -> None:
     """The speech bench (spec 15.9, the details of 5c)."""
-    p = sub.add_parser("speech-calls")
-    p.set_defaults(fn=cmd_speech_calls)
-    p.add_argument("--out", required=True, help="the results folder of speech-run; the calls' results go under it")
-    p.add_argument("--recordings", required=True, help="the folder holding recordings.json")
-    p.add_argument("--scripts", action="append", required=True, help="a folder of scripts; may be given more than once")
-    p.add_argument("--job", required=True, choices=list(speech_calls.JOB_KINDS),
-                   help="the job to run; label_check_app is the label check as the app sends it (5e)")
-    p.add_argument("--round", type=int, help="the round of the notes, 1 or 2")
-    p.add_argument("--data-folder", help="the data folder of the workers, which results may not go under")
-    p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
-    p.add_argument("--kind", choices=sorted(speech_commands2.KINDS), default="ollama",
-                   help="the kind of engine at that address: ollama, llamacpp or vllm")
-    p.add_argument("--recording", nargs="*", help="only these recordings, by name")
-    p.add_argument("--arm", nargs="*", help="only these arms")
+    speech_commands2.add_calls_command(sub, say)
     p = sub.add_parser("speech-drugs")
     p.set_defaults(fn=cmd_speech_drugs)
     p.add_argument("--month", required=True, help="the month of the drug file, as YYYYMM")

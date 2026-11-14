@@ -230,3 +230,73 @@ def test_6c_the_bench_command_names_the_parts_reading_and_the_marks(tmp_path, mo
     assert cli.main(["speech-stop-marks", "--local", "l", "--parts", "p", "--cloud", "c", "--recordings", "r", "--scripts", "a",
                      "--marks", "m", "--write", "w"]) == 0
     assert [str(x) for x in seen[1][0][:4]] == ["l", "p", "c", "None"] and str(seen[1][0][7]) == "w"
+
+
+def test_6c_ruling_22_speech_calls_takes_the_claude_kind_with_the_models_name_and_the_key_folder_and_sends_only_the_text_of_a_page(stored, tmp_path, server, monkeypatch, capsys):
+    # 15.10 ruling 22; 15.13 rulings 8 and 21; 7.3 rule 3. A made-up loopback server stands for the service; the key is made up.
+    import json
+
+    from openconsult.bench import claude
+    from openconsult.bench.speech import jobs
+    from openconsult.settings import keys
+    from tests.test_claude_kind import KEY_NAME, LIST_PATH, MADE_KEY, TAG, holds_no_key, listed, message_reply, messages
+
+    def by_form(body):
+        if "doubtful" in body["output_config"]["format"]["schema"]["properties"]:
+            return message_reply(json.dumps({"doubtful": []}))
+        count = len(re.findall(r"^\[\d+\] ", body["messages"][0]["content"], flags=re.M))
+        return message_reply(json.dumps({"lines": [{"line": i, "label": "doctor" if i % 2 else "patient"} for i in range(1, count + 1)]}))
+
+    server.routes[LIST_PATH] = listed()
+    server.routes["/v1/messages"] = by_form
+    monkeypatch.setattr(claude, "ADDRESS", server.address)                    # the made service in the service's place
+    said = stored["said"]
+    out = tmp_path / "haiku"
+    shutil.copytree(stored["out"] / "results", out / "results")
+    key_folder = tmp_path / "keys"
+    key_folder.mkdir()
+
+    def run(job, where=out, folder=key_folder, address=None):
+        return commands2.speech_calls(where, stored["folder"], [stored["scripts"]], job, None, stored["data"], say=said.append,
+                                      engine_address=address or server.address, engine_kind="claude", model=TAG, key_folder=folder)
+
+    # Refused before anything is sent: no key folder; a key folder with no key; results under the key folder; another address.
+    assert run("label_check", folder=None) == 10 and said[-1] == words.BENCH_UPLOAD_NO_KEY.format(service="The claude kind", name=KEY_NAME)
+    assert run("label_check") == 10 and said[-1] == words.BENCH_NO_KEY_FOUND.format(name=KEY_NAME, path=key_folder / keys.KEY_FILE)
+    (key_folder / keys.KEY_FILE).write_text(f"{KEY_NAME}={MADE_KEY}\n", encoding="utf-8")
+    under = key_folder / "out"
+    shutil.copytree(stored["out"] / "results", under / "results")
+    assert run("label_check", where=under) == 6
+    assert run("label_check", address="https://example.invalid") == 10 and "alone" in said[-1]
+    assert server.received == [] and not (out / "calls").exists()
+    # The three readings, each call through the door with the approved prompt and the app's own form.
+    assert [run(job) for job in ("label_check", "label_check_parts", "drug_name")] == [0, 0, 0]
+    sent = messages(server)
+    assert len(sent) == 3 + 6 + 3 and all(headers["x-api-key"] == MADE_KEY for _, headers in sent)
+    results = ResultWriter(out / "calls").read_all()
+    texts = {text for (job, _), record in results.items() for text in ([record["user"]] if isinstance(record["user"], str) else record["user"])}
+    for body, _ in sent:
+        # Only the text of a page: the model's name, the limit, the prompt, the one message, the form, thinking off. No effort, no name of a recording.
+        assert sorted(body) == ["max_tokens", "messages", "model", "output_config", "system", "thinking"]
+        assert body["model"] == TAG and sorted(body["output_config"]) == ["format"] and body["thinking"] == {"type": "disabled"}
+        assert body["system"] in (jobs.prompt_text("label_check"), jobs.prompt_text("drug_name"))
+        assert len(body["messages"]) == 1 and body["messages"][0]["role"] == "user" and body["messages"][0]["content"] in texts
+        assert body["messages"][0]["content"].startswith("TRANSCRIPT:\n[1] ")
+        for name in ("nemotron", "whisperx", "one", "wav", "recording"):
+            assert name not in json.dumps({key: value for key, value in body.items() if key not in ("system", "messages")})
+    whole = results[("label_check", PAGES[0])]
+    assert whole["engine"]["tag"] == TAG and whole["call"]["ok"] and whole["counts"] == {"named_twice": 0, "dropped": 0, "made_unsure": []}
+    assert results[("drug_name", PAGES[0])]["call"]["max_tokens"] == 3000                    # the app's limit (the plan of 6c, point 14)
+    # The made key is in no result, no record and no printed line.
+    assert holds_no_key(json.dumps([r for r in results.values()]), "\n".join(str(line) for line in said), capsys.readouterr().out)
+    for row in ModelCalls(open_database(out / "calls" / "calls.db")).rows():
+        assert holds_no_key(json.dumps(row)) and row["engine"] == "claude"
+    # A result that exists is never asked again; no call is sent a second time.
+    assert run("label_check") == 0 and len(messages(server)) == 12
+    # The service refuses the key: the result is written apart, nothing more is sent, and the run stops with its own code.
+    server.routes["/v1/messages"] = (401, {"type": "error", "error": {"type": "authentication_error", "message": "made-up"}})
+    stopped = tmp_path / "stopped"
+    shutil.copytree(stored["out"] / "results", stopped / "results")
+    assert run("label_check", where=stopped) == 11 and len(messages(server)) == 13
+    assert said[-2].startswith("STOP: ") and "written apart" in said[-2]
+    assert ResultWriter(stopped / "calls").read_all() == {} and len(list((stopped / "calls" / "results" / "label_check" / "stopped").glob("*.json"))) == 1
