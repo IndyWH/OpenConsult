@@ -46,6 +46,11 @@ ADDRESS = "https://api.anthropic.com"
 KEY_NAME = "ANTHROPIC_API_KEY"
 VERSION = "2026-10-21"                        # the API version the service's reference gives (7 Nov 2026)
 EFFORTS = ("low", "medium", "high")           # the service's own setting; None sends nothing and the service's default stands
+# Thinking is switched off by the service's own field, which is no word a model reads. Claude Sonnet 5.5 refuses the
+# type disabled and takes between_tools, with nothing else in the field, at its default effort (15.10 ruling 30; the
+# service's own pages, read by Cowork on 14 Nov 2026). Every other model is sent what it was sent before.
+THINKING_OFF = {"type": "disabled"}
+THINKING_OFF_FOR = {"claude-sonnet-5-5": {"type": "between_tools"}}
 
 
 def engine_version(effort: str | None) -> str:
@@ -193,7 +198,7 @@ class ClaudeEngine(Stops):
         if self.effort:
             body["output_config"]["effort"] = self.effort
         if not call.think:
-            body["thinking"] = {"type": "disabled"}
+            body["thinking"] = dict(THINKING_OFF_FOR.get(call.tag, THINKING_OFF))
         return body
 
     def chat(self, call: Call) -> Reply:

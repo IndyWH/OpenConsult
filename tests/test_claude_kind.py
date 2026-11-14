@@ -455,3 +455,24 @@ def test_15_13_the_record_check_reads_thinking_in_a_reply_of_any_of_the_three_sh
     assert answer_text("not json") == (None, None)
     # A made engine of the suite is untouched by the new shape.
     assert FakeEngine().name == "made-up"
+
+
+def test_15_10_ruling_30_claude_sonnet_is_sent_thinking_off_by_its_own_field_and_claude_haikus_request_is_the_bytes_it_was():
+    # Step 6d, the plan review's point 4: Claude Sonnet 5.5 refuses thinking of the type disabled, so for that model alone the
+    # kind sends between_tools, with nothing else in the field. No effort is sent, no other field changes, and no word a
+    # model reads changes. The request for Claude Haiku is the same as before, byte for byte.
+    import hashlib
+    from openconsult.llm.ollama import encode
+    engine = ClaudeEngine(key=MADE_KEY)
+    haiku = engine.build_request(dataclasses.replace(CALL, tag="claude-haiku-5-5"))
+    # The figure was taken with the code as it stood before the kind learnt the other field.
+    assert hashlib.sha256(encode(haiku)).hexdigest() == "e37d0e7a102e027434dec5367f34f816ad9ffb7ddf1c509f26ef85fe56148b61"
+    assert haiku["thinking"] == {"type": "disabled"} and engine.build_request(CALL)["thinking"] == {"type": "disabled"}
+    sonnet = engine.build_request(dataclasses.replace(CALL, tag="claude-sonnet-5-5"))
+    assert sonnet["thinking"] == {"type": "between_tools"} and sonnet["model"] == "claude-sonnet-5-5"
+    same = lambda body: {k: v for k, v in body.items() if k not in ("model", "thinking")}   # noqa: E731
+    assert same(sonnet) == same(haiku) and set(sonnet) == set(haiku) and "effort" not in sonnet["output_config"]
+    assert sonnet["system"] == CALL.system and sonnet["messages"] == [{"role": "user", "content": CALL.user}]
+    # A call that asks for thinking sends no thinking field to either model, as before.
+    for tag in ("claude-haiku-5-5", "claude-sonnet-5-5"):
+        assert "thinking" not in engine.build_request(dataclasses.replace(CALL, tag=tag, think=True))
