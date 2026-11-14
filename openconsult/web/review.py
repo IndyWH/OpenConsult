@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import alarms, deletion, note, who_check
+from openconsult.consult import alarms, deletion, gate, note, who_check
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -31,7 +31,7 @@ from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
 router = APIRouter()
-GATE_REFUSALS = ("too_short", "empty")
+GATE_REFUSALS = gate.REFUSALS
 # A check of who spoke that failed or was refused at Stop before 6c: said at the control from its run, not among the warnings.
 CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).

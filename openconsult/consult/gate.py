@@ -27,6 +27,16 @@ TOO_SHORT_WORDS = 60
 LOW_CONFIDENCE = 0.60
 
 
+# The two warnings that are a refusal by rule one: no note is drafted for such a transcript.
+REFUSALS = ("too_short", "empty")
+
+
+def refused_in(warnings: list[dict]) -> bool:
+    """Whether the gate refused, read from the stored warnings: true after
+    a restart too, when the object that judged is gone (V1_LESSONS 1.12)."""
+    return any(w["kind"] in REFUSALS for w in warnings)
+
+
 @dataclass
 class Verdict:
     refused: bool

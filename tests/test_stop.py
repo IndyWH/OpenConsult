@@ -258,6 +258,47 @@ def test_1_12_15_9_ruling_37_a_consultation_left_at_the_stage_of_the_check_goes_
 
 
 
+def test_ruling_8_1_12_the_gates_refusal_is_remembered_after_a_restart_at_the_note_stage_and_no_note_is_drafted(tmp_path, clock, machine):
+    # The plan review of 6c, point 3: the note stage reads the refusal from the stored warnings, not from an object that is gone.
+    from openconsult.consult import gate
+    found = {}
+    for name, live in (("refused", [live_seg(1, 0.0, 0.5, "Hello.", "S1")]), ("judged_fit", LONG_LINES)):
+        folder = tmp_path / name
+        app, client = app_on(folder, clock, machine, MadeUpWorker(live=[live]))
+        set_up(client)
+        log_in(client)
+        client.post("/patients", data=PATIENT)
+        client.post("/consultations/start/1", data=TICKS)
+        first = app.state.parts.running[1]
+        first.begin_sound(CAPTURE)
+        first.sound(LOUD)
+        first.stop()
+        assert until(lambda: first.stop_stage == "who_spoke")
+        # As the app leaves it when it closes after the gate and before the note: the answer, the gate's warnings, the stage note.
+        rows = app.state.parts.consultations
+        rows.set_labels(1, speakers.labels_from_answer(rows.transcript_lines(1), "S1"))
+        verdict = gate.judge([r for r in rows.transcript_lines(1) if r["n"] is not None], first.speech_door.declares, "made-up")
+        for warning in verdict.warnings:
+            rows.add_warning(1, **warning)
+        rows.set(1, doctor_speaker="S1", stop_stage="note")
+        first.close()
+        engine = FakeEngine({"note": [NOTE]})
+        doors = {NEMOTRON.name: SpeechDoor(NEMOTRON, make_worker=MadeUpWorker, installed=lambda: True)}
+        app2 = build_app(store.build(folder, PORT), machine=machine, clock=clock, engines={"vllm": FakeEngine(version=None), "ollama": engine}, doors=doors)
+        client2 = browser(app2)
+        resumed = app2.state.parts.running[1]
+        assert resumed.stop_stage == "note" and resumed.final.refused is False          # the new object has judged nothing
+        log_in(client2)
+        client2.get("/consultations/1")
+        assert until(lambda: resumed.state == FINAL)
+        found[name] = (verdict.refused, len(engine.calls_for("note")), len(app2.state.parts.notes.drafts(1)), resumed.final.refused,
+                       words.NOTE_GATE_REFUSED.split(":")[0] in text_of(client2.get("/consultations/1")))
+        resumed.close()
+    assert found["refused"] == (True, 0, 0, True, True)         # no note call, no draft, and the page says why (R3)
+    assert found["judged_fit"] == (False, 1, 1, False, False)   # the twin: a transcript the gate passed gets its note
+
+
+
 NOTE = {"reasoning": "made up.", "subjective": [{"text": "made up history", "turns": [1]}], "objective": [],
         "assessment": [{"text": "made up impression", "turns": [0, 3]}], "plan": [{"text": "uncited plan", "turns": [9]}]}
 

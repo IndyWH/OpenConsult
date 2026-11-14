@@ -76,6 +76,9 @@ def draft_note(c: Consultation) -> None:
     refused (ruling 8; R3). The three figures of 6a are taken first, so
     Stop to final keeps its meaning; the note's seconds are a fourth."""
     c.final.figures = figures(c)
+    # The refusal is read from the stored warnings, not from this object's memory: a consultation
+    # that went on from this stage after a restart was judged by an object that is gone (ruling 8).
+    c.final.refused = gate.refused_in(c.rows.warnings(c.id))
     if c.final.refused or c.notes is None:
         return
     started = c.timer()
