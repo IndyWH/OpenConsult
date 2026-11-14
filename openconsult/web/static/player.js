@@ -11,30 +11,29 @@
   const data = document.getElementById('player-data');
   if (!audio || !data) return;
   const player = JSON.parse(data.textContent);
-  let from = 0;
   let stopAt = null;      // where a pressed line or stretch ends; null when the sound plays on
-  let watching = false;
+  let timer = null;
+  let moving = false;     // true while this script itself moves the sound to a press's start
 
+  // Stops at the end of the press's stretch. The browser's own time events come a quarter second apart, so a timer
+  // is set for what is left; it sets itself again when the sound started late.
   function stopIfReached() {
     if (stopAt === null) return;
-    const t = audio.currentTime;
-    // Moved away with the player's own bar: its controls play on as before.
-    if (t < from - 0.25 || t > stopAt + 0.75) { stopAt = null; return; }
-    if (t >= stopAt) { stopAt = null; audio.pause(); }
-  }
-  function watch() {
-    stopIfReached();
-    watching = stopAt !== null;
-    if (watching) window.requestAnimationFrame(watch);           // closer than the browser's own time events, a quarter second apart
+    const left = stopAt - audio.currentTime;
+    if (left <= 0) { stopAt = null; audio.pause(); return; }
+    window.clearTimeout(timer);
+    timer = window.setTimeout(stopIfReached, Math.max(10, left * 1000 / (audio.playbackRate || 1)));
   }
   function playFrom(start, end) {
-    from = start;
     stopAt = (end === undefined || Number.isNaN(end) || end <= start) ? null : end;
+    moving = true;
     audio.currentTime = start;
+    window.setTimeout(function () { moving = false; }, 500);
     audio.play();
-    if (stopAt !== null && !watching) { watching = true; window.requestAnimationFrame(watch); }
+    stopIfReached();
   }
-  // A pause with the player's own control before the end: the next play is the player's own and plays on.
+  // The player's own controls play on as before: a move with its bar, or a pause before the end, ends a press's stop.
+  audio.addEventListener('seeking', function () { if (moving) moving = false; else stopAt = null; });
   audio.addEventListener('pause', function () { if (stopAt !== null && audio.currentTime < stopAt) stopAt = null; });
   document.querySelectorAll('button.play-line, button.play-stretch').forEach(function (button) {
     button.addEventListener('click', function () { playFrom(Number(button.dataset.start), Number(button.dataset.end)); });

@@ -145,7 +145,7 @@ button.row-play { padding: .3rem .7rem; flex: none; }
 button.tick { width: 2.1rem; height: 2.1rem; padding: 0; border-radius: 50%; font-size: 1.05rem; line-height: 1; flex: none; }
 button.tick.not-ticked { background: transparent; border: 2px dashed #55946F; color: #55946F; font-weight: 400; }
 button.tick.not-ticked:hover { border-color: var(--green); color: var(--green); }
-button.tick.ticked, button.tick.ticked:hover { background: var(--green); border: 2px solid var(--green); color: #FFFFFF; font-weight: 700; }
+button.tick.ticked, button.tick.ticked:hover { background: var(--green); border: 2px solid var(--ink); color: #FFFFFF; font-weight: 700; }
 @media (forced-colors: active) { button.tick.ticked { border-width: 4px; } }
 @keyframes spin { to { transform: rotate(360deg); } }
 .alarm-fired { color: var(--red); font-weight: 600; }
