@@ -605,10 +605,11 @@ AFTER_FINAL_LINE = "{kind} at {when}, {lead} after final"
 LEAD_WORDS = {"seconds": ("1 second", "{n} seconds"), "minutes": ("1 minute", "{n} minutes"),
               "hours": ("1 hour", "{n} hours"), "days": ("1 day", "{n} days")}
 CALLS_HEADING = "The calls, in time order"
-CALL_KINDS = {"alarm": "pass {n}, the alarm", "assessment": "pass {n}, the assessment", "label_check": "the label check",
+CALL_KINDS = {"alarm": "pass {n}, the alarm", "assessment": "pass {n}, the assessment", "label_check": "the check of who spoke",
               "drug_name": "the check of drug names",
               "note": "note draft {n}, {asked}", "referrals": "the referral list", "letter": "letter {n}, {specialty}",
               "guideline": "guideline summary after pass {n}"}
+CALL_CHECK_PART = "the check of who spoke, part {n} of {parts}"
 CALL_ASKED_BY = {"stop": "at Stop", "draft": "by Draft the note", "again": "by Draft again"}
 CALL_UNKNOWN_KIND = "a call of the job {job}"
 CALL_LINE = "{time}: {kind}, {seconds} s, {outcome}."
@@ -619,7 +620,7 @@ CALL_NO_ROW = "No row of the record refers to this call; it is tied to the consu
 CALL_SEARCH_MS = "The search before this call took {ms} ms."
 CALL_FAILURE = "Failure: {detail}"
 CALL_TOKENS = "Tokens: {read} read, {written} written."
-KIND_WORDS = {"alarm": "alarm", "assessment": "assessment", "guideline": "guideline summary", "label_check": "label check",
+KIND_WORDS = {"alarm": "alarm", "assessment": "assessment", "guideline": "guideline summary", "label_check": "check of who spoke",
               "drug_name": "check of drug names",
               "note": "note", "referrals": "referral list", "letter": "letter"}
 WENT_IN_HEADING = "What went in, by source"

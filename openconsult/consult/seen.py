@@ -346,6 +346,11 @@ def references(consultations, notes, letters, sources, consultation_id: int) -> 
         for column, kind in (("alarm_call_id", "alarm"), ("assessment_call_id", "assessment")):
             if pass_row[column] is not None:
                 found[pass_row[column]] = ({"kind": kind, "pass_n": pass_row["n"]}, pass_row)
+    # Each call of a run of the who-spoke check, a part by its number (6c); a check at Stop before 6c is its run's one call.
+    for run in consultations.check_runs(consultation_id):
+        for k, call_id in enumerate(run["call_ids"], start=1):
+            if call_id is not None:
+                found[call_id] = ({"kind": "label_check", "part": k, "parts": run["parts"]}, run)
     drug_call = consultations.drug_call(consultation_id)
     if drug_call is not None and drug_call["call_id"] is not None:
         found[drug_call["call_id"]] = ({"kind": "drug_name"}, drug_call)

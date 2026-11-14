@@ -51,6 +51,9 @@ def test_ruling_28_R2_R18_the_view_is_reached_from_the_review_and_patient_pages_
     app, client, c = reviewed(tmp_path, clock, machine)
     p = app.state.parts
     checked(app, client)
+    # A call of the check made with no run to name it (as the bench of a later stage might leave one): shown as having no row.
+    from openconsult.consult import labels
+    labels.run(p.door, p.consultations.transcript_lines(1), 1)
     assert 'href="/consultations/1/calls"' in client.get("/consultations/1").text                  # the review page's link
     assert 'href="/consultations/1/calls"' in client.get("/patients/1").text and words.MODEL_SAW_LINK in text_of(client.get("/patients/1"))
     before = record_of(p)
@@ -60,8 +63,9 @@ def test_ruling_28_R2_R18_the_view_is_reached_from_the_review_and_patient_pages_
     calls = p.consultations.model_calls(1)
     assert len(calls) >= 3 and answer.text.count('<details class="call"') == len(calls)
     assert [f'id="call-{row["id"]}"' in answer.text for row in calls] == [True] * len(calls)        # every call, by its row
-    assert "pass 1, the alarm" in page and "pass 1, the assessment" in page and "the label check" in page
-    assert "note draft 1, at Stop" in page and words.CALL_NO_ROW in page                            # the label check: no row refers to it
+    assert "pass 1, the alarm" in page and "pass 1, the assessment" in page and "the check of who spoke" in page
+    assert "the check of drug names" in page and "the label check" not in page                      # the two calls of 6c, by their names
+    assert "note draft 1, at Stop" in page and page.count(words.CALL_NO_ROW) == 1                   # the run names its call; the other has no row
     model = words.LETTER_MODEL_LINE.format(model=p.door.profile.tag, engine="made-up", version="0.0-made-up")
     assert page.count(model) == len(calls)                                                           # R20, each call's own row
     main = main_of(answer.text)
@@ -139,3 +143,25 @@ def test_ruling_28_the_guideline_call_opens_to_its_passages_with_their_sources(t
     assert words.CALL_SEARCH_MS.format(ms=first["search_ms"]) in page                               # the review's point 1
     assert words.AVERAGE_LINE.format(kind="guideline summary", count=len(p.sources.answers(1)), mean=0.0, slowest=0.0, failed="") in page
     assert 'data-source="whole"' not in raw
+
+
+def test_6c_the_page_lists_each_call_of_the_check_a_part_by_its_number(tmp_path, clock, machine):
+    # The details of step 6c, The record: the page of the calls lists each call of the check, a part by its number.
+    from openconsult.consult import labels
+    app, client, c = reviewed(tmp_path, clock, machine)
+    p = app.state.parts
+    made = []
+    for _ in range(2):                       # two calls, as a long page read in two parts leaves them
+        _, outcome = labels.run(p.door, p.consultations.transcript_lines(1), 1)
+        made += outcome["call_ids"]
+    run = p.consultations.add_check_run(1, 2, 200)
+    p.consultations.end_check_run(run, "failed", reason="made up.", call_ids=made, named_twice=0, dropped=0)
+    answer = client.get("/consultations/1/calls")
+    page = text_of(answer)
+    assert words.CALL_CHECK_PART.format(n=1, parts=2) in page and words.CALL_CHECK_PART.format(n=2, parts=2) in page
+    assert words.CALL_NO_ROW not in page and answer.text.count('data-kind="label_check"') >= 2
+    first = answer.text.split(f'id="call-{made[0]}"')[1].split("</details>")[0]
+    assert 'data-source="lines"' in first and "label_check.frame.txt" in first                   # each read back from its frame
+    assert words.AVERAGE_LINE.format(kind="check of who spoke", count=2, mean=0.0, slowest=0.0, failed="") in page    # its seconds, by its name
+    assert "label check" not in page
+    c.close()

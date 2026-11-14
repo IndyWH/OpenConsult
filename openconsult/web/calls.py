@@ -29,6 +29,8 @@ def kind_words(name: dict) -> str:
     form = words.CALL_KINDS.get(name["kind"])
     if form is None:
         return words.CALL_UNKNOWN_KIND.format(job=name["kind"])
+    if name.get("parts", 1) > 1:
+        return words.CALL_CHECK_PART.format(n=name["part"], parts=name["parts"])
     return form.format(n=name.get("pass_n", name.get("n", "")), asked=words.CALL_ASKED_BY.get(name.get("asked_by", ""), ""),
                        specialty=name.get("specialty", ""))
 
