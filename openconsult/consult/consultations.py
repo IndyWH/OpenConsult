@@ -3,7 +3,8 @@ consultation itself with its stamps (R20), the live lines as shown, the
 lines at Stop as the choice gave them and as they stand after the label
 check, each pass as settled, and every warning the gate raised; since
 6b the doctor's edits to words and labels, each kept with what stood
-before (rulings 7 and 11). Adds and reads; the few columns that change
+before (rulings 7 and 11); since 6c the runs of the who-spoke check and
+the drug-name marks (check_rows.py). Adds and reads; the few columns that change
 as a consultation moves on are set by name. Nothing here reads a setting
 or talks to a model."""
 
@@ -12,13 +13,14 @@ from __future__ import annotations
 import json
 from dataclasses import asdict
 
+from openconsult.consult.check_rows import CheckRows
 from openconsult.db import Database
 from openconsult.patients.audit import Clock, now_local
 from openconsult.speech.lines import Line
 
 STATES = ("live", "stopping", "final")
 STOP_STAGES = ("who_spoke", "label_check", "checks", "gate", "note")
-EDIT_KINDS = ("words", "label", "undo", "swap")
+EDIT_KINDS = ("words", "label", "undo", "swap", "check")
 SWAPPED = {"doctor": "patient", "patient": "doctor"}
 LABELS = ("doctor", "patient", "unsure")
 SETTABLE = ("stopped_at", "final_at", "speech_stamp", "echo_cancellation", "noise_suppression", "auto_gain",
@@ -27,7 +29,7 @@ SETTABLE = ("stopped_at", "final_at", "speech_stamp", "echo_cancellation", "nois
 FORMATS = ("wav", "opus")
 
 
-class Consultations:
+class Consultations(CheckRows):
     def __init__(self, db: Database, clock: Clock = now_local):
         self._db = db
         self._clock = clock
@@ -179,7 +181,9 @@ class Consultations:
 
     def swap_labels(self, consultation_id: int) -> int:
         """v1's Swap: every doctor line becomes patient and every patient
-        line doctor; unsure lines stay. One edit row for the whole swap."""
+        line doctor; unsure lines stay. One edit row for the whole swap.
+        The labels before of a check's standing changes are exchanged too."""
+        self.swap_changes(consultation_id)
         for row in self.transcript_lines(consultation_id):
             if row["n"] is not None and row["label"] in SWAPPED:
                 self._db.execute("UPDATE transcript_line SET label = ?, set_by_doctor = 1 WHERE id = ?",

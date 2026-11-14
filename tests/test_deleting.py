@@ -18,7 +18,8 @@ from tests.fakes import FakeEngine, MadeUpWorker
 from tests.test_review_page import LINES, engine_with, nemotron_doors, run_through
 from tests.test_start import PATIENT, TICKS, app_with
 
-TABLES = ("letter_edit", "letter_approval", "letter", "referral_item", "referral_list", "note_edit", "note_entry", "note_approval", "note_refusal", "note_draft", "transcript_edit", "transcript_line",
+TABLES = ("letter_edit", "letter_approval", "letter", "referral_item", "referral_list", "note_edit", "note_entry", "note_approval", "note_refusal", "note_draft", "transcript_edit",
+          "drug_mark", "drug_name_call", "speaker_check_change", "speaker_check", "transcript_line",
           "live_line", "warning", "cds_pass", "guideline_answer", "model_call", "consultation")
 
 
@@ -27,6 +28,8 @@ def rows_of(db, cid):
     for table in TABLES:
         if table == "consultation":
             found[table] = db.query_one("SELECT COUNT(*) AS n FROM consultation WHERE id = ?", (cid,))["n"]
+        elif table == "speaker_check_change":
+            found[table] = db.query_one("SELECT COUNT(*) AS n FROM speaker_check_change WHERE check_id IN (SELECT id FROM speaker_check WHERE consultation_id = ?)", (cid,))["n"]
         elif table in ("letter_edit", "letter_approval"):
             found[table] = db.query_one(f"SELECT COUNT(*) AS n FROM {table} WHERE letter_id IN (SELECT id FROM letter WHERE consultation_id = ?)", (cid,))["n"]
         elif table == "note_entry":
@@ -65,7 +68,15 @@ def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_
     client.post(f"/consultations/1/entries/{entry['id']}", data={"text": "edited words"})
     client.post("/consultations/1/note/approve")
     letters_rows(p, 1)
+    # 6c: a run of the who-spoke check with one changed line, and the drug-name call with one mark (the details, The record).
+    run = p.consultations.add_check_run(1, 1, 2)
+    p.consultations.end_check_run(run, "answered", call_ids=[], labels={1: {"label": "patient", "changed_by_check": True, "unsure": False}},
+                                  changes=[(1, "doctor", "patient")], named_twice=0, dropped=0)
+    if p.consultations.drug_call(1) is None:
+        p.consultations.add_drug_call(1, None, "answered", None, 1, 0)
+    p.consultations.add_drug_mark(1, p.consultations.drug_call(1)["id"], 1, "made", "made-up drug", [1], [{"line": 1, "first": 0, "last": 4}])
     before = rows_of(p.db, 1)
+    assert before["speaker_check"] == 1 and before["speaker_check_change"] == 1 and before["drug_name_call"] == 1 and before["drug_mark"] >= 1
     assert before["letter"] == 2 and before["letter_edit"] == 1 and before["letter_approval"] == 1 and before["referral_item"] == 2
     assert before["transcript_line"] == 2 and before["cds_pass"] >= 1 and before["note_approval"] == 1 and before["note_edit"] == 1 and before["guideline_answer"] == 2
     recording = tmp_path / "recordings" / "consultation_1.wav"
@@ -83,9 +94,10 @@ def test_ruling_8_D44_10_5_delete_removes_every_row_in_one_transaction_then_the_
     assert line.event == "consultation.deleted"
     assert line.detail == (f"patient 1, consultation 1 of 2026-10-04: 1 letter edits, 1 letter approvals, 2 letters, 2 referral items, "
                            f"1 referral lists, {before['note_edit']} edits, {before['note_entry']} entries, "
-                           f"1 approvals, 0 refusals, 1 drafts, 0 transcript edits, 2 lines, 2 live lines, {before['warning']} warnings, "
+                           f"1 approvals, 0 refusals, 1 drafts, 1 transcript edits, {before['drug_mark']} drug marks, 1 drug name calls, "
+                           f"1 check changes, 1 check runs, 2 lines, 2 live lines, {before['warning']} warnings, "
                            f"{before['cds_pass']} passes, 2 guideline answers, {before['model_call']} model calls, 1 recording file, {size} bytes")
-    for word in ("word", "Yes", "made up", "edited"):
+    for word in ("word", "Yes", "made up", "edited", "made-up drug"):
         assert word not in line.detail                                                       # no word of the note or a line
     # Gone from the patient's page, the earlier notes and the block (8.3); the Patients page still lists the patient.
     assert 'data-consultation="1"' not in client.get("/patients/1").text and words.NO_CONSULTATIONS in text_of(client.get("/patients/1"))

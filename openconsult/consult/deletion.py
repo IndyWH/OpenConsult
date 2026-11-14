@@ -43,6 +43,11 @@ ROW_DELETIONS = (
     ("refusals", "DELETE FROM note_refusal WHERE consultation_id = ?"),
     ("drafts", "DELETE FROM note_draft WHERE consultation_id = ?"),
     ("transcript_edits", "DELETE FROM transcript_edit WHERE consultation_id = ?"),
+    # The rows of 6c: the marks before their call, the changes before their run, both before the model calls.
+    ("drug_marks", "DELETE FROM drug_mark WHERE consultation_id = ?"),
+    ("drug_name_calls", "DELETE FROM drug_name_call WHERE consultation_id = ?"),
+    ("check_changes", "DELETE FROM speaker_check_change WHERE check_id IN (SELECT id FROM speaker_check WHERE consultation_id = ?)"),
+    ("check_runs", "DELETE FROM speaker_check WHERE consultation_id = ?"),
     ("lines", "DELETE FROM transcript_line WHERE consultation_id = ?"),
     ("live_lines", "DELETE FROM live_line WHERE consultation_id = ?"),
     ("warnings", "DELETE FROM warning WHERE consultation_id = ?"),

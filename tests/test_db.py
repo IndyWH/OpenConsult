@@ -256,7 +256,7 @@ def test_6_5_a_version_7_database_with_its_letters_comes_forward_to_8(tmp_path, 
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 8
+    assert new.version() >= 8          # 6c's version 9 comes with it, as the version 6 test allows for 7
     assert {"guideline_source", "guideline_passage", "guideline_answer"} <= set(new.tables())
     assert Users(new, Audit(new)).verify("example-password")
     assert new.query_one("SELECT text FROM note_approval")["text"] == "made up"
@@ -277,4 +277,65 @@ def test_6_5_a_version_7_database_with_its_letters_comes_forward_to_8(tmp_path, 
     with pytest.raises(sqlite3.DatabaseError):
         new.execute(answer, ("guessed",))
     new.execute(answer, ("below_floor",))
+    new.close()
+
+
+def test_6_5_a_version_8_database_with_its_checked_labels_comes_forward_to_9(tmp_path, monkeypatch):
+    # The owner's real database is at version 8 (stage 8b), with consultations whose check of who spoke ran at Stop.
+    # Step 6c (15.10, the details: The record; ruling 24): the edits keep their ids and the kind check is allowed;
+    # a check that answered at Stop is a run that counts as run, each line still marked with the answer's label before;
+    # a refused or failed one is a run that did not answer; the two counts are 0 for a reply the old rule took.
+    from openconsult.patients.audit import Audit
+    from openconsult.patients.users import Users
+
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 8)
+    old = open_database(path)
+    assert old.version() == 8 and "speaker_check" not in old.tables()
+    Users(old, Audit(old)).set_up("Dr", "Example", "example-password")
+    old.execute("INSERT INTO patient (name, date_of_birth, sex, created_at) VALUES ('Made-up', '1990-01-01', 'F', 't')")
+    for cid, doctor in ((1, "S1"), (2, "S1"), (3, "none"), (4, "S2")):
+        old.execute("INSERT INTO consultation (patient_id, started_at, intended_minutes, speech_choice, engine, model_tag, "
+                    "speakers_given, state, doctor_speaker, patient_name, patient_date_of_birth, patient_sex) "
+                    "VALUES (1, 't', 15, 'nemotron', 'vllm', 'tag', 2, 'final', ?, 'Made-up', '1990-01-01', 'F')", (doctor,))
+    line = ("INSERT INTO transcript_line (consultation_id, n, start_s, end_s, text, raw_speaker, label, changed_by_check, "
+            "revised_by_service, unsure, refused, set_by_doctor) VALUES (?, ?, 0.0, 1.0, 'made up', ?, ?, ?, 0, 0, ?, 0)")
+    # Consultation 1: the check answered and changed lines 1 (S1, the doctor by the answer) and 3 (S2); line 2 stands; one line refused.
+    for n, speaker, label, changed, refused in ((1, "S1", "patient", 1, 0), (2, "S2", "patient", 0, 0), (3, "S2", "doctor", 1, 0), (None, "S1", "unsure", 0, 1)):
+        old.execute(line, (1, n, speaker, label, changed, refused))
+    old.execute(line, (2, 1, "S1", "doctor", 0, 0))          # consultation 2: the reply was refused
+    old.execute(line, (3, 1, "S1", "doctor", 1, 0))          # consultation 3: I cannot tell, then the check named the doctor
+    old.execute(line, (4, 1, "S1", "patient", 0, 0))         # consultation 4: the call failed; consultation 5 has no check at all
+    call = ("INSERT INTO model_call (at, job, engine, model_tag, prompt_sha256, request, wall_ms, outcome, consultation_id) "
+            "VALUES (?, ?, 'vllm', 'tag', 'h', '{}', 1, ?, ?)")
+    old.execute(call, ("t1", "note", "ok", 1))
+    for at, outcome, cid in (("t2", "ok", 1), ("t3", "ok", 2), ("t4", "ok", 3), ("t5", "too_slow", 4)):
+        old.execute(call, (at, "label_check", outcome, cid))
+    old.execute("INSERT INTO warning (consultation_id, kind, detail) VALUES (2, 'label_check_refused', 'repeated 2')")
+    old.execute("INSERT INTO warning (consultation_id, kind, detail) VALUES (4, 'label_check_failed', 'too_slow')")
+    old.execute("INSERT INTO transcript_edit (consultation_id, at, kind, line_n, before, after) VALUES (1, 't', 'words', 2, 'made', 'made up')")
+    old.execute("INSERT INTO transcript_edit (consultation_id, at, kind, line_n, before, after) VALUES (1, 't', 'swap', NULL, NULL, NULL)")
+    old.execute("DELETE FROM transcript_edit WHERE id = 1")                      # so that an id kept is not an id made again
+    old.close()
+    monkeypatch.undo()
+    new = open_database(path)
+    assert new.version() == 9
+    assert {"speaker_check", "speaker_check_change", "drug_name_call", "drug_mark", "transcript_edit"} <= set(new.tables())
+    assert "transcript_edit_9" not in new.tables() and Users(new, Audit(new)).verify("example-password")
+    assert [(r["id"], r["kind"]) for r in new.query("SELECT * FROM transcript_edit")] == [(2, "swap")]
+    new.execute("INSERT INTO transcript_edit (consultation_id, at, kind, line_n, before, after) VALUES (1, 't', 'check', NULL, NULL, '2')")
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO transcript_edit (consultation_id, at, kind, line_n, before, after) VALUES (1, 't', 'other', NULL, NULL, NULL)")
+    runs = {r["consultation_id"]: dict(r) for r in new.query("SELECT * FROM speaker_check")}
+    assert sorted(runs) == [1, 2, 3, 4]
+    assert [(runs[c]["outcome"], runs[c]["reason"], runs[c]["named_twice"], runs[c]["dropped"], runs[c]["at_stop"]) for c in (1, 2, 3, 4)] == [
+        ("answered", None, 0, 0, 1), ("refused", "repeated 2", None, None, 1), ("answered", None, 0, 0, 1), ("failed", "too_slow", None, None, 1)]
+    assert (runs[1]["parts"], runs[1]["joined_lines"], runs[1]["call_ids"], runs[1]["changed"], runs[1]["asked_at"]) == (1, 3, "[2]", 2, "t2")
+    changes = [(r["check_id"], r["line_n"], r["label_before"], r["label_after"], r["undone_at"]) for r in new.query("SELECT * FROM speaker_check_change ORDER BY id")]
+    assert changes == [(runs[1]["id"], 1, "doctor", "patient", None), (runs[1]["id"], 3, "patient", "doctor", None),
+                       (runs[3]["id"], 1, "unsure", "doctor", None)]
+    assert new.query("SELECT * FROM drug_name_call") == [] and new.query("SELECT * FROM drug_mark") == []
+    assert new.query_one("SELECT COUNT(*) AS n FROM transcript_line")["n"] == 7 and new.query_one("SELECT COUNT(*) AS n FROM model_call")["n"] == 5
+    with pytest.raises(sqlite3.DatabaseError):
+        new.execute("INSERT INTO speaker_check (consultation_id, asked_at, outcome, parts, joined_lines) VALUES (1, 't', 'half', 1, 1)")
     new.close()

@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 8
+VERSION = 9
 
 MIGRATIONS = {
     1: """
@@ -450,5 +450,112 @@ CREATE TABLE guideline_answer (
     wall_ms INTEGER NOT NULL,
     shown INTEGER NOT NULL
 );
+""",
+    # Step 6c (spec 15.10, rulings 18 to 24 and the details of the step: The
+    # record; 15.9 rulings 37 and 39): each run of the who-spoke check with
+    # how it ended, its calls, and the two counts of ruling 24; each line a
+    # run changed, with its label before and after, so Undo puts back what
+    # stood; the drug-name call of Stop and each mark it left, with the
+    # drug the model named, which no page the doctor works on shows. The
+    # transcript's edits gain the kind check: SQLite cannot change a CHECK
+    # in place, so the table is made again with every row and its id. A
+    # version 8 folder comes forward with every row; a check that ran at
+    # Stop is written as a run, answered when its call was read and no
+    # refusal stands (the old rule took no reply with a line named twice or
+    # a number off the page, so both counts are 0), and each line still
+    # marked gets its change row, the label before being the answer's.
+    9: """
+CREATE TABLE speaker_check (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    asked_at TEXT NOT NULL,
+    ended_at TEXT,
+    outcome TEXT NOT NULL CHECK (outcome IN ('running', 'answered', 'failed', 'refused')),
+    reason TEXT,
+    parts INTEGER NOT NULL,
+    joined_lines INTEGER NOT NULL,
+    call_ids TEXT NOT NULL DEFAULT '[]',
+    changed INTEGER NOT NULL DEFAULT 0,
+    no_first_reading INTEGER NOT NULL DEFAULT 0,
+    named_twice INTEGER,
+    dropped INTEGER,
+    at_stop INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE speaker_check_change (
+    id INTEGER PRIMARY KEY,
+    check_id INTEGER NOT NULL REFERENCES speaker_check(id),
+    line_n INTEGER NOT NULL,
+    label_before TEXT NOT NULL CHECK (label_before IN ('doctor', 'patient', 'unsure')),
+    label_after TEXT NOT NULL CHECK (label_after IN ('doctor', 'patient', 'unsure')),
+    undone_at TEXT
+);
+
+CREATE TABLE drug_name_call (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL UNIQUE REFERENCES consultation(id),
+    call_id INTEGER REFERENCES model_call(id),
+    at TEXT NOT NULL,
+    outcome TEXT NOT NULL CHECK (outcome IN ('answered', 'failed')),
+    reason TEXT,
+    kept INTEGER NOT NULL,
+    dropped INTEGER NOT NULL
+);
+
+CREATE TABLE drug_mark (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    drug_name_call_id INTEGER NOT NULL REFERENCES drug_name_call(id),
+    joined_line INTEGER NOT NULL,
+    heard TEXT NOT NULL,
+    meant TEXT NOT NULL,
+    page_lines TEXT NOT NULL,
+    places TEXT NOT NULL,
+    first_line INTEGER NOT NULL,
+    cleared_at TEXT
+);
+
+CREATE TABLE transcript_edit_9 (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    at TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK (kind IN ('words', 'label', 'undo', 'swap', 'check')),
+    line_n INTEGER,
+    before TEXT,
+    after TEXT
+);
+INSERT INTO transcript_edit_9 (id, consultation_id, at, kind, line_n, before, after)
+    SELECT id, consultation_id, at, kind, line_n, before, after FROM transcript_edit;
+DROP TABLE transcript_edit;
+ALTER TABLE transcript_edit_9 RENAME TO transcript_edit;
+
+INSERT INTO speaker_check (consultation_id, asked_at, ended_at, outcome, reason, parts, joined_lines, call_ids, changed,
+                           named_twice, dropped, at_stop)
+    SELECT m.consultation_id, m.at, m.at,
+           CASE WHEN EXISTS (SELECT 1 FROM warning w WHERE w.consultation_id = m.consultation_id AND w.kind = 'label_check_refused') THEN 'refused'
+                WHEN m.outcome = 'ok' AND NOT EXISTS (SELECT 1 FROM warning w WHERE w.consultation_id = m.consultation_id AND w.kind = 'label_check_failed') THEN 'answered'
+                ELSE 'failed' END,
+           (SELECT w.detail FROM warning w WHERE w.consultation_id = m.consultation_id
+                AND w.kind IN ('label_check_refused', 'label_check_failed') ORDER BY w.id LIMIT 1),
+           1,
+           (SELECT COUNT(*) FROM transcript_line t WHERE t.consultation_id = m.consultation_id AND t.n IS NOT NULL),
+           '[' || m.id || ']',
+           (SELECT COUNT(*) FROM transcript_line t WHERE t.consultation_id = m.consultation_id AND t.changed_by_check = 1),
+           NULL, NULL, 1
+    FROM model_call m
+    WHERE m.job = 'label_check' AND m.consultation_id IS NOT NULL
+      AND m.id = (SELECT MAX(x.id) FROM model_call x WHERE x.job = 'label_check' AND x.consultation_id = m.consultation_id);
+UPDATE speaker_check SET named_twice = 0, dropped = 0 WHERE outcome = 'answered';
+
+INSERT INTO speaker_check_change (check_id, line_n, label_before, label_after)
+    SELECT s.id, t.n,
+           CASE WHEN c.doctor_speaker IS NULL OR c.doctor_speaker = 'none' OR t.raw_speaker IS NULL THEN 'unsure'
+                WHEN t.raw_speaker = c.doctor_speaker THEN 'doctor' ELSE 'patient' END,
+           t.label
+    FROM transcript_line t
+    JOIN consultation c ON c.id = t.consultation_id
+    JOIN speaker_check s ON s.consultation_id = t.consultation_id
+    WHERE t.changed_by_check = 1 AND t.n IS NOT NULL
+    ORDER BY t.consultation_id, t.n;
 """,
 }
