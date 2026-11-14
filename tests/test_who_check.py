@@ -399,3 +399,54 @@ def test_6c_a_check_that_answered_at_stop_before_6c_counts_as_already_run_and_un
     assert client.post("/consultations/1/lines/1/undo").status_code == 303
     assert p.consultations.line(1, 1)["label"] == "doctor"                                # the answer's label, as it was
     c.close()
+
+
+def test_ruling_18_the_line_above_the_note_after_a_check_that_changed_a_label_and_after_an_undo_and_the_note_is_never_touched(tmp_path, clock, machine):
+    from tests.test_review_page import NOTE
+    engine = engine_with(note=[NOTE, NOTE, NOTE], label_check=[said("patient", "patient", "unsure", "doctor")])
+    app, client, c = reviewed(tmp_path / "changed", clock, machine, engine)
+    p = app.state.parts
+
+    def count_on_approve():
+        return client.get("/consultations/1").text.split('id="warning-count"')[1].split("</a>")[0].split(">")[-1].strip()
+
+    def entries():
+        return [(e["id"], e["text"], e["lines"]) for e in p.notes.entries(p.notes.current_draft(1)["id"])]
+
+    before, count_before = entries(), count_on_approve()
+    assert words.NOTE_SPEAKERS_CHANGED not in text_of(client.get("/consultations/1"))
+    press(app, client)                                          # line 1 changes to patient, and is marked
+    raw, page = client.get("/consultations/1").text, text_of(client.get("/consultations/1"))
+    assert page.count(words.NOTE_SPEAKERS_CHANGED) == 1 and raw.find('id="note"') < raw.find('id="speakers-changed"') < raw.find('id="section-subjective"')
+    # The draft is not touched: no entry changed, removed or written again, and nothing was drafted by itself.
+    assert entries() == before and len(p.notes.drafts(1)) == 1 and len(engine.calls_for("note")) == 1
+    # It counts as one warning on Approve, beside the row of the changed line; Draft the note again is offered, as after an edit by hand.
+    number = int(count_before.split()[0])
+    assert count_on_approve() == words.WARNINGS_COUNT.format(count=number + 2)
+    assert 'id="draft" aria-describedby="draft-refusal" disabled' not in raw and words.DRAFT_AGAIN in page
+    assert 'id="approve" aria-describedby="approve-refusal" disabled' not in raw                 # it never blocks Approve
+    # Drafted again, from the speakers as they stand now: the line goes, and the earlier draft is kept.
+    assert client.post("/consultations/1/note/draft").status_code == 303
+    assert "[0] Patient: What brings you in today?" in engine.calls_for("note")[1].user
+    page = text_of(client.get("/consultations/1"))
+    assert words.NOTE_SPEAKERS_CHANGED not in page and len(p.notes.drafts(1)) == 2 and count_on_approve() == words.WARNINGS_COUNT.format(count=number + 1)
+    # An Undo of the check's change: the same line shows again (Cowork's detail of ruling 18), and goes with the next draft.
+    assert client.post("/consultations/1/lines/1/undo").status_code == 303
+    page = text_of(client.get("/consultations/1"))
+    assert words.NOTE_SPEAKERS_CHANGED in page and count_on_approve() == words.WARNINGS_COUNT.format(count=number + 1) and len(engine.calls_for("note")) == 2
+    assert client.post("/consultations/1/note/draft").status_code == 303
+    assert words.NOTE_SPEAKERS_CHANGED not in text_of(client.get("/consultations/1")) and len(engine.calls_for("note")) == 3
+    c.close()
+    # The twin: a check that marks no line, and an edit of a label by hand, do not show the line (the edit still offers Draft again).
+    engine = engine_with(label_check=[said("doctor", "patient", "patient", "unsure")])
+    app, client, c = reviewed(tmp_path / "unchanged", clock, machine, engine)
+    press(app, client)
+    assert app.state.parts.consultations.check_runs(1)[0]["changed"] == 0 and app.state.parts.consultations.check_runs(1)[0]["no_first_reading"] == 1
+    raw, page = client.get("/consultations/1").text, text_of(client.get("/consultations/1"))
+    assert words.NOTE_SPEAKERS_CHANGED not in page and words.CHECK_CHANGED_NONE in page          # the page does not contradict itself
+    assert 'id="draft" aria-describedby="draft-refusal" disabled' in raw
+    text = app.state.parts.consultations.line(1, 4)["text"]
+    assert client.post("/consultations/1/lines/4", data={"label": "patient", "text": text}).status_code == 303
+    raw, page = client.get("/consultations/1").text, text_of(client.get("/consultations/1"))
+    assert words.NOTE_SPEAKERS_CHANGED not in page and 'id="draft" aria-describedby="draft-refusal" disabled' not in raw
+    c.close()

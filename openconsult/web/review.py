@@ -130,6 +130,10 @@ def note_state(p, row: dict, gate_refused: bool) -> dict:
     entries = p.notes.entries(draft["id"]) if draft else []
     has_note = bool(draft and not draft["refused"] and not draft["failure"])
     later_edit = draft is not None and (p.consultations.last_edit_id(cid) or 0) > (draft["last_edit_id"] or 0)
+    # Ruling 18: the check, or an Undo of its change, later than the draft on the page. The note is never touched
+    # or drafted again by itself: the page says so above it, and Draft the note again is offered as after any edit.
+    speakers_changed = has_note and any(e["kind"] in ("check", "undo") and e["id"] > (draft["last_edit_id"] or 0)
+                                        for e in p.consultations.transcript_edits(cid))
     if approval:
         draft_reason = words.NOTE_READ_ONLY
     elif gate_refused:
@@ -147,7 +151,7 @@ def note_state(p, row: dict, gate_refused: bool) -> dict:
     refuse_reason = (words.ALREADY_APPROVED if approval else words.ALREADY_REFUSED if refused_by_doctor
                      else words.NOTHING_TO_APPROVE if not has_note else None)
     return {"draft": draft, "entries": entries, "sections": {s: [e for e in entries if e["section"] == s] for s in note.SECTIONS},
-            "approval": approval, "refused_by_doctor": refused_by_doctor, "has_note": has_note,
+            "approval": approval, "refused_by_doctor": refused_by_doctor, "has_note": has_note, "speakers_changed": speakers_changed,
             "earlier": len(drafts) - 1 if drafts else 0,
             # After Approve the whole page is read-only; after Refuse the entries are, the transcript is not.
             "entries_read_only": bool(approval or refused_by_doctor), "transcript_read_only": bool(approval),
@@ -193,6 +197,7 @@ def page_data(p, row: dict) -> dict:
                      transcript_reason=words.CHECK_RUNNING, draft_reason=words.CHECK_RUNNING,
                      approve_reason=words.CHECK_RUNNING, refuse_reason=words.CHECK_RUNNING)
     player = player_data(row, lines, warnings, p.settings.data_folder)
+    counted = len(warnings) + (1 if state["speakers_changed"] else 0)        # the line of ruling 18 counts as one warning on Approve
     pass_rows = p.consultations.passes(cid)
     differentials = note.last_shown_differentials(pass_rows)
     marks = alarms.review_marks(pass_rows, [d.get("condition") for d in differentials if isinstance(d, dict)])
@@ -207,7 +212,7 @@ def page_data(p, row: dict) -> dict:
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
             "conversion_failed": words.CONVERSION_FAILED.format(reason=row["conversion_failure"]) if row.get("conversion_failure") else None,
-            "warning_count": words.WARNING_ONE if len(warnings) == 1 else words.WARNINGS_COUNT.format(count=len(warnings)),
+            "warning_count": words.WARNING_ONE if counted == 1 else words.WARNINGS_COUNT.format(count=counted),
             "differentials": differentials,
             "gate_refused": gate_refused, "gate_reason": gate_reason, "model_line": model_line_of(row),
             "date": words.plain_date(datetime.fromisoformat(row["started_at"])), **state,

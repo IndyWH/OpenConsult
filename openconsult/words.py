@@ -268,6 +268,8 @@ DRUG_NOT_PROVEN = ("A drug name with no mark is not proven right. The model can 
 DRUG_CHECK_FAILED = "The check of drug names did not run: {reason} No drug name is marked."
 # A draft, for the owner to correct (the details of step 6c, The sentences).
 DRUG_MARKED_ONE = "The language model marked 1 drug name it doubts. Press the marked line to hear the word, then type the name."
+# Above the note when the check, or an Undo of it, changed who spoke after the note was written (15.10 ruling 18). The owner's.
+NOTE_SPEAKERS_CHANGED = "Who spoke has changed since this note was written. Draft the note again to write it from the speakers as they stand now."
 # The who-spoke check on the review page (15.10 ruling 19; 15.9 ruling 37). The owner's sentences, letter for letter.
 CHECK_WHO_SPOKE = "Check who spoke"
 CHECK_WHO_SPOKE_LINE = ("The language model reads the transcript and changes the speaker where the words point to the other person. "

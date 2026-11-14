@@ -28,6 +28,7 @@
     {% else %}<span class="mark">{{ words.NOTE_DRAFT_LINE }}</span>{% endif %}
   </div>
   <div class="pane-body">
+    {% if speakers_changed %}<p class="statement no-print" id="speakers-changed">{{ words.NOTE_SPEAKERS_CHANGED }}</p>{% endif %}
     {% if gate_refused %}<p class="failed" id="note-state">{{ words.NOTE_GATE_REFUSED.format(reason=gate_reason) }}</p>
     {% elif not draft %}<p class="mark" id="note-state">{{ words.NO_NOTE_YET }}</p>
     {% elif draft.failure %}<p class="failed" id="note-state">{{ words.NOTE_CALL_FAILED.format(reason=draft.failure) }}</p>

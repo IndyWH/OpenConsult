@@ -297,7 +297,8 @@ def test_ruling_7_a_label_the_check_changed_is_undone_with_one_press_and_a_line_
     assert [(l["label"], l["changed_by_check"]) for l in lines] == [("patient", 1), ("doctor", 0)]   # line 2 had no first reading (ruling 14)
     page = text_of(client.get("/consultations/1"))
     assert words.WARN_LABEL_CHANGED.format(n=1, label="Patient") in page and words.UNDO_LABEL in page
-    assert words.WARNINGS_COUNT.format(count=3) in page                                   # the changed label among the warnings
+    assert words.WARNINGS_COUNT.format(count=4) in page                                   # the changed label among the warnings, and the line of ruling 18
+    assert words.NOTE_SPEAKERS_CHANGED in page
     assert client.post("/consultations/1/lines/1/undo").status_code == 303
     line = p.consultations.line(1, 1)
     assert (line["label"], line["changed_by_check"], line["set_by_doctor"], line["unsure"]) == ("doctor", 0, 1, 0)   # the label before the check
