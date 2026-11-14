@@ -128,7 +128,7 @@ class Consultations(CheckRows):
         return [dict(r) for r in rows]
 
     def set_labels(self, consultation_id: int, labels: dict[int, dict]) -> None:
-        """After the label check: for each line number, its label, whether
+        """After the answer to which speaker was you: for each line number, its label, whether
         the check changed it, and whether it is unsure. The words are never
         touched here: only these three columns are set."""
         for n, row in labels.items():

@@ -4,7 +4,8 @@ turn, its number in square brackets, the speaker word, a colon and the
 words. The three speaker words are the bench's (15.9 ruling 22), typed
 here once and read by the bench too, so no word a model reads is new.
 The turns are built by the bench's own rule from the transcript lines as
-they stand after the label check and after any edit: neighbouring lines
+they stand, after the answer to which speaker was you, after the check of
+who spoke where the doctor asked for it, and after any edit: neighbouring lines
 of one label join, numbered from 0. No patient line is sent (D3). After
 the call, v1's citation check with its half line (ruling 8; R4), as plain
 functions apart from the call (V1_LESSONS 6.2)."""

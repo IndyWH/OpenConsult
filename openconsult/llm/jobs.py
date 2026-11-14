@@ -50,8 +50,8 @@ JOBS = {
     "label_check": Job(
         name="label_check", prompt="label_check", form="label_check", frames=("label_check",),
         max_tokens=3000, timeout_s=120.0,
-        on_failure="The labels stand as the who-spoke answer set them; the final page says the check "
-                   "did not run and why. Nothing is asked a second time.",
+        on_failure="The labels stand as they were; the review page says at the control that the check "
+                   "did not run and why, and offers it again. Nothing is asked a second time by itself.",
     ),
     # The drug-name call at Stop (15.9 rulings 18 and 39; 15.10 rulings 20 and 21). The bench's longest
     # reply was 1,237 tokens of its 1,500 on a page of nine minutes, so a longer page would pass 1,500:
