@@ -11,7 +11,7 @@
 {%- endmacro %}
 {% block head %}<link rel="stylesheet" href="/static/print.css" media="print">{% endblock %}
 {% block main %}
-<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}" data-kept="{{ kept_words }}">
+<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}">
 <script id="words" type="application/json">{{ words_json|safe }}</script>
 <script id="player-data" type="application/json">{{ player_json|safe }}</script>
 <script id="marks" type="application/json">{{ marks_json|safe }}</script>
@@ -64,7 +64,9 @@
 {# Two: Approve and Refuse, the count of warnings on the Approve control (R15). #}
 <section class="pane controls no-print" id="controls">
   <div class="pane-body control-row">
-    <form method="post" action="/consultations/{{ cid }}/note/approve" id="approve-form">
+    {# data-part marks each part of the page that a press on a row of a doubted name can change. After a name is kept on
+       leaving its box, the script fresh.js puts the app's own answer in place part by part (ruling 33). #}
+    <form method="post" action="/consultations/{{ cid }}/note/approve" id="approve-form" data-part>
       <button class="primary" id="approve" aria-describedby="approve-refusal" {% if approve_reason %}disabled{% endif %}>{{ words.APPROVE }}</button>
       <a href="#warnings" id="warning-count" class="warning-count">{{ warning_count }}</a>
       <a href="#alarms" id="alarm-count" class="warning-count">{{ alarm_count }}</a>
@@ -75,7 +77,7 @@
       <button id="refuse" aria-describedby="refuse-refusal" {% if refuse_reason %}disabled{% endif %}>{{ words.REFUSE }}</button>
       {{ refusal("refuse") }}
     </form>
-    <form method="post" action="/consultations/{{ cid }}/note/draft" id="draft-form">
+    <form method="post" action="/consultations/{{ cid }}/note/draft" id="draft-form" data-part>
       <button id="draft" aria-describedby="draft-refusal" {% if draft_reason %}disabled{% endif %}>{{ draft_control }}</button>
       {{ refusal("draft") }}
       {% if draft_reason and not (refused and refused.control == "draft") %}<p class="mark reason">{{ draft_reason }}</p>{% endif %}
@@ -93,14 +95,14 @@
 <section class="pane no-print" id="warnings">
   <div class="pane-head"><h2>{{ words.WARNINGS }}</h2></div>
   <div class="pane-body">
-    {% for sentence in drug_head %}<p class="statement drug-head">{{ sentence }}</p>{% endfor %}
+    <div id="drug-head" data-part>{% for sentence in drug_head %}<p class="statement drug-head">{{ sentence }}</p>{% endfor %}</div>
     {# The row of a doubted drug name, the one place to hear it, correct it and settle it (rulings 26 and 28): a form of
        its own that works with no script. Line n, the words with the doubted words as a field, play, the tick. #}
     {% if drug_marks %}<ul class="panel-list drug-rows" id="drug-rows">{% for m in drug_marks %}
-      <li class="drug-row" id="drug-mark-{{ m.id }}" data-kind="drug_mark" data-settled="{{ 'yes' if m.settled else 'no' }}">
+      <li class="drug-row" id="drug-mark-{{ m.id }}" data-kind="drug_mark" data-settled="{{ 'yes' if m.settled else 'no' }}" data-part>
         <form method="post" action="/consultations/{{ cid }}/marks/{{ m.id }}" class="drug-row-form">
           <button type="button" class="cite row-line" data-line="{{ m.n }}">{{ words.DRUG_ROW_LINE.format(n=m.n) }}</button>
-          <span class="row-words">{% for s in m.segments %}{% if s.kind == "plain" %}{{ s.text }}{% elif m.settled %}<span class="settled-words">{{ s.text }}</span>{% elif s.kind == "field" %}<input name="words" value="{{ s.text }}" class="doubted-field" size="{{ m.size }}" data-mark="{{ m.id }}" autocomplete="off" aria-label="{{ words.DRUG_FIELD_NAME.format(n=m.n) }}"{% if transcript_read_only %} readonly{% endif %}>{% else %}<mark class="doubted">{{ s.text }}</mark>{% endif %}{% endfor %}</span>
+          <span class="row-words">{% for s in m.segments %}{% if s.kind == "plain" %}{{ s.text }}{% elif m.settled %}<span class="settled-words">{{ s.text }}</span>{% elif s.kind == "field" %}<input name="words" value="{{ s.text }}" class="doubted-field" size="{{ m.size }}" autocomplete="off" aria-label="{{ words.DRUG_FIELD_NAME.format(n=m.n) }}"{% if transcript_read_only %} readonly{% endif %}>{% else %}<mark class="doubted">{{ s.text }}</mark>{% endif %}{% endfor %}</span>
           {% if player.available and m.start_s is not none and m.end_s is not none %}<button type="button" class="play-stretch row-play" data-start="{{ m.start_s }}" data-end="{{ m.end_s }}" aria-label="{{ words.PLAY_LINE }}" title="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
           {% set tick_name = (words.TICK_SETTLED_READ_ONLY if m.settled else words.TICK_OPEN_READ_ONLY) if transcript_read_only else (words.TICK_SETTLED if m.settled else words.TICK_OPEN) %}
           <button class="tick {{ 'ticked' if m.settled else 'not-ticked' }}" id="tick-{{ m.id }}" name="press" value="{{ 'open' if m.settled else 'settle' }}" aria-pressed="{{ 'true' if m.settled else 'false' }}" aria-label="{{ tick_name }}" title="{{ tick_name }}" aria-describedby="tick-{{ m.id }}-refusal"{% if transcript_read_only %} aria-disabled="true"{% endif %}>{% if m.settled %}&#10004;{% else %}&#10003;{% endif %}</button>
@@ -109,14 +111,14 @@
       </li>{% endfor %}</ul>{% endif %}
     {# Draft the note again, where the doctor is (the details of step 6d; R15): the same control a second time under
        the rows, only when the one at the top can act. One press, one draft, never by itself. #}
-    {% if drug_marks and not draft_reason %}<form method="post" action="/consultations/{{ cid }}/note/draft" id="draft-rows-form" class="draft-rows">
+    <div id="draft-rows-slot" data-part>{% if drug_marks and not draft_reason %}<form method="post" action="/consultations/{{ cid }}/note/draft" id="draft-rows-form" class="draft-rows">
       <input type="hidden" name="where" value="rows">
       <button id="draft-rows" aria-describedby="draft-rows-refusal">{{ draft_control }}</button>{{ refusal("draft-rows") }}</form>
-    {% else %}{{ refusal("draft-rows") }}{% endif %}
-    {% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
+    {% else %}{{ refusal("draft-rows") }}{% endif %}</div>
+    <div id="other-warnings" data-part>{% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
       {% elif player.available and w.line_n and w.line_start_s is not none %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}" data-start="{{ w.line_start_s }}" data-end="{{ w.line_end_s }}">{{ words.PLAY_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
-    {% elif not drug_marks %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}
+    {% elif not drug_marks %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}</div>
     <h3 class="mark" id="alarms">{{ words.ALARMS }}</h3>
     {% if alarms %}<ul class="panel-list">{% for a in alarms %}<li class="alarm-line" data-key="{{ a.key }}" data-n="{{ a.n }}">{{ a.text }}
       {% if player.available and a.start_s is not none %}<button type="button" class="play-at" data-start="{{ a.start_s }}">{{ words.PLAY_FROM_ALARM }}</button>{% endif %}</li>{% endfor %}</ul>
@@ -154,7 +156,7 @@
   </div>
   <div class="pane-body" id="final-transcript">
     {% for line in lines %}
-    <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}">
+    <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" data-part>
       <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
       {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" aria-label="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
       {% if transcript_read_only %}<span class="line-text">{% for piece, doubted in line.segments %}{% if doubted %}<mark class="doubted">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</span>{% if line.doubted %}<span class="mark doubted-word"> ({{ words.CHECK_THIS_NAME }})</span>{% endif %}{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
@@ -206,7 +208,8 @@
 <script src="/static/use.js"></script>
 <script src="/static/alarmdialog.js"></script>
 <script src="/static/review.js"></script>
-<script src="/static/kept.js"></script>
+<script src="/static/fresh.js"></script>
+<script src="/static/rows.js"></script>
 <script src="/static/letters.js"></script>
 <script src="/static/player.js"></script>
 {% endblock %}

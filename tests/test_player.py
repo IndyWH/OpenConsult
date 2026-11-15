@@ -8,7 +8,7 @@ import re
 from openconsult import words
 from openconsult.consult import opus
 from openconsult.web.review import STRIP_COLUMNS, player_data, strip_of
-from tests.conftest import ORIGIN, browser, changes, snapshot, text_of
+from tests.conftest import ORIGIN, browser, changes, log_in, snapshot, text_of
 from tests.fakes import MadeUpConverter
 from tests.test_review_page import reviewed
 
@@ -138,6 +138,11 @@ def test_6d2_fault_one_the_page_names_the_file_its_player_was_shown_with_and_onc
     # The address the script then gives the player, the name as a query the route does not read: the same Ogg.
     assert client.get("/consultations/1/recording?file=consultation_1.ogg").content == played.content
     assert shown_with() == "consultation_1.ogg"                                               # a page loaded again names the Ogg
+    # The script's question is the page's own and is not use (15.6): asked with ?quiet it does not put off the lock.
+    clock.advance(minutes=29)
+    assert client.get("/consultations/1/recording/file?quiet").text == "consultation_1.ogg"
+    clock.advance(minutes=2)
+    assert client.get("/consultations/1?quiet").status_code == 303 and log_in(client).status_code == 303
     # The recording gone (retention): no name, and the page names no file.
     (tmp_path / "recordings" / "consultation_1.ogg").unlink()
     gone = client.get("/consultations/1/recording/file")

@@ -6,10 +6,13 @@ lost at the next press, and after a press the page moved by itself. A
 made-up page and made-up replies; a made-up name stands for what the
 doctor types. The page's scripts are seen in a browser, not run here."""
 
+import json
+from html.parser import HTMLParser
+
 from openconsult import words
 from tests.conftest import refusal_on, text_of
 from tests.test_drug_marks import PAGE, REPLY
-from tests.test_drug_rows import DRAFT_OFF, TYPED, counted, events, mark_of, row, texts, tick
+from tests.test_drug_rows import CUT_PAGE, CUT_REPLY, DRAFT_OFF, TYPED, counted, events, mark_of, row, texts, tick
 from tests.test_review_marks import page_of, part
 from tests.test_review_page import NOTE, engine_with
 from tests.test_who_check import HeldEngine, reviewed, said
@@ -98,4 +101,105 @@ def test_R15_keep_on_a_read_only_page_is_refused_at_the_row_while_a_check_runs_a
     refused = tick(client, 1, words=TYPED, press="keep")
     assert refused.status_code == 400 and refusal_on(text_of(refused), "tick-1") == words.NOTE_READ_ONLY
     assert texts(p) == before and mark_of(p, 1)["standing"] == "met for min" and events(p) == []
+    c.close()
+
+
+# ------------------------------------------- the page after a keep, with no load
+
+class Parts(HTMLParser):
+    """The page cut at the parts it marks with data-part: the text outside
+    them, each part's name with the count of fields a doctor can change in
+    it, the fields outside every part, and whether a part stands in a part."""
+
+    VOID = ("input", "br", "hr", "img", "meta", "link")
+
+    def __init__(self, raw: str):
+        super().__init__(convert_charrefs=False)
+        self.outside, self.fields, self.loose, self.nested, self._depth, self._part = [], {}, [], 0, 0, None
+        self.feed(raw)
+
+    def handle_starttag(self, tag, attrs):
+        held = dict(attrs)
+        field = tag in ("input", "select", "textarea") and held.get("type") != "hidden"
+        if self._depth:
+            self.nested += "data-part" in held
+            self.fields[self._part] += field
+            self._depth += tag not in self.VOID
+        elif "data-part" in held:
+            self._part, self._depth = held["id"], 1
+            assert self._part not in self.fields, f"the part {self._part} is named twice"
+            self.fields[self._part] = 0
+        else:
+            self.outside.append(self.get_starttag_text())
+            if field:
+                self.loose.append(held.get("class"))
+
+    def handle_endtag(self, tag):
+        if self._depth:
+            self._depth -= 1
+        else:
+            self.outside.append(f"</{tag}>")
+
+    def handle_data(self, data):
+        if not self._depth:
+            self.outside.append(data)
+
+    handle_entityref = handle_charref = handle_comment = lambda self, data: self.handle_data(data)
+
+
+def player_data_of(raw: str) -> dict:
+    return json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])
+
+
+def outside_the_parts(raw: str) -> str:
+    # The stretch of a cleared mark leaves the player data, which stands outside the parts. No press reads a stretch from
+    # there: since ruling 29 each button carries its own start and end. So the data is compared without its stretches.
+    data = player_data_of(raw)
+    plain = raw.replace(json.dumps(data), json.dumps({**data, "stretches": []}))
+    assert plain != raw or data["stretches"] == []
+    # White space is folded: where a row has gone, the list holds one run of it fewer, which shows nothing.
+    return " ".join("".join(Parts(plain).outside).split())
+
+
+def test_ruling_33_everything_a_keep_changes_on_the_page_lies_inside_the_parts_the_page_marks_for_its_script(tmp_path, clock, machine):
+    # After a keep the page is not loaded: the script puts the app's own answer in place, part by part (fresh.js), and must
+    # then show what a load would show. So everything a keep can change has to lie inside a marked part. Three cases: new
+    # words on the first edit; another mark on the line cleared, its row gone; a line left with no words.
+    cleared = {"doubtful": [{"line": 2, "heard": "met for min", "meant": ""}, {"line": 2, "heard": "min twice", "meant": ""},
+                            {"line": 2, "heard": "at night", "meant": ""}]}
+    for name, page, reply, gone in (("new", PAGE, REPLY, []), ("cleared", PAGE, cleared, ["drug-mark-2"]), ("empty", CUT_PAGE, CUT_REPLY, [])):
+        app, client, c = reviewed(tmp_path / name, clock, machine, engine_with(drug_name=[reply]), page=page)
+        before = client.get("/consultations/1").text
+        assert tick(client, 1, words=TYPED, press="keep").status_code == 303
+        after = client.get("/consultations/1").text
+        assert before != after and outside_the_parts(before) == outside_the_parts(after), name
+        was, now = Parts(before), Parts(after)
+        # Each part is named once and none stands inside another, so a part can be put in place, or left, whole.
+        assert was.nested == now.nested == 0 and sorted(set(was.fields) - set(now.fields)) == gone and set(now.fields) <= set(was.fields)
+        assert all(after.count(f'id="{part}"') == 1 for part in now.fields)
+        # Review point 1c (ruling 12): a box or a choice the doctor can change stands in one part at most, so that a part
+        # holding unsaved words is left whole: a row holds its one box, a line its box and its speaker choice, and the
+        # note's own boxes stand in no part, so the note is never put in place.
+        for part, fields in now.fields.items():
+            expected = 1 if part.startswith("drug-mark-") else 2 if part.startswith("line-") else 0
+            assert fields == expected, (name, part, fields)
+        entries = len(app.state.parts.notes.entries(app.state.parts.notes.current_draft(1)["id"]))
+        assert now.loose == ["entry-text"] * entries and entries > 0
+        # The parts that hold what the keep changed: the row, the lines of the name, and Draft the note again in both places.
+        for part in ("approve-form", "draft-form", "drug-head", "drug-mark-1", "draft-rows-slot", "other-warnings", "line-1"):
+            assert part in now.fields, (name, part)
+        c.close()
+
+
+def test_6d2_nothing_of_the_kept_words_is_left_on_the_page(tmp_path, clock, machine):
+    # The details, The kept words go: no words can now stand typed and unsaved in a row the doctor has left, so the script
+    # that kept them in the browser's store, and what the page told it, are gone. What took their place sends to the app.
+    app, client, c = reviewed(tmp_path, clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
+    raw, _ = page_of(client)
+    assert "data-kept" not in raw and "data-mark" not in raw and "kept.js" not in raw
+    assert client.get("/static/kept.js").status_code == 404
+    for script in ("rows.js", "fresh.js"):
+        served = client.get(f"/static/{script}")
+        assert f'<script src="/static/{script}"></script>' in raw and served.status_code == 200
+        assert "sessionStorage" not in served.text and "localStorage" not in served.text
     c.close()

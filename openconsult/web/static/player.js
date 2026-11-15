@@ -61,10 +61,11 @@
     retaken = true;
     retake(held);
   }
-  // Only a page shown with the WAV asks: the conversion goes one way, and an Ogg stays.
+  // Only a page shown with the WAV asks: the conversion goes one way, and an Ogg stays. The question is the page's own
+  // and is not use (15.6): it must not put off the lock behind the back of the page's count.
   function ask() {
     if (!/\.wav$/.test(held || '')) return;
-    fetch(address + '/file').then(function (r) { return r.ok && !r.redirected ? r.text() : ''; }).then(function (name) {
+    fetch(address + '/file?quiet').then(function (r) { return r.ok && !r.redirected ? r.text() : ''; }).then(function (name) {
       if (changed(held, name.trim())) retake(name.trim());
     }).catch(function () {});
   }
@@ -85,11 +86,12 @@
   // The player's own controls play on as before: a move with its bar, or a pause before the end, ends a press's stop.
   audio.addEventListener('seeking', function () { if (moving) moving = false; else stopAt = null; });
   audio.addEventListener('pause', function () { if (stopAt !== null && audio.currentTime < stopAt) stopAt = null; });
-  document.querySelectorAll('button.play-line, button.play-stretch').forEach(function (button) {
-    button.addEventListener('click', function () { playFrom(Number(button.dataset.start), Number(button.dataset.end)); });
-  });
-  document.querySelectorAll('button.play-at').forEach(function (button) {
-    button.addEventListener('click', function () { playFrom(Number(button.dataset.start)); });
+  // One listener for the page: a row or a line that fresh.js put in place is a new node, and its play must work as after a load.
+  document.addEventListener('click', function (event) {
+    const button = event.target.closest ? event.target.closest('button.play-line, button.play-stretch, button.play-at') : null;
+    if (!button) return;
+    if (button.classList.contains('play-at')) playFrom(Number(button.dataset.start));
+    else playFrom(Number(button.dataset.start), Number(button.dataset.end));
   });
   audio.addEventListener('timeupdate', function () {
     const t = audio.currentTime;

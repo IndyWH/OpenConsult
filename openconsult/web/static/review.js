@@ -13,8 +13,10 @@
     line.classList.add('marked');
     line.scrollIntoView({block: 'center'});
   }
-  document.querySelectorAll('button.cite').forEach(function (button) {
-    button.addEventListener('click', function () { show(button.dataset.line); });
+  // One listener for the page: a row or a line that fresh.js put in place is a new node, and its line number must work as after a load.
+  document.addEventListener('click', function (event) {
+    const button = event.target.closest ? event.target.closest('button.cite') : null;
+    if (button) show(button.dataset.line);
   });
   // The red mark beside the assessment (15.11 ruling 9): a press shows the alarm the app matched.
   const marksNode = document.getElementById('marks');

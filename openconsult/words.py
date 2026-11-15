@@ -279,6 +279,10 @@ DRUG_FIELD_NAME = "The doubted words on line {n}"
 TICK_SETTLED_READ_ONLY = "Ticked as right."
 TICK_OPEN_READ_ONLY = "Not ticked."
 LINE_NO_WORDS = "No words are left on this line. They were part of a drug name that was corrected."
+# Leaving a row's box keeps the typed name (ruling 33). Shown at the row when the app did not take it; the reason has these two forms.
+NAME_NOT_SAVED = "This name was not saved: {reason}. It is still in the box."
+NOT_SAVED_NO_ANSWER = "OpenConsult did not answer"
+NOT_SAVED_ERROR = "OpenConsult answered with an error ({status})"
 # Above the note when the check, or an Undo of it, changed who spoke after the note was written (15.10 ruling 18). The owner's.
 NOTE_SPEAKERS_CHANGED = "Who spoke has changed since this note was written. Draft the note again to write it from the speakers as they stand now."
 # The who-spoke check on the review page (15.10 ruling 19; 15.9 ruling 37). The owner's sentences, letter for letter.

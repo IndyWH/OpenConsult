@@ -35,7 +35,8 @@ GATE_REFUSALS = gate.REFUSALS
 # A check of who spoke that failed or was refused at Stop before 6c: said at the control from its run, not among the warnings.
 CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
-SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE")
+SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE", "NAME_NOT_SAVED", "NOT_SAVED_NO_ANSWER",
+                "NOT_SAVED_ERROR")
 # The loudness strip is drawn in this many columns, each the loudest of its windows.
 STRIP_COLUMNS = 400
 
@@ -219,9 +220,6 @@ def page_data(p, row: dict) -> dict:
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
             "lines": lines, "warnings": warnings, "who_check": who, "drug_head": drug["head"], "drug_marks": drug["marks"],
-            # What the page script may do with words typed into a row and not yet ticked (kept.js): put them back, wait
-            # while a check of who spoke runs, or drop them once the page is read-only for good.
-            "kept_words": "wait" if who["running"] else "drop" if state["approval"] else "open",
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),

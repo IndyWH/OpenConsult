@@ -135,7 +135,7 @@ input.doubted-field {
   width: auto; max-width: 100%; margin: 0; padding: 0 .15rem; font: inherit; color: inherit; cursor: text;
   background: #FBE7B0; border: 1px solid transparent; border-radius: 2px; field-sizing: content;
 }
-input.doubted-field:focus, input.doubted-field.kept { background: var(--panel); border-color: var(--ink-soft); padding: .1rem .35rem; }
+input.doubted-field:focus, input.doubted-field.unsaved { background: var(--panel); border-color: var(--ink-soft); padding: .1rem .35rem; }
 input.doubted-field[readonly] { cursor: default; }
 .settled-words { font-weight: 600; }
 button.row-play { padding: .3rem .7rem; flex: none; }
