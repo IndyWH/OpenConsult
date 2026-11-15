@@ -403,7 +403,10 @@ async def tick_mark(request: Request, consultation_id: int, mark_id: int, user=D
     corrected by the function its own box uses; then the mark is settled,
     with the time. A press on a ticked tick opens it again; the line keeps
     what was typed. The button says which press it is, so a press from a
-    stale page never turns a mark the wrong way. The note is never
+    stale page never turns a mark the wrong way. A third press, keep, is
+    sent by the page's script when the doctor leaves the box (ruling 33):
+    the typed words go into the line as at the tick, and the mark is not
+    settled, so a stray click never settles a name. The note is never
     corrected by this: Draft the note again is offered, never run."""
     p = parts(request)
     row = final_row(request, consultation_id)
@@ -422,12 +425,14 @@ async def tick_mark(request: Request, consultation_id: int, mark_id: int, user=D
             p.audit.record("drug_name.opened", where)
         raise Redirect(back)
     if mark["settled_at"] is not None:
-        raise Redirect(back)                                              # ticked already: its words are locked
+        raise Redirect(back)                                              # ticked already: its words are locked, for a tick and for a keep
     typed = fields.get("words", mark["standing"]).strip()
     if not typed:
         return review_page(request, user, consultation_id, refused=(control, words.ENTRY_EMPTY))
     if typed != mark["standing"]:
         drug_marks.correct(p.consultations, p.audit, consultation_id, mark, typed)
+    if fields.get("press") == "keep":
+        raise Redirect(back)                                              # kept in the line, not settled: the tick stays faded
     p.consultations.settle_mark(mark_id)
     p.audit.record("drug_name.settled", where)
     raise Redirect(back)
