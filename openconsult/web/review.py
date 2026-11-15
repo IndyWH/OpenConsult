@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import alarms, deletion, drug_marks, gate, note, who_check
+from openconsult.consult import alarms, deletion, drug_marks, gate, note, reading, who_check
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -81,6 +81,15 @@ def press_start(start_s: float | None) -> float | None:
     """Where a press that plays a line or a row starts: one second before
     the line's own start, never before the start of the recording."""
     return None if start_s is None else max(0.0, round(start_s - PLAY_LEAD_S, 3))
+
+
+def turns_of(lines: list[dict]) -> list[dict]:
+    """The transcript as the reading view shows it (15.10 rulings 35 and
+    42): one entry for each turn of speech by the one rule of
+    reading.py, with the numbers of its first and last line. It is how
+    the page is shown: nothing of it is stored."""
+    return [{"first": entry["lines"][0]["n"], "last": entry["lines"][-1]["n"], "speaker": entry["speaker"], "lines": entry["lines"]}
+            for entry in reading.entries_of(lines)]
 
 
 def script_words() -> dict:
@@ -238,7 +247,8 @@ def page_data(p, row: dict) -> dict:
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
-            "lines": lines, "warnings": warnings, "who_check": who, "drug_head": drug["head"], "drug_marks": drug["marks"],
+            "lines": lines, "turns": turns_of(lines), "warnings": warnings, "who_check": who, "drug_head": drug["head"],
+            "drug_marks": drug["marks"],
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
                 date=words.plain_date(datetime.fromisoformat(row["started_at"]))),

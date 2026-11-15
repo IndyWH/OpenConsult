@@ -160,7 +160,18 @@
     {% if conversion_failed %}<p class="mark" id="conversion-failed">{{ conversion_failed }}</p>{% endif %}
   </div>
   <div class="pane-body" id="final-transcript">
-    {% for line in lines %}
+    {# The reading view (15.10 rulings 35 and 42 to 44): one entry for each turn of speech, the browser's own disclosure
+       element, sent closed. Closed, its summary shows the speaker, the numbers of its first and last line and the turn's
+       words as running text, the words of each line a piece of their own with the marks that line carries. A press on
+       the turn opens its lines in place, each exactly as before this view; then the running text is hidden, so the words
+       are shown once. Each piece is a marked part beside its line, so a kept name shows inside a closed turn too. #}
+    {% if turns %}<p id="turn-says" hidden>{{ words.TURN_PRESS }}</p>{% endif %}
+    {% for turn in turns %}
+    <details class="turn" id="turn-{{ turn.first }}">
+      <summary aria-describedby="turn-says"><span class="speaker">[{{ turn.first }}{% if turn.last != turn.first %}–{{ turn.last }}{% endif %}] {{ words.LABEL_WORDS[turn.speaker] }}</span>
+        <span class="turn-text">{% for line in turn.lines %}<span class="turn-line" id="turn-line-{{ line.n }}" data-part>{% for piece, mark in line.reading %}{% if mark %}<a class="turn-doubt" href="#drug-mark-{{ mark }}" title="{{ words.CHECK_THIS_NAME }}"><mark class="doubted">{{ piece }}</mark></a>{% else %}{{ piece }}{% endif %}{% endfor %}{% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}{% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}{% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}{% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}</span> {% endfor %}</span>
+      </summary>
+    {% for line in turn.lines %}
     <div class="line{% if line.changed_by_check %} changed{% endif %}" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" data-part>
       <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
       {# A line the check changed says so at its start, beside the speaker, with its Undo, and carries an edge: told by the
@@ -187,6 +198,8 @@
       {% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}
       {% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}
     </div>
+    {% endfor %}
+    </details>
     {% endfor %}
   </div>
 </section>

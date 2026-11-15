@@ -273,13 +273,15 @@ def review_data(rows: Consultations, consultation_id: int, lines: list[dict]) ->
     cleared, settled or not, in the order the names were heard; or one
     warning for a call that failed. A mark that is not settled counts on
     Approve and none blocks it. On each line: the words a mark that is not
-    settled doubts, and the line's words cut at them; a settled mark shows
-    no highlight. No note entry carries a sign (ruling 27). Nothing when
+    settled doubts, and the line's words cut at them, for the line
+    (segments) and for its turn in the reading view, where each doubted
+    stretch is a press to its row (reading); a settled mark shows no
+    highlight. No note entry carries a sign (ruling 27). Nothing when
     the call has not run (a consultation from before 6c, or a gate that
     refused). The drug the model named is never read here."""
     call = rows.drug_call(consultation_id)
     for line in lines:
-        line["doubted"], line["segments"] = [], [(line["text"], False)]
+        line["doubted"], line["segments"], line["reading"] = [], [(line["text"], False)], [(line["text"], None)]
     if call is None:
         return {"head": [], "rows": [], "marks": [], "open": 0}
     if call["outcome"] != "answered":
@@ -289,12 +291,15 @@ def review_data(rows: Consultations, consultation_id: int, lines: list[dict]) ->
     marks = rows.drug_marks(consultation_id)
     standing = [m for m in marks if m["settled_at"] is None]
     spans = spans_of(standing)
+    # The mark whose row a doubted stretch leads to: the first heard of those that begin it (the reading view, step 6e).
+    leads = {(place["line"], place["first"]): m["id"] for m in reversed(standing) for place in m["places"]}
     for line in lines:
         text, at, segments = line["text"], 0, []
         for first, last in spans.get(line["n"], []):
-            segments += [(text[at:first], False), (text[first:last], True)]
+            segments += [(text[at:first], None), (text[first:last], leads[(line["n"], first)])]
             at = last
-        line["segments"] = [s for s in segments + [(text[at:], False)] if s[0]]
+        line["reading"] = [s for s in segments + [(text[at:], None)] if s[0]]
+        line["segments"] = [(piece, mark is not None) for piece, mark in line["reading"]]
         line["doubted"] = [{"piece": text[place["first"]:place["last"]], "mark": m["id"]}
                            for m in standing for place in m["places"] if place["line"] == line["n"]]
     counted = (words.DRUG_MARKED.format(count=len(marks)) if len(marks) > 1 else words.DRUG_MARKED_ONE if marks

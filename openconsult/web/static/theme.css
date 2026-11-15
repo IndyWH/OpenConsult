@@ -187,6 +187,15 @@ button.cite:hover { text-decoration: underline; }
 .check-outcome .refusal:empty { display: none; }
 .transcript .line.changed { border-left: 4px solid var(--ink); padding-left: .5rem; }
 .changed-words { font-size: .85rem; font-weight: 600; }
+/* The reading view (15.10 rulings 35 and 42 to 44): a turn is the browser's own disclosure, with its own mark of one left
+   in sight; closed it reads as running text; opened, its running text is hidden so that the words are shown once. */
+.transcript details.turn { margin: 0 0 .6rem; }
+.transcript details.turn > summary { color: var(--ink); font-size: 1rem; line-height: 1.5; }
+.transcript details.turn[open] > summary .turn-text { display: none; }
+.transcript details.turn[open] > summary { margin-bottom: .4rem; }
+.transcript details.turn > .line { margin-left: 1rem; }
+.transcript summary .speaker { color: var(--ink-faint); font-size: .8rem; margin-right: .5rem; }
+a.turn-doubt { text-decoration: underline dotted; color: inherit; }
 .approved { color: var(--green); }
 .entry-form, .line-form, .undo-form, .swap { display: inline-flex; gap: .4rem; align-items: center; margin: 0; flex-wrap: wrap; }
 .entry-form input, .line-form input.line-text { width: auto; flex: 1; min-width: 18rem; margin-top: 0; }

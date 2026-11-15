@@ -279,6 +279,9 @@ DRUG_FIELD_NAME = "The doubted words on line {n}"
 TICK_SETTLED_READ_ONLY = "Ticked as right."
 TICK_OPEN_READ_ONLY = "Not ticked."
 LINE_NO_WORDS = "No words are left on this line. They were part of a drug name that was corrected."
+# The reading view of the transcript (15.10 rulings 35 and 42 to 44; the details of step 6e). Drafts, for the owner to
+# correct on screen. The first is what a screen reader is told at a turn, as its description and never as its name.
+TURN_PRESS = "Press to open or close the lines of this turn."
 # Leaving a row's box keeps the typed name (ruling 33). Shown at the row when the app did not take it; the reason has these two forms.
 NAME_NOT_SAVED = "This name was not saved: {reason}. It is still in the box."
 NOT_SAVED_NO_ANSWER = "OpenConsult did not answer"
