@@ -416,7 +416,10 @@ async def tick_mark(request: Request, consultation_id: int, mark_id: int, user=D
     if data["transcript_read_only"]:
         return review_page(request, user, consultation_id, refused=(control, data["transcript_reason"]))
     fields = await form_fields(request)
-    back, where = f"/consultations/{consultation_id}#drug-mark-{mark_id}", f"consultation {consultation_id}: line {mark['heard_first']}"
+    # With no script a row's press comes back at its row. The page's script keeps the place itself and asks for no anchor,
+    # which would carry the row to the top of the window, past the next one (ruling 34).
+    back = f"/consultations/{consultation_id}" + ("" if fields.get("place") == "keep" else f"#drug-mark-{mark_id}")
+    where = f"consultation {consultation_id}: line {mark['heard_first']}"
     if fields.get("press") == "open":
         if mark["settled_at"] is not None:
             p.consultations.settle_mark(mark_id, settled=False)

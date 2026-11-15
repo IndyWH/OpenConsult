@@ -127,7 +127,8 @@ a.doubted-word .mark { text-decoration: underline; }
 /* The row of a doubted drug name (15.10 rulings 26 and 28): line, words, play, tick. The field looks like the
    highlighted words until it takes the cursor; then it is a box to type in. With no style sheet it is a text field. */
 .drug-rows { list-style: none; padding-left: 0; }
-.drug-row { margin: .55rem 0; }
+/* A row at its anchor stands clear of the app's bar, which stays at the top of the window. */
+.drug-row { margin: .55rem 0; scroll-margin-top: 4.2rem; }
 .drug-row-form { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
 .drug-row-form .row-words { flex: 1 1 22rem; line-height: 1.9; }
 .drug-row-form .refusal { flex-basis: 100%; margin: 0; min-height: 0; }

@@ -7,6 +7,7 @@ made-up page and made-up replies; a made-up name stands for what the
 doctor types. The page's scripts are seen in a browser, not run here."""
 
 import json
+import re
 from html.parser import HTMLParser
 
 from openconsult import words
@@ -15,7 +16,7 @@ from tests.test_drug_marks import PAGE, REPLY
 from tests.test_drug_rows import CUT_PAGE, CUT_REPLY, DRAFT_OFF, TYPED, counted, events, mark_of, row, texts, tick
 from tests.test_review_marks import page_of, part
 from tests.test_review_page import NOTE, engine_with
-from tests.test_who_check import HeldEngine, reviewed, said
+from tests.test_who_check import HeldEngine, press, reviewed, said
 
 OTHER = "another made-up name"
 
@@ -202,4 +203,50 @@ def test_6d2_nothing_of_the_kept_words_is_left_on_the_page(tmp_path, clock, mach
         served = client.get(f"/static/{script}")
         assert f'<script src="/static/{script}"></script>' in raw and served.status_code == 200
         assert "sessionStorage" not in served.text and "localStorage" not in served.text
+    c.close()
+
+
+# ------------------------------------------------------ the page keeps its place
+
+def test_ruling_34_a_rows_press_that_asks_to_keep_the_pages_place_is_sent_to_no_anchor_and_one_that_does_not_goes_to_its_row(tmp_path, clock, machine):
+    # The room run of 15 Nov 2026: a press on a row came back with that row at the top of the window, past the next row.
+    # The page's script keeps the place itself and says so with the press; with no script the press comes back at its row.
+    app, client, c = reviewed(tmp_path, clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
+    for fields in ({"words": TYPED, "press": "keep"}, {"words": TYPED, "press": "settle"}, {"press": "open"}, {"words": OTHER, "press": "keep"}):
+        asked = tick(client, 1, place="keep", **fields)
+        assert asked.status_code == 303 and asked.headers["location"].endswith("/consultations/1"), fields
+    assert mark_of(app.state.parts, 1)["standing"] == OTHER                                    # each press still did its work
+    for fields in ({"words": TYPED, "press": "keep"}, {"words": TYPED, "press": "settle"}, {"press": "open"}):
+        plain = tick(client, 1, **fields)
+        assert plain.status_code == 303 and plain.headers["location"].endswith("/consultations/1#drug-mark-1"), fields
+    # At its anchor the row stands clear of the app's bar, which stays at the top of the window.
+    css = client.get("/static/theme.css").text
+    assert "scroll-margin-top" in css.split(".drug-row {")[1].split("}")[0] and "position: sticky; top: 0" in css.split("header.app {")[1].split("}")[0]
+    c.close()
+
+
+def test_ruling_34_the_page_marks_the_presses_that_keep_its_place_and_no_other(tmp_path, clock, machine):
+    engine = engine_with(drug_name=[REPLY], label_check=[said("patient", "patient", "doctor")])
+    app, client, c = reviewed(tmp_path, clock, machine, engine, page=PAGE)
+
+    def forms(raw: str) -> dict:
+        return {action.replace("/consultations/1/", ""): "data-stay" in rest for action, rest in re.findall(r'<form method="post" action="([^"]+)"([^>]*)>', raw)}
+
+    raw = client.get("/consultations/1").text
+    assert '<script src="/static/place.js"></script>' in raw and client.get("/static/place.js").status_code == 200
+    entry = app.state.parts.notes.entries(app.state.parts.notes.current_draft(1)["id"])[0]["id"]
+    before = forms(raw)
+    # A row, Save on a line, Swap and Save on a note entry keep the place.
+    for kept in ("marks/1", "marks/2", "lines/1", "lines/4", "lines/swap", f"entries/{entry}"):
+        assert before[kept] is True, kept
+    # Draft the note again, Approve and Refuse bring the page to the note; Check who spoke goes to its own place; Delete asks its question.
+    for moved in ("note/approve", "note/refuse", "note/draft", "who-check", "delete"):
+        assert before[moved] is False, moved
+    # After a check that changed lines, and an edit: Undo on a line and Undo all keep the place; Draft the note again under the rows does not.
+    press(app, client)
+    assert tick(client, 1, words=TYPED, press="keep").status_code == 303
+    after = forms(client.get("/consultations/1").text)
+    assert after["lines/1/undo"] is True and after["who-check/undo-all"] is True and after["note/draft"] is False
+    assert [action for action, stays in after.items() if stays and not action.startswith(("marks/", "lines/", "entries/", "who-check/undo-all"))] == []
+    assert 'id="draft-rows-form" class="draft-rows">' in client.get("/consultations/1").text
     c.close()
