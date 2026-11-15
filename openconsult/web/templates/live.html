@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% set title = words.LIVE_TITLE %}
 {% block main %}
-<div id="live" data-consultation="{{ consultation.id }}" data-piece-seconds="{{ piece_s }}" data-stopping="{{ words.STOPPING }}">
+<div id="live" data-consultation="{{ consultation.id }}" data-piece-seconds="{{ piece_s }}" data-stopping="{{ words.STOPPING }}" data-worklet-mark="{{ static_mark('recorder-worklet.js') }}">
 <script id="state" type="application/json">{{ state_json|safe }}</script>
 <script id="words" type="application/json">{{ words_json|safe }}</script>
 
@@ -57,9 +57,9 @@
 <dialog id="alarm-dialog" class="alarm-dialog"></dialog>
 <dialog id="passage-dialog" class="alarm-dialog passage-dialog"></dialog>
 </div>
-<script src="/static/alarmdialog.js"></script>
-<script src="/static/panels.js"></script>
-<script src="/static/guidelines.js"></script>
-<script src="/static/earlier.js"></script>
-<script src="/static/live.js"></script>
+<script src="{{ static('alarmdialog.js') }}"></script>
+<script src="{{ static('panels.js') }}"></script>
+<script src="{{ static('guidelines.js') }}"></script>
+<script src="{{ static('earlier.js') }}"></script>
+<script src="{{ static('live.js') }}"></script>
 {% endblock %}

@@ -213,7 +213,7 @@ def test_6d2_nothing_of_the_kept_words_is_left_on_the_page(tmp_path, clock, mach
     assert client.get("/static/kept.js").status_code == 404
     for script in ("rows.js", "fresh.js"):
         served = client.get(f"/static/{script}")
-        assert f'<script src="/static/{script}"></script>' in raw and served.status_code == 200
+        assert re.search(rf'<script src="/static/{re.escape(script)}\?v=[0-9a-f]{{12}}"></script>', raw) and served.status_code == 200
         assert "sessionStorage" not in served.text and "localStorage" not in served.text
     c.close()
 
@@ -245,7 +245,7 @@ def test_ruling_34_the_page_marks_the_presses_that_keep_its_place_and_no_other(t
         return {action.replace("/consultations/1/", ""): "data-stay" in rest for action, rest in re.findall(r'<form method="post" action="([^"]+)"([^>]*)>', raw)}
 
     raw = client.get("/consultations/1").text
-    assert '<script src="/static/place.js"></script>' in raw and client.get("/static/place.js").status_code == 200
+    assert re.search(r'<script src="/static/place\.js\?v=[0-9a-f]{12}"></script>', raw) and client.get("/static/place.js").status_code == 200
     entry = app.state.parts.notes.entries(app.state.parts.notes.current_draft(1)["id"])[0]["id"]
     before = forms(raw)
     # A row, Save on a line, Swap and Save on a note entry keep the place.

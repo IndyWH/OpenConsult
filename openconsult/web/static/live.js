@@ -101,7 +101,8 @@
       rate: context.sampleRate,
     };
     sendCapture(window.capture);
-    await context.audioWorklet.addModule('/static/recorder-worklet.js');
+    // The worklet's address carries the mark of its file, as every script the page names does: a stored older copy is never run.
+    await context.audioWorklet.addModule('/static/recorder-worklet.js?v=' + page.dataset.workletMark);
     const worklet = new AudioWorkletNode(context, 'pcm-forwarder');
     const pieceSamples = Math.round(context.sampleRate * pieceSeconds);
     worklet.port.onmessage = function (event) { if (!stopped) enqueue(toInt16(event.data), pieceSamples); };

@@ -80,7 +80,7 @@ def test_8_8_the_page_has_the_player_the_presses_and_the_strip_and_when_the_reco
 def test_ruling_4_the_printed_page_is_the_note_alone(tmp_path, clock, machine):
     app, client, c = reviewed(tmp_path, clock, machine)
     raw = client.get("/consultations/1").text
-    assert '<link rel="stylesheet" href="/static/print.css" media="print">' in raw
+    assert re.search(r'<link rel="stylesheet" href="/static/print\.css\?v=[0-9a-f]{12}" media="print">', raw)    # with the mark of its file (6d2)
     sheet = client.get("/static/print.css")
     assert sheet.status_code == 200
     hidden = sheet.text.split("{ display: none !important; }")[0]

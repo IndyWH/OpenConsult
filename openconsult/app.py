@@ -5,11 +5,9 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Callable
 
 from fastapi import FastAPI
-from fastapi.staticfiles import StaticFiles
 
 import asyncio
 
@@ -42,10 +40,9 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import calls as calls_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, patients as patients_web, review, routes, who_check as who_check_web
+from openconsult.web import calls as calls_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, pages, patients as patients_web, review, routes, who_check as who_check_web
 from openconsult.web.first_run import FirstRun
 
-STATIC = Path(__file__).parent / "web" / "static"
 # The finder the app uses at start; tests stand a quiet one in its place.
 find_converter_at_start = opus.find_converter
 
@@ -155,7 +152,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app = FastAPI(docs_url=None, redoc_url=None, openapi_url=None, lifespan=_lifespan)
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
-    app.mount("/static", StaticFiles(directory=STATIC), name="static")
+    app.mount("/static", pages.AskedEachTime(directory=pages.STATIC), name="static")
     for module in (routes, consult, live, review, who_check_web, patients_web, letters_web, guidelines_web, calls_web):
         app.include_router(module.router)
     return app

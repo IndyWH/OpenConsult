@@ -8,18 +8,50 @@ message landed, so a refusal can never be lost (V1_LESSONS 5.1).
 from __future__ import annotations
 
 import email
+import hashlib
 from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import parse_qsl
 
 from fastapi import Request
 from fastapi.responses import HTMLResponse
+from fastapi.staticfiles import StaticFiles
 from jinja2 import Environment, FileSystemLoader
 
 from openconsult import words
 
 TEMPLATES = Path(__file__).parent / "templates"
+STATIC = Path(__file__).parent / "static"
+MARK_LETTERS = 12
 _env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
+
+
+def static_mark(name: str, folder: Path = STATIC) -> str:
+    """The mark of a script or a style: the start of the sha256 of the
+    file's own bytes, read as the page is made. In the room check of 15
+    Nov 2026 the page was new and the browser ran its own stored copies of
+    older scripts, so two mends never ran. An address that carries the
+    mark changes when the file does, and no stored copy answers it."""
+    return hashlib.sha256((Path(folder) / name).read_bytes()).hexdigest()[:MARK_LETTERS]
+
+
+def static_address(name: str, folder: Path = STATIC) -> str:
+    """The address a page names for a script or a style, with its mark."""
+    return f"/static/{name}?v={static_mark(name, folder)}"
+
+
+class AskedEachTime(StaticFiles):
+    """The static files, served so that a browser asks each time whether
+    its copy is still good, and is told so with a 304 when it is. With
+    nothing said, a browser may keep a file for a tenth of its age."""
+
+    def file_response(self, *args, **kwargs):
+        response = super().file_response(*args, **kwargs)
+        response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
+_env.globals.update(static=static_address, static_mark=static_mark)
 
 
 class LostRefusal(Exception):
