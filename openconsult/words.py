@@ -279,6 +279,8 @@ DRUG_FIELD_NAME = "The doubted words on line {n}"
 TICK_SETTLED_READ_ONLY = "Ticked as right."
 TICK_OPEN_READ_ONLY = "Not ticked."
 LINE_NO_WORDS = "No words are left on this line. They were part of a drug name that was corrected."
+# A settled row whose doubted words were taken out of the line (15.10 ruling 40): shown where the words stood. A draft.
+DRUG_TAKEN_OUT = "Taken out of the line."
 # The reading view of the transcript (15.10 rulings 35 and 42 to 44; the details of step 6e). Drafts, for the owner to
 # correct on screen. The first is what a screen reader is told at a turn, as its description and never as its name.
 TURN_PRESS = "Press to open or close the lines of this turn."

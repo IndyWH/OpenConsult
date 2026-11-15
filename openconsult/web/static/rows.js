@@ -76,6 +76,9 @@
   function tickOf(box) { return box && box.form ? box.form.querySelector('button.tick') : null; }
   function leave(box, to) {
     if (box.readOnly || !box.form || !changed(box) || onWay.has(box) || box.form === sending) return;
+    // An empty box that is left takes nothing out of the line: only the tick or the Enter key does (ruling 40), so that a
+    // stray click never takes a name out. Nothing is sent; the box stays as he left it and counts as not saved (ruling 12).
+    if (!box.value.trim()) return;
     const tick = tickOf(box);
     if (to && tick && tick.contains(to)) { forTick = box; return; }
     keep(box);

@@ -414,7 +414,7 @@ async def edit_line(request: Request, consultation_id: int, n: int, user=Depends
         p.consultations.set_line_words(consultation_id, n, text)
         p.audit.record("transcript.edited", f"consultation {consultation_id}: line {n}")
         # A doubted name typed over here: a mark whose words are gone leaves the page and stays in the record (ruling 20).
-        drug_marks.after_edit(p.consultations, consultation_id, n)
+        drug_marks.after_edit(p.consultations, consultation_id, n, before={n: line["text"]})
     if label != line["label"]:
         p.consultations.set_line_label(consultation_id, n, label)
         p.audit.record("label.set", f"consultation {consultation_id}: line {n} to {label}")
@@ -453,8 +453,14 @@ async def tick_mark(request: Request, consultation_id: int, mark_id: int, user=D
     stale page never turns a mark the wrong way. A third press, keep, is
     sent by the page's script when the doctor leaves the box (ruling 33):
     the typed words go into the line as at the tick, and the mark is not
-    settled, so a stray click never settles a name. The note is never
-    corrected by this: Draft the note again is offered, never run."""
+    settled, so a stray click never settles a name. A tick with the box
+    empty takes the doubted words out of the line and settles the mark
+    (ruling 40): a leftover piece of a name the speech choice cut over
+    two lines would otherwise go to the note's model as if it had been
+    said. The line stays, the record keeps the words as heard, and a
+    second press opens the mark with an empty box, so that words can be
+    typed back. The note is never corrected by this: Draft the note
+    again is offered, never run."""
     p = parts(request)
     row = final_row(request, consultation_id)
     data = page_data(p, row)
@@ -477,7 +483,9 @@ async def tick_mark(request: Request, consultation_id: int, mark_id: int, user=D
     if mark["settled_at"] is not None:
         raise Redirect(back)                                              # ticked already: its words are locked, for a tick and for a keep
     typed = fields.get("words", mark["standing"]).strip()
-    if not typed:
+    # An empty box with the tick or the Enter key takes the doubted words out of the line (ruling 40). Leaving an empty
+    # box takes nothing out: the page's script sends no keep for one, and a keep that a stale page sends is refused as built.
+    if not typed and mark["standing"] and fields.get("press") == "keep":
         return review_page(request, user, consultation_id, refused=(control, words.ENTRY_EMPTY))
     if typed != mark["standing"]:
         drug_marks.correct(p.consultations, p.audit, consultation_id, mark, typed)

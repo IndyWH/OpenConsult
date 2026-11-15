@@ -139,6 +139,7 @@ input.doubted-field {
 input.doubted-field:focus, input.doubted-field.unsaved { background: var(--panel); border-color: var(--ink-soft); padding: .1rem .35rem; }
 input.doubted-field[readonly] { cursor: default; }
 .settled-words { font-weight: 600; }
+.settled-words.taken-out { font-weight: 400; font-style: italic; color: var(--ink-soft); }
 button.row-play { padding: .3rem .7rem; flex: none; }
 /* The tick is never told by colour alone (R15; the plan review of 6d, point 3). Not ticked: a thin tick in an empty
    ring with a broken edge, faded but 3.6 to 1 on the pane. Ticked: a heavy tick on a filled disc with a whole edge.

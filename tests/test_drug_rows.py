@@ -249,13 +249,18 @@ def test_6d_taking_a_piece_out_leaves_one_space_at_the_cut_and_none_at_an_end_of
     assert drug_marks.places_of("of", [1, 2, 3], {1: "made", 2: " ", 3: "of words"}) == [{"line": 3, "first": 0, "last": 2}]   # an empty line holds no place
 
 
-def test_6d_an_empty_field_is_refused_at_the_row_and_a_press_for_a_mark_that_is_not_on_the_page_changes_nothing(tmp_path, clock, machine):
+def test_6d_ruling_40_an_empty_field_is_taken_at_the_row_and_a_press_for_a_mark_that_is_not_on_the_page_changes_nothing(tmp_path, clock, machine):
     app, client, c = reviewed(tmp_path, clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
     p = app.state.parts
     before = texts(p)
-    refused = tick(client, 1, words="   ", press="settle")
-    assert refused.status_code == 400 and refusal_on(text_of(refused), "tick-1") == words.ENTRY_EMPTY       # the line box's own sentence
-    assert texts(p) == before and mark_of(p, 1)["settled_at"] is None and events(p) == []
+    # Restated in step 6e. As built in 6d a tick with an empty field was refused at the row and changed nothing; these three
+    # assertions pinned that. Ruling 40 of 15 Nov 2026 reverses it: the press is taken, the doubted words are out of the
+    # line and the mark is settled. On a consultation of its own, so that what follows stands as it was written.
+    other, pressed, o = reviewed(tmp_path / "ruling-40", clock, machine, engine_with(drug_name=[REPLY]), page=PAGE)
+    taken = tick(pressed, 1, words="   ", press="settle")
+    assert taken.status_code == 303 and texts(other.state.parts)[3] == before[3].replace("met for min ", "") and "met for min" in before[3]
+    assert mark_of(other.state.parts, 1)["settled_at"] is not None and [event for event, _ in events(other.state.parts)] == ["transcript.edited", "drug_name.settled"]
+    o.close()
     # A mark that is unknown, or cleared by an edit, has no row: the press goes back to the warnings and changes nothing (R15).
     p.consultations.clear_mark(2)
     for mark in (2, 99):
