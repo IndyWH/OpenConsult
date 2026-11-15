@@ -249,3 +249,51 @@ def test_rulings_29_38_a_turns_one_press_plays_from_one_second_before_its_first_
     gone = client.get("/consultations/1").text
     assert turn_plays(gone) == {} and "turn-play" not in gone and len(turns(gone)) == 4
     c.close()
+
+
+# ------------------------------------------------- after the check of who spoke
+
+def test_ruling_44_a_line_the_check_moved_is_marked_inside_its_closed_turn_with_its_own_undo_and_no_turn_is_sent_open(tmp_path, clock, machine):
+    # On six recordings with two people the check moved 23 lines, 18 of them wrongly, and a moved line joins the turn of
+    # its new speaker: so the mark must be in sight without a press. The check here moves line 7 to the patient, and names
+    # the two words that had no speaker; line 6 then stands between two lines of the patient, inside that turn.
+    from openconsult import words
+    app, client, c = made(tmp_path, clock, machine)
+    press(app, client)
+    raw = client.get("/consultations/1").text
+    sent = turns(raw)
+    assert [(t["head"], t["lines"], t["open"]) for t in sent] == [("[1–4] Doctor", [1, 2, 3, 4], False), ("[5–7] Patient", [5, 6, 7], False)]
+    held = pieces(text_of(client.get("/consultations/1")))
+    # Where they stand: the words changed by the check, that line's own Undo, then the line's words, in a box of their own.
+    assert held[7] == (f'<span class="changed-words">{words.LABEL_CHANGED}</span> '
+                       f'<button class="turn-undo" id="turn-undo-7" form="turn-undo-form-7">{words.UNDO_LABEL}</button> Tell me more.')
+    assert '<span class="turn-line changed" id="turn-line-7" data-part>' in raw and raw.count('class="turn-line changed"') == 1
+    assert [n for n in held if "changed-words" in held[n] or "turn-undo" in held[n]] == [7]
+    # The Undo is tied to a form with the line's own undo address, the one the opened line's Undo has; the press keeps the page's place.
+    form = '<form method="post" action="/consultations/1/lines/7/undo" id="turn-undo-form-7" class="turn-undo-form" data-stay hidden></form>'
+    assert raw.count(form) == 1 and raw.count('action="/consultations/1/lines/7/undo"') == 2 and raw.count('id="undo-7"') == 1
+    assert raw.index('id="turn-5"') < raw.index(form) < raw.index('id="line-5"')
+    # A word with no first speaker that the check named stays marked as unsure, where it stands (ruling 14).
+    assert held[6] == f'Yes.<span class="mark"> ({words.LABEL_UNSURE})</span>' and words.LABEL_UNSURE in held[2]
+    # Told by the words, the button and the box, never by colour alone (R15).
+    css = client.get("/static/theme.css").text.split(".turn-line.changed {")[1].split("}")[0]
+    assert "border: 1px solid" in css and "border-left: 4px solid" in css
+    # One press undoes that line. No turn is sent open by it, and the mark is gone.
+    assert client.post("/consultations/1/lines/7/undo", data={"place": "keep"}).status_code == 303
+    assert app.state.parts.consultations.line(1, 7)["label"] == "doctor"
+    raw = client.get("/consultations/1").text
+    assert [(t["head"], t["open"]) for t in turns(raw)] == [("[1–4] Doctor", False), ("[5] Patient", False), ("[6] Unsure", False), ("[7] Doctor", False)]
+    assert "turn-undo" not in raw and "changed-words" not in raw
+    c.close()
+
+
+def test_ruling_44_R15_read_only_a_moved_line_keeps_its_words_and_its_box_inside_the_turn_and_has_no_undo(tmp_path, clock, machine):
+    from openconsult import words
+    app, client, c = made(tmp_path, clock, machine)
+    press(app, client)
+    assert client.post("/consultations/1/note/approve").status_code == 303
+    raw = client.get("/consultations/1").text
+    assert pieces(text_of(client.get("/consultations/1")))[7] == f'<span class="changed-words">{words.LABEL_CHANGED}</span> Tell me more.'
+    assert '<span class="turn-line changed" id="turn-line-7" data-part>' in raw and "turn-undo" not in raw
+    assert not any(t["open"] for t in turns(raw))
+    c.close()

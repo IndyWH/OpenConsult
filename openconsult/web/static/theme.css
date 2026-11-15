@@ -192,12 +192,17 @@ button.cite:hover { text-decoration: underline; }
 /* The reading view (15.10 rulings 35 and 42 to 44): a turn is the browser's own disclosure, with its own mark of one left
    in sight; closed it reads as running text; opened, its running text is hidden so that the words are shown once. */
 .transcript details.turn { margin: 0 0 .6rem; }
-.transcript details.turn > summary { color: var(--ink); font-size: 1rem; line-height: 1.5; }
+.transcript details.turn > summary { color: var(--ink); font-size: 1rem; line-height: 1.7; }
 .transcript details.turn[open] > summary .turn-text { display: none; }
 .transcript details.turn[open] > summary { margin-bottom: .4rem; }
 .transcript details.turn > .line { margin-left: 1rem; }
 .transcript summary .speaker { color: var(--ink-faint); font-size: .8rem; margin-right: .5rem; }
 a.turn-doubt { text-decoration: underline dotted; color: inherit; }
+/* A line the check moved, inside its turn (ruling 44): its words in a box with a heavy edge at its start, so the doctor
+   sees which words moved and where they end without a colour. */
+.turn-line.changed { border: 1px solid var(--ink); border-left: 4px solid var(--ink); padding: .05rem .35rem; border-radius: 2px; }
+.turn-line.changed .changed-words { margin-right: .2rem; }
+button.turn-undo { padding: .1rem .6rem; font-size: .78rem; margin-right: .2rem; }
 a.open-all { font-size: .9rem; text-decoration: none; border-radius: 999px; padding: .5rem 1.2rem; background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); }
 a.open-all:hover { border-color: #D8CEC3; color: var(--ink); }
 .transcript details.turn > .turn-holds { margin: 0 0 .4rem 1rem; min-height: 0; }
