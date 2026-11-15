@@ -57,10 +57,14 @@ def strip_of(windows: list, columns: int = STRIP_COLUMNS) -> list:
 def player_data(row: dict, lines: list[dict], warnings: list[dict], data_folder) -> dict:
     """What the player script reads (D51; V1_LESSONS 5.2): whether the file
     is there, the length, each line's times, the strip, and the warnings'
-    stretches, all computed here and run by tests."""
+    stretches, all computed here and run by tests. And the name of the
+    file the page is shown with: the review page is shown before the WAV
+    is converted, so the script must be able to tell that the recording
+    has changed under the player (the mend run of step 6d, fault one)."""
     windows = json.loads(row["loudness"] or "[]")
     file_there = bool(row["recording_file"]) and (folder_of(data_folder) / row["recording_file"]).is_file()
-    return {"available": file_there, "length_s": round(len(windows) * WINDOW_S, 1),
+    return {"available": file_there, "file": row["recording_file"] if file_there else None,
+            "length_s": round(len(windows) * WINDOW_S, 1),
             "lines": [{"n": line["n"], "start_s": line["start_s"], "end_s": line["end_s"]} for line in lines],
             "strip": strip_of(windows), "window_s": WINDOW_S,
             "stretches": [{"kind": w["kind"], "start_s": w["start_s"], "end_s": w["end_s"]} for w in warnings
@@ -463,6 +467,21 @@ async def recording(request: Request, consultation_id: int, user=Depends(guards.
         return PlainTextResponse(words.AUDIO_GONE.format(date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
                                  status_code=404)
     return FileResponse(path, media_type="audio/ogg" if path.suffix == ".ogg" else "audio/wav")
+
+
+@router.get("/consultations/{consultation_id}/recording/file", dependencies=[Depends(guards.this_computer)])
+async def recording_file(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """The name of the recording's file as it is now, and nothing else
+    (the mend run of step 6d, fault one). A page shown before the WAV was
+    converted asks this at a press of play; a new name tells its player to
+    take the recording's address afresh. 404 when there is no such
+    consultation or no such file."""
+    p = parts(request)
+    row = p.consultations.get(consultation_id)
+    name = row["recording_file"] if row is not None and row["state"] == "final" else None
+    if not name or not (folder_of(p.settings.data_folder) / name).is_file():
+        return PlainTextResponse("", status_code=404)
+    return PlainTextResponse(name)
 
 
 @router.get("/consultations/{consultation_id}/note.txt")

@@ -6,8 +6,10 @@ import json
 import re
 
 from openconsult import words
+from openconsult.consult import opus
 from openconsult.web.review import STRIP_COLUMNS, player_data, strip_of
 from tests.conftest import ORIGIN, browser, changes, snapshot, text_of
+from tests.fakes import MadeUpConverter
 from tests.test_review_page import reviewed
 
 
@@ -23,6 +25,11 @@ def test_8_8_D51_15_6_ruling_6_the_recording_is_served_to_the_logged_in_user_on_
     elsewhere = browser(app, address="192.0.2.9")
     elsewhere.cookies = client.cookies
     assert elsewhere.get("/consultations/1/recording").status_code == 403
+    # The address that gives the file's name (6d2, fault one) is guarded the same, and gives nothing for a consultation that is not there.
+    assert browser(app).get("/consultations/1/recording/file").status_code == 303
+    assert elsewhere.get("/consultations/1/recording/file").status_code == 403
+    missing = client.get("/consultations/9/recording/file")
+    assert missing.status_code == 404 and missing.text == ""
     assert changes(before, snapshot(folder)) == []                  # read, never written (R18)
     assert client.get("/consultations/9/recording").status_code == 303   # no such consultation: back to the home page
 
@@ -104,4 +111,35 @@ def test_ruling_29_every_press_that_plays_a_line_carries_that_lines_start_and_it
     # The alarm's Play from where it fired carries a start and no end; a warning's stretch keeps its own end.
     alarm = re.findall(r'<button type="button" class="play-at"([^>]*)>', raw)
     assert alarm and all("data-start=" in a and "data-end" not in a for a in alarm) and words.PLAY_FROM_ALARM in raw
+    c.close()
+
+
+def test_6d2_fault_one_the_page_names_the_file_its_player_was_shown_with_and_once_converted_the_addresses_give_the_ogg_and_its_name(tmp_path, clock, machine):
+    # The room run of 15 Nov 2026: the review page was shown 3 s before the WAV was converted and removed. The player held the
+    # head of the WAV, the same address then gave the Ogg, and the first press of play was silent until the page was loaded
+    # again. The page now tells its script which file it was shown with, and one address gives the file's name as it is now,
+    # so that the script can take the recording afresh. What the script then does is seen in a browser, not asserted here.
+    app, client, c = reviewed(tmp_path, clock, machine)
+
+    def shown_with():
+        raw = client.get("/consultations/1").text
+        return json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])["file"]
+
+    assert shown_with() == "consultation_1.wav"
+    named = client.get("/consultations/1/recording/file")
+    assert named.status_code == 200 and named.text == "consultation_1.wav" and named.headers["content-type"].startswith("text/plain")
+    # Stop's last job, run as it runs in the room: after the page has been shown (15.11 ruling 7). Nothing in it changes.
+    c.converter = MadeUpConverter()
+    assert opus.convert_consultation(c).ok and not (tmp_path / "recordings" / "consultation_1.wav").exists()
+    played = client.get("/consultations/1/recording")
+    assert played.status_code == 200 and played.headers["content-type"].startswith("audio/ogg") and played.content == b"OggS made up"
+    named = client.get("/consultations/1/recording/file")
+    assert named.status_code == 200 and named.text == "consultation_1.ogg"                    # nothing but the name
+    # The address the script then gives the player, the name as a query the route does not read: the same Ogg.
+    assert client.get("/consultations/1/recording?file=consultation_1.ogg").content == played.content
+    assert shown_with() == "consultation_1.ogg"                                               # a page loaded again names the Ogg
+    # The recording gone (retention): no name, and the page names no file.
+    (tmp_path / "recordings" / "consultation_1.ogg").unlink()
+    gone = client.get("/consultations/1/recording/file")
+    assert gone.status_code == 404 and gone.text == "" and shown_with() is None
     c.close()
