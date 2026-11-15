@@ -4,6 +4,99 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-15. Step 6d2, the mend run: the first play is heard, a name typed and left is kept, the page keeps its place, and the check of who spoke is seen
+
+Run on 15 Nov 2026 under the owner's approval of the plan and Cowork's
+review of it (ten points; all are in). The spec is 6abc2bd (sha256
+81faf6ff...), the stage prompt bac357e (stage-prompts/STAGE_06D2.md).
+The private report is STAGE6D2_REPORT.md in the log folder, with the
+plan and its review beside it. Eight commits, none pushed. No model was
+called, no engine started, and nothing left the machine.
+
+For the patient. In the room run of 15 Nov the row of a doubted drug
+name did what it is for, and the page failed under the doctor's hands
+four times. A name he typed and believed saved, but which was not,
+would have left the wrong medicine in the note; and a change of 29
+speakers that he did not see could not be judged by him. Now the first
+press of play gives sound. A name typed in a row is in the transcript
+line as soon as he leaves the box, with the tick still faded; Enter
+saves and ticks. After a press the page stays where it was. And when
+he presses Check who spoke the page stays at the top of the transcript
+and says there what the check did, with the control that undoes it all.
+
+The four mends (15.10 rulings 33, 34 and 37 and the details of 6d2).
+- The first play. The review page is shown before the Stop thread
+  converts the WAV, so the player held the head of a file that was then
+  removed; the same address gave the Ogg and the browser stalled with
+  no error. The page now names the file it was shown with, one
+  read-only address gives the file's name as it is now, and at a press
+  the script takes the recording afresh when the name has changed. The
+  browser's own play control asks the same. The conversion is as it
+  was. With no script the sound plays after a load, as before.
+- Leaving the box. The row's form takes a third press, keep, sent by
+  the page's script in the background when the focus leaves a box whose
+  words changed: the function the tick uses, and no settling. Keep on a
+  settled mark changes nothing; an empty box and a read-only page are
+  refused at the row. The press that took the doctor out of the box is
+  never lost: a play plays; the row's own tick or Enter sends one act;
+  any other press that loads the page is held until every keep has
+  answered. The app's answer is the page itself, and fresh.js puts its
+  marked parts (data-part) in place; a part holding unsaved words or an
+  unsaved choice is left whole. A keep that is refused or not answered
+  is said at the row and a held press is dropped. kept.js is gone.
+- The place. A press on a form marked data-stay (a row, Save and Undo
+  on a line, Swap, Undo all, Save on a note entry) still loads the
+  page; place.js notes the control and its height in the window for
+  that one load, and puts both back, with the keyboard on the control.
+  A row then asks for no anchor. With no script a row comes back at its
+  anchor, now clear of the app's bar.
+- The check of who spoke. The press, each wait and the end come back at
+  the transcript's anchor, by the address alone; each wait's address
+  differs by a count so that the browser loads it. The running and
+  outcome sentences are in ordinary type with Undo all beside the
+  outcome. A changed line says so at its start, with its Undo, and
+  carries a solid edge. No sentence of the owner's changed.
+- The lock (ruling 12; the plan review, point 3). use.js asks the page
+  whether any field differs from what the app gave it, instead of
+  remembering that something was typed; takes the seconds left from a
+  keep's answer; and adds the one second the script-less pages have.
+The suite is 960 tests in 80 s, none skipped; the start check passes.
+One test went with kept.js; one gained three assertions; none weakened.
+
+Seen in a browser by the build model: this machine's own Chrome 157,
+headless, with a throwaway profile, a dead proxy and no name lookups,
+driven with real mouse and key events on a made-up consultation of the
+suite with a made tone of ten minutes. The first play's fault was made
+on the code as it stood (the time stood still, no error) and was gone
+after the mend. Each line of Done when you see, for 6d2, held there.
+Not seen: a hand's timing, real speech, Firefox or Safari, a screen
+reader. The owner's room check is the check that counts.
+
+One new sentence, a draft, in two forms: This name was not saved:
+OpenConsult did not answer. It is still in the box. And: This name was
+not saved: OpenConsult answered with an error ({status}). It is still
+in the box.
+
+Flags. FOUND AND NOT MENDED, FOR A RULING: the lock can fail to fall on
+the review page. A request for the recording counts as use, and the
+page's count does not hear of it. After sound is played, or the note
+is copied, the page's own check can come early; the page is shown
+again, its own request for the recording puts the lock off, and so on
+without end. Older than this run. The mend in use.js covers a kept
+name and the plain page, not this. Also: a play that still fails after
+the address was taken again is silent, as built; a tick's press loads
+the page, so a playing sound stops, as built; with the app not
+answering, a row's own tick gives the browser's error page, as every
+press does; words.py is 949 lines, over its target as before.
+
+Made untrue, and put right in this commit: CLAUDE.md's run line and the
+README's account of the row and of the check. Not mine to write, in the
+spec: nothing found. No help page exists. The two oldest entries here,
+run 9e and stage 5e, moved to the archive.
+
+Next: the owner's room check of 6d2; a ruling on the lock; then the
+collating step (ruling 35), then 9b.
+
 ## 2026-11-14. Step 6d: a doubted drug name is corrected and ticked at its warning; Claude Sonnet benched on the drug names, two marks held and the third missed by 5
 
 Run on 14 Nov 2026 under the owner's approval of the plan and Cowork's
@@ -366,111 +459,3 @@ own. The suite is 881 tests in 74 s, over the target of one minute.
 Made untrue: nothing in the repo. The spec's line that the default cloud
 speech service waits for this run is Cowork's to write on the owner's
 ruling.
-
-## 2026-11-10. Stage 5e: the speech bench on three new recordings, both passes of the two cloud services
-
-Built and run in one session on 10 Nov 2026 under the owner's approval of
-the plan. THE FIGURES COUNT: three recordings of 21 Oct 2026, real voices
-(545, 355 and 387 s). Nothing of 5e is built into the app but the opening
-commit (R31). The tables are stage5e-tables3 in the private log folder;
-the private report is STAGE5E_REPORT.md beside them.
-
-The spec, committed once, not a character changed: 233ec9b (sha256
-66469965...). The stage prompt is e56af10 (stage-prompts/STAGE_05E.md).
-
-The opening commit (9e8cfc1): the live page asks the browser for sound at
-48,000 samples a second and says so when it is not given; no fallback.
-
-The bench (4147c6f to d4efa9e): a key folder apart from the workers' data
-folder; each service's upload arm with the delete and its proof; the wait
-to first shown defined again; the line for Alba; the doctor's voice cut
-from a recording's own page and never used on that recording; the label
-check as the app sends it beside the bench's own; the tables of 5e.
-
-The run. 18 live results and 6 uploads, none failed; every upload deleted
-and proven gone, and asked for again afterwards with the two gate clips
-(Speechmatics 5 jobs, AssemblyAI 4): nothing held. The driver's first pass
-gave speech-calls no --data-folder, so its seven steps ended at once with
-no call made; a second pass made the 126 calls on vLLM. The engine was
-found down and left down. Scored twice, the same byte for byte.
-
-For the patient, over the three recordings: no kind of page had a passage
-missing with no sign or a word where nobody spoke. AssemblyAI live wrote
-one drug as another real drug three times, and both notes held it; no
-other kind did. Drug names caught of 61 spoken: WhisperX 50, Nemotron 18,
-the tied pair 8, Speechmatics live 58 and whole 60, AssemblyAI live 56
-and whole 61. Words under the wrong speaker by the choice itself:
-WhisperX 47, Nemotron 2, the tied pair 3, Speechmatics live 5 and whole
-11, AssemblyAI live 257 and whole 0. The label check left more words under the wrong speaker than the choice
-alone on every kind but AssemblyAI live, and as the app sends it today it failed on all three Speechmatics live pages (613 to 785
-lines; the reply would need 8,000 to 10,000 tokens of a limit of 3,000).
-The line for Alba: no live arm serves; almost every patient speech was
-final only after the doctor's reply began.
-
-Read by hand, the line for Alba was wrong three ways and was fixed
-(32c32dd, d4efa9e): a pause inside a short reply taken for the patient's;
-words matching no speech between the line and the reply; a sound going on
-after the line was final. Both script notes of script 14 lack facts 14-03
-and 14-16: the notes lack them, the rule is not wrong.
-
-Flags. The suite is 881 tests in 73 s, over the target of one minute.
-Speechmatics' reply does not itself prove the medical domain was applied;
-the job's own record holds it. AssemblyAI names a host for the uploaded
-file that is not EU by name. Nemotron's largest gap inside a word was
-1.92 s, close to the 2.0 s figure. speech-calls without --data-folder
-refuses its own results folder. The private check found one run of six
-common dosing words of a script in V2_SPEC.md and in a test of 8 Nov,
-neither written by this run.
-
-Made untrue: CLAUDE.md's speech commands and the README's line of the
-live page, both corrected in this commit. No help page names the sample
-rate; none is made untrue.
-
-## 2026-11-08. Run 9e: the letter check reads prescription frequencies as figures; the README says how the cloud model was chosen
-
-Built in one session on 8 Nov 2026 under the owner's approval of the
-plan. Run 9e is 15.13 rulings 21 and 24; no call to any service, no
-bench run, nothing offered on any page (R31). The plan and the recount
-are STAGE9E_PLAN.md and stage9e-recount.out in the private log folder.
-
-The spec, committed once, not a character changed: 36354c4 (sha256
-4e45032a...). The run prompt is 492be72 (stage-prompts/STAGE_09E.md).
-
-The frequency rule (c42875f). letter_check.numbers_in, the one reader of
-a text's figures for a sentence and for its cited lines, reads the
-frequencies of a prescription as figures both ways: od, om, mane, nocte
-and once as 1; bd and twice as 2; tds as 3; qds as 4; whole words only
-(abdomen holds no bd). One choice the spec did not spell out, put in the
-plan and approved: on (omni nocte) is also the English preposition, and
-read everywhere it marked 38 true sentences in the 65 stored letters of
-run 9d2 (1 of A, 6 of B, 6 of C, 25 of D) and took M3 of D from 13 to 0
-of 13; so on is a frequency only after a dose, a figure then a unit (mg,
-g, mcg, ml, units, iu, tablet, puff, drop), the unit within three tokens
-(20 mg up to on). A frequency the lines do not give is still a figure
-outside them, marked as ruling 20 says. 3 tests; the suite 828.
-
-The recount, run 9d2's 65 stored letters through the check at c42875f,
-no call made: M3 of A 13 and 11 of 13 (run 9d2 13 and 0 of 13); letters
-marked on A 2 (run 9d2 13), the two the sentence that gives the
-unchanged doses (metformin 1 g, amlodipine 5 mg, atorvastatin 20 mg,
-omeprazole 20 mg) cited to the Plan line that names those medicines
-without their doses, which the check is right to point at; B, C and D
-unchanged (C's one marked letter stands, D's M3 13 of 13). Every other
-figure of the table as run 9d2 left it.
-
-The README (this commit): Cowork's section on how the cloud model was
-chosen (ruling 21), 84 lines, inserted byte for byte after the list and
-before the prototype line, proven by code (the bytes found once, the
-file without them equal to the committed one); the private word check
-printed nothing. HANDOVER's run 8d entry moved to the archive to stay
-under 500 lines.
-
-Made untrue: the 9d2 entry's last line (the README section came with
-this run); the figure 13 of 13 marked on A in STAGE9D2_REPORT.md,
-STAGE9D2_LETTERS.md and ruling 24 stands as run 9d2's record, with the
-recount beside it. Carried, unchanged: for 9b the line Why this model on
-the connect screen (ruling 21); for 9c the control's disabled reason
-(ruling 23); for 5e the live-or-not of each cloud transcription service.
-Open for the owner: the rule on model-specific prompt lines (ruling 22)
-waits for a real complaint; Alba in cloud mode is ruled (ruling 23).
-

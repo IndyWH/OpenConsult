@@ -3,6 +3,113 @@
 The older entries of HANDOVER.md, moved here as it passed 500 lines
 (spec 5.3). Newest first. Not read by default.
 
+## 2026-11-10. Stage 5e: the speech bench on three new recordings, both passes of the two cloud services
+
+Built and run in one session on 10 Nov 2026 under the owner's approval of
+the plan. THE FIGURES COUNT: three recordings of 21 Oct 2026, real voices
+(545, 355 and 387 s). Nothing of 5e is built into the app but the opening
+commit (R31). The tables are stage5e-tables3 in the private log folder;
+the private report is STAGE5E_REPORT.md beside them.
+
+The spec, committed once, not a character changed: 233ec9b (sha256
+66469965...). The stage prompt is e56af10 (stage-prompts/STAGE_05E.md).
+
+The opening commit (9e8cfc1): the live page asks the browser for sound at
+48,000 samples a second and says so when it is not given; no fallback.
+
+The bench (4147c6f to d4efa9e): a key folder apart from the workers' data
+folder; each service's upload arm with the delete and its proof; the wait
+to first shown defined again; the line for Alba; the doctor's voice cut
+from a recording's own page and never used on that recording; the label
+check as the app sends it beside the bench's own; the tables of 5e.
+
+The run. 18 live results and 6 uploads, none failed; every upload deleted
+and proven gone, and asked for again afterwards with the two gate clips
+(Speechmatics 5 jobs, AssemblyAI 4): nothing held. The driver's first pass
+gave speech-calls no --data-folder, so its seven steps ended at once with
+no call made; a second pass made the 126 calls on vLLM. The engine was
+found down and left down. Scored twice, the same byte for byte.
+
+For the patient, over the three recordings: no kind of page had a passage
+missing with no sign or a word where nobody spoke. AssemblyAI live wrote
+one drug as another real drug three times, and both notes held it; no
+other kind did. Drug names caught of 61 spoken: WhisperX 50, Nemotron 18,
+the tied pair 8, Speechmatics live 58 and whole 60, AssemblyAI live 56
+and whole 61. Words under the wrong speaker by the choice itself:
+WhisperX 47, Nemotron 2, the tied pair 3, Speechmatics live 5 and whole
+11, AssemblyAI live 257 and whole 0. The label check left more words under the wrong speaker than the choice
+alone on every kind but AssemblyAI live, and as the app sends it today it failed on all three Speechmatics live pages (613 to 785
+lines; the reply would need 8,000 to 10,000 tokens of a limit of 3,000).
+The line for Alba: no live arm serves; almost every patient speech was
+final only after the doctor's reply began.
+
+Read by hand, the line for Alba was wrong three ways and was fixed
+(32c32dd, d4efa9e): a pause inside a short reply taken for the patient's;
+words matching no speech between the line and the reply; a sound going on
+after the line was final. Both script notes of script 14 lack facts 14-03
+and 14-16: the notes lack them, the rule is not wrong.
+
+Flags. The suite is 881 tests in 73 s, over the target of one minute.
+Speechmatics' reply does not itself prove the medical domain was applied;
+the job's own record holds it. AssemblyAI names a host for the uploaded
+file that is not EU by name. Nemotron's largest gap inside a word was
+1.92 s, close to the 2.0 s figure. speech-calls without --data-folder
+refuses its own results folder. The private check found one run of six
+common dosing words of a script in V2_SPEC.md and in a test of 8 Nov,
+neither written by this run.
+
+Made untrue: CLAUDE.md's speech commands and the README's line of the
+live page, both corrected in this commit. No help page names the sample
+rate; none is made untrue.
+
+## 2026-11-08. Run 9e: the letter check reads prescription frequencies as figures; the README says how the cloud model was chosen
+
+Built in one session on 8 Nov 2026 under the owner's approval of the
+plan. Run 9e is 15.13 rulings 21 and 24; no call to any service, no
+bench run, nothing offered on any page (R31). The plan and the recount
+are STAGE9E_PLAN.md and stage9e-recount.out in the private log folder.
+
+The spec, committed once, not a character changed: 36354c4 (sha256
+4e45032a...). The run prompt is 492be72 (stage-prompts/STAGE_09E.md).
+
+The frequency rule (c42875f). letter_check.numbers_in, the one reader of
+a text's figures for a sentence and for its cited lines, reads the
+frequencies of a prescription as figures both ways: od, om, mane, nocte
+and once as 1; bd and twice as 2; tds as 3; qds as 4; whole words only
+(abdomen holds no bd). One choice the spec did not spell out, put in the
+plan and approved: on (omni nocte) is also the English preposition, and
+read everywhere it marked 38 true sentences in the 65 stored letters of
+run 9d2 (1 of A, 6 of B, 6 of C, 25 of D) and took M3 of D from 13 to 0
+of 13; so on is a frequency only after a dose, a figure then a unit (mg,
+g, mcg, ml, units, iu, tablet, puff, drop), the unit within three tokens
+(20 mg up to on). A frequency the lines do not give is still a figure
+outside them, marked as ruling 20 says. 3 tests; the suite 828.
+
+The recount, run 9d2's 65 stored letters through the check at c42875f,
+no call made: M3 of A 13 and 11 of 13 (run 9d2 13 and 0 of 13); letters
+marked on A 2 (run 9d2 13), the two the sentence that gives the
+unchanged doses (metformin 1 g, amlodipine 5 mg, atorvastatin 20 mg,
+omeprazole 20 mg) cited to the Plan line that names those medicines
+without their doses, which the check is right to point at; B, C and D
+unchanged (C's one marked letter stands, D's M3 13 of 13). Every other
+figure of the table as run 9d2 left it.
+
+The README (this commit): Cowork's section on how the cloud model was
+chosen (ruling 21), 84 lines, inserted byte for byte after the list and
+before the prototype line, proven by code (the bytes found once, the
+file without them equal to the committed one); the private word check
+printed nothing. HANDOVER's run 8d entry moved to the archive to stay
+under 500 lines.
+
+Made untrue: the 9d2 entry's last line (the README section came with
+this run); the figure 13 of 13 marked on A in STAGE9D2_REPORT.md,
+STAGE9D2_LETTERS.md and ruling 24 stands as run 9d2's record, with the
+recount beside it. Carried, unchanged: for 9b the line Why this model on
+the connect screen (ruling 21); for 9c the control's disabled reason
+(ruling 23); for 5e the live-or-not of each cloud transcription service.
+Open for the owner: the rule on model-specific prompt lines (ruling 22)
+waits for a real complaint; Alba in cloud mode is ruled (ruling 23).
+
 ## 2026-11-08. Run 9d2: the door accepts any list length, the letter check marks instead of removing, the effort tested, Claude Haiku 5.5 benched again; stage 3 and 7b passed, the letters and the summaries missed, no call failed
 
 Built and run in one session on 8 Nov 2026 under Cowork's plan review

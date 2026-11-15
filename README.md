@@ -34,7 +34,11 @@ This branch is where OpenConsult v2.0 is being built.
   the line's words with the doubted words as a field, a play button for
   the stretch it was heard on, and a tick. The doctor plays it, types
   the right name over a wrong one, and ticks it; the tick also settles a
-  name that was heard rightly, and a second press opens it again. The
+  name that was heard rightly, and a second press opens it again. A
+  name typed in a row and then left is saved into the transcript line
+  as soon as the doctor leaves the box, with the tick still faded until
+  he presses it; the Enter key saves and ticks; and after a press the
+  page stays where it was, with the next row where it stood. The
   correction goes into the transcript line and the note is then drafted
   again with one press, never corrected in place, because the right drug
   can change the clinical picture. A name is always shown as the words
@@ -42,8 +46,10 @@ This branch is where OpenConsult v2.0 is being built.
   and one line says that a name with no mark is not proven right. The
   check of who
   spoke no longer runs by itself: one control on the review page, Check
-  who spoke, asks the language model for it, every change is marked and
-  can be undone one line at a time or all at once, and the page says so
+  who spoke, asks the language model for it; the page stays at the top
+  of the transcript while it runs and says there on how many lines the
+  speaker changed, with the control that undoes them all; every changed
+  line says so at its start, with its own Undo; and the page says so
   above the note when who spoke has changed since the note was written.
   An approved note is read-only and
   audited; the copy gives the note alone. After Approve, a Referral
