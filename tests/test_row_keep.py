@@ -16,9 +16,18 @@ from tests.test_drug_marks import PAGE, REPLY
 from tests.test_drug_rows import CUT_PAGE, CUT_REPLY, DRAFT_OFF, TYPED, counted, events, mark_of, row, texts, tick
 from tests.test_review_marks import page_of, part
 from tests.test_review_page import NOTE, engine_with
+from tests.test_stop import until
 from tests.test_who_check import HeldEngine, press, reviewed, said
 
 OTHER = "another made-up name"
+
+
+def stop_thread_done(app, consultation_id: int = 1) -> bool:
+    """Waits until the Stop thread has finished its last step, the conversion (15.11 ruling 7). The helpers give the
+    consultation back as soon as it is final, as the app shows the review page then; the conversion's one write to
+    the row comes a moment later, and with no converter in the suite it puts a sentence on the page. A test that
+    compares two reads of the page, or runs the conversion itself, waits for that write first."""
+    return until(lambda: app.state.parts.consultations.get(consultation_id)["recording_format"] is not None)
 
 
 def test_ruling_33_keep_with_new_words_corrects_the_line_offers_draft_the_note_again_and_does_not_settle(tmp_path, clock, machine):
@@ -170,6 +179,9 @@ def test_ruling_33_everything_a_keep_changes_on_the_page_lies_inside_the_parts_t
                             {"line": 2, "heard": "at night", "meant": ""}]}
     for name, page, reply, gone in (("new", PAGE, REPLY, []), ("cleared", PAGE, cleared, ["drug-mark-2"]), ("empty", CUT_PAGE, CUT_REPLY, [])):
         app, client, c = reviewed(tmp_path / name, clock, machine, engine_with(drug_name=[reply]), page=page)
+        # Not steady as first written: the first read could come before the Stop thread's conversion step had written its
+        # sentence into the row and the second after it, and the two pages then differed outside the marked parts.
+        assert stop_thread_done(app)
         before = client.get("/consultations/1").text
         assert tick(client, 1, words=TYPED, press="keep").status_code == 303
         after = client.get("/consultations/1").text

@@ -11,6 +11,7 @@ from openconsult.web.review import STRIP_COLUMNS, player_data, strip_of
 from tests.conftest import ORIGIN, browser, changes, log_in, snapshot, text_of
 from tests.fakes import MadeUpConverter
 from tests.test_review_page import reviewed
+from tests.test_row_keep import stop_thread_done
 
 
 def test_8_8_D51_15_6_ruling_6_the_recording_is_served_to_the_logged_in_user_on_this_computer_only(tmp_path, clock, machine):
@@ -125,6 +126,9 @@ def test_6d2_fault_one_the_page_names_the_file_its_player_was_shown_with_and_onc
         raw = client.get("/consultations/1").text
         return json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])["file"]
 
+    # The Stop thread's own conversion step, which finds no converter in the suite, has ended: the test then runs the
+    # step itself with a made converter, and the two must not meet.
+    assert stop_thread_done(app)
     assert shown_with() == "consultation_1.wav"
     named = client.get("/consultations/1/recording/file")
     assert named.status_code == 200 and named.text == "consultation_1.wav" and named.headers["content-type"].startswith("text/plain")
