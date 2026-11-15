@@ -5,6 +5,7 @@ R30; V1_LESSONS 1.12). Made-up doors and made-up replies: only what code
 does with a reply's numbers and labels is asserted, never what a model
 would say."""
 
+import re
 import threading
 
 from openconsult import words
@@ -449,4 +450,99 @@ def test_ruling_18_the_line_above_the_note_after_a_check_that_changed_a_label_an
     assert client.post("/consultations/1/lines/4", data={"label": "patient", "text": text}).status_code == 303
     raw, page = client.get("/consultations/1").text, text_of(client.get("/consultations/1"))
     assert words.NOTE_SPEAKERS_CHANGED not in page and 'id="draft" aria-describedby="draft-refusal" disabled' not in raw
+    c.close()
+
+
+# ------------------------------------- the check is seen (the mend run of step 6d)
+
+def test_6d2_ruling_19_the_press_on_check_who_spoke_each_wait_and_the_end_come_back_at_the_checks_place(tmp_path, clock, machine):
+    # The room run of 15 Nov 2026: the check changed 29 lines in 5 seconds, and the page came back at its top, at the note,
+    # with the outcome far below. Now the press, each wait and the end stand at the top of the transcript, by the address
+    # alone, so with and without a script.
+    from tests.test_review_page import NOTE
+    engine = HeldEngine({"note": [NOTE], "label_check": [said("patient", "doctor", "unsure", "patient")]})
+    app, client, c = reviewed(tmp_path, clock, machine, engine)
+    pressed = client.post("/consultations/1/who-check")
+    assert pressed.status_code == 303 and pressed.headers["location"].endswith("/consultations/1#transcript") and engine.entered.wait(20)
+    # Each wait names the place, and its address differs from the last by a count, so that the browser loads it.
+    first = client.get("/consultations/1").text
+    assert 'http-equiv="refresh" content="1;url=/consultations/1?quiet=1#transcript"' in first and first.count('id="transcript"') == 1
+    assert 'content="1;url=/consultations/1?quiet=2#transcript"' in client.get("/consultations/1?quiet=1").text
+    assert 'content="1;url=/consultations/1?quiet=8#transcript"' in client.get("/consultations/1?quiet=7").text
+    assert 'content="1;url=/consultations/1?quiet=1#transcript"' in client.get("/consultations/1?quiet").text
+    # A wait is the page's own check and is not use (15.6), with its count as without.
+    clock.advance(minutes=29)
+    assert client.get("/consultations/1?quiet=3").status_code == 200
+    clock.advance(minutes=2)
+    assert client.get("/consultations/1?quiet=4").status_code == 303
+    assert log_in(client).status_code == 303
+    # The end: the load the last wait asked for shows the outcome, with no further wait.
+    engine.release.set()
+    app.state.parts.who_checks.wait(1, 20)
+    last = client.get("/consultations/1?quiet=5").text
+    assert 'http-equiv="refresh"' not in last and 'id="check-who-outcome"' in last and 'id="check-who-running"' not in last
+    # The place stands clear of the app's bar, which stays at the top of the window.
+    assert "#transcript { scroll-margin-top:" in client.get("/static/theme.css").text
+    c.close()
+
+
+def test_6d2_R15_the_running_and_outcome_sentences_stand_at_the_checks_place_not_as_marks_with_undo_all_beside_the_outcome(tmp_path, clock, machine):
+    from tests.test_review_page import NOTE
+    engine = HeldEngine({"note": [NOTE], "label_check": [EngineTimeout("no answer"), said("patient", "doctor", "unsure", "patient")]})
+    app, client, c = reviewed(tmp_path, clock, machine, engine)
+    p = app.state.parts
+
+    def tag(raw, name):
+        found = re.search(rf'<p class="([^"]*)" id="{name}">', raw)
+        return found.group(1).split() if found else None
+
+    def place(raw):
+        return raw.split('id="who-check"')[1].split('id="player"')[0]
+
+    assert client.post("/consultations/1/who-check").status_code == 303 and engine.entered.wait(20)
+    raw = client.get("/consultations/1").text
+    assert tag(raw, "check-who-running") == ["check-says"] and words.CHECK_RUNNING in place(raw)       # a statement, not a mark
+    engine.release.set()
+    p.who_checks.wait(1, 20)
+    # A run that failed: said at the same place, in its red, and no Undo all.
+    raw = client.get("/consultations/1").text
+    assert tag(raw, "check-who-outcome") == ["check-says", "failed"] and 'id="undo-all"' not in raw
+    engine.entered.clear()
+    assert client.post("/consultations/1/who-check").status_code == 303 and engine.entered.wait(20)
+    p.who_checks.wait(1, 20)
+    raw = client.get("/consultations/1").text
+    assert tag(raw, "check-who-outcome") == ["check-says"] and "mark" not in tag(raw, "check-who-outcome")
+    outcome = place(raw).split('<div class="check-outcome">')[1].split("</div>")[0]
+    # Undo all stands beside the outcome, in the same block, after it; the owner's sentences are not changed by a letter.
+    assert outcome.index(words.CHECK_CHANGED.format(count=3)) < outcome.index('id="undo-all"') < outcome.index(words.CHECK_UNDO_ALL)
+    assert (words.CHECK_CHANGED, words.CHECK_UNDO_ALL, words.CHECK_RUNNING, words.LABEL_CHANGED) == (
+        "The check changed the speaker on {count} lines. Each one is marked below.", "Undo all the changes of the check",
+        "Checking who spoke. This can take up to a minute.", "changed by the check")
+    c.close()
+
+
+def test_6d2_ruling_7_R15_a_changed_line_says_so_at_its_start_with_its_undo_and_carries_an_edge_and_an_unchanged_line_has_neither(tmp_path, clock, machine):
+    engine = engine_with(label_check=[said("patient", "patient", "patient", "unsure")])          # line 1 changes; the others do not
+    app, client, c = reviewed(tmp_path, clock, machine, engine)
+    press(app, client)
+
+    def line(raw, n):
+        return raw.split(f'id="line-{n}"')[1].split(f'id="line-{n + 1}"')[0]
+
+    raw = client.get("/consultations/1").text
+    changed, unchanged = line(raw, 1), line(raw, 2)
+    assert '<div class="line changed" id="line-1"' in raw and '<div class="line" id="line-2"' in raw
+    # At the start of the line, beside the speaker: the words, then Undo; before the play button and the line's boxes.
+    places = [changed.index(mark) for mark in ('class="speaker"', '<span class="changed-words">' + words.LABEL_CHANGED + "</span>", 'id="undo-1"',
+                                               'class="play-line cite"', 'class="line-form"')]
+    assert places == sorted(places) and changed.count(words.LABEL_CHANGED) == 1 and changed.count('id="undo-1-refusal"') == 1
+    assert "changed-words" not in unchanged and 'id="undo-2"' not in unchanged and unchanged.count('id="undo-2-refusal"') == 1
+    # The edge is a solid line down the side, so the change is not told by colour alone.
+    assert "border-left: 4px solid" in client.get("/static/theme.css").text.split(".transcript .line.changed {")[1].split("}")[0]
+    # Read-only, after Approve: the words and the edge stay, the Undo goes, and a press from a stale page is answered at the line.
+    assert client.post("/consultations/1/note/approve").status_code == 303
+    raw = client.get("/consultations/1").text
+    assert '<div class="line changed" id="line-1"' in raw and '<span class="changed-words">' in line(raw, 1) and 'id="undo-1"' not in raw
+    refused = client.post("/consultations/1/lines/1/undo")
+    assert refused.status_code == 400 and slot_text(text_of(refused), "undo-1") == words.NOTE_READ_ONLY
     c.close()

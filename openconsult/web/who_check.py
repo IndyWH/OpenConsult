@@ -25,7 +25,8 @@ async def check(request: Request, consultation_id: int, user=Depends(guards.logg
     if not state["offered"]:
         return review.review_page(request, user, consultation_id, refused=("check-who", state["reason"]))
     p.who_checks.start(consultation_id)
-    raise Redirect(f"/consultations/{consultation_id}")
+    # Back at the check's own place, the top of the transcript, where the running sentence and then the outcome stand.
+    raise Redirect(f"/consultations/{consultation_id}#{review.CHECK_PLACE}")
 
 
 @router.post("/consultations/{consultation_id}/who-check/undo-all")

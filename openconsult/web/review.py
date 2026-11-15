@@ -37,6 +37,8 @@ CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
 SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE", "NAME_NOT_SAVED", "NOT_SAVED_NO_ANSWER",
                 "NOT_SAVED_ERROR")
+# The check of who spoke comes back at its own place, the top of the transcript: the press, each wait and the end.
+CHECK_PLACE = "transcript"
 # The loudness strip is drawn in this many columns, each the loudest of its windows.
 STRIP_COLUMNS = 400
 
@@ -247,6 +249,10 @@ def review_page(request: Request, user, consultation_id: int, refused: tuple | N
                    words_json=json_words(), **data)
     if data["who_check"]["running"]:
         context["refresh_every"] = 1         # the page waits for the run as the stopping page waits for a stage
+        # Each wait comes back at the check's place, and so does the load that shows the outcome. Each wait's address
+        # differs by a count: an address that differed by nothing but its anchor would only be scrolled to, never loaded.
+        waited = request.query_params.get("quiet", "")
+        context["refresh_to"] = f"/consultations/{consultation_id}?quiet={int(waited) + 1 if waited.isdigit() else 1}#{CHECK_PLACE}"
     if refused:
         return refuse(request, "review.html", refused[0], refused[1], **context)
     return render(request, "review.html", **context)

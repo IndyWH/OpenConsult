@@ -141,12 +141,16 @@
   </div>
   <div class="pane-body who-check" id="who-check">
     {% if who_check.offered %}<p class="mark" id="check-who-line">{{ words.CHECK_WHO_SPOKE_LINE }}</p>{% endif %}
-    {% if who_check.running %}<p id="check-who-running"><span class="spinner"></span> {{ words.CHECK_RUNNING }}</p>{% endif %}
-    {% if who_check.ran and not transcript_read_only %}<p class="mark reason" id="check-who-ran">{{ words.CHECK_ALREADY_RAN }}</p>{% endif %}
-    {% if who_check.line %}<p class="{{ 'failed' if who_check.failed else 'mark' }}" id="check-who-outcome">{{ who_check.line }}</p>{% endif %}
+    {# The running sentence and the outcome are statements in the page's ordinary type, not marks, with Undo all beside the
+       outcome: in the room run of 15 Nov 2026 the check changed 29 lines and the doctor saw a faded button and nothing else. #}
+    {% if who_check.running %}<p class="check-says" id="check-who-running"><span class="spinner"></span> {{ words.CHECK_RUNNING }}</p>{% endif %}
+    <div class="check-outcome">
+    {% if who_check.line %}<p class="check-says{{ ' failed' if who_check.failed else '' }}" id="check-who-outcome">{{ who_check.line }}</p>{% endif %}
     {% if who_check.undo_all %}<form method="post" action="/consultations/{{ cid }}/who-check/undo-all" id="undo-all-form" data-stay>
       <button id="undo-all" aria-describedby="undo-all-refusal">{{ words.CHECK_UNDO_ALL }}</button>{{ refusal("undo-all") }}</form>
     {% else %}{{ refusal("undo-all") }}{% endif %}
+    </div>
+    {% if who_check.ran and not transcript_read_only %}<p class="mark reason" id="check-who-ran">{{ words.CHECK_ALREADY_RAN }}</p>{% endif %}
   </div>
   <div class="pane-body player" id="player">
     {% if player.available %}
@@ -157,10 +161,16 @@
   </div>
   <div class="pane-body" id="final-transcript">
     {% for line in lines %}
-    <div class="line" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" data-part>
+    <div class="line{% if line.changed_by_check %} changed{% endif %}" id="line-{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" data-part>
       <span class="speaker">[{{ line.n }}] {{ words.LABEL_WORDS[line.label] }}</span>
+      {# A line the check changed says so at its start, beside the speaker, with its Undo, and carries an edge: told by the
+         words, the button and the edge, never by colour alone (ruling 19; R15). #}
+      {% if line.changed_by_check %}<span class="changed-words">{{ words.LABEL_CHANGED }}</span>{% endif %}
+      {% if line.changed_by_check and not transcript_read_only %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form" data-stay>
+        <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
+      {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
       {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" aria-label="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
-      {% if transcript_read_only %}<span class="line-text">{% for piece, doubted in line.segments %}{% if doubted %}<mark class="doubted">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</span>{% if line.doubted %}<span class="mark doubted-word"> ({{ words.CHECK_THIS_NAME }})</span>{% endif %}{{ refusal("save-line-" ~ line.n) }}{{ refusal("undo-" ~ line.n) }}
+      {% if transcript_read_only %}<span class="line-text">{% for piece, doubted in line.segments %}{% if doubted %}<mark class="doubted">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</span>{% if line.doubted %}<span class="mark doubted-word"> ({{ words.CHECK_THIS_NAME }})</span>{% endif %}{{ refusal("save-line-" ~ line.n) }}
       {% else %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}" class="line-form" data-stay>
         <select name="label" aria-label="{{ words.SPEAKER_WORD.format(n=line.n) }}">{% for value, word in words.LABEL_WORDS.items() %}<option value="{{ value }}"{% if value == line.label %} selected{% endif %}>{{ word }}</option>{% endfor %}</select>
         <input name="text" value="{{ line.text }}" class="line-text">
@@ -169,14 +179,10 @@
       </form>
       {# The doubted words of the line, beside its box: a press that goes to the name's row in the warnings, where it is corrected (the details of step 6d). #}
       {% for d in line.doubted %}<a class="doubted-word" href="#drug-mark-{{ d.mark }}"><mark class="doubted">{{ d.piece }}</mark> <span class="mark">{{ words.CHECK_THIS_NAME }}</span></a>{% endfor %}
-      {% if line.changed_by_check %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form" data-stay>
-        <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
-      {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
       {% endif %}
       {# A line a drug-name correction left with no words: it keeps its number, speaker and sound (the plan review of 6d, point 1). #}
       {% if not line.text %}<span class="mark no-words">{{ words.LINE_NO_WORDS }}</span>{% endif %}
       {% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}
-      {% if line.changed_by_check %}<span class="mark"> ({{ words.LABEL_CHANGED }})</span>{% endif %}
       {% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}
       {% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}
       {% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}

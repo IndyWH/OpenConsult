@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }} - {{ words.APP_NAME }}</title>
 <link rel="stylesheet" href="/static/theme.css">
-{% if refresh %}<meta http-equiv="refresh" content="{{ refresh }};url={{ path }}?quiet">{% endif %}
+{% if refresh %}<meta http-equiv="refresh" content="{{ refresh }};url={{ refresh_to or (path ~ '?quiet') }}">{% endif %}
 {% block head %}{% endblock %}
 </head>
 <body>

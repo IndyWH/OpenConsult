@@ -178,6 +178,15 @@ button.cite:hover { text-decoration: underline; }
 .warning-count { margin-left: .6rem; font-size: .85rem; color: var(--red); }
 .reason { max-width: 22rem; }
 .line.marked { background: #F3EDE6; border-radius: 6px; }
+/* The check of who spoke (15.10 ruling 19): its place stands clear of the app's bar; its sentences are in the page's
+   ordinary type; a line it changed carries a solid edge and says so at its start, so the change is not told by colour. */
+#transcript { scroll-margin-top: 4.2rem; }
+.check-says { display: flex; align-items: center; gap: .5rem; margin: .2rem 0; }
+.check-says .spinner { margin-left: 0; flex: none; }
+.check-outcome { display: flex; align-items: center; gap: .9rem; flex-wrap: wrap; }
+.check-outcome .refusal:empty { display: none; }
+.transcript .line.changed { border-left: 4px solid var(--ink); padding-left: .5rem; }
+.changed-words { font-size: .85rem; font-weight: 600; }
 .approved { color: var(--green); }
 .entry-form, .line-form, .undo-form, .swap { display: inline-flex; gap: .4rem; align-items: center; margin: 0; flex-wrap: wrap; }
 .entry-form input, .line-form input.line-text { width: auto; flex: 1; min-width: 18rem; margin-top: 0; }
