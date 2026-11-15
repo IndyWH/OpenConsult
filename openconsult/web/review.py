@@ -86,10 +86,20 @@ def press_start(start_s: float | None) -> float | None:
 def turns_of(lines: list[dict]) -> list[dict]:
     """The transcript as the reading view shows it (15.10 rulings 35 and
     42): one entry for each turn of speech by the one rule of
-    reading.py, with the numbers of its first and last line. It is how
-    the page is shown: nothing of it is stored."""
-    return [{"first": entry["lines"][0]["n"], "last": entry["lines"][-1]["n"], "speaker": entry["speaker"], "lines": entry["lines"]}
-            for entry in reading.entries_of(lines)]
+    reading.py, with the numbers of its first and last line and the
+    stretch its one press plays (rulings 29 and 38): from one second
+    before its first line's start to the latest end among its lines,
+    for lines can overlap. Never a sum of its lines' lengths: lines of
+    one word are 0.08 to 0.24 s long by the speech choice's times, and a
+    turn must not be cut short by them. It is how the page is shown:
+    nothing of it is stored."""
+    found = []
+    for entry in reading.entries_of(lines):
+        held = entry["lines"]
+        ends = [line["end_s"] for line in held if line["end_s"] is not None]
+        found.append({"first": held[0]["n"], "last": held[-1]["n"], "speaker": entry["speaker"], "lines": held,
+                      "play_s": press_start(held[0]["start_s"]), "end_s": max(ends) if ends else None})
+    return found
 
 
 def script_words() -> dict:

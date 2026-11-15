@@ -212,7 +212,8 @@ a.open-all:hover { border-color: #D8CEC3; color: var(--ink); }
 .player { display: flex; flex-direction: column; gap: .5rem; border-bottom: 1px solid var(--line); }
 .player audio { width: 100%; }
 .player canvas { width: 100%; height: 48px; cursor: pointer; background: var(--paper); border-radius: 6px; }
-.line.playing { background: #EFE7DE; }
+.line.playing, .turn-line.playing { background: #EFE7DE; }
+button.turn-play { margin: 0 .5rem 0 0; }
 button.play-stretch { padding: .2rem .7rem; font-size: .78rem; margin-left: .5rem; }
 
 /* The Patients page (7a): the search box in one row, the number small. */

@@ -172,6 +172,7 @@
     {% for turn in turns %}
     <details class="turn" id="turn-{{ turn.first }}"{% if turn.open %} open{% endif %}>
       <summary aria-describedby="turn-says"><span class="speaker">[{{ turn.first }}{% if turn.last != turn.first %}–{{ turn.last }}{% endif %}] {{ words.LABEL_WORDS[turn.speaker] }}</span>
+        {% if player.available and turn.play_s is not none and turn.end_s is not none %}<button type="button" class="play-stretch turn-play" data-start="{{ turn.play_s }}" data-end="{{ turn.end_s }}" aria-label="{{ words.PLAY_TURN }}" title="{{ words.PLAY_TURN }}">&#9654;</button>{% endif %}
         <span class="turn-text">{% for line in turn.lines %}<span class="turn-line" id="turn-line-{{ line.n }}" data-part>{% for piece, mark in line.reading %}{% if mark %}<a class="turn-doubt" href="#drug-mark-{{ mark }}" title="{{ words.CHECK_THIS_NAME }}"><mark class="doubted">{{ piece }}</mark></a>{% else %}{{ piece }}{% endif %}{% endfor %}{% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}{% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}{% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}{% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}</span> {% endfor %}</span>
       </summary>
     {% for line in turn.lines %}

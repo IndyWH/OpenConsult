@@ -103,7 +103,7 @@ def test_rulings_35_42_43_the_transcript_is_sent_as_turns_each_closed_with_its_s
     assert [raw.count(f'id="turn-{first}"') for first in (1, 5, 6, 7)] == [1, 1, 1, 1] and raw.count("<details class=\"turn\"") == 4
     # What a screen reader is told at a turn is its description, never its name: the turn's own words are still read.
     page = text_of(client.get("/consultations/1"))
-    assert raw.count('<summary aria-describedby="turn-says">') == 4 and raw.count('id="turn-says"') == 1 and "aria-label" not in sent[0]["summary"]
+    assert raw.count('<summary aria-describedby="turn-says">') == 4 and raw.count('id="turn-says"') == 1 and "<summary aria-label" not in raw
     assert '<p id="turn-says" hidden>' + "Press to open or close the lines of this turn." + "</p>" in page
     c.close()
 
@@ -208,4 +208,44 @@ def test_R15_a_save_or_an_undo_on_a_line_that_is_refused_comes_back_with_that_li
     entry = app.state.parts.notes.entries(app.state.parts.notes.current_draft(1)["id"])[0]["id"]
     refused = client.post(f"/consultations/1/entries/{entry}", data={"text": " "})
     assert refused.status_code == 400 and not any(t["open"] for t in turns(refused.text))
+    c.close()
+
+
+# ------------------------------------------------------------------------ play
+
+def turn_plays(raw: str) -> dict[int, tuple[float, float]]:
+    found = {}
+    for t in turns(raw):
+        press = re.search(r'<button type="button" class="play-stretch turn-play" data-start="([^"]*)" data-end="([^"]*)" aria-label="([^"]*)" title="([^"]*)">', t["summary"])
+        if press:
+            assert press.group(3) == press.group(4) == "Play this turn"
+            found[t["first"]] = (float(press.group(1)), float(press.group(2)))
+    return found
+
+
+def test_rulings_29_38_a_turns_one_press_plays_from_one_second_before_its_first_line_to_the_latest_end_among_its_lines(tmp_path, clock, machine):
+    # A turn's stretch is from its first line's start to the end of its lines, never a sum of their lengths: lines of one
+    # word are 0.08 to 0.24 s long by the speech choice's times. The start is one second early, not below zero (ruling 38).
+    # Lines can overlap, so the end is the latest among the turn's lines (the plan review of 6e, point 5).
+    page = [live_seg(1, 1.2, 1.9, "Good morning, come in and", "S1"), live_seg(2, 1.85, 1.88, "sit.", "S1"),
+            live_seg(3, 1.9, 1.95, "Yes.", None), live_seg(4, 1.96, 2.0, "Thank you. " + "word " * 60, "S2")]
+    app, client, c = reviewed(tmp_path / "overlap", clock, machine, engine_with(note=[NOTE]), page=page)
+    assert stop_thread_done(app)
+    raw = client.get("/consultations/1").text
+    assert [t["lines"] for t in turns(raw)] == [[1, 2], [3], [4]]
+    assert turn_plays(raw) == {1: (0.2, 1.9), 3: (0.9, 1.95), 4: (0.96, 2.0)}
+    # An entry of one unsure word plays as its line does: the same start and the same end as the line's own press.
+    assert 'class="play-line cite" data-line="3" data-start="0.9" data-end="1.95"' in raw.split('id="line-3"')[1]
+    c.close()
+    # The made-up page of this file: one press for each turn, in its summary, before its words; a line's own press is as it was.
+    app, client, c = made(tmp_path / "made", clock, machine)
+    raw = client.get("/consultations/1").text
+    assert turn_plays(raw) == {1: (0.0, 0.8), 5: (0.0, 1.5), 6: (0.55, 1.6), 7: (0.7, 2.0)}
+    assert all(t["summary"].index("turn-play") < t["summary"].index('class="turn-text"') for t in turns(raw))
+    assert raw.count('class="play-stretch turn-play"') == 4 and raw.split('id="final-transcript"')[1].count('class="play-line cite"') == 7
+    # The recording gone: no press on a turn, as none on a line.
+    for file in (tmp_path / "made" / "recordings").iterdir():
+        file.unlink()
+    gone = client.get("/consultations/1").text
+    assert turn_plays(gone) == {} and "turn-play" not in gone and len(turns(gone)) == 4
     c.close()

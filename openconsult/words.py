@@ -282,6 +282,7 @@ LINE_NO_WORDS = "No words are left on this line. They were part of a drug name t
 # The reading view of the transcript (15.10 rulings 35 and 42 to 44; the details of step 6e). Drafts, for the owner to
 # correct on screen. The first is what a screen reader is told at a turn, as its description and never as its name.
 TURN_PRESS = "Press to open or close the lines of this turn."
+PLAY_TURN = "Play this turn"                # the one press of a turn: it plays the whole turn and stops
 OPEN_ALL_LINES = "Open all the lines"
 CLOSE_ALL_LINES = "Close all the lines"
 TURN_NOT_SAVED = "This turn holds words that are not saved. Save them first."

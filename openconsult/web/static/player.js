@@ -96,9 +96,13 @@
   audio.addEventListener('timeupdate', function () {
     const t = audio.currentTime;
     stopIfReached();
-    document.querySelectorAll('.line.playing').forEach(function (line) { line.classList.remove('playing'); });
+    document.querySelectorAll('.playing').forEach(function (line) { line.classList.remove('playing'); });
     const line = player.lines.find(function (l) { return t >= l.start_s && t < l.end_s; });
-    if (line) { const node = document.getElementById('line-' + line.n); if (node) node.classList.add('playing'); }
+    // The sounding line is marked on the line, and on its words inside its turn: the one in sight shows it (step 6e).
+    if (line) ['line-', 'turn-line-'].forEach(function (name) {
+      const node = document.getElementById(name + line.n);
+      if (node) node.classList.add('playing');
+    });
     drawStrip(t);
   });
 
