@@ -156,3 +156,56 @@ def test_ruling_33_after_a_name_is_kept_its_words_stand_inside_the_closed_turn_i
     # Four words with no speaker are no longer inside the doctor's turn: an entry of their own, and the doctor's lines two turns.
     assert [(t["head"], t["lines"]) for t in turns(after)][:3] == [("[1] Doctor", [1]), ("[2] Unsure", [2]), ("[3–4] Doctor", [3, 4])]
     c.close()
+
+
+# ------------------------------------------------- a turn opens, and stays open
+
+def test_ruling_43_the_control_that_opens_all_works_by_a_load_with_no_script_and_the_page_hands_its_script_the_turns_words(tmp_path, clock, machine):
+    from openconsult import words
+    app, client, c = made(tmp_path, clock, machine)
+    raw = client.get("/consultations/1").text
+    # Closed: the control opens all, beside Swap at the top of the transcript, by a load that comes back at the transcript.
+    head = raw.split('id="transcript"')[1].split('id="who-check"')[0]
+    assert head.index('id="swap"') < head.index('id="open-all"')
+    assert f'<a class="open-all" id="open-all" href="/consultations/1?lines=open#transcript">{words.OPEN_ALL_LINES}</a>' in head
+    opened = client.get("/consultations/1?lines=open").text
+    assert [t["open"] for t in turns(opened)] == [True] * 4 and [t["lines"] for t in turns(opened)] == [t["lines"] for t in turns(raw)]
+    # Open: the same control closes them again, by a load of the page's plain address. The lines are those of the closed page.
+    assert f'<a class="open-all" id="open-all" href="/consultations/1#transcript">{words.CLOSE_ALL_LINES}</a>' in opened
+    assert line_pieces(opened) == line_pieces(raw) and not any(t["open"] for t in turns(client.get("/consultations/1").text))
+    # The press is the doctor's, so it is use, as any load of the page is (15.6).
+    clock.advance(minutes=29)
+    assert client.get("/consultations/1?lines=open").status_code == 200
+    clock.advance(minutes=29)
+    assert client.get("/consultations/1").status_code == 200
+    # The script that opens the turns again after a load runs before the one that keeps the page's place, and its sentences are the app's.
+    assert raw.index("/static/review.js") < raw.index("/static/place.js") and client.get("/static/review.js").status_code == 200
+    handed = raw.split('<script id="words" type="application/json">')[1].split("</script>")[0]
+    assert all(sentence in text_of(client.get("/consultations/1")) or sentence in handed for sentence in (words.CLOSE_ALL_LINES, words.TURN_NOT_SAVED))
+    assert (words.OPEN_ALL_LINES, words.CLOSE_ALL_LINES, words.TURN_NOT_SAVED) == (
+        "Open all the lines", "Close all the lines", "This turn holds words that are not saved. Save them first.")
+    # Read only, after Approve: the same reading view, turns that open to lines with no box.
+    assert client.post("/consultations/1/note/approve").status_code == 303
+    after = client.get("/consultations/1?lines=open").text
+    assert [t["open"] for t in turns(after)] == [True] * 4 and 'id="open-all"' in after and 'class="line-form"' not in after
+    c.close()
+
+
+def test_R15_a_save_or_an_undo_on_a_line_that_is_refused_comes_back_with_that_lines_turn_open_and_the_sentence_in_its_slot(tmp_path, clock, machine):
+    # A turn is sent closed, and the slot of a line's refusal stands on the line: so the app sends that one turn open, with
+    # and without a script. No other press opens a turn.
+    from openconsult import words
+    from tests.conftest import refusal_on
+    from tests.test_review_page import slot_text
+    app, client, c = made(tmp_path, clock, machine)
+    emptied =client.post("/consultations/1/lines/3", data={"label": "doctor", "text": ""})
+    assert emptied.status_code == 400 and refusal_on(text_of(emptied), "save-line-3") == words.ENTRY_EMPTY
+    assert [(t["first"], t["open"]) for t in turns(emptied.text)] == [(1, True), (5, False), (6, False), (7, False)]
+    undone = client.post("/consultations/1/lines/5/undo")
+    assert undone.status_code == 400 and slot_text(text_of(undone), "undo-5") == words.NOT_CHANGED_BY_CHECK
+    assert [(t["first"], t["open"]) for t in turns(undone.text)] == [(1, False), (5, True), (6, False), (7, False)]
+    # A refusal elsewhere on the page opens none: the note entry whose number is also a line's.
+    entry = app.state.parts.notes.entries(app.state.parts.notes.current_draft(1)["id"])[0]["id"]
+    refused = client.post(f"/consultations/1/entries/{entry}", data={"text": " "})
+    assert refused.status_code == 400 and not any(t["open"] for t in turns(refused.text))
+    c.close()

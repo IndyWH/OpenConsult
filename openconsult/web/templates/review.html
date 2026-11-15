@@ -138,6 +138,9 @@
       <button id="check-who" aria-describedby="check-who-refusal">{{ words.CHECK_WHO_SPOKE }}</button>{{ refusal("check-who") }}</form>
     {% elif who_check.ran and not transcript_read_only %}<span class="swap"><button id="check-who" aria-describedby="check-who-refusal" disabled>{{ words.CHECK_WHO_SPOKE }}</button>{{ refusal("check-who") }}</span>
     {% else %}{{ refusal("check-who") }}{% endif %}
+    {# The control that opens every turn and closes them again (ruling 43). With a script it does so in place; with no
+       script it is a link that loads the page at the transcript with every turn open, and then one that loads it closed. #}
+    {% if turns %}<a class="open-all" id="open-all" href="/consultations/{{ cid }}{{ '' if lines_open else '?lines=open' }}#transcript">{{ words.CLOSE_ALL_LINES if lines_open else words.OPEN_ALL_LINES }}</a>{% endif %}
   </div>
   <div class="pane-body who-check" id="who-check">
     {% if who_check.offered %}<p class="mark" id="check-who-line">{{ words.CHECK_WHO_SPOKE_LINE }}</p>{% endif %}
@@ -167,7 +170,7 @@
        are shown once. Each piece is a marked part beside its line, so a kept name shows inside a closed turn too. #}
     {% if turns %}<p id="turn-says" hidden>{{ words.TURN_PRESS }}</p>{% endif %}
     {% for turn in turns %}
-    <details class="turn" id="turn-{{ turn.first }}">
+    <details class="turn" id="turn-{{ turn.first }}"{% if turn.open %} open{% endif %}>
       <summary aria-describedby="turn-says"><span class="speaker">[{{ turn.first }}{% if turn.last != turn.first %}–{{ turn.last }}{% endif %}] {{ words.LABEL_WORDS[turn.speaker] }}</span>
         <span class="turn-text">{% for line in turn.lines %}<span class="turn-line" id="turn-line-{{ line.n }}" data-part>{% for piece, mark in line.reading %}{% if mark %}<a class="turn-doubt" href="#drug-mark-{{ mark }}" title="{{ words.CHECK_THIS_NAME }}"><mark class="doubted">{{ piece }}</mark></a>{% else %}{{ piece }}{% endif %}{% endfor %}{% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}{% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}{% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}{% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}</span> {% endfor %}</span>
       </summary>

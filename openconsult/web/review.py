@@ -36,7 +36,7 @@ GATE_REFUSALS = gate.REFUSALS
 CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
 SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE", "NAME_NOT_SAVED", "NOT_SAVED_NO_ANSWER",
-                "NOT_SAVED_ERROR")
+                "NOT_SAVED_ERROR", "OPEN_ALL_LINES", "CLOSE_ALL_LINES", "TURN_NOT_SAVED")
 # A press that plays a line or a row starts this long before the line, and ends where it ended (15.10 ruling 38: in
 # the room check of 15 Nov 2026 the sound of a row began late, and at one row the drug's name was gone).
 PLAY_LEAD_S = 1.0
@@ -266,6 +266,12 @@ def review_page(request: Request, user, consultation_id: int, refused: tuple | N
     row = final_row(request, consultation_id)
     letters_web.ensure_list(p, consultation_id)      # the list call, once, at the first opening after Approve (15.12 ruling 2)
     data = page_data(p, row)
+    # A turn is sent closed (ruling 43), but for two cases that work with no script: every turn after a press on the
+    # control that opens all, and the turn of a line whose Save or Undo was refused, so that the sentence is seen (R15).
+    data["lines_open"] = request.query_params.get("lines") == "open"
+    at_line = refused[0].rpartition("-")[2] if refused and refused[0].startswith(("save-line-", "undo-")) else ""
+    for turn in data["turns"]:
+        turn["open"] = data["lines_open"] or (at_line.isdigit() and turn["first"] <= int(at_line) <= turn["last"])
     data["asking_delete"] = asking_delete
     data["delete_question"] = words.DELETE_CONSULTATION_QUESTION.format(name=data["ran_with"]["name"], date=data["date"])
     draft = data["draft"]

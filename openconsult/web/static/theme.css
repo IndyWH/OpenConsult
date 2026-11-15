@@ -196,6 +196,9 @@ button.cite:hover { text-decoration: underline; }
 .transcript details.turn > .line { margin-left: 1rem; }
 .transcript summary .speaker { color: var(--ink-faint); font-size: .8rem; margin-right: .5rem; }
 a.turn-doubt { text-decoration: underline dotted; color: inherit; }
+a.open-all { font-size: .9rem; text-decoration: none; border-radius: 999px; padding: .5rem 1.2rem; background: var(--panel); border: 1px solid var(--line); color: var(--ink-soft); }
+a.open-all:hover { border-color: #D8CEC3; color: var(--ink); }
+.transcript details.turn > .turn-holds { margin: 0 0 .4rem 1rem; min-height: 0; }
 .approved { color: var(--green); }
 .entry-form, .line-form, .undo-form, .swap { display: inline-flex; gap: .4rem; align-items: center; margin: 0; flex-wrap: wrap; }
 .entry-form input, .line-form input.line-text { width: auto; flex: 1; min-width: 18rem; margin-top: 0; }

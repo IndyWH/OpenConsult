@@ -282,6 +282,9 @@ LINE_NO_WORDS = "No words are left on this line. They were part of a drug name t
 # The reading view of the transcript (15.10 rulings 35 and 42 to 44; the details of step 6e). Drafts, for the owner to
 # correct on screen. The first is what a screen reader is told at a turn, as its description and never as its name.
 TURN_PRESS = "Press to open or close the lines of this turn."
+OPEN_ALL_LINES = "Open all the lines"
+CLOSE_ALL_LINES = "Close all the lines"
+TURN_NOT_SAVED = "This turn holds words that are not saved. Save them first."
 # Leaving a row's box keeps the typed name (ruling 33). Shown at the row when the app did not take it; the reason has these two forms.
 NAME_NOT_SAVED = "This name was not saved: {reason}. It is still in the box."
 NOT_SAVED_NO_ANSWER = "OpenConsult did not answer"
