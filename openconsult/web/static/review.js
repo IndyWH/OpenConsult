@@ -21,12 +21,17 @@
   const page = document.getElementById('review');
   if (!page) return;
   const WORDS = JSON.parse(document.getElementById('words').textContent);
+  // A line number pressed: the turn that holds the line is shown, with that line's words marked inside it, in the middle
+  // of the window; the turn is not opened. On an opened turn the line itself is marked, as before the reading view.
   function show(n) {
-    document.querySelectorAll('.line.marked').forEach(function (line) { line.classList.remove('marked'); });
+    document.querySelectorAll('.marked').forEach(function (node) { node.classList.remove('marked'); });
     const line = document.getElementById('line-' + n);
     if (!line) return;
-    line.classList.add('marked');
-    line.scrollIntoView({block: 'center'});
+    const turn = line.closest('details.turn');
+    const shown = turn && !turn.open ? document.getElementById('turn-line-' + n) : line;
+    if (!shown) return;
+    shown.classList.add('marked');
+    shown.scrollIntoView({block: 'center'});
   }
   // One listener for the page: a row or a line that fresh.js put in place is a new node, and its line number must work as after a load.
   document.addEventListener('click', function (event) {
