@@ -76,7 +76,8 @@ def test_rulings_26_28_each_mark_is_a_row_a_form_of_its_own_with_line_words_fiel
     second = row(raw, 1)
     assert '<span class="row-words">I take <input name="words" value="met for min"' in second and second.count("<input") == 1
     assert '> twice a day and <mark class="doubted">met for min</mark> at night.' in second
-    assert 'class="play-stretch row-play" data-start="1.0" data-end="1.6"' in second and 'data-line="3">' + words.DRUG_ROW_LINE.format(n=3) in second
+    # Line 3 starts at 1.0: its row's press starts one second early, at 0.0 (ruling 38), and ends where the line ends.
+    assert 'class="play-stretch row-play" data-start="0.0" data-end="1.6"' in second and 'data-line="3">' + words.DRUG_ROW_LINE.format(n=3) in second
     # The player's data holds each row's stretch; no guess is shown (ruling 6): not in a row, a field or the page.
     data = json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])
     assert {"kind": "drug_mark", "start_s": 0.0, "end_s": 0.9} in data["stretches"] and {"kind": "drug_mark", "start_s": 1.0, "end_s": 1.6} in data["stretches"]

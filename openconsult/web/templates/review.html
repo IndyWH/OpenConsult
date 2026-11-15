@@ -104,7 +104,7 @@
         <form method="post" action="/consultations/{{ cid }}/marks/{{ m.id }}" class="drug-row-form" data-stay>
           <button type="button" class="cite row-line" data-line="{{ m.n }}">{{ words.DRUG_ROW_LINE.format(n=m.n) }}</button>
           <span class="row-words">{% for s in m.segments %}{% if s.kind == "plain" %}{{ s.text }}{% elif m.settled %}<span class="settled-words">{{ s.text }}</span>{% elif s.kind == "field" %}<input name="words" value="{{ s.text }}" class="doubted-field" size="{{ m.size }}" autocomplete="off" aria-label="{{ words.DRUG_FIELD_NAME.format(n=m.n) }}"{% if transcript_read_only %} readonly{% endif %}>{% else %}<mark class="doubted">{{ s.text }}</mark>{% endif %}{% endfor %}</span>
-          {% if player.available and m.start_s is not none and m.end_s is not none %}<button type="button" class="play-stretch row-play" data-start="{{ m.start_s }}" data-end="{{ m.end_s }}" aria-label="{{ words.PLAY_LINE }}" title="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
+          {% if player.available and m.start_s is not none and m.end_s is not none %}<button type="button" class="play-stretch row-play" data-start="{{ m.play_s }}" data-end="{{ m.end_s }}" aria-label="{{ words.PLAY_LINE }}" title="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
           {% set tick_name = (words.TICK_SETTLED_READ_ONLY if m.settled else words.TICK_OPEN_READ_ONLY) if transcript_read_only else (words.TICK_SETTLED if m.settled else words.TICK_OPEN) %}
           <button class="tick {{ 'ticked' if m.settled else 'not-ticked' }}" id="tick-{{ m.id }}" name="press" value="{{ 'open' if m.settled else 'settle' }}" aria-pressed="{{ 'true' if m.settled else 'false' }}" aria-label="{{ tick_name }}" title="{{ tick_name }}" aria-describedby="tick-{{ m.id }}-refusal"{% if transcript_read_only %} aria-disabled="true"{% endif %}>{% if m.settled %}&#10004;{% else %}&#10003;{% endif %}</button>
           {{ refusal("tick-" ~ m.id) }}
@@ -118,7 +118,7 @@
     {% else %}{{ refusal("draft-rows") }}{% endif %}</div>
     <div id="other-warnings" data-part>{% if warnings %}<ul class="panel-list">{% for w in warnings %}<li class="warning" data-kind="{{ w.kind }}">{{ w.text }}
       {% if player.available and w.start_s is not none and w.end_s is not none %}<button type="button" class="play-stretch" data-start="{{ w.start_s }}" data-end="{{ w.end_s }}">{{ words.PLAY_STRETCH }}</button>
-      {% elif player.available and w.line_n and w.line_start_s is not none %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}" data-start="{{ w.line_start_s }}" data-end="{{ w.line_end_s }}">{{ words.PLAY_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
+      {% elif player.available and w.line_n and w.line_start_s is not none %}<button type="button" class="play-line cite" data-line="{{ w.line_n }}" data-start="{{ w.line_play_s }}" data-end="{{ w.line_end_s }}">{{ words.PLAY_LINE }}</button>{% endif %}</li>{% endfor %}</ul>
     {% elif not drug_marks %}<p class="mark">{{ words.NO_WARNINGS }}</p>{% endif %}</div>
     <h3 class="mark" id="alarms">{{ words.ALARMS }}</h3>
     {% if alarms %}<ul class="panel-list">{% for a in alarms %}<li class="alarm-line" data-key="{{ a.key }}" data-n="{{ a.n }}">{{ a.text }}
@@ -169,7 +169,7 @@
       {% if line.changed_by_check and not transcript_read_only %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}/undo" class="undo-form" data-stay>
         <button id="undo-{{ line.n }}" aria-describedby="undo-{{ line.n }}-refusal">{{ words.UNDO_LABEL }}</button>{{ refusal("undo-" ~ line.n) }}</form>
       {% else %}{{ refusal("undo-" ~ line.n) }}{% endif %}
-      {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" data-start="{{ line.start_s }}" data-end="{{ line.end_s }}" aria-label="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
+      {% if player.available %}<button type="button" class="play-line cite" data-line="{{ line.n }}" data-start="{{ line.play_s }}" data-end="{{ line.end_s }}" aria-label="{{ words.PLAY_LINE }}">&#9654;</button>{% endif %}
       {% if transcript_read_only %}<span class="line-text">{% for piece, doubted in line.segments %}{% if doubted %}<mark class="doubted">{{ piece }}</mark>{% else %}{{ piece }}{% endif %}{% endfor %}</span>{% if line.doubted %}<span class="mark doubted-word"> ({{ words.CHECK_THIS_NAME }})</span>{% endif %}{{ refusal("save-line-" ~ line.n) }}
       {% else %}<form method="post" action="/consultations/{{ cid }}/lines/{{ line.n }}" class="line-form" data-stay>
         <select name="label" aria-label="{{ words.SPEAKER_WORD.format(n=line.n) }}">{% for value, word in words.LABEL_WORDS.items() %}<option value="{{ value }}"{% if value == line.label %} selected{% endif %}>{{ word }}</option>{% endfor %}</select>

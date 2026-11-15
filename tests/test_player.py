@@ -7,6 +7,7 @@ import re
 
 from openconsult import words
 from openconsult.consult import opus
+from openconsult.web import review
 from openconsult.web.review import STRIP_COLUMNS, player_data, strip_of
 from tests.conftest import ORIGIN, browser, changes, log_in, snapshot, text_of
 from tests.fakes import MadeUpConverter
@@ -93,9 +94,10 @@ def test_ruling_4_the_printed_page_is_the_note_alone(tmp_path, clock, machine):
         assert mark in raw, mark
 
 
-def test_ruling_29_every_press_that_plays_a_line_carries_that_lines_start_and_its_end_to_stop_at_and_the_alarms_press_no_end(tmp_path, clock, machine):
+def test_rulings_29_38_every_press_that_plays_a_line_carries_a_start_one_second_before_it_and_its_end_to_stop_at_and_the_alarms_press_no_end(tmp_path, clock, machine):
     # As built for 8.8 a pressed line played to the end of the recording, and the pause was far up the page (15.10 ruling 29).
     # The app gives each press its stretch on the button itself; the script plays it and stops. The alarm's press plays on.
+    # Since ruling 38 the stretch starts one second before the line, never before the recording's start; its end is the line's.
     app, client, c = reviewed(tmp_path, clock, machine)
     raw = client.get("/consultations/1").text
     data = json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])
@@ -103,7 +105,7 @@ def test_ruling_29_every_press_that_plays_a_line_carries_that_lines_start_and_it
     presses = re.findall(r'<button type="button" class="play-line cite" data-line="(\d+)" data-start="([^"]*)" data-end="([^"]*)"', raw)
     assert len(presses) == raw.count('class="play-line') >= 3                    # on the transcript and in the warnings: none without its end
     for n, start, end in presses:
-        assert (float(start), float(end)) == times[int(n)] and float(end) > float(start)
+        assert (float(start), float(end)) == (max(0.0, times[int(n)][0] - 1.0), times[int(n)][1]) and float(end) > float(start)
     assert {int(n) for n, _, _ in presses} == set(times)
     in_warnings = raw.split('id="warnings"')[1].split('id="transcript"')[0]
     assert 'class="play-line cite"' in in_warnings and ">" + words.PLAY_LINE + "</button>" in in_warnings
@@ -151,4 +153,39 @@ def test_6d2_fault_one_the_page_names_the_file_its_player_was_shown_with_and_onc
     (tmp_path / "recordings" / "consultation_1.ogg").unlink()
     gone = client.get("/consultations/1/recording/file")
     assert gone.status_code == 404 and gone.text == "" and shown_with() is None
+    c.close()
+
+
+def test_ruling_38_a_press_that_plays_a_line_or_a_row_starts_one_second_before_the_line_never_below_zero_and_ends_where_it_ended(tmp_path, clock, machine):
+    # The room check of 15 Nov 2026: the sound of a row began late; at one row the drug's name was gone and the sound began
+    # at the dose, and a row of 0.24 s gave no sound. So the app gives each press on a line or a row a start one second
+    # before the line's own, not below zero, and leaves the end. The player's data keeps the true times; the alarm's press
+    # (pinned in tests/test_alarms.py), a warning's own stretch and the strip are not changed.
+    from tests.test_live import live_seg
+    from tests.test_review_page import engine_with
+    from tests.test_who_check import reviewed as reviewed_with
+    page = [live_seg(1, 0.4, 0.9, "What do you take", "S1"), live_seg(2, 1.0, 1.3, "for the sugar?", "S1"),
+            live_seg(3, 1.5, 1.8, "I take met for min twice a day. " + "word " * 60, "S2"), live_seg(4, 1.85, 2.0, "Yes.", None)]
+    reply = {"doubtful": [{"line": 2, "heard": "met for min", "meant": "a made-up drug"}, {"line": 1, "heard": "take for", "meant": ""}]}
+    app, client, c = reviewed_with(tmp_path, clock, machine, engine_with(drug_name=[reply]), page=page)
+    assert stop_thread_done(app)
+    raw = client.get("/consultations/1").text
+    data = json.loads(raw.split('<script id="player-data" type="application/json">')[1].split("</script>")[0])
+    # The true times stay in the player's data: the line marked while it plays is the line that is sounding.
+    assert [(line["n"], line["start_s"], line["end_s"]) for line in data["lines"]] == [(1, 0.4, 0.9), (2, 1.0, 1.3), (3, 1.5, 1.8), (4, 1.85, 2.0)]
+    assert {"kind": "drug_mark", "start_s": 1.5, "end_s": 1.8} in data["stretches"] and {"kind": "drug_mark", "start_s": 0.4, "end_s": 1.3} in data["stretches"]
+    # A line's press, on the transcript: one second early, not below zero; the end as it was.
+    transcript = raw.split('id="final-transcript"')[1]
+    presses = re.findall(r'class="play-line cite" data-line="(\d+)" data-start="([^"]*)" data-end="([^"]*)"', transcript)
+    assert [(int(n), float(start), float(end)) for n, start, end in presses] == [(1, 0.0, 0.9), (2, 0.0, 1.3), (3, 0.5, 1.8), (4, 0.85, 2.0)]
+    # The same press in the warnings: line 4 has no speaker, and its warning plays it.
+    warnings = raw.split('id="warnings"')[1].split('id="transcript"')[0]
+    assert 'class="play-line cite" data-line="4" data-start="0.85" data-end="2.0"' in warnings
+    # A row's press: from one second before the first line the name was heard on, to the end of the last.
+    rows = re.findall(r'id="drug-mark-(\d+)".*?class="play-stretch row-play" data-start="([^"]*)" data-end="([^"]*)"', warnings, flags=re.S)
+    assert [(int(m), float(start), float(end)) for m, start, end in rows] == [(2, 0.0, 1.3), (1, 0.5, 1.8)]
+    # The line itself still says where it truly starts, and the alarm's press carries a start and no end.
+    assert 'id="line-3" data-start="1.5" data-end="1.8"' in raw
+    assert review.press_start(None) is None and review.press_start(0.99) == 0.0 and review.press_start(61.37) == 60.37
+    assert review.PLAY_LEAD_S == 1.0
     c.close()

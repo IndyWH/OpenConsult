@@ -43,7 +43,7 @@ def test_rulings_20_27_a_mark_shows_in_its_two_places_no_note_entry_carries_a_si
     assert warnings.index(words.DRUG_MARKED.format(count=2)) < warnings.index(words.DRUG_NOT_PROVEN) < warnings.index('<ul class="panel-list drug-rows"')
     first, second = 'id="drug-mark-2"', 'id="drug-mark-1"'                # the row of the name heard on lines 1 and 2, then the one on line 3
     assert warnings.index(first) < warnings.index(second) < warnings.index(words.WARN_CONFIDENCE_NOT_MEASURED.split(":")[0])
-    assert warnings.count('data-kind="drug_mark"') == 2 and 'class="play-stretch row-play" data-start="1.0" data-end="1.6"' in warnings
+    assert warnings.count('data-kind="drug_mark"') == 2 and 'class="play-stretch row-play" data-start="0.0" data-end="1.6"' in warnings
     assert 'value="take for"' in warnings and 'value="met for min"' in warnings and OLD_WARNING not in page       # the row itself shows the words
     # Ruling 27: no note entry carries a sign of a doubted name, also not the entry that draws on a marked line and wrote another word.
     subjective = part(raw, 'id="section-subjective"', 'id="section-objective"')

@@ -37,6 +37,9 @@ CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
 SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE", "NAME_NOT_SAVED", "NOT_SAVED_NO_ANSWER",
                 "NOT_SAVED_ERROR")
+# A press that plays a line or a row starts this long before the line, and ends where it ended (15.10 ruling 38: in
+# the room check of 15 Nov 2026 the sound of a row began late, and at one row the drug's name was gone).
+PLAY_LEAD_S = 1.0
 # The check of who spoke comes back at its own place, the top of the transcript: the press, each wait and the end.
 CHECK_PLACE = "transcript"
 # The loudness strip is drawn in this many columns, each the loudest of its windows.
@@ -72,6 +75,12 @@ def player_data(row: dict, lines: list[dict], warnings: list[dict], data_folder)
             "strip": strip_of(windows), "window_s": WINDOW_S,
             "stretches": [{"kind": w["kind"], "start_s": w["start_s"], "end_s": w["end_s"]} for w in warnings
                           if w["start_s"] is not None and w["end_s"] is not None]}
+
+
+def press_start(start_s: float | None) -> float | None:
+    """Where a press that plays a line or a row starts: one second before
+    the line's own start, never before the start of the recording."""
+    return None if start_s is None else max(0.0, round(start_s - PLAY_LEAD_S, 3))
 
 
 def script_words() -> dict:
@@ -199,6 +208,14 @@ def page_data(p, row: dict) -> dict:
     for w in warnings:
         held = by_number.get(w["line_n"])
         w["line_start_s"], w["line_end_s"] = (held["start_s"], held["end_s"]) if held else (None, None)
+        w["line_play_s"] = press_start(w["line_start_s"])
+    # Ruling 38: each press on a line or a row is given its start, one second early. The player's data keeps the true
+    # times, so the line marked while it plays is the line that is sounding; a warning's own stretch, the alarm's press
+    # and the strip are not changed.
+    for line in lines:
+        line["play_s"] = press_start(line["start_s"])
+    for mark in drug["marks"]:
+        mark["play_s"] = press_start(mark["start_s"])
     if gate_refused:
         state["draft_reason"] = words.NOTE_GATE_REFUSED.format(reason=gate_reason)
     who = who_check.page_state(p.consultations, cid, state["transcript_read_only"], bool(lines))
