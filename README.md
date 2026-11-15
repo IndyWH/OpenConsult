@@ -29,10 +29,12 @@ This branch is where OpenConsult v2.0 is being built.
   the counts of warnings and alarms, Refuse, the warnings and the alarms
   each a press from the sound, and the transcript with a player for the
   recording, where a word or a speaker can be corrected and the note
-  drafted again; a pressed line plays that line and stops. A doubted
+  drafted again; a pressed line plays from one second before that line
+  to its end, and stops. A doubted
   drug name is a row among the warnings, the one place to deal with it:
   the line's words with the doubted words as a field, a play button for
-  the stretch it was heard on, and a tick. The doctor plays it, types
+  the stretch it was heard on, and a tick. One click on the doubted
+  words selects them all. The doctor plays it, types
   the right name over a wrong one, and ticks it; the tick also settles a
   name that was heard rightly, and a second press opens it again. A
   name typed in a row and then left is saved into the transcript line

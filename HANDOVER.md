@@ -7,11 +7,13 @@ The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 ## 2026-11-15. Step 6d2, the mend run: the first play is heard, a name typed and left is kept, the page keeps its place, and the check of who spoke is seen
 
 Run on 15 Nov 2026 under the owner's approval of the plan and Cowork's
-review of it (ten points; all are in). The spec is 6abc2bd (sha256
-81faf6ff...), the stage prompt bac357e (stage-prompts/STAGE_06D2.md).
-The private report is STAGE6D2_REPORT.md in the log folder, with the
-plan and its review beside it. Eight commits, none pushed. No model was
-called, no engine started, and nothing left the machine.
+review of it (ten points; all are in), then two mails from Cowork with
+his okay the same day. The spec is 42e42b7 (sha256 2978b9cf...; first
+6abc2bd, 81faf6ff...), the stage prompt bac357e
+(stage-prompts/STAGE_06D2.md). The private report is STAGE6D2_REPORT.md
+in the log folder, with the plans and the review beside it. Fourteen
+commits, none pushed. No model was called, no engine started, and
+nothing left the machine.
 
 For the patient. In the room run of 15 Nov the row of a doubted drug
 name did what it is for, and the page failed under the doctor's hands
@@ -60,15 +62,43 @@ The four mends (15.10 rulings 33, 34 and 37 and the details of 6d2).
   whether any field differs from what the app gave it, instead of
   remembering that something was typed; takes the seconds left from a
   keep's answer; and adds the one second the script-less pages have.
-The suite is 960 tests in 80 s, none skipped; the start check passes.
 One test went with kept.js; one gained three assertions; none weakened.
+Two tests were made to wait for the Stop thread's conversion step: one
+had failed 3 times in 8 on Cowork's clean copy (cd147a3, tests only).
+
+Three more mends, after the owner's room check on the build of dd88d5d
+(rulings 38 and 39; the details, Three more mends).
+- WHAT THE ROOM CHECK FOUND: the page was new and the browser ran its
+  own stored copies of older scripts, because the app served its
+  static files with nothing that tells a browser when a copy is too
+  old. So the first play and leaving the box never ran in the room.
+  Older than this run, and it would have met every doctor after every
+  update. Now every script and style address carries a mark, the start
+  of the sha256 of the file's bytes (pages.static_address), the
+  recorder worklet too, and the static files are served no-cache.
+  Proven with one browser profile kept between looks: after the page
+  of 33c8c9a, the page of cd147a3 ran the old player.js, use.js and
+  review.js from the browser's store; the final code ran its own.
+- One second early: each press on a line or a row starts one second
+  before the line, not below zero (review.PLAY_LEAD_S); the end stays.
+- Measured with a made sound that tells the time, by the samples that
+  leave the player: with the recording in pieces of one second (as the
+  app converts) and of a tenth, the sound began at the asked place in
+  all 72 presses, to 10 ms. So the pieces are not why a row sounded
+  late, and the converter is unchanged. Not measured: a loudspeaker's
+  own start; the speech choice's line times, which wait for a later
+  step. One press of 72 ended 0.7 s early; not seen again, not explained.
+- One click on a row's box selects all its words.
+The suite is 964 tests in 86 s, none skipped. The start check passed at
+dd88d5d and was not run after it: the owner's app was on its port.
 
 Seen in a browser by the build model: this machine's own Chrome 157,
 headless, with a throwaway profile, a dead proxy and no name lookups,
 driven with real mouse and key events on a made-up consultation of the
-suite with a made tone of ten minutes. The first play's fault was made
+suite with a made sound of ten minutes. The first play's fault was made
 on the code as it stood (the time stood still, no error) and was gone
-after the mend. Each line of Done when you see, for 6d2, held there.
+after the mend. Each line of Done when you see, for 6d2, held there,
+the last time by the sound itself and not the player's clock.
 Not seen: a hand's timing, real speech, Firefox or Safari, a screen
 reader. The owner's room check is the check that counts.
 
@@ -94,8 +124,9 @@ README's account of the row and of the check. Not mine to write, in the
 spec: nothing found. No help page exists. The two oldest entries here,
 run 9e and stage 5e, moved to the archive.
 
-Next: the owner's room check of 6d2; a ruling on the lock; then the
-collating step (ruling 35), then 9b.
+Next: the owner's room check of 6d2 again, in a browser that has run
+an older build; a ruling on the lock; then the collating step (ruling
+35), then 9b.
 
 ## 2026-11-14. Step 6d: a doubted drug name is corrected and ticked at its warning; Claude Sonnet benched on the drug names, two marks held and the third missed by 5
 
