@@ -28,9 +28,19 @@ This branch is where OpenConsult v2.0 is being built.
   beside the assessment and marked as not part of the note, Approve with
   the counts of warnings and alarms, Refuse, the warnings and the alarms
   each a press from the sound, and the transcript with a player for the
-  recording, where a word or a speaker can be corrected and the note
-  drafted again; a pressed line plays from one second before that line
-  to its end, and stops. A doubted
+  recording. The transcript reads as turns of speech, doctor, patient,
+  doctor, patient: neighbouring lines of one speaker are one entry,
+  however the speech choice cut them, with the numbers of its first and
+  last line and one press that plays the whole turn; up to three words
+  with no speaker between two lines of one speaker sit inside that
+  turn, marked as unsure where they stand, and at a change of speaker
+  they stay an entry of their own. A press on a turn opens its own
+  lines in place, where a word or a speaker can be corrected and the
+  note drafted again; what was opened stays open after a press, a turn
+  that holds words not yet saved is not closed, and one control opens
+  every turn. Nothing of a turn is stored and no model reads one. A
+  pressed line plays from one second before that line to its end, and
+  stops. A doubted
   drug name is a row among the warnings, the one place to deal with it:
   the line's words with the doubted words as a field, a play button for
   the stretch it was heard on, and a tick. One click on the doubted
@@ -40,8 +50,11 @@ This branch is where OpenConsult v2.0 is being built.
   name typed in a row and then left is saved into the transcript line
   as soon as the doctor leaves the box, with the tick still faded until
   he presses it; the Enter key saves and ticks; and after a press the
-  page stays where it was, with the next row where it stood. The
-  correction goes into the transcript line and the note is then drafted
+  page stays where it was, with the next row where it stood. A leftover
+  piece of a name that the speech choice cut over two lines is taken
+  out at its row: the box emptied, then the tick; the line stays, the
+  record keeps the words as heard, and a second press opens it again.
+  The correction goes into the transcript line and the note is then drafted
   again with one press, never corrected in place, because the right drug
   can change the clinical picture. A name is always shown as the words
   that were heard, never as a guess; no sign stands on the note entries;
@@ -50,9 +63,13 @@ This branch is where OpenConsult v2.0 is being built.
   spoke no longer runs by itself: one control on the review page, Check
   who spoke, asks the language model for it; the page stays at the top
   of the transcript while it runs and says there on how many lines the
-  speaker changed, with the control that undoes them all; every changed
-  line says so at its start, with its own Undo; and the page says so
-  above the note when who spoke has changed since the note was written.
+  speaker changed, with the control that undoes them all; every line it
+  moved says so inside its turn, where it now stands, in a box of its
+  own with its own Undo, and no turn opens by itself; and the page says
+  so above the note when who spoke has changed since the note was
+  written. The app locks itself after 30 minutes with no use: on the
+  review page a press, a keystroke and sound that is playing are use,
+  and the page fetching the recording by itself is not.
   An approved note is read-only and
   audited; the copy gives the note alone. After Approve, a Referral
   letters section lists the referrals the note states and, under a line
