@@ -82,6 +82,15 @@
     retaken = false;
     ask();
   });
+  // Sound is use (15.10 ruling 41). A press that plays is told as every press of the page is (use.js). Here: the player's
+  // own control starting sound; while sound plays, again whenever 30 s have passed since the app was last told; and once
+  // more when the sound stops or ends, so that the lock's 30 minutes run from the end of the sound.
+  const told = window.pageFields && window.pageFields.tell ? window.pageFields.tell : function () {};
+  let sounded = false;      // sound has started and its end has not yet been told
+  audio.addEventListener('play', function () { sounded = true; told(false); });
+  ['pause', 'ended'].forEach(function (name) {
+    audio.addEventListener(name, function () { if (sounded) { sounded = false; told(true); } });
+  });
   audio.addEventListener('error', function () { failed(null); });
   // The player's own controls play on as before: a move with its bar, or a pause before the end, ends a press's stop.
   audio.addEventListener('seeking', function () { if (moving) moving = false; else stopAt = null; });
@@ -95,6 +104,7 @@
   });
   audio.addEventListener('timeupdate', function () {
     const t = audio.currentTime;
+    if (!audio.paused) told(false);
     stopIfReached();
     document.querySelectorAll('.playing').forEach(function (line) { line.classList.remove('playing'); });
     const line = player.lines.find(function (l) { return t >= l.start_s && t < l.end_s; });

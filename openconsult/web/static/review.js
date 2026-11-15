@@ -53,7 +53,11 @@
     fetch(page.dataset.path + '/note.txt').then(function (r) {
       if (!r.ok) throw new Error(r.status);
       return r.text();
-    }).then(function (text) { return navigator.clipboard.writeText(text); })
+    }).then(function (text) {
+      // The fetch was use: the app is told once more, and its answer sets the page's count, so the two agree (ruling 41).
+      if (window.pageFields && window.pageFields.tell) window.pageFields.tell(true);
+      return navigator.clipboard.writeText(text);
+    })
       .then(function () { result.textContent = WORDS.COPIED; })
       .catch(function (error) { result.textContent = WORDS.COPY_FAILED.replace('{reason}', error && error.message ? error.message : String(error)); });
   });

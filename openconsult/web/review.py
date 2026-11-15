@@ -519,10 +519,12 @@ async def delete(request: Request, consultation_id: int, user=Depends(guards.log
 
 
 @router.get("/consultations/{consultation_id}/recording", dependencies=[Depends(guards.this_computer)])
-async def recording(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+async def recording(request: Request, consultation_id: int, user=Depends(guards.logged_in_not_use)):
     """The recording, played only to the logged-in user from this
     computer (8.8; D51; 15.6 ruling 6): the file is read and never
-    written (R18); one that is not there is 404."""
+    written (R18); one that is not there is 404. The request is never
+    use (15.10 ruling 41): the page makes it by itself; a press of play
+    and sound that is playing are told by the page's script."""
     p = parts(request)
     row = final_row(request, consultation_id)
     path = folder_of(p.settings.data_folder) / (row["recording_file"] or "")
@@ -533,12 +535,12 @@ async def recording(request: Request, consultation_id: int, user=Depends(guards.
 
 
 @router.get("/consultations/{consultation_id}/recording/file", dependencies=[Depends(guards.this_computer)])
-async def recording_file(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+async def recording_file(request: Request, consultation_id: int, user=Depends(guards.logged_in_not_use)):
     """The name of the recording's file as it is now, and nothing else
     (the mend run of step 6d, fault one). A page shown before the WAV was
     converted asks this at a press of play; a new name tells its player to
     take the recording's address afresh. 404 when there is no such
-    consultation or no such file."""
+    consultation or no such file. Never use (ruling 41)."""
     p = parts(request)
     row = p.consultations.get(consultation_id)
     name = row["recording_file"] if row is not None and row["state"] == "final" else None

@@ -95,13 +95,27 @@ def socket_user(websocket):
 def logged_in(request: Request):
     """The user, for a page behind the login. A request with ?quiet is
     the page's own timed check and is not use (spec 15.6)."""
+    return _user(request, touch="quiet" not in request.query_params)
+
+
+def logged_in_not_use(request: Request):
+    """The user, for a request the page makes by itself and that is never
+    use, whatever its address says (15.10 ruling 41): the recording and
+    the question for its file. The review page fetches the recording when
+    it is shown and shown again; counted as use, that fetch put the lock
+    off time after time, and a consultation left on a screen stayed on
+    the screen. The login is read and never touched."""
+    return _user(request, touch=False)
+
+
+def _user(request: Request, touch: bool):
     first_run_done(request)
     p = parts(request)
     token = request.cookies.get(COOKIE)
     if token is None:
         raise Redirect("/login")
     user = p.users.get()
-    found = p.logins.find(token, user.generation, touch="quiet" not in request.query_params)
+    found = p.logins.find(token, user.generation, touch=touch)
     if found.login is None:
         raise Redirect(f"/login?why={WHY_FOR[found.reason]}", clear_login=True)
     request.state.seconds_left = p.logins.seconds_left(found.login)

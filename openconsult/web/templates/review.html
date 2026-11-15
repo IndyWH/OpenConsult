@@ -11,7 +11,8 @@
 {%- endmacro %}
 {% block head %}<link rel="stylesheet" href="{{ static('print.css') }}" media="print">{% endblock %}
 {% block main %}
-<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}">
+{# data-presses: on this page every press of the doctor is use, as typing is (15.10 ruling 41; the plan review of 6e, point 4). #}
+<div id="review" data-use data-seconds-left="{{ seconds_left }}" data-path="/consultations/{{ cid }}" data-consultation="{{ cid }}" data-presses>
 <script id="words" type="application/json">{{ words_json|safe }}</script>
 <script id="player-data" type="application/json">{{ player_json|safe }}</script>
 <script id="marks" type="application/json">{{ marks_json|safe }}</script>

@@ -189,3 +189,51 @@ def test_ruling_38_a_press_that_plays_a_line_or_a_row_starts_one_second_before_t
     assert review.press_start(None) is None and review.press_start(0.99) == 0.0 and review.press_start(61.37) == 60.37
     assert review.PLAY_LEAD_S == 1.0
     c.close()
+
+
+# ------------------------------------- what counts as use (15.10 ruling 41)
+
+def test_ruling_41_a_request_for_the_recording_or_for_its_files_name_is_never_use_whatever_its_address_says(tmp_path, clock, machine):
+    # Found by the mend run of step 6d and older than it: the review page fetches the recording by itself when it is shown,
+    # the app counted that fetch as use, and so after a line had been played the lock could fail to fall: a consultation
+    # left on a screen stayed on the screen. The recording and the question for its file are now never use.
+    app, client, c = reviewed(tmp_path, clock, machine)
+    assert stop_thread_done(app)
+    name = app.state.parts.consultations.get(1)["recording_file"]
+    asked = (("/consultations/1/recording", {}), (f"/consultations/1/recording?file={name}", {}), ("/consultations/1/recording", {"Range": "bytes=0-99"}),
+             ("/consultations/1/recording/file", {}), ("/consultations/1/recording/file?quiet", {}))
+    for address, headers in asked:
+        assert log_in(client).status_code == 303
+        clock.advance(minutes=29)
+        assert client.get(address, headers=headers).status_code in (200, 206), address      # the login is live, and is not touched
+        clock.advance(minutes=2)
+        answer = client.get("/consultations/1")
+        assert answer.status_code == 303 and "/login" in answer.headers["location"], address  # 31 minutes with no use: the lock has fallen
+    # Set beside it, a request that is use: the page itself, asked for by the doctor.
+    assert log_in(client).status_code == 303
+    clock.advance(minutes=29)
+    assert client.get("/consultations/1").status_code == 200
+    clock.advance(minutes=2)
+    assert client.get("/consultations/1").status_code == 200
+    c.close()
+
+
+def test_ruling_41_the_page_tells_its_script_that_every_press_is_use_and_the_app_answers_a_tell_and_the_copy_with_the_seconds_left(tmp_path, clock, machine):
+    # The plan review of 6e, point 4, from the words of the ruling: your last press or keystroke. The review page is marked
+    # so that its script tells the app at a press anywhere on it, as at typing; the new-patient form is not.
+    app, client, c = reviewed(tmp_path, clock, machine)
+    raw = client.get("/consultations/1").text
+    assert re.search(r'<div id="review" data-use data-seconds-left="\d+" data-path="/consultations/1" data-consultation="1" data-presses>', raw)
+    form = client.get("/patients/new").text
+    assert "data-use" in form and "data-presses" not in form
+    # A tell is use and gives the seconds left, from which the page's own count runs.
+    clock.advance(minutes=20)
+    assert client.post("/use").json() == {"seconds_left": 1800}
+    # The copy of the note is use, as built; the page's script then tells, and the answer is the same count as the app's.
+    clock.advance(minutes=20)
+    assert client.get("/consultations/1/note.txt").status_code == 200
+    clock.advance(minutes=20)
+    assert client.post("/use").json() == {"seconds_left": 1800}
+    clock.advance(minutes=31)
+    assert client.get("/consultations/1?quiet").status_code == 303
+    c.close()
