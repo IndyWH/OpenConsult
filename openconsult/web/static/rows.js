@@ -13,7 +13,8 @@
 // were left. A keep that is refused, or gets no answer, is said at its row,
 // and a held press is then dropped: nothing is drafted, approved or ticked
 // from words that were not saved. The app holds every word; here is only
-// what is on its way.
+// what is on its way. And one click on a row's box selects all its words
+// (ruling 39), so that typing replaces them with no second click.
 (function () {
   const page = document.getElementById('review');
   if (!page || !window.freshPage) return;
@@ -86,6 +87,17 @@
     if (box && box.isConnected && box.form !== sending) leave(box, null);
   }
 
+  // The click that gives a row's box the focus selects all its words (ruling 39). A click in a box that already has
+  // the focus places the caret as before, so one letter can still be mended; so does a stretch chosen by dragging.
+  let entered = null;
+  document.addEventListener('focusin', function (event) {
+    const box = event.target.matches && event.target.matches(BOX) ? event.target : null;
+    entered = box && pressed && box.contains(pressed) && !window.freshPage.busy ? box : null;
+  });
+  document.addEventListener('click', function (event) {
+    if (entered && event.target === entered && !entered.readOnly && entered.selectionStart === entered.selectionEnd) entered.select();
+    entered = null;
+  });
   document.addEventListener('pointerdown', function (event) { pressed = event.target; }, true);
   document.addEventListener('pointerup', function () {
     window.setTimeout(function () { pressed = null; if (forTick && document.activeElement !== tickOf(forTick)) tickPassed(); }, 0);
