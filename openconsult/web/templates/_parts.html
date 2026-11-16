@@ -24,3 +24,30 @@
 </table>
 <p class="sentence">{{ machine.sentence }}</p>
 {%- endmacro %}
+
+{# The cloud statement of a path, as built by code from the owner's words, with its tick (15.13, ruling 5). The
+   checksum of the text shown goes with the tick, so a tick is never taken for another text. #}
+{% macro cloud_statement(statement) -%}
+<section class="pane" id="cloud-statement">
+  <div class="pane-head"><h2>{{ statement.made.heading }}</h2></div>
+  <div class="pane-body">
+    <p>{{ statement.made.intro }}</p>
+    <h3>{{ words.CLOUD_SENT_HEADING }}</h3>
+    <ul class="panel-list" id="statement-sent">{% for line in statement.made.sent %}<li>{{ line }}</li>{% endfor %}</ul>
+    <h3>{{ words.CLOUD_STAYS_HEADING }}</h3>
+    <ul class="panel-list" id="statement-stays">{% for line in statement.made.stays %}<li>{{ line }}</li>{% endfor %}</ul>
+    {% for heading, lines in statement.made.parts %}
+    <h3>{{ heading }}</h3>
+    <ul class="panel-list statement-part">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>
+    {% endfor %}
+    <p class="statement">{{ statement.made.prototype }}</p>
+    <form method="post" action="/statement/tick">
+      <input type="hidden" name="sha256" value="{{ statement.made.sha256 }}">
+      <input type="hidden" name="back" value="{{ statement.back }}">
+      <label class="tick"><input type="checkbox" name="understand" value="yes"> {{ statement.made.tick }}</label>
+      <button class="primary" id="tick-statement" aria-describedby="tick-statement-refusal">{{ words.SAVE }}</button>
+      {{ refusal("tick-statement") }}
+    </form>
+  </div>
+</section>
+{%- endmacro %}

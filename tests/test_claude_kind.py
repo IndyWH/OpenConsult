@@ -395,7 +395,11 @@ def test_15_13_the_two_calls_of_a_pass_are_still_sent_together(server, record):
 
 
 @pytest.mark.parametrize("machine", ["linux-card", "linux-none", "windows-card", "mac"])
-def test_rule_6_the_app_cannot_reach_the_cloud_kinds(machine, tmp_path):
+def test_rule_6_the_app_loads_nothing_of_the_bench_and_cannot_reach_the_benchs_kinds(machine, tmp_path):
+    # Restated in run 9b (15.13, ruling 21 and the details of the run; the review of its plan, point 2). Until then
+    # this test pinned that the app loads no module of Claude at all. The Claude engine is now the app's own
+    # (llm/claude.py), so what stands is: the app loads nothing of the bench; the order of the local engines asked
+    # at start holds no cloud kind; and the second host, which is the bench's alone, cannot be reached by the app.
     from openconsult.settings.machine import Card, describe
     described = {"linux-card": describe("Linux", "x86_64", [Card("Made-up card", 24564)]), "linux-none": describe("Linux", "x86_64", []),
                  "windows-card": describe("Windows", "AMD64", [Card("Made-up card", 24564)]), "mac": describe("Darwin", "arm64", [])}[machine]
@@ -406,7 +410,7 @@ def test_rule_6_the_app_cannot_reach_the_cloud_kinds(machine, tmp_path):
             "from openconsult.settings import store\n"
             "from openconsult.settings.machine import describe\n"
             "app = build_app(store.build(sys.argv[1], 8765), machine=describe('Linux', 'x86_64', []))\n"
-            "print(sorted(name for name in sys.modules if name.startswith('openconsult.bench') or 'claude' in name))\n")
+            "print(sorted(name for name in sys.modules if name.startswith('openconsult.bench') or 'deepinfra' in name))\n")
     done = subprocess.run([sys.executable, "-c", code, str(tmp_path)], capture_output=True, text=True, timeout=60)
     assert done.returncode == 0, done.stderr
     assert done.stdout.strip() == "[]"

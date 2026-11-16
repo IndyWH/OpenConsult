@@ -703,6 +703,9 @@ EVENTS = {
     "decision.converter": "Recording converter found at start",
     "setting.changed": "Setting changed",
     "statement.ticked": "Cloud statement ticked",
+    "connection.tested": "Connection to a cloud service tested",
+    "key.saved": "Key of a cloud service kept in the secure store",
+    "key.removed": "Key of a cloud service taken out of the secure store",
     "audio.deleted": "Recordings deleted by the retention sweep",
     "recording.converted": "Recording converted to Opus",
     "recording.conversion_failed": "Recording kept as WAV: conversion failed",
@@ -1042,3 +1045,40 @@ CONNECT_CLAUDE_LINES = (
     "10 US cents.",
     "Get a key opens the Console. Paste the key here and press Test connection.",
 )
+
+# Run 9b: the connect screens and the section Connections (7.2; 15.13, the details of the run). Drafts, for the
+# owner to correct on screen. Get a key, Test connection and Why this model are his own words of ruling 34 and 30,
+# used as the names of the link, the button and the line.
+SECTION_CONNECTIONS = "Connections"
+CONNECT_SPEECHMATICS_TITLE = "Connect Speechmatics"
+CONNECT_SPEECHMATICS_LINE = ("OpenConsult needs a key from your Speechmatics account. Get a key opens its page. Paste the key here "
+                             "and press Test connection.")
+GET_A_KEY = "Get a key"
+TEST_CONNECTION = "Test connection"
+WHY_THIS_MODEL = "Why this model"
+FIELD_KEY = "Key"
+CONNECTED = "Connected."
+NOT_CONNECTED = "Not connected."
+KEY_SAVED = "Connected. The key is kept in this computer's secure store."
+PASTE_A_KEY = "Paste a key first."
+NO_SECURE_STORE = ("This computer has no secure store that answers, so OpenConsult cannot keep a key here. Nothing was saved. "
+                   "A developer can put the key in the file .env in the data folder.")
+KEY_NOT_KEPT = "The secure store did not take the key, so nothing was saved: {reason}"
+KEY_WHERE = {"store": "The key is in this computer's secure store.",
+             "environment": "The key comes from the environment the app was started in.",
+             "file": "The key comes from the file .env in the data folder."}
+LAST_TEST_PASSED = "Last tested on {date} at {time}: it answered."
+LAST_TEST_FAILED = "Last tested on {date} at {time}: {reason}"
+NOT_TESTED_YET = "Not tested since OpenConsult started."
+TEST = "Test"
+REMOVE = "Remove"
+CONNECT = "Connect"
+KEY_REMOVED = "Removed. The key is no longer in this computer's secure store."
+KEY_NOT_IN_STORE = ("This key is not in the secure store, so OpenConsult cannot remove it. Take it out of the environment or of "
+                    "the file .env.")
+# This machine: one row for each cloud service in use, with its connection as it stands.
+ROW_CONNECTION = "Connection to {service}"
+MACHINE_CONNECTED = "Connected, tested at {time}."
+MACHINE_TEST_FAILED = "The last test failed at {time}: {reason}"
+STATEMENT_TICK_FIRST = "Read the statement and tick it to save this choice."
+STATEMENT_CHANGED = "The statement has changed since you ticked it. Read it and tick it again."

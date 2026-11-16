@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal, cloud_statement with context %}
+{% block main %}
+<h1 class="page">{{ title }}</h1>
+<div class="pane"><div class="pane-body" id="connect" data-service="{{ service.name }}">
+  <ul class="panel-list" id="connect-lines">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% if why %}<p><a href="/why-this-model" id="why-this-model-link">{{ words.WHY_THIS_MODEL }}</a></p>{% endif %}
+  <p><a class="button" id="get-a-key" href="{{ key_page }}" target="_blank" rel="noopener noreferrer">{{ words.GET_A_KEY }}</a></p>
+  <p class="sentence" id="connection-state">{{ service.state }}</p>
+  {% if service.where %}<p class="mark" id="key-where">{{ service.where }}</p>{% endif %}
+  {% if service.last %}<p class="mark" id="last-test">{{ service.last }}</p>{% endif %}
+  {# The key's field never holds a value: a pasted key is never shown again (7.2). #}
+  <form method="post" action="/connect/{{ service.name }}" autocomplete="off">
+    <label>{{ words.FIELD_KEY }}<input name="key" type="password" autocomplete="off" spellcheck="false"{% if no_store %} disabled{% endif %}></label>
+    <button class="primary" id="test-connection" aria-describedby="test-connection-refusal"{% if no_store and not service.has_key %} disabled{% endif %}>{{ words.TEST_CONNECTION }}</button>
+    <p class="refusal" id="test-connection-refusal" role="alert">{% if refused and refused.control == "test-connection" %}{{ refused.message }}{% elif no_store %}{{ no_store }}{% endif %}</p>
+    {% if notice %}<p class="notice" id="connect-notice">{{ notice }}</p>{% endif %}
+  </form>
+</div></div>
+{% if to_tick %}{{ cloud_statement(to_tick) }}{% endif %}
+{% if user %}<p><a href="/settings#connections">{{ words.NAV_SETTINGS }}</a></p>{% endif %}
+{% endblock %}

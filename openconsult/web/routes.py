@@ -12,7 +12,8 @@ from openconsult import words
 from openconsult.patients import patients as patients_module
 from openconsult.patients.users import MIN_PASSWORD, name_problem, password_problem
 from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
-from openconsult.web import guards, guidelines as guidelines_web
+from openconsult.settings.connections import SERVICES
+from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -42,7 +43,24 @@ def room_lines(request: Request) -> list[tuple[str, str]]:
     if p.machine.case == "suitable":
         found += [(words.ROW_GUIDELINE_SEARCH, p.decisions.guideline_search.sentence),
                   (words.ROW_SPEECH_CHOICE, p.decisions.whisperx_choice.sentence)]
-    return found + [(words.ROW_CONVERTER, p.decisions.converter.sentence)]
+    return found + [(words.ROW_CONVERTER, p.decisions.converter.sentence)] + connection_lines(p)
+
+
+def connection_lines(p) -> list[tuple[str, str]]:
+    """One row for each cloud service the chosen path uses, with its
+    connection as it stands and the reason of a failed test (7.2; R15).
+    Read from what the app holds: no test is made at a view of this page."""
+    found = []
+    for service in p.stored.path(p.machine.case).services:
+        state = p.connections.state(service)
+        if state.last is not None and state.last.ok:
+            line = words.MACHINE_CONNECTED.format(time=f"{state.last_at:%H:%M}")
+        elif state.last is not None:
+            line = words.MACHINE_TEST_FAILED.format(time=f"{state.last_at:%H:%M}", reason=state.last.sentence)
+        else:
+            line = words.CONNECTED if state.connected else words.NOT_CONNECTED
+        found.append((words.ROW_CONNECTION.format(service=words.SERVICE_TITLES[service]), line))
+    return found
 
 
 @dataclass(frozen=True)
@@ -252,7 +270,8 @@ async def logout(request: Request):
 
 # ---------------------------------------------------------------- settings
 
-NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED, "retention": words.RETENTION_SAVED}
+NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED, "retention": words.RETENTION_SAVED,
+          "tested": words.CONNECTED, "removed": words.KEY_REMOVED}
 
 
 def _settings_page(request: Request, user, refused=None):
@@ -261,7 +280,9 @@ def _settings_page(request: Request, user, refused=None):
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
-                   guidelines=guidelines_web.section_data(request), page_path="/settings")
+                   guidelines=guidelines_web.section_data(request), page_path="/settings",
+                   connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],
+                   to_tick=cloud_web.statement_view(parts(request), "/settings"))
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)
     return render(request, "settings.html", **context)

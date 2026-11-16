@@ -33,6 +33,7 @@ from openconsult.patients.logins import Logins
 from openconsult.patients.patients import Patients
 from openconsult.patients.users import Users
 from openconsult.settings import room
+from openconsult.settings.connections import Connections
 from openconsult.settings.decisions import Decisions, converter_element, language_model_element
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.secure import SystemStore
@@ -48,6 +49,14 @@ from openconsult.web.first_run import FirstRun
 find_converter_at_start = opus.find_converter
 # The system's secure store for the keys (7.2); the suite stands a made one in its place and never touches a real one.
 system_store = SystemStore
+
+
+def default_testers() -> dict:
+    """The tests of the two connections as the app runs them: none named
+    here, so the real ones of settings/connections.py stand. The suite
+    puts testers in this function's place that fail a test which would
+    reach a real service."""
+    return {}
 
 
 @dataclass
@@ -77,6 +86,7 @@ class Parts:
     who_checks: object = None                      # the runs of the who-spoke check asked for on the review page (6c)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     store: object = None                           # the system's secure store for the keys of the cloud services (9b)
+    connections: Connections = None                # the key in use and the last test of each cloud service (9b)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -84,11 +94,12 @@ class Parts:
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
               engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None, card_programs: Callable | None = None,
-              find_converter: Callable | None = None, embedder=None, secure_store=None) -> FastAPI:
+              find_converter: Callable | None = None, embedder=None, secure_store=None, testers: dict | None = None) -> FastAPI:
     """engines, speech, doors, card_programs, find_converter, embedder and
-    secure_store are passed in by tests, so the suite needs no vLLM, no
-    Ollama, no speech worker, no card, no converter, no embedding worker
-    and no secure store (spec 15.7, 15.8, 15.9, 15.11, 15.12, 15.13).
+    secure_store are passed in by tests, and testers, the tests of the
+    two cloud connections, so the suite needs no vLLM, no Ollama, no
+    speech worker, no card, no converter, no embedding worker, no secure
+    store and no cloud service (spec 15.7, 15.8, 15.9, 15.11, 15.12, 15.13).
     Building a store asks nothing of the system. Building a
     door starts nothing and reads nothing but a path. The engine is chosen
     here, once, the room on the card is read once, the converter is found
@@ -119,7 +130,12 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     for name, choice in CHOICES.items():
         doors.setdefault(name, make_door(settings.data_folder, choice, store=secure_store))
     sources = Sources(db, audit, clock)
-    door = Door(engine, ModelCalls(db, clock), profile)
+    calls = ModelCalls(db, clock)
+    door = Door(engine, calls, profile)
+    stored = Stored(db, audit, clock)
+    connections = Connections(settings.data_folder, secure_store, audit, calls, clock, testers={**default_testers(), **(testers or {})})
+    # The test of a connection runs at each start, for each service the chosen path uses that has a key (7.2).
+    connections.test_all(stored.path(machine.case).services)
     parts = Parts(
         settings=settings,
         db=db,
@@ -138,7 +154,8 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         consultations=Consultations(db, clock),
         notes=Notes(db, clock),
         letters=Letters(db, clock),
-        stored=Stored(db, audit, clock),
+        stored=stored,
+        connections=connections,
         sources=sources,
         embedder=embedder,
         guidelines=Guidelines(sources, Index(sources), embedder, door, audit),

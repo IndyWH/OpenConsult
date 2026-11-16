@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_parts.html" import refusal, machine_rows with context %}
+{% from "_parts.html" import refusal, machine_rows, cloud_statement with context %}
 {% set title = words.SETTINGS_TITLE %}
 {% block main %}
 <h1 class="page">{{ words.SETTINGS_TITLE }}</h1>
@@ -8,6 +8,30 @@
   <div class="pane-head"><h2>{{ words.SECTION_MACHINE }}</h2></div>
   <div class="pane-body">{{ machine_rows(machine, models, room, speech, choices) }}</div>
 </section>
+
+{# Connections (7.2; 7.3): each cloud service Connected or Not connected, with Test and Remove, and nothing of the key. #}
+<section class="pane" id="connections">
+  <div class="pane-head"><h2>{{ words.SECTION_CONNECTIONS }}</h2></div>
+  <div class="pane-body">
+    {% for c in connections %}
+    <div class="connection" data-service="{{ c.name }}">
+      <h3>{{ c.title }}</h3>
+      <p class="sentence" id="state-{{ c.name }}">{{ c.state }}</p>
+      {% if c.where %}<p class="mark" id="where-{{ c.name }}">{{ c.where }}</p>{% endif %}
+      {% if c.last %}<p class="mark" id="last-{{ c.name }}">{{ c.last }}</p>{% endif %}
+      <div class="control-row">
+        <a class="button" id="connect-{{ c.name }}" href="/connect/{{ c.name }}">{{ words.CONNECT }}</a>
+        <form method="post" action="/connections/{{ c.name }}/test"><button id="test-{{ c.name }}" aria-describedby="test-{{ c.name }}-refusal"{% if not c.has_key %} disabled{% endif %}>{{ words.TEST }}</button></form>
+        <form method="post" action="/connections/{{ c.name }}/remove"><button id="remove-{{ c.name }}" aria-describedby="remove-{{ c.name }}-refusal"{% if not c.has_key %} disabled{% endif %}>{{ words.REMOVE }}</button></form>
+      </div>
+      {{ refusal("test-" ~ c.name) }}
+      {{ refusal("remove-" ~ c.name) }}
+    </div>
+    {% endfor %}
+    {% if notice in (words.CONNECTED, words.KEY_REMOVED) %}<p class="notice" id="connections-notice">{{ notice }}</p>{% endif %}
+  </div>
+</section>
+{% if to_tick %}{{ cloud_statement(to_tick) }}{% endif %}
 
 <section class="pane" id="guidelines">
   <div class="pane-head"><h2>{{ words.SECTION_GUIDELINES }}</h2></div>

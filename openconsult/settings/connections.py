@@ -35,7 +35,9 @@ from openconsult.llm.engine import EngineTimeout, EngineUnreachable
 from openconsult.llm.profile import CLAUDE as CLAUDE_PROFILE
 from openconsult.llm.record import CallRow, ModelCalls
 from openconsult.prompts import loader
+from openconsult.settings import keys
 from openconsult.settings.path import CLAUDE, SPEECHMATICS
+from openconsult.settings.secure import NoStore
 from openconsult.speech import environment
 from openconsult.speech.choices import SPEECHMATICS as SPEECHMATICS_CHOICE
 from openconsult.speech.door import Door
@@ -169,3 +171,124 @@ def test_speechmatics(key: str, data_folder: Path, make_worker: Callable | None 
         return Tested(SPEECHMATICS, True, None, "the session started", seconds)
     reason = live.failure if live.failure in (KEY_REFUSED, NO_CREDIT, NO_INTERNET, LIMIT_REACHED) else SERVICE_DOWN
     return Tested(SPEECHMATICS, False, reason, f"{live.failure}: {live.detail or ''}"[:300], seconds)
+
+
+# ---------------------------------------------- the connections of the app
+
+@dataclass(frozen=True)
+class Service:
+    name: str
+    key_name: str
+    key_page: str          # the service's own page where a key is made, read on the service's own page on 16 Nov 2026
+
+
+SERVICES = {
+    CLAUDE: Service(CLAUDE, claude.KEY_NAME, "https://platform.claude.com/settings/keys"),
+    SPEECHMATICS: Service(SPEECHMATICS, SPEECHMATICS_CHOICE.key, "https://portal.speechmatics.com/settings/api-keys/"),
+}
+NOT_CONNECTED, NO_STORE = "not_connected", "no_store"
+
+
+@dataclass(frozen=True)
+class State:
+    """What the page says of one service, and nothing of the key."""
+    service: str
+    has_key: bool
+    where: str | None            # keys.STORE, keys.ENVIRONMENT or keys.FILE
+    last: Tested | None          # the last test in this run of the app
+    last_at: object | None
+    connected: bool
+
+
+class KeyNotSaved(Exception):
+    """The key passed its test and the secure store did not keep it."""
+
+
+class Connections:
+    """The keys in use and the last test of each service, for one run of
+    the app. A key is written to the secure store here alone, and only
+    after it has passed its test (7.2); nothing here holds a key longer
+    than a call. A key that came from the store passed its test when it
+    was saved; one from the environment or the file counts as connected
+    only after it has passed a test in this run."""
+
+    def __init__(self, data_folder: Path, store, audit, record: ModelCalls | None, clock, environ=os.environ,
+                 testers: dict | None = None):
+        self._data_folder, self._store, self._audit, self._clock, self._environ = Path(data_folder), store, audit, clock, environ
+        self._testers = {CLAUDE: lambda key: test_claude(key, record),
+                         SPEECHMATICS: lambda key: test_speechmatics(key, self._data_folder, environ=environ), **(testers or {})}
+        self._last: dict[str, tuple[Tested, object]] = {}
+        self._lock = threading.Lock()
+
+    def key(self, service: str) -> str | None:
+        return keys.find_key(SERVICES[service].key_name, self._data_folder, self._environ, self._store)[0]
+
+    def state(self, service: str) -> State:
+        value, where = keys.find_key(SERVICES[service].key_name, self._data_folder, self._environ, self._store)
+        last, at = self._last.get(service, (None, None))
+        connected = value is not None and (last.ok if last is not None else where == keys.STORE)
+        return State(service, value is not None, where, last, at, connected)
+
+    def connected(self, service: str) -> bool:
+        return self.state(service).connected
+
+    def store_reason(self) -> str | None:
+        """Why no secure store answers on this computer, or None when one does."""
+        return self._store.why_not()
+
+    def _keep(self, service: str, tested: Tested) -> Tested:
+        with self._lock:
+            self._last[service] = (tested, self._clock())
+        outcome = "answered" if tested.ok else f"{tested.reason} ({tested.detail})"
+        self._audit.record("connection.tested", f"{words.SERVICE_TITLES[service]}: {outcome}")
+        return tested
+
+    def test(self, service: str) -> Tested | None:
+        """The key in use, tested now; None when there is no key to test."""
+        key = self.key(service)
+        if key is None:
+            return None
+        return self._keep(service, self._testers[service](key))
+
+    def test_all(self, services) -> dict[str, Tested | None]:
+        """Several services side by side, so a view waits for the slowest
+        one and not for their sum."""
+        found: dict[str, Tested | None] = {}
+        threads = [threading.Thread(target=lambda s=service: found.__setitem__(s, self.test(s)), name=f"connection-{service}",
+                                    daemon=True) for service in services]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join()
+        return found
+
+    def connect(self, service: str, pasted: str) -> Tested:
+        """A pasted key: tested, and kept in the secure store only if it
+        passed (7.2). The key that was in use stays in use when the pasted
+        one fails. Raises KeyNotSaved when the store did not keep a key
+        that passed."""
+        tested = self._testers[service](pasted)
+        if not tested.ok:
+            # Said on the screen and written to the log, and not kept as the service's state: the key in use was not tested.
+            self._audit.record("connection.tested", f"{words.SERVICE_TITLES[service]}: a pasted key: {tested.reason} ({tested.detail})")
+            return tested
+        try:
+            self._store.put(SERVICES[service].key_name, pasted)
+        except NoStore as none:
+            raise KeyNotSaved(str(none)) from None
+        self._audit.record("key.saved", f"{words.SERVICE_TITLES[service]}: kept in the secure store after it passed its test")
+        return self._keep(service, tested)
+
+    def remove(self, service: str) -> bool:
+        """Take the key out of the secure store. False when the key in use
+        is not there: the app removes nothing from the environment or a file."""
+        if self.state(service).where != keys.STORE:
+            return False
+        try:
+            self._store.take_out(SERVICES[service].key_name)
+        except NoStore:
+            return False
+        with self._lock:
+            self._last.pop(service, None)
+        self._audit.record("key.removed", f"{words.SERVICE_TITLES[service]}: taken out of the secure store")
+        return True

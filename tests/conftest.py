@@ -20,7 +20,7 @@ from fastapi.testclient import TestClient
 from openconsult import app as app_module
 from openconsult import browser as browser_module
 from openconsult.app import build_app
-from openconsult.settings import paths, store
+from openconsult.settings import keys as keys_module, paths, store
 from openconsult.settings.machine import Card, describe
 from tests.fakes import FakeEngine, MadeUpServer
 from tests.made_up_store import MadeStore
@@ -78,6 +78,15 @@ def r18_guard(tmp_path, monkeypatch):
     # And no real secure store is ever touched (7.2; 9b): an app built without naming one gets a made store, empty
     # and in memory, and the package's own calls fail the test that reaches them, on every system.
     monkeypatch.setattr(app_module, "system_store", MadeStore)
+    # No key of a cloud service is ever read from the environment of the machine that runs the suite, and an app
+    # built without naming its testers never tests a connection against a real service.
+    for name in keys_module.NAMES:
+        monkeypatch.delenv(name, raising=False)
+
+    def refuse_real_service(key):
+        pytest.fail("a test sent the test of a connection to a real service")
+
+    monkeypatch.setattr(app_module, "default_testers", lambda: {"claude": refuse_real_service, "speechmatics": refuse_real_service})
     import keyring
 
     def refuse_real_store(*args, **kwargs):
