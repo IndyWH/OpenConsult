@@ -68,3 +68,9 @@ def beginning(machine_case: str) -> ChosenPath:
     if machine_case == "suitable":
         return ChosenPath(THIS_COMPUTER, THIS_COMPUTER)
     return ChosenPath(CLAUDE, SPEECHMATICS)
+
+
+def path_of(row) -> ChosenPath:
+    """The path a consultation started with, from its own row (7.3): an
+    older row reads this computer for both."""
+    return ChosenPath(row["language_model_path"], row["transcription_path"], bool(row["better_accuracy"]))

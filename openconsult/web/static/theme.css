@@ -288,3 +288,8 @@ details.call summary { cursor: pointer; font-size: .92rem; }
 details.call .part { margin: .5rem 0; }
 details.call .part h4 { margin: 0 0 .2rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; }
 details.call pre { white-space: pre-wrap; font-family: var(--sans); font-size: .88rem; line-height: 1.45; margin: 0; padding: .5rem .7rem; background: var(--paper); border-radius: 6px; max-height: 24rem; overflow: auto; }
+
+/* The cloud mark (run 9b): a border, a drawn cloud and words in the page's own ink, so it reads the same without colour. */
+.cloud-mark { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: .4rem; border: 2px solid var(--ink); border-radius: var(--radius); padding: .25rem .6rem; margin: .3rem 0; color: var(--ink); background: var(--panel); }
+.cloud-mark .cloud-word { font-weight: 700; letter-spacing: .02em; }
+.cloud-mark .cloud-lines { grid-column: 1 / -1; list-style: none; margin: .1rem 0 0; padding: 0; font-size: .82rem; }

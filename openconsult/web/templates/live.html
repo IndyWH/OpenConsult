@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_parts.html" import cloud_mark with context %}
 {% set title = words.LIVE_TITLE %}
 {% block main %}
 <div id="live" data-consultation="{{ consultation.id }}" data-piece-seconds="{{ piece_s }}" data-stopping="{{ words.STOPPING }}" data-worklet-mark="{{ static_mark('recorder-worklet.js') }}">
@@ -7,6 +8,7 @@
 
 <div class="fixed-zone">
   <div class="who"><b>{{ patient.name }}</b> <span class="clock" id="clock" data-started="{{ state.started_at }}" data-intended="{{ state.intended_minutes }}"></span></div>
+  {% if mark %}{{ cloud_mark(mark) }}{% endif %}
   <div id="acknowledge"></div>
   <form method="post" action="/consultations/{{ consultation.id }}/stop" id="stop-form">
     <button class="primary stop" id="stop" aria-describedby="stop-refusal">{{ words.STOP }}</button>

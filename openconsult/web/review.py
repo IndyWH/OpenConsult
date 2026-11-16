@@ -23,6 +23,8 @@ from openconsult.consult import alarms, deletion, drug_marks, gate, note, readin
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
+from openconsult.settings.path import path_of
+from openconsult.settings.statement import mark_lines
 from openconsult.speech.choices import CHOICES
 from openconsult.speech.loudness import WINDOW_S
 from openconsult.web import guards
@@ -254,6 +256,7 @@ def page_data(p, row: dict) -> dict:
     alarm_rows = alarms.alarm_lines(pass_rows, p.consultations.live_lines(cid), datetime.fromisoformat(row["started_at"]),
                                     alarms.acknowledged_keys(p.audit.lines(), cid), words)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
+            "mark": mark_lines(path_of(row)),     # the cloud mark among the details the consultation ran with (ruling 5)
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),

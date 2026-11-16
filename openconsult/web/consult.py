@@ -17,7 +17,7 @@ from openconsult.llm import claude
 from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.patients.patients import parse_date, problem
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, ChosenPath
-from openconsult.settings.statement import statement_for
+from openconsult.settings.statement import mark_lines, statement_for
 from openconsult.speech.choices import NEMOTRON, SPEECHMATICS as SPEECHMATICS_CHOICE, WHISPERX_PYANNOTE
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
@@ -158,6 +158,7 @@ def _start_context(request: Request, user, patient, ask_engine: bool = True) -> 
                 speech=(words.CHOICE_SPEECHMATICS if path.speechmatics_live else choice.door.choice.title) if choice.door else None,
                 # The path in two rows (7.3; 9b): where the language model runs, beside the speech choice.
                 model=words.CHOICE_CLAUDE if path.claude else words.CHOICE_THIS_COMPUTER, lead=state.lead, tests=state.tests,
+                mark=mark_lines(path),
                 # A patient with an approved note gets the list and the switch, on by default (ruling 3; D25).
                 earlier=earlier_lines(notes), switch=bool(notes),
                 problem=state.problem, page_path=f"/consultations/start/{patient.id}")

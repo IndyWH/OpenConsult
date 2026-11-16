@@ -15,6 +15,8 @@ from fastapi import APIRouter, Depends, Request, WebSocket, WebSocketDisconnect
 from openconsult import words
 from openconsult.consult import earlier, speakers, stop as stop_module
 from openconsult.consult.live import ANSWERED, FINAL, LIVE, Capture
+from openconsult.settings.path import path_of
+from openconsult.settings.statement import mark_lines
 from openconsult.web import guards, review
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -86,7 +88,9 @@ def live_page(request: Request, user, consultation, refused=None):
     return render(request, "live.html", user=user, active="new_patient", consultation=consultation, state=state,
                   state_json=json.dumps(state), words_json=json.dumps(script_words()),
                   model_line=model_line(request, consultation), patient=consultation.patient, piece_s=PIECE_S,
-                  earlier=earlier_panel(p, consultation))
+                  earlier=earlier_panel(p, consultation),
+                  # The cloud mark, for the whole consultation, by the path it started with (15.13, ruling 5).
+                  mark=mark_lines(path_of(p.consultations.get(consultation.id))))
 
 
 def stopping_page(request: Request, user, consultation, refused=None):

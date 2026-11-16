@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% from "_parts.html" import refusal with context %}
+{% from "_parts.html" import refusal, cloud_mark with context %}
 {% set title = words.REVIEW_TITLE %}
 {# The model's last differentials, beside the assessment (ruling 4), or alone where no note stands yet. #}
 {% macro differentials_aside() -%}
@@ -20,6 +20,7 @@
 <h1 class="page print-keep">{{ words.REVIEW_TITLE }}</h1>
 <p class="statement print-keep"><b>{{ ran_with.name }}</b> <span class="mark">{{ date }}</span></p>
 <p class="mark no-print" id="ran-with">{{ words.RAN_WITH }} {{ ran_with.name }}, {{ ran_with.born }}, {{ ran_with.sex }}. <a href="/patients/{{ patient.id }}">{{ words.PATIENTS_PAGE_LINK }}</a>{% if ran_with.corrected %}<br>{{ ran_with.corrected }}{% endif %}</p>
+{% if mark %}<div class="no-print">{{ cloud_mark(mark) }}</div>{% endif %}
 
 {# One: the draft note (ruling 11). #}
 <section class="pane note print-keep" id="note">

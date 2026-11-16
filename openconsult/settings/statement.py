@@ -102,3 +102,17 @@ def statement_for(path: ChosenPath, at_the_press: bool = False) -> Statement | N
         parts.append((words.CLOUD_CLAUDE_HEADING, tuple(words.CLOUD_CLAUDE_LINES)))
     return Statement(heading, words.CLOUD_INTRO, _sent(path, recording), _stays(path, recording), tuple(parts),
                      words.CLOUD_PROTOTYPE, tick)
+
+
+def mark_lines(path: ChosenPath) -> tuple[str, ...]:
+    """The lines of the cloud mark for a path (15.13, ruling 5; the owner's
+    words of 16 Nov 2026): one for each thing that is true of it, in this
+    order; none for a path with nothing in the cloud, which has no mark."""
+    lines = []
+    if path.speechmatics_live:
+        lines.append(words.CLOUD_MARK_SOUND)
+    if path.claude:
+        lines.append(words.CLOUD_MARK_WORDS)
+    if path.recording_after_stop:
+        lines.append(words.CLOUD_MARK_RECORDING)
+    return tuple(lines)
