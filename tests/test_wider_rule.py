@@ -4,8 +4,8 @@ to come. Made sound, made-up lines; nothing here hears a model."""
 
 import math
 
-from openconsult.speech.choices import (ASSEMBLYAI, EXACT_TIMES_S, NEMOTRON, NEMOTRON_TIME_SLACK_S, SPEECHMATICS,
-                                        WHISPERX_PYANNOTE)
+from openconsult.bench.speech.arms import ASSEMBLYAI  # the second cloud service's choice is the bench's alone since run 9b (15.13, ruling 28)
+from openconsult.speech.choices import EXACT_TIMES_S, NEMOTRON, NEMOTRON_TIME_SLACK_S, SPEECHMATICS, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door
 from openconsult.speech.lines import Line
 from openconsult.speech.loudness import Loudness, refuse_quiet

@@ -4,7 +4,8 @@ functions of 5c are not changed here, only shown."""
 
 from openconsult import words
 from openconsult.consult.gate import LOW_CONFIDENCE, TOO_SHORT_WORDS, judge, missing_speech, word_count
-from openconsult.speech.choices import ASSEMBLYAI, NEMOTRON, WHISPERX_PYANNOTE
+from openconsult.bench.speech.arms import ASSEMBLYAI  # the second cloud service's choice is the bench's alone since run 9b (15.13, ruling 28)
+from openconsult.speech.choices import NEMOTRON, WHISPERX_PYANNOTE
 from openconsult.speech.lines import Line
 
 

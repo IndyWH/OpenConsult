@@ -1,7 +1,9 @@
 """The AssemblyAI worker (spec 15.9, rulings 5, 9 and 10; the details of
 5b): live text with speaker labels through the service's EU address, the
-medical mode on, no word list. Run by the app on its own Python as a
-process of its own, on the cloud frame. It never imports the app.
+medical mode on, no word list. An arm of the bench alone since run 9b
+(15.13, ruling 28): no page of the app offers this service. Run on the
+app's own Python as a process of its own, on the cloud frame of the
+app's speech workers. It never imports the app.
 
 The address is a named constant, and main dials it and nothing else: no
 argument and no environment value can change it. The options are fixed
@@ -33,7 +35,8 @@ import sys
 from urllib.parse import urlencode
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, os.path.join(os.path.dirname(HERE), "common"))
+# What the cloud workers share stands with the app's speech workers; this folder stands under the bench.
+sys.path.insert(0, os.path.join(HERE, os.pardir, os.pardir, os.pardir, "speech", "common"))
 import cloud  # noqa: E402
 
 SERVICE = "assemblyai"

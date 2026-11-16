@@ -33,10 +33,11 @@ class Choice:
     folder: str
     environment: bool          # built in the data folder, or none: the app's own Python
     key: str | None = None     # the name of the key it needs
+    workers: Path | None = None   # where its worker folder stands, for a choice of the bench alone; None: beside this file
 
     @property
     def worker_folder(self) -> Path:
-        return WORKERS / self.folder
+        return (self.workers or WORKERS) / self.folder
 
 
 WHISPERX_PYANNOTE = Choice(
@@ -59,7 +60,7 @@ NEMOTRON = Choice(
     environment=True,
 )
 
-# Ruling 9: each cloud service gives text with a confidence score and
+# Ruling 9: a cloud service gives text with a confidence score and
 # speaker labels live, through its EU address, and there is one transcript.
 SPEECHMATICS = Choice(
     name="speechmatics",
@@ -71,14 +72,6 @@ SPEECHMATICS = Choice(
     key="SPEECHMATICS_API_KEY",
 )
 
-ASSEMBLYAI = Choice(
-    name="assemblyai",
-    title=words.ROW_ASSEMBLYAI,
-    declares=Declares(confidence="live", speakers="live", second_transcript=False,
-                      time_slack_s=EXACT_TIMES_S),
-    folder="assemblyai",
-    environment=False,
-    key="ASSEMBLYAI_API_KEY",
-)
-
-CHOICES = {choice.name: choice for choice in (WHISPERX_PYANNOTE, NEMOTRON, SPEECHMATICS, ASSEMBLYAI)}
+# The choices a consultation can run on. The second cloud service of the bench is not offered in v2.0 (15.13,
+# ruling 28): its choice, its worker and its upload are the bench's alone (bench/speech/arms.py).
+CHOICES = {choice.name: choice for choice in (WHISPERX_PYANNOTE, NEMOTRON, SPEECHMATICS)}

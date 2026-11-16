@@ -246,7 +246,8 @@ def test_7_1_the_app_imports_no_speech_library_and_never_the_worker(tmp_path):
 
 # ------------------------------------------------ the choices of 5b (15.9)
 
-from openconsult.speech.choices import ASSEMBLYAI, NEMOTRON, SPEECHMATICS  # noqa: E402
+from openconsult.bench.speech.arms import ASSEMBLYAI  # noqa: E402  (the second cloud service's choice is the bench's alone since run 9b (15.13, ruling 28))
+from openconsult.speech.choices import NEMOTRON, SPEECHMATICS  # noqa: E402
 from openconsult.speech.lines import Revision  # noqa: E402
 
 

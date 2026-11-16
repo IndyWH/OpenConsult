@@ -107,7 +107,14 @@ def test_d26_the_reset_command_takes_no_password_on_the_command_line(tmp_path):
 
 
 def test_15_9_the_commands_name_their_choice_and_none_named_is_whisperx(tmp_path):
-    # --choice takes the four names; anything else is refused by the command itself.
+    # --choice takes the three names; anything else is refused by the command itself, the second cloud
+    # service among them: it is the bench's alone since run 9b (15.13, ruling 28).
+    with pytest.raises(SystemExit) as stopped:
+        main(["self-test", "--choice", "assemblyai", "--data-folder", str(tmp_path)], say=Said())
+    assert stopped.value.code == 2
+    with pytest.raises(SystemExit) as stopped:
+        main(["install-speech", "--choice", "assemblyai", "--data-folder", str(tmp_path)], say=Said())
+    assert stopped.value.code == 2
     with pytest.raises(SystemExit) as stopped:
         main(["self-test", "--choice", "made-up", "--data-folder", str(tmp_path)], say=Said())
     assert stopped.value.code == 2
@@ -119,6 +126,6 @@ def test_15_9_the_commands_name_their_choice_and_none_named_is_whisperx(tmp_path
         return Door(choice, make_worker=lambda: None, installed=lambda: False)
 
     main(["self-test", "--data-folder", str(tmp_path)], say=Said(), make_speech=make_speech, sleep=lambda s: None)
-    main(["self-test", "--choice", "assemblyai", "--data-folder", str(tmp_path)], say=Said(), make_speech=make_speech,
+    main(["self-test", "--choice", "speechmatics", "--data-folder", str(tmp_path)], say=Said(), make_speech=make_speech,
          sleep=lambda s: None)
-    assert seen == ["whisperx_pyannote", "assemblyai"]
+    assert seen == ["whisperx_pyannote", "speechmatics"]

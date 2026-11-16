@@ -1,6 +1,7 @@
-"""The arms of the speech bench (spec 15.9, ruling 15): the four speech
-choices as built, and the two arms that belong to the bench alone, the
-tied Nemotron pair and WhisperX with v1's line. An arm names the Choice
+"""The arms of the speech bench (spec 15.9, ruling 15): the speech
+choices of the app, the second cloud service, which is the bench's alone
+since run 9b (15.13, ruling 28), and the two arms that were always the
+bench's alone, the tied Nemotron pair and WhisperX with v1's line. An arm names the Choice
 its door is built with, which choice's environment runs its worker,
 its worker file when it is not the app's own, and the cloud service it
 sends sound to, if any, so that consent can be checked by code (ruling
@@ -16,7 +17,7 @@ from pathlib import Path
 from openconsult import words
 from openconsult.settings import keys
 from openconsult.speech import environment
-from openconsult.speech.choices import (ASSEMBLYAI, NEMOTRON, NEMOTRON_TIME_SLACK_S, SPEECHMATICS, WHISPERX_PYANNOTE,
+from openconsult.speech.choices import (EXACT_TIMES_S, NEMOTRON, NEMOTRON_TIME_SLACK_S, SPEECHMATICS, WHISPERX_PYANNOTE,
                                         Choice)
 from openconsult.speech.door import Door, make_door
 from openconsult.speech.lines import Declares
@@ -48,6 +49,13 @@ TIED_PAIR = Choice(name="nemotron_tied_pair", title=words.ARM_TIED_PAIR,
 # WhisperX with v1's line (ruling 3): the same live model, given the line.
 V1_LINE = Choice(name="whisperx_v1_line", title=words.ARM_V1_LINE, declares=WHISPERX_PYANNOTE.declares,
                  folder="", environment=True)
+
+# The second cloud service (15.9 rulings 5 and 9; 15.13 ruling 28): not offered by any page of the app since run
+# 9b, and kept here so that a later version of the service can be measured again. Text with a confidence score and
+# speaker labels live, through its EU address, one transcript; its worker folder stands beside this file.
+ASSEMBLYAI = Choice(name="assemblyai", title=words.ROW_ASSEMBLYAI,
+                    declares=Declares(confidence="live", speakers="live", second_transcript=False, time_slack_s=EXACT_TIMES_S),
+                    folder="assemblyai", environment=False, key="ASSEMBLYAI_API_KEY", workers=BENCH)
 
 ARMS: dict[str, Arm] = {
     "whisperx_pyannote": Arm("whisperx_pyannote", WHISPERX_PYANNOTE, WHISPERX_PYANNOTE, None),

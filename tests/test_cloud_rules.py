@@ -140,6 +140,7 @@ def test_10_4_a_line_that_dies_without_closing_is_noticed_and_nothing_reconnects
 
 from openconsult import words  # noqa: E402
 from openconsult.speech import door as door_module  # noqa: E402
+from openconsult.bench.speech import arms  # noqa: E402  (the second cloud service's choice is the bench's alone since run 9b)
 from openconsult.speech import choices  # noqa: E402  (the service kinds above are strings)
 from openconsult.speech.door import Door, make_door  # noqa: E402
 from tests.fakes import MadeUpWorker  # noqa: E402
@@ -189,4 +190,4 @@ def test_10_4_a_local_choice_that_fails_never_falls_to_a_cloud_service(tmp_path,
     assert len(RecordingWorker.started) == 2
     for command in RecordingWorker.started:
         assert command[1].endswith(str(choices.NEMOTRON.worker_folder / "worker.py"))
-        assert not any(str(choice.worker_folder) in part for choice in (choices.SPEECHMATICS, choices.ASSEMBLYAI) for part in command)
+        assert not any(str(choice.worker_folder) in part for choice in (choices.SPEECHMATICS, arms.ASSEMBLYAI) for part in command)

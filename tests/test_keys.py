@@ -5,7 +5,8 @@ a key appears nowhere it should not. Every key here is made up."""
 from openconsult import words
 from openconsult.settings import keys
 from openconsult.speech import environment
-from openconsult.speech.choices import ASSEMBLYAI, NEMOTRON, SPEECHMATICS, WHISPERX_PYANNOTE
+from openconsult.bench.speech.arms import ASSEMBLYAI  # the second cloud service's choice is the bench's alone since run 9b (15.13, ruling 28)
+from openconsult.speech.choices import NEMOTRON, SPEECHMATICS, WHISPERX_PYANNOTE
 from openconsult.speech.door import make_door
 
 MADE_UP = "made-up-key-0123456789"

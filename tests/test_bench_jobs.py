@@ -126,7 +126,7 @@ def test_R31_the_three_jobs_are_not_in_the_apps_table(record):
 
 
 def test_R31_nothing_of_the_app_names_part_two():
-    assert sorted(CHOICES) == ["assemblyai", "nemotron", "speechmatics", "whisperx_pyannote"]
+    assert sorted(CHOICES) == ["nemotron", "speechmatics", "whisperx_pyannote"]      # three since run 9b (15.13, ruling 28)
     for command in ("speech-voice", "speech-drugs", "speech-calls", "speech-score"):
         with pytest.raises(SystemExit) as refused:
             app_cli.main([command])

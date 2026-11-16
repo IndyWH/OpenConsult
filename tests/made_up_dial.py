@@ -14,10 +14,12 @@ import sys
 from pathlib import Path
 
 WORKERS = Path(__file__).resolve().parents[1] / "openconsult" / "speech"
+# The second cloud service's worker is the bench's alone since run 9b (15.13, ruling 28).
+FOLDERS = {"assemblyai": WORKERS.parent / "bench" / "speech"}
 
 
 def load_worker(name: str):
-    spec = importlib.util.spec_from_file_location(f"{name}_worker", WORKERS / name / "worker.py")
+    spec = importlib.util.spec_from_file_location(f"{name}_worker", FOLDERS.get(name, WORKERS) / name / "worker.py")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module

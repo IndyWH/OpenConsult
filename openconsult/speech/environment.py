@@ -23,12 +23,13 @@ from pathlib import Path
 from typing import Callable, Mapping
 
 from openconsult import words
-from openconsult.speech.choices import CHOICES, Choice
+from openconsult.settings import keys
+from openconsult.speech.choices import Choice
 
 SPEECH = "speech"
 PYTHON = "3.12"
 UV = "uv"
-KEY_NAMES = tuple(choice.key for choice in CHOICES.values() if choice.key)
+KEY_NAMES = keys.NAMES
 
 
 @dataclass(frozen=True)

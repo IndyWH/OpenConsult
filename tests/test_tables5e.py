@@ -144,7 +144,7 @@ def test_R31_nothing_of_5e_is_built_into_the_app():
     from openconsult.llm.jobs import JOBS
     from openconsult.speech.choices import CHOICES
     assert sorted(JOBS) == ["alarm", "assessment", "drug_name", "guideline", "label_check", "letter", "note", "referrals"]
-    assert sorted(CHOICES) == ["assemblyai", "nemotron", "speechmatics", "whisperx_pyannote"]
+    assert sorted(CHOICES) == ["nemotron", "speechmatics", "whisperx_pyannote"]      # three since run 9b (15.13, ruling 28)
     assert all(choice.declares.second_transcript is False for name, choice in CHOICES.items() if choice.key)
     import openconsult
     from pathlib import Path

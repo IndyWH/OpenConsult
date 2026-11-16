@@ -12,6 +12,9 @@ from pathlib import Path
 from typing import Mapping
 
 KEY_FILE = ".env"
+# Every name a key is read by, the app's and the bench's: the names the example settings file holds. A worker's
+# environment is cleared of all of them before its own one key goes in, so no process holds another's key.
+NAMES = ("ANTHROPIC_API_KEY", "SPEECHMATICS_API_KEY", "ASSEMBLYAI_API_KEY", "DEEPINFRA_API_KEY")
 
 
 def parse_env(text: str) -> dict[str, str]:
