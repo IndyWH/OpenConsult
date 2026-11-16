@@ -40,7 +40,7 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
-from openconsult.web import calls as calls_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, pages, patients as patients_web, review, routes, who_check as who_check_web
+from openconsult.web import calls as calls_web, cloud as cloud_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, pages, patients as patients_web, review, routes, who_check as who_check_web
 from openconsult.web.first_run import FirstRun
 
 # The finder the app uses at start; tests stand a quiet one in its place.
@@ -153,7 +153,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
     app.mount("/static", pages.AskedEachTime(directory=pages.STATIC), name="static")
-    for module in (routes, consult, live, review, who_check_web, patients_web, letters_web, guidelines_web, calls_web):
+    for module in (routes, consult, live, review, who_check_web, patients_web, letters_web, guidelines_web, calls_web, cloud_web):
         app.include_router(module.router)
     return app
 
