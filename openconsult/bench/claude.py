@@ -1,23 +1,14 @@
-"""The Claude kind of the bench (spec 15.13, rulings 14 to 17 and the
-details for run 9d): Claude Haiku 5.5 through the door, in the service's
-own Messages API. A class of its own on the door's joint beside the
-DeepInfra kind: the app's system message in the system field, its user
-message in the messages field, the form in output_config.format,
-thinking switched off by the service's own field, the job's limit on
-tokens written; no temperature (the service refuses it), no seed (the
-API has none), none of the local arm's sampling values. The key goes in
-the x-api-key header and nowhere else, to the service's own address over
-https. The bench's alone (R31).
-
-The form as sent is a copy for the wire (sent_form): every object marked
-as taking no other property, which the service demands, and maxItems
-taken off, which it does not hold. The door still judges every reply
-against the whole form, so a reply over a list's limit is a failed call.
+"""The Claude kind of the bench (spec 15.13, rulings 14 to 17 and 22, the
+details for runs 9d, 9d2 and 9b). The engine itself, with the request
+the benches sent, is the app's own (llm/claude.py) since run 9b, and
+nothing of it is written twice. What stays here is the bench's alone
+(R31), a class on top of that engine:
 
 The kind keeps under the account's limits by waiting before a call, by
 the figures of the service's own reply headers, and never sends a call a
 second time; a call refused for rate is a failed call, three in a row
-stop the run. Standard library only.
+stop the run. A refused key or used-up credit stops the run too, and
+nothing more is sent.
 
 The effort (15.13, ruling 22): the service's own control of speed and
 cost, low, medium or high, sent in output_config when the bench names
@@ -28,68 +19,24 @@ later reader knows what was benched.
 
 from __future__ import annotations
 
-import copy
 import datetime as dt
-import http.client
-import json
 import threading
 import time
-import urllib.error
 import urllib.request
 from typing import Callable
 
-from openconsult.bench.cloud import Stops, own_address, stop_line
-from openconsult.llm.engine import Call, EngineStatus, EngineTimeout, EngineUnreachable, Reply
-from openconsult.llm.ollama import encode
+from openconsult.bench.cloud import Stops, own_address, stop_line  # noqa: F401  (own_address: the shared rule, read here by the tests)
+from openconsult.llm import claude as engine
+from openconsult.llm.claude import (ADDRESS, ENGINE_VERSION, KEY_NAME, NO_DIGEST, STATUS_TIMEOUT_S, TAKEN_OFF,  # noqa: F401
+                                    THINKING_OFF, THINKING_OFF_FOR, VERSION, engine_version, sent_form)
+from openconsult.llm.engine import Call, Reply
 
-ADDRESS = "https://api.anthropic.com"
-KEY_NAME = "ANTHROPIC_API_KEY"
-VERSION = "2026-10-21"                        # the API version the service's reference gives (7 Nov 2026)
 EFFORTS = ("low", "medium", "high")           # the service's own setting; None sends nothing and the service's default stands
-# Thinking is switched off by the service's own field, which is no word a model reads. Claude Sonnet 5.5 refuses the
-# type disabled and takes between_tools, with nothing else in the field, at its default effort (15.10 ruling 30; the
-# service's own pages, read by Cowork on 14 Nov 2026). Every other model is sent what it was sent before.
-THINKING_OFF = {"type": "disabled"}
-THINKING_OFF_FOR = {"claude-sonnet-5-5": {"type": "between_tools"}}
-
-
-def engine_version(effort: str | None) -> str:
-    """What the request pins, for the record: the API version and the
-    effort sent, or default when none is (the service gives no build version)."""
-    return f"anthropic-version {VERSION}, effort {effort or 'default'}"
-
-
-ENGINE_VERSION = engine_version(None)
-NO_DIGEST = "no digest given by the service"
-STATUS_TIMEOUT_S = 2.0
 # The key refused or forbidden: nothing more is sent. A 400 naming the credit balance is the service's billing answer.
 STOP_STATUSES = (401, 403)
 CREDIT_WORD = "credit"
 RATE_STATUS, RATE_IN_A_ROW = 429, 3
-# The constraints the service's own answer named as not held (the gate of 9d): taken off for sending only.
-TAKEN_OFF = ("maxItems",)
 MARGIN_S = 0.2
-
-
-def sent_form(form: dict) -> dict:
-    """The form as the service takes it: a copy with additionalProperties
-    false on every object and the constraints of TAKEN_OFF removed.
-    Nothing else is touched."""
-    copied = copy.deepcopy(form)
-
-    def walk(node):
-        if not isinstance(node, dict):
-            return
-        for key in TAKEN_OFF:
-            node.pop(key, None)
-        if node.get("type") == "object":
-            node["additionalProperties"] = False
-        for sub in node.get("properties", {}).values():
-            walk(sub)
-        walk(node.get("items"))
-
-    walk(copied)
-    return copied
 
 
 def moment(value: str | None) -> float | None:
@@ -100,60 +47,20 @@ def moment(value: str | None) -> float | None:
         return None
 
 
-class ClaudeEngine(Stops):
-    name = "claude"
-
+class ClaudeEngine(Stops, engine.ClaudeEngine):
     def __init__(self, address: str = ADDRESS, key: str = "", expected: str | None = None,
                  urlopen: Callable = urllib.request.urlopen, sleep: Callable = time.sleep, effort: str | None = None):
         # The expected address is read at the call, so a test may stand a made service in its place.
-        self.address = own_address(address, expected or ADDRESS)
+        super().__init__(address, key, expected or ADDRESS, urlopen)
         if effort is not None and effort not in EFFORTS:
             raise ValueError(f"not an effort the service names: {effort}; one of {', '.join(EFFORTS)}, or none")
         self.effort = effort
-        self._key = key
-        self._urlopen = urlopen
         self._sleep = sleep
-        self._context: int | None = None
         self._lock = threading.Lock()
         self._remaining: dict[str, tuple[int, float | None]] = {}   # limit name: (remaining, reset moment)
         self._retry_until: float | None = None
         self._last_input: int | None = None
         self._rate_in_a_row = 0
-
-    # ------------------------------------------------------------ the wire
-
-    def headers(self, data: bytes | None) -> dict:
-        found = {"x-api-key": self._key, "anthropic-version": VERSION}
-        if data:
-            found["content-type"] = "application/json"
-        return found
-
-    def _exchange(self, path: str, data: bytes | None, timeout_s: float) -> tuple[int, str, dict]:
-        """One HTTP exchange: the status, the body as text and the reply's
-        headers (lower-cased names), and only the joint's two exceptions."""
-        request = urllib.request.Request(self.address + path, data=data, headers=self.headers(data))
-        sent = data.decode("utf-8") if data else None
-        try:
-            with self._urlopen(request, timeout=timeout_s) as answer:
-                return answer.status, answer.read().decode("utf-8", errors="replace"), {k.lower(): v for k, v in answer.headers.items()}
-        except urllib.error.HTTPError as refused:
-            return refused.code, refused.read().decode("utf-8", errors="replace"), {k.lower(): v for k, v in refused.headers.items()}
-        except TimeoutError as slow:
-            raise EngineTimeout(str(slow), sent) from slow
-        except urllib.error.URLError as failed:
-            if isinstance(failed.reason, TimeoutError):
-                raise EngineTimeout(str(failed.reason), sent) from failed
-            raise EngineUnreachable(str(failed.reason), sent) from failed
-        except (OSError, http.client.HTTPException) as failed:
-            raise EngineUnreachable(f"{type(failed).__name__}: {failed}", sent) from failed
-
-    def _get_json(self, path: str, timeout_s: float) -> dict | None:
-        try:
-            status, text, _ = self._exchange(path, None, timeout_s)
-            found = json.loads(text) if status == 200 else None
-            return found if isinstance(found, dict) else None
-        except (EngineUnreachable, EngineTimeout, ValueError):
-            return None
 
     # ------------------------------------------------------------ the rate
 
@@ -169,7 +76,7 @@ class ClaudeEngine(Stops):
                 self._retry_until = time.time() + float(after) if after and str(after).replace(".", "", 1).isdigit() else (
                     max((reset for _, reset in self._remaining.values() if reset), default=time.time() + 1.0))
 
-    def _wait_for_rate(self, call: Call, body_length: int) -> int:
+    def before_send(self, call: Call, body_length: int) -> int:
         """Sleep until the limits allow the two calls of a pass; the ms waited.
         Under the lock, so the two threads of a pass check in turn and the
         second passes without sleeping once the first has waited."""
@@ -189,97 +96,31 @@ class ClaudeEngine(Stops):
             self._remaining, self._retry_until = {}, None
             return round(1000 * waited)
 
-    # ------------------------------------------------------------ the call
-
-    def build_request(self, call: Call) -> dict:
-        body = {"model": call.tag, "max_tokens": call.max_tokens, "system": call.system,
-                "messages": [{"role": "user", "content": call.user}],
-                "output_config": {"format": {"type": "json_schema", "schema": sent_form(call.form)}}}
-        if self.effort:
-            body["output_config"]["effort"] = self.effort
-        if not call.think:
-            body["thinking"] = dict(THINKING_OFF_FOR.get(call.tag, THINKING_OFF))
-        return body
-
-    def chat(self, call: Call) -> Reply:
-        self.refuse_if_stopped()
-        sent = encode(self.build_request(call))
-        request = sent.decode("utf-8")
-        if self._context is None:
-            self._context = self.context(call.tag)   # read once, so no call carries it in its time
-        if self._context is None:
-            raise EngineUnreachable("the service did not say what context the model runs at", request)
-        if self._context < call.context:
-            return Reply("error", None, None, f"the service runs the model at a context of {self._context}, "
-                         f"below the call's {call.context}", None, None, None, None, None, None, 0, request, None)
-        waited_ms = self._wait_for_rate(call, len(sent))
-        started = time.perf_counter()
-        status, text, headers = self._exchange("/v1/messages", sent, call.timeout_s)
-        wall_ms = round(1000 * (time.perf_counter() - started))
+    def after_exchange(self, status: int, text: str, headers: dict) -> None:
         self._note_limits(status, headers)
         self._rate_in_a_row = self._rate_in_a_row + 1 if status == RATE_STATUS else 0
         if status in STOP_STATUSES or (status == 400 and CREDIT_WORD in text.lower()):
             self.stop(stop_line(status))
         elif self._rate_in_a_row >= RATE_IN_A_ROW:
             self.stop(f"the service refused the rate (HTTP {RATE_STATUS}) {RATE_IN_A_ROW} times in a row; nothing more is sent")
-        return self._read(status, text, wall_ms, waited_ms, request)
+
+    # ------------------------------------------------------------ the call
+
+    def build_request(self, call: Call) -> dict:
+        body = super().build_request(call)
+        if self.effort:
+            body["output_config"]["effort"] = self.effort
+        return body
+
+    def chat(self, call: Call) -> Reply:
+        self.refuse_if_stopped()
+        return super().chat(call)
 
     def _read(self, status: int, text: str, wall_ms: int, waited_ms: int, request: str) -> Reply:
-        """The reply into the joint's one Reply. total_ms is the exchange
-        alone; load_ms the wait for the rate (the service has no load time)."""
-
-        def failed(ended: str, error: str, answer: str | None = None, tokens=(None, None)) -> Reply:
-            return Reply(ended, answer, status, error, tokens[0], tokens[1], wall_ms, waited_ms, None, None, wall_ms + waited_ms, request, text)
-
-        if status != 200:
-            return failed("did_not_fit" if self.did_not_fit(status, text) else "error", text[:2000])
-        try:
-            reply = json.loads(text)
-            content, stop = reply["content"], reply.get("stop_reason")
-            blocks = [b for b in content if isinstance(b, dict)]
-        except (ValueError, KeyError, TypeError) as odd:
-            return failed("error", f"not a message reply: {odd}")
-        texts = [b.get("text", "") for b in blocks if b.get("type") == "text"]
-        answer = "".join(texts) if texts else None
-        usage = reply.get("usage") or {}
-        tokens = (usage.get("input_tokens"), usage.get("output_tokens"))
-        if isinstance(tokens[0], int):
-            self._last_input = tokens[0]
-        if stop not in ("end_turn", "max_tokens"):
-            details = reply.get("stop_details")
-            return failed("error", f"the reply ended with stop_reason {stop}" + (f"; stop_details {json.dumps(details)}" if details else ""),
-                          answer, tokens)
-        return Reply("cut" if stop == "max_tokens" else "complete", answer, status, None, tokens[0], tokens[1],
-                     wall_ms, waited_ms, None, None, wall_ms + waited_ms, request, text)
-
-    def did_not_fit(self, status: int, text: str) -> bool:
-        return status == 400 and "too long" in text.lower()
-
-    # ------------------------------------------------------------ the identity
-
-    def _model(self, tag: str, timeout_s: float) -> dict | None:
-        listed = (self._get_json("/v1/models?limit=1000", timeout_s) or {}).get("data")
-        for model in listed if isinstance(listed, list) else []:
-            if isinstance(model, dict) and model.get("id") == tag:
-                return model
-        return None
-
-    def context(self, tag: str, timeout_s: float = STATUS_TIMEOUT_S) -> int | None:
-        """The model's room as the service's list gives it (max_input_tokens),
-        for the fit rule (R19); the arm is not measured at it (status below)."""
-        found = (self._model(tag, timeout_s) or {}).get("max_input_tokens")
-        return found if isinstance(found, int) and not isinstance(found, bool) else None
+        reply = super()._read(status, text, wall_ms, waited_ms, request)
+        if isinstance(reply.prompt_tokens, int):
+            self._last_input = reply.prompt_tokens     # the size of a call, for the next wait
+        return reply
 
     def version(self, timeout_s: float = STATUS_TIMEOUT_S) -> str | None:
         return engine_version(self.effort)
-
-    def model_digest(self, tag: str, timeout_s: float = STATUS_TIMEOUT_S) -> str | None:
-        return NO_DIGEST if self._model(tag, timeout_s) is not None else None
-
-    def status(self, tag: str, timeout_s: float = STATUS_TIMEOUT_S) -> EngineStatus:
-        """Running when the service lists the model. The context is None:
-        the service's room is its own and not a setting of the arm."""
-        digest = self.model_digest(tag, timeout_s)
-        if digest is None:
-            return EngineStatus(False, None, None, None)
-        return EngineStatus(True, engine_version(self.effort), True, digest, None)

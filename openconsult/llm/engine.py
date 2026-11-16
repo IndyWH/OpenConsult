@@ -43,6 +43,7 @@ class Reply:
     wall_ms: int
     request: str
     raw: str | None
+    model: str | None = None   # the model's name as the reply gives it, where a service names it (R20)
 
 
 ENDINGS = ("complete", "cut", "did_not_fit", "error")

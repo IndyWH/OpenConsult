@@ -42,7 +42,7 @@ class Door:
         self._record = record
         self.profile = profile
         self._timer = timer
-        self._identity: tuple[str | None, str | None] | None = None
+        self._identity: dict[str, tuple[str | None, str | None]] = {}    # by the model's name
 
     @property
     def engine_name(self) -> str:
@@ -62,7 +62,7 @@ class Door:
         profile's steady values (spec 10.4)."""
         job = job_named(job_name)
         sampling = sampling or self.profile.sampling
-        return Call(job=job.name, tag=self.profile.tag, system=loader.prompt(job.prompt),
+        return Call(job=job.name, tag=self.profile.tag_for(job.name), system=loader.prompt(job.prompt),
                     user=user, form=loader.form(job.form), temperature=sampling.temperature,
                     seed=sampling.seed, context=self.profile.context, max_tokens=job.max_tokens,
                     think=self.profile.think, timeout_s=job.timeout_s)
@@ -80,7 +80,7 @@ class Door:
         two). The same limits, the same form check and the same record as
         ask(); the app's jobs are not touched."""
         sampling = sampling or self.profile.sampling
-        call = Call(job=job.name, tag=self.profile.tag, system=system, user=user, form=form,
+        call = Call(job=job.name, tag=self.profile.tag_for(job.name), system=system, user=user, form=form,
                     temperature=sampling.temperature, seed=sampling.seed, context=self.profile.context,
                     max_tokens=job.max_tokens, think=self.profile.think, timeout_s=job.timeout_s)
         return self._run(job, call, consultation_id)
@@ -93,7 +93,7 @@ class Door:
             return self._failed(call, job, started, slow, "too_slow",
                                 f"no answer within {job.timeout_s:.0f} s: {slow}", consultation_id)
         except EngineUnreachable as gone:
-            self._identity = None  # read it again when the engine is back
+            self._identity = {}  # read it again when the engine is back
             return self._failed(call, job, started, gone, "unreachable", str(gone), consultation_id)
         wall_ms = round(1000 * (self._timer() - started))
         outcome, detail, answer = self._judge(reply, call, job, wall_ms)
@@ -130,18 +130,22 @@ class Door:
         call_id = self._write(call, sent, None, None, wall_ms, outcome, detail, consultation_id)
         return Result(job.name, False, None, outcome, detail, call_id, wall_ms, None, None)
 
-    def identity(self) -> tuple[str | None, str | None]:
-        """The engine's version and the model's digest, read once and kept
-        until the engine is lost (V1_LESSONS 9.6)."""
-        if self._identity is None:
-            self._identity = (self._engine.version(), self._engine.model_digest(self.profile.tag))
-        return self._identity
+    def identity(self, tag: str | None = None) -> tuple[str | None, str | None]:
+        """The engine's version and the model's digest, read once for each
+        model and kept until the engine is lost (V1_LESSONS 9.6). With no
+        model named, the profile's own."""
+        tag = tag or self.profile.tag
+        if tag not in self._identity:
+            self._identity[tag] = (self._engine.version(), self._engine.model_digest(tag))
+        return self._identity[tag]
 
     def _write(self, call: Call, request: str, raw: str | None, reply: Reply | None,
                wall_ms: int, outcome: str, detail: str | None, consultation_id: int | None = None) -> int:
-        version, digest = self.identity()
+        version, digest = self.identity(call.tag)
+        # The model's name as the reply gives it, where the service names it (R20); else the name asked for.
+        named = (reply.model if reply else None) or call.tag
         return self._record.add(CallRow(
-            job=call.job, engine=self._engine.name, engine_version=version, model_tag=call.tag,
+            job=call.job, engine=self._engine.name, engine_version=version, model_tag=named,
             model_digest=digest, prompt_sha256=loader.sha256(call.system), request=request,
             reply=raw, prompt_tokens=reply.prompt_tokens if reply else None,
             output_tokens=reply.output_tokens if reply else None, wall_ms=wall_ms,

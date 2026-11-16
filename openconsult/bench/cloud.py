@@ -1,27 +1,19 @@
 """What the two cloud kinds of the bench share (spec 15.13, the details
 of runs 9a2 and 9d), in one place and not written twice: the rule that a
 kind speaks to its own service's address over https and to no other,
-checked before any connection; the stop after a refused key or used-up
-credit, after which nothing more is sent (run 9a, rule 9); and the shape
-of the row the bench command reads a kind's key by (7.3, rule 3).
+checked before any connection, which the app's Claude engine holds to
+as well and which therefore lives with the engines (llm/cloud.py); the
+stop after a refused key or used-up credit, after which nothing more is
+sent (run 9a, rule 9); and the shape of the row the bench command reads
+a kind's key by (7.3, rule 3).
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 
+from openconsult.llm.cloud import AddressRefused, own_address  # noqa: F401  (the shared rule, read here by the kinds and the tests)
 from openconsult.llm.engine import EngineUnreachable
-
-
-class AddressRefused(ValueError):
-    """The key goes to the service's own address and to no other."""
-
-
-def own_address(address: str, expected: str) -> str:
-    """The address with no trailing slash, when it is the expected one."""
-    if address.rstrip("/") != expected.rstrip("/"):
-        raise AddressRefused(f"the cloud kind speaks to {expected} alone, not {address}")
-    return address.rstrip("/")
 
 
 def stop_line(status: int) -> str:
