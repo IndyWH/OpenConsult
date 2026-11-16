@@ -22,6 +22,8 @@ from openconsult.guidelines.panel import Guidelines
 from openconsult.guidelines.search import Index
 from openconsult.guidelines.sources import Sources
 from openconsult.llm.choose import NoEngine, choose
+from openconsult.llm.claude import ClaudeEngine
+from openconsult.llm.cloud_door import ClaudeDoors
 from openconsult.llm.door import Door
 from openconsult.llm.engine import Engine
 from openconsult.llm.ollama import OllamaEngine
@@ -36,6 +38,7 @@ from openconsult.settings import room
 from openconsult.settings.connections import Connections
 from openconsult.settings.decisions import Decisions, converter_element, language_model_element
 from openconsult.settings.machine import Machine, read_machine
+from openconsult.settings.path import CLAUDE, THIS_COMPUTER
 from openconsult.settings.secure import SystemStore
 from openconsult.settings.store import Settings
 from openconsult.settings.stored import Stored
@@ -49,6 +52,13 @@ from openconsult.web.first_run import FirstRun
 find_converter_at_start = opus.find_converter
 # The system's secure store for the keys (7.2); the suite stands a made one in its place and never touches a real one.
 system_store = SystemStore
+
+
+def make_claude_engine(key: str):
+    """The Claude engine with a key, to the service's own address. The suite
+    puts an engine in this function's place that fails a test which would
+    call the real service."""
+    return ClaudeEngine(key=key)
 
 
 def default_testers() -> dict:
@@ -87,14 +97,30 @@ class Parts:
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
     store: object = None                           # the system's secure store for the keys of the cloud services (9b)
     connections: Connections = None                # the key in use and the last test of each cloud service (9b)
+    calls: ModelCalls = None                       # the record of every model call
+    claude_doors: ClaudeDoors = None               # the door to Claude with the key in use (9b)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
+
+    def door_of(self, language_model: str) -> Door:
+        """The door of a path's language model: this computer's, chosen at
+        start and held for the run, or the door to Claude. Nothing ever
+        answers in the other's place (10.4)."""
+        return self.claude_doors.door() if language_model == CLAUDE else self.door
+
+    def door_for(self, consultation_id: int) -> Door:
+        """The door every later call of a consultation goes by: the path the
+        consultation started with, read from its own row, never the
+        setting as it stands now (7.3)."""
+        row = self.consultations.get(consultation_id)
+        return self.door_of(row["language_model_path"] if row else THIS_COMPUTER)
 
 
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
               engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None, card_programs: Callable | None = None,
-              find_converter: Callable | None = None, embedder=None, secure_store=None, testers: dict | None = None) -> FastAPI:
+              find_converter: Callable | None = None, embedder=None, secure_store=None, testers: dict | None = None,
+              claude_engine: Callable | None = None) -> FastAPI:
     """engines, speech, doors, card_programs, find_converter, embedder and
     secure_store are passed in by tests, and testers, the tests of the
     two cloud connections, so the suite needs no vLLM, no Ollama, no
@@ -134,6 +160,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     door = Door(engine, calls, profile)
     stored = Stored(db, audit, clock)
     connections = Connections(settings.data_folder, secure_store, audit, calls, clock, testers={**default_testers(), **(testers or {})})
+    claude_doors = ClaudeDoors(lambda: connections.key(CLAUDE), calls, claude_engine or make_claude_engine)
     # The test of a connection runs at each start, for each service the chosen path uses that has a key (7.2).
     connections.test_all(stored.path(machine.case).services)
     parts = Parts(
@@ -156,16 +183,18 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         letters=Letters(db, clock),
         stored=stored,
         connections=connections,
+        calls=calls,
+        claude_doors=claude_doors,
         sources=sources,
         embedder=embedder,
-        guidelines=Guidelines(sources, Index(sources), embedder, door, audit),
+        guidelines=Guidelines(sources, Index(sources), embedder, door, audit, door_for=lambda cid: parts.door_for(cid)),
         converter=converter,
         store=secure_store,
         clock=clock,
         finaliser=_finalise,
     )
     # A check of who spoke left running by the last run is ended as failed: no label had changed (6c).
-    parts.who_checks = WhoChecks(door, parts.consultations, audit)
+    parts.who_checks = WhoChecks(door, parts.consultations, audit, door_for=parts.door_for)
     parts.who_checks.sweep()
     # A consultation left live or stopping by the last run goes on (review point 3).
     for consultation in stop.sweep(parts):

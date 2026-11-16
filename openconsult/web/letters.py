@@ -37,7 +37,7 @@ def ensure_list(p, consultation_id: int) -> None:
     """The list call, once, at the first opening of the review page after
     Approve (ruling 2); nothing before an approved note (R5)."""
     if p.notes.approval(consultation_id) is not None and p.letters.list_of(consultation_id) is None:
-        referrals.make_list(p.door, p.letters, p.notes, p.consultations, p.audit, consultation_id)
+        referrals.make_list(p.door_for(consultation_id), p.letters, p.notes, p.consultations, p.audit, consultation_id)
 
 
 def item_status(p, item: dict) -> dict:
@@ -110,7 +110,7 @@ async def list_again(request: Request, consultation_id: int, user=Depends(guards
     listed = p.letters.list_of(consultation_id)
     if listed is None or not listed["failure"]:
         return _review(request, user, consultation_id, "list-again", words.LIST_STANDS)
-    referrals.make_list(p.door, p.letters, p.notes, p.consultations, p.audit, consultation_id, again=True)
+    referrals.make_list(p.door_for(consultation_id), p.letters, p.notes, p.consultations, p.audit, consultation_id, again=True)
     raise Redirect(f"/consultations/{consultation_id}")
 
 
@@ -127,7 +127,7 @@ async def named(request: Request, consultation_id: int, user=Depends(guards.logg
     if not title:
         return _review(request, user, consultation_id, "draft-named", words.TITLE_EMPTY)
     item_id = referrals.name_item(p.letters, p.audit, consultation_id, specialty, title)
-    drafted = letter_module.draft(p.door, p.letters, p.notes, p.consultations, p.audit, consultation_id, p.letters.item(item_id))
+    drafted = letter_module.draft(p.door_for(consultation_id), p.letters, p.notes, p.consultations, p.audit, consultation_id, p.letters.item(item_id))
     raise Redirect(f"/consultations/{consultation_id}/letters/{drafted['id']}")
 
 
@@ -154,7 +154,7 @@ async def draft_item(request: Request, consultation_id: int, item_id: int, user=
     p = parts(request)
     _approved_row(request, consultation_id)
     item = _item_of(request, consultation_id, item_id)
-    drafted = letter_module.draft(p.door, p.letters, p.notes, p.consultations, p.audit, consultation_id, item)
+    drafted = letter_module.draft(p.door_for(consultation_id), p.letters, p.notes, p.consultations, p.audit, consultation_id, item)
     raise Redirect(f"/consultations/{consultation_id}/letters/{drafted['id']}")
 
 
@@ -259,7 +259,7 @@ async def draft_again(request: Request, consultation_id: int, letter_id: int, us
     state = letter_state(p, row, found)
     if state["again_reason"]:
         return letter_page(request, user, consultation_id, letter_id, refused=("again", state["again_reason"]))
-    drafted = letter_module.draft(p.door, p.letters, p.notes, p.consultations, p.audit, consultation_id, state["item"])
+    drafted = letter_module.draft(p.door_for(consultation_id), p.letters, p.notes, p.consultations, p.audit, consultation_id, state["item"])
     raise Redirect(f"/consultations/{consultation_id}/letters/{drafted['id']}")
 
 

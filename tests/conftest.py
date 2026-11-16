@@ -87,6 +87,15 @@ def r18_guard(tmp_path, monkeypatch):
         pytest.fail("a test sent the test of a connection to a real service")
 
     monkeypatch.setattr(app_module, "default_testers", lambda: {"claude": refuse_real_service, "speechmatics": refuse_real_service})
+
+    # And a call to Claude never leaves a test: an app built without naming its Claude engine gets one that fails the test.
+    class NoRealClaude(Absent):
+        name = "claude"
+
+        def __init__(self, key):
+            super().__init__("https://api.anthropic.com")
+
+    monkeypatch.setattr(app_module, "make_claude_engine", NoRealClaude)
     import keyring
 
     def refuse_real_store(*args, **kwargs):

@@ -41,8 +41,9 @@ class Guidelines:
     (15.12, ruling 25): the search is asked without it and the row says 0."""
 
     def __init__(self, sources: Sources, index: Index, embedder, door: Door, audit,
-                 floor: float = GUIDELINE_FLOOR, timer: Callable = time.perf_counter):
+                 floor: float = GUIDELINE_FLOOR, timer: Callable = time.perf_counter, door_for=None):
         self.sources, self.index, self.embedder, self.door, self.audit = sources, index, embedder, door, audit
+        self.door_for = door_for     # the door of a consultation's own path (7.3; 9b); with none given, the one door
         self.floor, self.timer = floor, timer
 
     def availability(self) -> tuple[str, str | None]:
@@ -74,7 +75,8 @@ class Guidelines:
             return self._answered(names, found.query, found, pass_n, consultation_id, FAILED, failure=found.failure, started=started)
         if found.below_floor:
             return self._answered(names, found.query, found, pass_n, consultation_id, "below_floor", started=started)
-        outcome = summary_module.summarise(self.door, found.query, found.sent, patient, consultation_id=consultation_id)
+        door = self.door_for(consultation_id) if self.door_for else self.door
+        outcome = summary_module.summarise(door, found.query, found.sent, patient, consultation_id=consultation_id)
         for sent in found.sent:
             sent["cited"] = sent["n"] in outcome.cited
         return self._answered(names, found.query, found, pass_n, consultation_id, outcome.outcome, outcome=outcome, started=started)

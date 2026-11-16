@@ -6,6 +6,7 @@ from __future__ import annotations
 from dataclasses import dataclass, fields
 
 from openconsult.db import Database
+from openconsult.llm.jobs import TEST_JOB
 from openconsult.patients.audit import Clock, now_local
 
 OUTCOMES = ("ok", "too_slow", "too_long", "unreachable", "bad_form", "did_not_fit")
@@ -37,7 +38,8 @@ COLUMNS = tuple(f.name for f in fields(CallRow))
 
 
 class ModelCalls:
-    """Adds rows and reads them back. Nothing here changes or removes one."""
+    """Adds rows and reads them back. Nothing here removes one, and the one
+    change is tie(), which gives a test of a connection its consultation."""
 
     def __init__(self, db: Database, clock: Clock = now_local):
         self._db = db
@@ -52,6 +54,15 @@ class ModelCalls:
                   *(getattr(row, name) for name in COLUMNS))
         cursor = self._db.execute(f"INSERT INTO model_call ({names}) VALUES ({marks})", values)
         return int(cursor.lastrowid)
+
+    def tie(self, call_ids, consultation_id: int) -> None:
+        """Tie the rows of the test of a connection made at Start to the
+        consultation that Start then began, so that its page of calls shows
+        them (15.8, ruling 1). The one change a row ever sees: this one
+        column, from none, and only for a test of a connection."""
+        for call_id in call_ids:
+            self._db.execute("UPDATE model_call SET consultation_id = ? WHERE id = ? AND consultation_id IS NULL AND job = ?",
+                             (consultation_id, call_id, TEST_JOB))
 
     def rows(self, newest_first: bool = True) -> list[dict]:
         order = "DESC" if newest_first else "ASC"

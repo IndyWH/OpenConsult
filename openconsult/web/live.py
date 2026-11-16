@@ -49,10 +49,8 @@ def running(request: Request, consultation_id: int):
 
 
 def model_line(request: Request, consultation) -> str:
-    p = parts(request)
-    return words.MODEL_LINE.format(speech=consultation.speech_door.choice.title, model=p.door.profile.tag,
-                                   engine=words.ENGINE_NAMES.get(p.engine.name, p.engine.name),
-                                   version=p.door.identity()[0] or "")
+    # From the consultation's own row, as the review page reads it: the path it started with (7.3; R20).
+    return review.model_line_of(parts(request).consultations.get(consultation.id))
 
 
 @router.get("/consultations/{consultation_id}")

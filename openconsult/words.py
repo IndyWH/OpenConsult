@@ -1091,3 +1091,8 @@ CHOICE_SPEECHMATICS = "Speechmatics, a cloud service"
 PATH_NEXT_CONSULTATION = "A change takes effect at the next consultation, never during one."
 PATH_SAVED = "Saved. It takes effect at the next consultation."
 CONNECT_FIRST = "Connect {service} first."
+# The Start screen in cloud mode (7.2; 7.3; R15; run 9b). Drafts.
+ROW_MODEL_IN_USE = "Language model"
+START_NOT_CONNECTED = "Start is not offered: {service} is not connected. Connect it in Settings."
+START_STATEMENT = "Start is not offered: the statement for your choices is not ticked. Read and tick it in Settings."
+START_TEST_FAILED = "Start is not offered: {reason}"

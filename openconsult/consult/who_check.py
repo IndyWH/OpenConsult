@@ -27,8 +27,9 @@ CLOSE_WAIT_S = 5.0
 class WhoChecks:
     """The runs of the check, held for the app's run: one thread a run."""
 
-    def __init__(self, door: Door, rows: Consultations, audit: Audit):
-        self.door, self.rows, self.audit = door, rows, audit
+    def __init__(self, door: Door, rows: Consultations, audit: Audit, door_for=None):
+        # door_for: the door of a consultation's own path (7.3; 9b). With none given, the one door for every consultation.
+        self.door, self.rows, self.audit, self.door_for = door, rows, audit, door_for
         self._threads: dict[int, threading.Thread] = {}
         self._lock = threading.Lock()
 
@@ -69,7 +70,8 @@ class WhoChecks:
 
     def _check(self, consultation_id: int, run_id: int) -> None:
         rows = [r for r in self.rows.transcript_lines(consultation_id) if r["n"] is not None]
-        found, outcome = labels.run(self.door, rows, consultation_id)
+        door = self.door_for(consultation_id) if self.door_for else self.door
+        found, outcome = labels.run(door, rows, consultation_id)
         counts = {"call_ids": outcome["call_ids"], "named_twice": outcome["named_twice"], "dropped": outcome["dropped"]}
         if found is None:
             reason = outcome.get("detail") or outcome.get("failure")

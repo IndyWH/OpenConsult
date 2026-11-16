@@ -251,7 +251,7 @@ def resume(p, row: dict) -> Consultation:
     patient = p.patients.get(row["patient_id"])
     door = p.doors[row["speech_choice"]]
     c = Consultation(row["id"], patient, row["intended_minutes"], datetime.fromisoformat(row["started_at"]), door,
-                     p.door, p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes,
+                     p.door_for(row["id"]), p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes,
                      converter=p.converter, guidelines=p.guidelines)
     c.state = STOPPING
     stage = STAGE_GONE.get(row["stop_stage"], row["stop_stage"])

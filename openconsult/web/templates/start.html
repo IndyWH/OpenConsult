@@ -21,8 +21,10 @@
       </select>
     </label>
     <table class="plain facts"><tr><th>{{ words.ROW_SPEECH_IN_USE }}</th><td>{{ speech or problem }}</td></tr></table>
+    <table class="plain facts" id="path"><tr><th>{{ words.ROW_MODEL_IN_USE }}</th><td>{{ model }}</td></tr></table>
     <button class="primary" id="start" aria-describedby="start-refusal" {% if problem %}disabled{% endif %}>{{ words.START }}</button>
     <p class="refusal" id="start-refusal" role="alert">{% if refused and refused.control == "start" %}{{ refused.message }}{% elif problem %}{{ problem }}{% endif %}</p>
+    {% if problem and lead %}<p id="start-lead"><a href="{{ lead[0] }}">{{ lead[1] }}</a></p>{% endif %}
   </div>
 </form>
 {% endblock %}

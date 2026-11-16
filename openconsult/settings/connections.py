@@ -248,7 +248,15 @@ class Connections:
         key = self.key(service)
         if key is None:
             return None
-        return self._keep(service, self._testers[service](key))
+        return self._keep(service, self._run(service, key))
+
+    def _run(self, service: str, key: str) -> Tested:
+        """A test never raises into a page or a start: whatever broke in it
+        is a service that did not answer, said plainly (R30)."""
+        try:
+            return self._testers[service](key)
+        except Exception as broke:  # noqa: BLE001 - the name of what broke, never its words, which could hold anything
+            return Tested(service, False, SERVICE_DOWN, f"the test itself failed: {type(broke).__name__}", 0.0)
 
     def test_all(self, services) -> dict[str, Tested | None]:
         """Several services side by side, so a view waits for the slowest
@@ -267,7 +275,7 @@ class Connections:
         passed (7.2). The key that was in use stays in use when the pasted
         one fails. Raises KeyNotSaved when the store did not keep a key
         that passed."""
-        tested = self._testers[service](pasted)
+        tested = self._run(service, pasted)
         if not tested.ok:
             # Said on the screen and written to the log, and not kept as the service's state: the key in use was not tested.
             self._audit.record("connection.tested", f"{words.SERVICE_TITLES[service]}: a pasted key: {tested.reason} ({tested.detail})")
