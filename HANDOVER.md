@@ -4,6 +4,16 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-16. Run 9b, at the half: half one stands by itself
+
+Half one of run 9b is built and stands by itself (15.13, ruling 35): the
+keys in the system's secure store, the connect screens with their test,
+the cloud statement and its tick, the choice of path, a consultation in
+cloud mode with Claude and Speechmatics, the cloud mark, a lost
+connection said and tried again, Why this model, and AssemblyAI out of
+the app. Nothing of it needs half two (the recording sent after Stop,
+the first-run steps) to work. The run's full entry takes this one's place.
+
 ## 2026-11-15. Step 6e, the collating step: the transcript of the review page reads as turns of speech; a leftover piece of a drug name is taken out at its row; what counts as use is said exactly
 
 Run on 15 Nov 2026 by the mailbox, under the owner's okay of the plan
