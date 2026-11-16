@@ -12,6 +12,7 @@ dependencies = [
     "websockets>=17.2",
     "imageio-ffmpeg>=0.6.0",
     "pypdf>=6.21.4",
+    "keyring>=25.7.0",
 ]
 
 [project.scripts]

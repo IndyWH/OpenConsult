@@ -54,7 +54,9 @@ def main() -> int:
     address = f"http://127.0.0.1:{port}"
     command = command_for(folder, port)
     with open(f"{folder}.out", "w+", encoding="utf-8") as output:
-        proc = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT)
+        # The check reads no secure store on any machine (spec 7.2): the package's own switch for no store.
+        environ = {**os.environ, "PYTHON_KEYRING_BACKEND": "keyring.backends.null.Keyring"}
+        proc = subprocess.Popen(command, stdout=output, stderr=subprocess.STDOUT, env=environ)
         try:
             body = wait_for_answer(address, proc)
             if "OpenConsult" not in body:

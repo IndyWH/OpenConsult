@@ -35,6 +35,7 @@ from openconsult.patients.users import Users
 from openconsult.settings import room
 from openconsult.settings.decisions import Decisions, converter_element, language_model_element
 from openconsult.settings.machine import Machine, read_machine
+from openconsult.settings.secure import SystemStore
 from openconsult.settings.store import Settings
 from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
@@ -45,6 +46,8 @@ from openconsult.web.first_run import FirstRun
 
 # The finder the app uses at start; tests stand a quiet one in its place.
 find_converter_at_start = opus.find_converter
+# The system's secure store for the keys (7.2); the suite stands a made one in its place and never touches a real one.
+system_store = SystemStore
 
 
 @dataclass
@@ -73,6 +76,7 @@ class Parts:
     converter: object = None                       # the recording converter found at start, or None (7a)
     who_checks: object = None                      # the runs of the who-spoke check asked for on the review page (6c)
     running: dict = field(default_factory=dict)    # the live consultations, by id, held for the run
+    store: object = None                           # the system's secure store for the keys of the cloud services (9b)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -80,11 +84,12 @@ class Parts:
 def build_app(settings: Settings, machine: Machine | None = None, clock: Clock = now_local,
               engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None, card_programs: Callable | None = None,
-              find_converter: Callable | None = None, embedder=None) -> FastAPI:
-    """engines, speech, doors, card_programs, find_converter and embedder
-    are passed in by tests, so the suite needs no vLLM, no Ollama, no
-    speech worker, no card, no converter and no embedding worker (spec
-    15.7, 15.8, 15.9, 15.11, 15.12). Building a
+              find_converter: Callable | None = None, embedder=None, secure_store=None) -> FastAPI:
+    """engines, speech, doors, card_programs, find_converter, embedder and
+    secure_store are passed in by tests, so the suite needs no vLLM, no
+    Ollama, no speech worker, no card, no converter, no embedding worker
+    and no secure store (spec 15.7, 15.8, 15.9, 15.11, 15.12, 15.13).
+    Building a store asks nothing of the system. Building a
     door starts nothing and reads nothing but a path. The engine is chosen
     here, once, the room on the card is read once, the converter is found
     once, and the decisions are written to the audit log once (rulings 36
@@ -108,10 +113,11 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     where = "card" if decisions.guideline_search.green else "processor"
     embedder = embedder or make_embedder(settings.data_folder, where)
     doors = dict(doors or {})
+    secure_store = secure_store if secure_store is not None else system_store()
     if speech is not None:
         doors.setdefault(WHISPERX_PYANNOTE.name, speech)
     for name, choice in CHOICES.items():
-        doors.setdefault(name, make_door(settings.data_folder, choice))
+        doors.setdefault(name, make_door(settings.data_folder, choice, store=secure_store))
     sources = Sources(db, audit, clock)
     door = Door(engine, ModelCalls(db, clock), profile)
     parts = Parts(
@@ -137,6 +143,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         embedder=embedder,
         guidelines=Guidelines(sources, Index(sources), embedder, door, audit),
         converter=converter,
+        store=secure_store,
         clock=clock,
         finaliser=_finalise,
     )

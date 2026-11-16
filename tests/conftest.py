@@ -23,6 +23,7 @@ from openconsult.app import build_app
 from openconsult.settings import paths, store
 from openconsult.settings.machine import Card, describe
 from tests.fakes import FakeEngine, MadeUpServer
+from tests.made_up_store import MadeStore
 
 pytest_plugins = ["pytester", "tests.noskip"]
 
@@ -74,6 +75,16 @@ def r18_guard(tmp_path, monkeypatch):
     monkeypatch.setattr(app_module.room, "read_programs", lambda: [])
     # And no real ffmpeg is looked for or run: a test that wants a converter passes a made one (7a).
     monkeypatch.setattr(app_module, "find_converter_at_start", lambda: None)
+    # And no real secure store is ever touched (7.2; 9b): an app built without naming one gets a made store, empty
+    # and in memory, and the package's own calls fail the test that reaches them, on every system.
+    monkeypatch.setattr(app_module, "system_store", MadeStore)
+    import keyring
+
+    def refuse_real_store(*args, **kwargs):
+        pytest.fail("R18: a test tried to reach the system's real secure store")
+
+    for name in ("get_keyring", "get_password", "set_password", "delete_password", "get_credential"):
+        monkeypatch.setattr(keyring, name, refuse_real_store)
 
 
 @pytest.fixture(autouse=True)

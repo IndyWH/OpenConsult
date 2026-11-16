@@ -282,12 +282,14 @@ class Door:
 
 
 def make_door(data_folder: Path, choice: Choice = WHISPERX_PYANNOTE,
-              environ=os.environ) -> Door:
+              environ=os.environ, store=None) -> Door:
     """The app's door: the real worker from the data folder's environment,
     or on the app's own Python for a cloud choice, with its one key in
-    the worker's environment and nowhere in the door."""
+    the worker's environment and nowhere in the door. The key is read at
+    each use, the secure store first when the app gives one (7.2), so a
+    key connected or removed while the app runs counts at once."""
     def key() -> str | None:
-        return keys.read_key(choice.key, data_folder, environ) if choice.key else None
+        return keys.read_key(choice.key, data_folder, environ, store) if choice.key else None
 
     return Door(
         choice,

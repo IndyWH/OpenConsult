@@ -240,3 +240,21 @@ it loads for the app is fetched by that command with no token: EmbeddingGemma 2
 (Google, Apache-2.0, as under stage 5d). The reranker the bench kit can
 fetch beside it, only when asked, is no part of the app (spec 15.12,
 ruling 25: not wired) and is not listed here.
+
+Run 9b, 16 Nov 2026. One library the app imports (linked at run time), to
+keep the key of a cloud service in the system's own secure store (spec 7.2):
+Credential Manager on Windows, Keychain on macOS, the Secret Service on
+Linux. It is loaded only when a store is asked. With what it brings:
+
+  keyring 25.7.0             MIT              https://pypi.org/project/keyring/
+    jaraco-classes 3.4.0     MIT              https://pypi.org/project/jaraco.classes/
+    jaraco-context 6.1.2     MIT              https://pypi.org/project/jaraco.context/
+    jaraco-functools 4.6.0   MIT              https://pypi.org/project/jaraco.functools/
+    more-itertools 11.2.1    MIT              https://pypi.org/project/more-itertools/
+    secretstorage 3.5.0      BSD-3-Clause     https://pypi.org/project/SecretStorage/ (Linux only)
+    jeepney 0.9.0            MIT              https://pypi.org/project/jeepney/ (Linux only)
+    cryptography 50.0.2      Apache-2.0 OR BSD-3-Clause
+                                             https://pypi.org/project/cryptography/ (Linux only)
+    cffi 2.1.1               MIT-0            https://pypi.org/project/cffi/ (Linux only)
+    pycparser 3.12           BSD-3-Clause     https://pypi.org/project/pycparser/ (Linux only)
+    pywin32-ctypes 0.2.3     BSD-3-Clause     https://pypi.org/project/pywin32-ctypes/ (Windows only)
