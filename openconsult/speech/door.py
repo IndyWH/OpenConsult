@@ -151,7 +151,12 @@ class Door:
             self._session = None
             return failed_live(gone.kind, gone.detail, self.fed_s, self.stamp)
         if reply.get("type") != "lines":
-            return failed_live(*self._error(reply), self.fed_s, self.stamp)
+            failure, detail = self._error(reply)
+            if failure in SENTENCES:
+                # A failure of the service that the worker names has ended the session at the worker (a lost
+                # connection, a refusal): it is ended here too, so that a new session can be opened (15.13, ruling 29).
+                self._session = None
+            return failed_live(failure, detail, self.fed_s, self.stamp)
         try:
             final = [self._live_line(s) for s in reply.get("segments") or []]
             pending = [self._live_line(s) for s in reply.get("pending") or []]

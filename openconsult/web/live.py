@@ -29,6 +29,8 @@ PIECE_S = 0.25           # the size the page sends, as the self-test and the ben
 SCRIPT_WORDS = ("LISTENING", "WAITING_FOR_WORDS", "PASS_RUNNING", "FROM_EARLIER_PASS", "PASS_FAILED", "ALARM_NONE",
                 "ALARM_FIRED", "ALARM_NO_ACTION", "ALARM_NOT_JUDGED", "ALARM_ARRANGED", "SHOW_REASONING",
                 "EARLIER_ALARMS", "ACKNOWLEDGE", "ACKNOWLEDGED", "CLOCK_USED", "CLOCK_OVER", "SPEECH_STOPPED",
+                # A lost connection (15.13, ruling 29).
+                "ALARM_NOT_LISTENING", "TRYING_AGAIN", "CONNECTION_BACK",
                 "SPEECH_STARTING", "MIC_REFUSED", "RATE_NOT_GIVEN", "SOCKET_LOST", "SOCKET_BACK", "QUESTIONS", "SIGNS",
                 "DIFFERENTIALS",
                 "SPEAKER_WORD", "ALARM_NAMED", "CLOSE", "EARLIER_NOTES_IN_USE",
@@ -102,10 +104,16 @@ def stopping_page(request: Request, user, consultation, refused=None):
     # The question only until the answer is taken; then the page says so and moves on by itself (15.12 ruling 28; R15).
     asking = state["stop_stage"] == "who_spoke" and not state["answered"]
     stage = ANSWERED if state["stop_stage"] == "who_spoke" and state["answered"] else state["stop_stage"]
+    rows = consultation.rows.transcript_lines(consultation.id) if asking else []
+    # One question for each speech session that has a speaker (ruling 29): one part where the connection held.
+    asked = speakers.parts_to_ask(rows)
     context = dict(user=user, active="new_patient", consultation=consultation, state=state, asking=asking,
                    stage_line=words.STAGE_LINES.get(stage or "", ""), patient=consultation.patient,
                    page_path=f"/consultations/{consultation.id}", refresh_every=0 if asking else 1,
-                   options=speakers.options(consultation.rows.transcript_lines(consultation.id)) if asking else [])
+                   options=speakers.options(rows) if asking else [], parts_asked=asked if len(asked) > 1 else [],
+                   # The stretch a lost connection left with no transcript, named by its times.
+                   lost=[words.WARN_NO_TRANSCRIPT.format(start=start, end=end)
+                         for start, end in stop_module.lost_stretches(consultation)] if asking else [])
     if refused:
         return refuse(request, "stopping.html", refused[0], refused[1], **context)
     return render(request, "stopping.html", **context)
@@ -121,7 +129,13 @@ async def answer(request: Request, consultation_id: int, user=Depends(guards.log
     picked = fields.get("speaker", "")
     if consultation.stop_stage != "who_spoke" or consultation.doctor_speaker is not None:
         raise Redirect(f"/consultations/{consultation.id}")     # answered already: the page has moved on
-    if not picked or not stop_module.answer(consultation, picked):
+    asked = speakers.sessions_to_ask(consultation.rows.transcript_lines(consultation.id))
+    if len(asked) > 1:
+        # One answer for each part, taken together: a part left unanswered is refused on the control (R15).
+        answers = {session: fields.get(f"speaker_{session}", "") for session in asked}
+        if not all(answers.values()) or not stop_module.answer_parts(consultation, answers):
+            return stopping_page(request, user, consultation, refused=("answer", words.PICK_ONE_EACH))
+    elif not picked or not stop_module.answer(consultation, picked):
         return stopping_page(request, user, consultation, refused=("answer", words.PICK_ONE))
     raise Redirect(f"/consultations/{consultation.id}")
 

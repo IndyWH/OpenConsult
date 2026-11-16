@@ -3,10 +3,25 @@
     <p class="statement"><b>{{ patient.name }}</b></p>
     <h2 class="question">{{ words.WHO_SPOKE_TITLE }}</h2>
     <p>{{ words.WHO_SPOKE_INTRO }}</p>
+    {% for line in lost %}<p class="failed lost-stretch">{{ line }}</p>{% endfor %}
+    {% if parts_asked %}
+    {# A lost connection (15.13, ruling 29): a later session names its speakers afresh, so each part has its own question. #}
+    <p id="who-spoke-parts">{{ words.WHO_SPOKE_PARTS }}</p>
+    {% for part in parts_asked %}
+    <fieldset class="who-part" data-session="{{ part.session }}">
+      <legend>{{ words.WHO_SPOKE_PART.format(n=loop.index, first=part.first, last=part.last) }}</legend>
+      {% for option in part.options %}
+      <label class="tick"><input type="radio" name="speaker_{{ part.session }}" value="{{ option.speaker }}">{{ words.SPEAKER_OPTION.format(n=option.n, words=option.words) }}</label>
+      {% endfor %}
+      <label class="tick"><input type="radio" name="speaker_{{ part.session }}" value="none">{{ words.CANNOT_TELL }}</label>
+    </fieldset>
+    {% endfor %}
+    {% else %}
     {% for option in options %}
     <label class="tick"><input type="radio" name="speaker" value="{{ option.speaker }}">{{ words.SPEAKER_OPTION.format(n=option.n, words=option.words) }}</label>
     {% endfor %}
     <label class="tick"><input type="radio" name="speaker" value="none">{{ words.CANNOT_TELL }}</label>
+    {% endif %}
     <button class="primary" id="answer" aria-describedby="answer-refusal">{{ words.ANSWER }}</button>
     <p class="refusal" id="answer-refusal" role="alert">{% if refused and refused.control == "answer" %}{{ refused.message }}{% endif %}</p>
   </div>

@@ -27,7 +27,9 @@ from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
 from openconsult.patients.patients import PatientRow
+from openconsult.consult.transcript import moved
 from openconsult.speech.lines import Line
+from openconsult.speech.loudness import WINDOW_S
 
 STAGES = ("speech", "who_spoke", "checks", "gate", "drug_name", "note")
 # A consultation found at a restart in the stage that Stop no longer has goes on
@@ -62,6 +64,9 @@ def checks(c: Consultation) -> None:
     windows = json.loads(row["loudness"] or "[]")
     for warning in gate.missing_speech(live, final, windows, c.speech_door.declares.second_transcript):
         c.rows.add_warning(c.id, **warning)
+    # The stretch a lost connection left with no transcript, named by its times (ruling 29).
+    for start, end in lost_stretches(c):
+        c.rows.add_warning(c.id, "no_transcript", start_s=start, end_s=end)
 
 
 def judge(c: Consultation) -> None:
@@ -111,27 +116,51 @@ def final_lines(c: Consultation) -> None:
     final = c.speech_door.stop(speakers=c.speakers_given) if c.speech.state == "open" else None
     with c.lock:
         c.speech = type(c.speech)("stopped")
+        # The lines of the sessions that ended before the one in use, as they were shown: a session that was lost
+        # can give nothing more, so what it gave live is what it gave (15.13, ruling 29). None for one session.
+        earlier = [(s.line, s.refused, s.session) for s in c.transcript.shown if s.session < c.session]
         if final is not None and final.ok:
-            heard = [(line, False) for line in final.lines] + [(r.line, True) for r in final.refused]
-            revised = {r.id for r in final.revisions if r.applied}
+            at = c.session_offset_s
+            heard = (earlier + [(moved(line, at), False, c.session) for line in final.lines]
+                     + [(moved(r.line, at), True, c.session) for r in final.refused])
+            revised = {(c.session, r.id) for r in final.revisions if r.applied}
             c.rows.set(c.id, stop_raw=json.dumps(list(final.raw), ensure_ascii=False))
         else:
-            heard = [(s.line, s.refused) for s in c.transcript.shown]
-            revised = {s.line.id for s in c.transcript.shown if s.revised}
+            heard = [(s.line, s.refused, s.session) for s in c.transcript.shown]
+            revised = {(s.session, s.line.id) for s in c.transcript.shown if s.revised}
             reason = (final.detail or final.failure) if final is not None else (c.speech_failure or c.speech.reason or "")
             c.rows.add_warning(c.id, "speech_failed", detail=reason)
-        c.rows.set(c.id, loudness=json.dumps(_windows(c.speech_door.loudness_windows)))
+        # Where a session was lost, the loudness is the whole recording's, so that speech no session heard is found
+        # by the check for missing speech; with one unbroken session it is the door's own, as before.
+        whole = c.loudness is not None and bool(c.rows.sessions(c.id))
+        c.rows.set(c.id, loudness=json.dumps(_windows(c.loudness.windows if whole else c.speech_door.loudness_windows)))
         write_lines(c, heard, revised)
 
 
-def write_lines(c: Consultation, heard: list[tuple[Line, bool]], revised: set) -> None:
+def write_lines(c: Consultation, heard: list[tuple[Line, bool, int]], revised: set) -> None:
     n = 0
     rows = []
-    for line, refused in heard:
+    for line, refused, session in heard:
         n = n if refused else n + 1
-        rows.append(line_as_row(line, None if refused else n, "unsure", refused=refused, unsure=True,
-                                revised=line.id in revised))
+        rows.append({**line_as_row(line, None if refused else n, "unsure", refused=refused, unsure=True,
+                                   revised=(session, line.id) in revised), "session": session})
     c.rows.add_transcript_lines(c.id, rows)
+
+
+def lost_stretches(c: Consultation) -> list[tuple[float, float]]:
+    """Each stretch of the recording that no session heard, by its times
+    (ruling 29): from the second a session was lost to the second the
+    next one opened, or to the recording's end."""
+    row = c.rows.get(c.id)
+    end = len(json.loads(row["loudness"] or "[]")) * WINDOW_S
+    sessions = c.rows.sessions(c.id)
+    found = []
+    for index, session in enumerate(sessions):
+        if session["lost_at_s"] is None:
+            continue
+        until = sessions[index + 1]["opened_at_s"] if index + 1 < len(sessions) else max(end, session["lost_at_s"])
+        found.append((round(session["lost_at_s"], 1), round(until, 1)))
+    return found
 
 
 def _windows(windows: list[float]) -> list[float | None]:
@@ -142,28 +171,59 @@ def _windows(windows: list[float]) -> list[float | None]:
 
 def wait_for_answer(c: Consultation) -> bool:
     """No limit on a human answer that changes the transcript (2.2). False
-    only when the app closed while waiting."""
+    only when the app closed while waiting. The labels are set session by
+    session: each session's lines by that session's own answer, because a
+    service names its speakers afresh in each (ruling 29; 15.9, ruling 4).
+    A line never takes a speaker from the answer given for another session."""
     while c.doctor_speaker is None:
         c.answer_event.wait()
         if c.closed and c.doctor_speaker is None:
             return False
     rows = c.rows.transcript_lines(c.id)
-    c.rows.set_labels(c.id, speakers.labels_from_answer(rows, c.doctor_speaker))
+    asked = speakers.sessions_to_ask(rows)
+    answers = c.doctor_speakers or {s["n"]: s["doctor_speaker"] for s in c.rows.sessions(c.id) if s["doctor_speaker"]}
+    if len(asked) <= 1:
+        c.rows.set_labels(c.id, speakers.labels_from_answer(rows, c.doctor_speaker))
+        return True
+    labels = {}
+    for session in sorted({r["session"] for r in rows}):
+        labels.update(speakers.labels_from_answer([r for r in rows if r["session"] == session],
+                                                  answers.get(session, speakers.CANNOT_TELL)))
+    c.rows.set_labels(c.id, labels)
     return True
 
 
 def answer(c: Consultation, doctor_speaker: str) -> bool:
-    """The page's answer. False when it is not the time, or the speaker is
-    not one the choice gave (and not I cannot tell)."""
+    """The page's answer where one session is asked. False when it is not
+    the time, or the speaker is not one the choice gave (and not I cannot
+    tell), or more than one session waits for its own answer."""
+    asked = speakers.sessions_to_ask(c.rows.transcript_lines(c.id))
+    if len(asked) > 1:
+        return False
+    return answer_parts(c, {(asked[0] if asked else 1): doctor_speaker})
+
+
+def answer_parts(c: Consultation, answers: dict[int, str]) -> bool:
+    """One answer for each session that is asked, taken together or not at
+    all: each must be a speaker that its own session gave, or I cannot tell."""
     with c.lock:
         if c.state != STOPPING or c.stop_stage != "who_spoke" or c.doctor_speaker is not None:
             return False
-        allowed = {o["speaker"] for o in speakers.options(c.rows.transcript_lines(c.id))} | {speakers.CANNOT_TELL}
-        if doctor_speaker not in allowed:
+        rows = c.rows.transcript_lines(c.id)
+        asked = speakers.sessions_to_ask(rows) or [1]
+        if sorted(answers) != sorted(asked):
             return False
-        c.doctor_speaker = doctor_speaker
-        c.rows.set(c.id, doctor_speaker=doctor_speaker)
-        c.audit.record("speakers.answered", f"consultation {c.id}: {doctor_speaker}")
+        for session, picked in answers.items():
+            allowed = {o["speaker"] for o in speakers.options([r for r in rows if r["session"] == session])} | {speakers.CANNOT_TELL}
+            if picked not in allowed:
+                return False
+        c.doctor_speakers = dict(answers)
+        for session, picked in answers.items():
+            c.rows.answer_session(c.id, session, picked)
+        c.doctor_speaker = answers[asked[0]]
+        c.rows.set(c.id, doctor_speaker=c.doctor_speaker)
+        said = c.doctor_speaker if len(asked) == 1 else ", ".join(f"part {n} {answers[s]}" for n, s in enumerate(asked, start=1))
+        c.audit.record("speakers.answered", f"consultation {c.id}: {said}")
         c._changed()
     c.answer_event.set()
     return True

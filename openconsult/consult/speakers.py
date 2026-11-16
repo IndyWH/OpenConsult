@@ -29,6 +29,31 @@ def options(rows: list[dict]) -> list[dict]:
     return list(found.values())
 
 
+def sessions_to_ask(rows: list[dict]) -> list[int]:
+    """The speech sessions that have a speaker to ask about, in order
+    (15.13, ruling 29): one for a consultation whose connection held;
+    more when a session was lost and a later one named its speakers
+    afresh. The question is asked once for each."""
+    found = []
+    for row in rows:
+        session = row.get("session", 1)
+        if row.get("raw_speaker") is not None and not row.get("refused") and session not in found:
+            found.append(session)
+    return sorted(found)
+
+
+def parts_to_ask(rows: list[dict]) -> list[dict]:
+    """For each session asked: its number, its first and last line number
+    and its own options."""
+    found = []
+    for session in sessions_to_ask(rows):
+        mine = [row for row in rows if row.get("session", 1) == session]
+        numbers = [row["n"] for row in mine if row.get("n") is not None]
+        found.append({"session": session, "first": min(numbers) if numbers else None, "last": max(numbers) if numbers else None,
+                      "options": options(mine)})
+    return found
+
+
 def labels_from_answer(rows: list[dict], doctor_speaker: str) -> dict[int, dict]:
     """By line number: the label and whether the line is unsure. I cannot
     tell (CANNOT_TELL) sets every line unsure."""

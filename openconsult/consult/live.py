@@ -32,6 +32,7 @@ from openconsult.llm.door import Door
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.patients.patients import PatientRow
 from openconsult.speech.door import Door as SpeechDoor
+from openconsult.speech.loudness import Loudness
 
 SPEAKERS = 2          # the doctor and the patient (ruling 9)
 WITHIN, OVER = "within", "over"
@@ -46,6 +47,10 @@ ANSWERED = "answered"
 # that moment, far beyond its length on the slowest machine, and no longer, so
 # that the app's shutdown never hangs on a thread that will not end.
 CLOSE_WAIT_S = 5.0
+# After a session of a cloud speech choice is lost, a new one is tried this often for as long as the consultation
+# runs (15.13, ruling 29). A design choice, not a measurement: each try is one dial with the worker's own limit of
+# 10 seconds, so tries never pile up.
+RECONNECT_EVERY_S = 10.0
 
 
 def clock_state(used_s: float, intended_minutes: int) -> str:
@@ -68,6 +73,8 @@ class Speech:
     reason) or stopped at Stop."""
     state: str = "not_started"
     reason: str | None = None
+    trying: bool = False     # a session of a cloud choice was lost and a new one is tried at an interval (ruling 29)
+    back: bool = False       # open again after a session was lost: the transcript and the alarm go on
 
 
 @dataclass
@@ -111,6 +118,11 @@ class Consultation:
         self.capture: Capture | None = None
         self.speech = Speech()
         self.speech_failure: str | None = None
+        self.session = 1                          # the speech session in use; a later one names its speakers afresh
+        self.session_offset_s = 0.0               # the second of the recording at which that session opened
+        self.loudness: Loudness | None = None     # the loudness of the whole recording, also of sound no session heard
+        self.doctor_speakers: dict[int, str] = {}  # the answer to which speaker was you, for each session
+        self._retry_at: float | None = None       # when the next try for a new session is due
         self.recording: Recording | None = None
         self.transcript = Transcript()
         self.passes = Passes()
@@ -153,6 +165,7 @@ class Consultation:
                           noise_suppression=_flag(capture.noise_suppression), auto_gain=_flag(capture.auto_gain),
                           sample_rate=capture.rate)
             self.speech = Speech("starting")
+            self.loudness = Loudness(capture.rate)
             self._changed()
         self._open_recording(capture.rate)
         opened = self.speech_door.open(capture.rate, speakers=self.speakers_given)
@@ -174,13 +187,41 @@ class Consultation:
 
     def _speech_failed(self, reason: str) -> None:
         """A failure of the speech choice is said with its reason and the
-        consultation goes on: the recording goes on, nothing is retried in
-        silence (10.4; carried from 5b)."""
+        consultation goes on: the recording goes on, and nothing is retried
+        in silence (10.4; carried from 5b). For a cloud choice the session
+        that was lost is written with the second it was lost at, and a new
+        session is tried at an interval, which the page says (ruling 29).
+        A local worker that dies is said as before and not started again."""
         if self.speech_failure is None:
             self.speech_failure = reason
             self.rows.set(self.id, speech_failure=reason)
-        self.speech = Speech("failed", reason)
+        trying = self.speech_door.choice.key is not None
+        if trying:
+            self.rows.add_session(self.id, self.session, self.session_offset_s)
+            self.rows.lose_session(self.id, self.session, self.loudness.seconds if self.loudness else 0.0, reason)
+            self._retry_at = self.timer() + RECONNECT_EVERY_S
+        self.speech = Speech("failed", reason, trying=trying)
         self._changed()
+
+    def _try_again(self) -> None:
+        """One try for a new session, on a thread of its own. When it opens,
+        the lines go on with their numbers in order; its speakers are its
+        own, and its times count from the second of the recording at which
+        it opened. When it does not, the next try is due an interval on."""
+        opened = self.speech_door.open(self.capture.rate, speakers=self.speakers_given)
+        with self.lock:
+            if self.state != LIVE:
+                if opened.ok:
+                    self.speech_door.end()      # Stop came meanwhile: the session just opened is ended, nothing asked of it
+                return
+            if not opened.ok:
+                self._retry_at = self.timer() + RECONNECT_EVERY_S
+                return
+            self.session += 1
+            self.session_offset_s = self.loudness.seconds if self.loudness else 0.0
+            self.rows.add_session(self.id, self.session, self.session_offset_s)
+            self.speech = Speech("open", back=True)
+            self._changed()
 
     # -------------------------------------------------------------- sound
 
@@ -192,9 +233,14 @@ class Consultation:
                 return
             if self.recording is not None:
                 self.recording.add(pcm)
+            if self.loudness is not None:
+                self.loudness.add(pcm)
             if self.speech.state != "open":
                 if self.speech.state in ("not_started", "starting"):
                     self._pending.append(pcm)
+                elif self._retry_at is not None and self.timer() >= self._retry_at:
+                    self._retry_at = None       # one try at a time: the next is set when this one has ended
+                    threading.Thread(target=self._try_again, name=f"consultation-{self.id}_reopen", daemon=True).start()
                 return
         self._feed(pcm)
 
@@ -206,8 +252,8 @@ class Consultation:
             if not live.ok:
                 self._speech_failed(live.detail or live.failure)
                 return
-            for shown in self.transcript.add(live):
-                self.rows.add_live_line(self.id, shown.n, shown.line, shown.refused, shown.shown_at_s)
+            for shown in self.transcript.add(live, self.session, self.session_offset_s):
+                self.rows.add_live_line(self.id, shown.n, shown.line, shown.refused, shown.shown_at_s, shown.session)
             self._changed()
             if self.passes.due(self.transcript):
                 self._start_pass()
@@ -352,7 +398,8 @@ class Consultation:
                 "intended_minutes": self.intended_minutes,
                 "used_s": round(used, 1),
                 "clock": clock_state(used, self.intended_minutes),
-                "speech": {"state": self.speech.state, "reason": self.speech.reason, "failure": self.speech_failure},
+                "speech": {"state": self.speech.state, "reason": self.speech.reason, "failure": self.speech_failure,
+                           "trying": self.speech.trying, "back": self.speech.back, "session": self.session},
                 "background": self.background is not None,     # the mark of 8.5
                 "transcript": {
                     "lines": [{"n": s.n, "speaker": s.line.speaker, "text": s.line.text, "start": s.line.start,

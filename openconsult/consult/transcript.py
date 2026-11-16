@@ -21,6 +21,12 @@ class Shown:
     refused: bool
     shown_at_s: float      # seconds of sound fed when the line arrived
     revised: bool = False  # a service revised its label after it was shown
+    session: int = 1       # the speech session that gave it (15.13, ruling 29): a later one names its speakers afresh
+
+
+def moved(line: Line, offset_s: float) -> Line:
+    """The line with its times moved by a session's opening second; the same line for the first session."""
+    return line if not offset_s else dataclasses.replace(line, start=line.start + offset_s, end=line.end + offset_s)
 
 
 class Transcript:
@@ -40,25 +46,31 @@ class Transcript:
     def text(self) -> str:
         return "\n".join(s.line.text for s in self.heard)
 
-    def add(self, live: Live) -> list[Shown]:
+    def add(self, live: Live, session: int = 1, offset_s: float = 0.0) -> list[Shown]:
         """What one feed gave, in the order the door gave it: the lines made
         final, then the refused ones; the partial text replaced; the
-        revisions applied. Returns the new entries, for the record."""
+        revisions applied. Returns the new entries, for the record. A
+        session after the first counts its times from its own start, so
+        its lines are moved by the second of the recording at which it
+        opened: every line then stands at its place in the recording."""
         new = []
         for line in live.lines:
-            new.append(Shown(len(self.shown) + len(new) + 1, line, False, live.fed_s))
+            new.append(Shown(len(self.shown) + len(new) + 1, moved(line, offset_s), False, live.fed_s + offset_s, session=session))
         for refused in live.refused:
-            new.append(Shown(len(self.shown) + len(new) + 1, refused.line, True, live.fed_s))
+            new.append(Shown(len(self.shown) + len(new) + 1, moved(refused.line, offset_s), True, live.fed_s + offset_s, session=session))
         self.shown += new
         self.partial = live.partial
         for revision in live.revisions:
-            self.revise(revision.id, revision.speaker, revision.applied)
+            self.revise(revision.id, revision.speaker, revision.applied, session)
         return new
 
-    def revise(self, line_id: int, speaker: str | None, applied: bool) -> None:
+    def revise(self, line_id: int, speaker: str | None, applied: bool, session: int = 1) -> None:
         if not applied:
             return
         for shown in self.shown:
+            # A service numbers its lines afresh in every session: a revision touches a line of its own session alone.
+            if shown.session != session:
+                continue
             if shown.line.id == line_id and not shown.refused:
                 shown.line = dataclasses.replace(shown.line, speaker=speaker)
                 shown.revised = True

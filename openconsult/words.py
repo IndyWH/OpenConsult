@@ -316,7 +316,7 @@ WARN_EMPTY = "Nothing was heard. No note will be drafted."
 WARNING_SENTENCES = {
     "missing_passage": WARN_MISSING_PASSAGE, "uncovered_speech": WARN_UNCOVERED, "no_speaker": WARN_NO_SPEAKER,
     "low_confidence": WARN_LOW_CONFIDENCE, "confidence_not_measured": WARN_CONFIDENCE_NOT_MEASURED,
-    "too_short": "{detail}", "empty": WARN_EMPTY,
+    "too_short": "{detail}", "empty": WARN_EMPTY, "no_transcript": "No transcript from {start} to {end} s: the connection was lost.",
 }
 
 # The note and the review page (spec 15.10, rulings 4, 6, 8, 11 and 12; R2, R15, R20; 8.8). Drafts.
@@ -1096,3 +1096,12 @@ ROW_MODEL_IN_USE = "Language model"
 START_NOT_CONNECTED = "Start is not offered: {service} is not connected. Connect it in Settings."
 START_STATEMENT = "Start is not offered: the statement for your choices is not ticked. Read and tick it in Settings."
 START_TEST_FAILED = "Start is not offered: {reason}"
+# A lost connection in a consultation (15.13, ruling 29). Drafts.
+ALARM_NOT_LISTENING = "The emergency alarm has stopped listening."
+TRYING_AGAIN = "OpenConsult is trying to connect again."
+CONNECTION_BACK = "The connection is back. The transcript and the alarm go on."
+WHO_SPOKE_PARTS = ("The connection was lost during this consultation, so the speakers were named afresh after it. "
+                   "Please answer for each part.")
+WHO_SPOKE_PART = "Part {n}: lines {first} to {last}"
+PICK_ONE_EACH = "Pick one for each part."
+WARN_NO_TRANSCRIPT = WARNING_SENTENCES["no_transcript"]

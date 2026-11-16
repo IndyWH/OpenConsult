@@ -77,7 +77,12 @@
     speech: function (state, words) {
       const node = document.getElementById('speech-line');
       const speech = state.speech;
-      if (speech.state === 'failed' || speech.failure) node.textContent = fill(words.SPEECH_STOPPED, {reason: speech.reason || speech.failure});
+      // A session lost (15.13, ruling 29): said at once, with the line that the alarm has stopped listening and,
+      // for a cloud choice, that a new connection is tried; when one opens, the page says that the two go on.
+      if (speech.state === 'failed') node.textContent = fill(words.SPEECH_STOPPED, {reason: speech.reason || speech.failure})
+        + ' ' + words.ALARM_NOT_LISTENING + (speech.trying ? ' ' + words.TRYING_AGAIN : '');
+      else if (speech.state === 'open' && speech.back) node.textContent = words.CONNECTION_BACK;
+      else if (speech.failure) node.textContent = fill(words.SPEECH_STOPPED, {reason: speech.failure});
       else if (speech.state === 'starting') node.textContent = words.SPEECH_STARTING;
       else if (speech.state === 'open') node.textContent = words.LISTENING;
       else node.textContent = '';
