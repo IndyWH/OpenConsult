@@ -79,6 +79,21 @@ def test_15_10_ruling_36_claude_sonnet_does_the_drug_name_call_and_claude_haiku_
     assert GEMMA_4_QAT.tag_for("drug_name") == GEMMA_4_QAT.tag                         # a local model does every job
 
 
+def test_R19_each_models_room_is_read_from_the_services_list_once_and_a_model_the_list_does_not_name_is_never_called(server, record):
+    door = Door(serve(server), record, CLAUDE)
+    for name in ("alarm", "drug_name", "alarm", "drug_name", "note"):
+        door.ask(name, "made-up words")
+    assert [path for path, _ in server.received].count(LIST_PATH) == 4                 # for each of two models: its room once, its identity once
+    assert len(sent(server)) == 5
+    # The list names Claude Haiku alone: the drug-name call is not sent, and fails plainly (10.4).
+    lone = Door(serve(server), record, CLAUDE)
+    server.routes[LIST_PATH] = (200, {"data": [{"id": HAIKU, "type": "model", "max_input_tokens": 1000000}], "has_more": False})
+    before = len(sent(server))
+    failed = lone.ask("drug_name", "made-up words")
+    assert not failed.ok and failed.failure == "unreachable" and len(sent(server)) == before
+    assert lone.ask("alarm", "made-up words").ok
+
+
 def test_R20_a_call_to_claude_records_the_service_the_model_as_the_reply_names_it_the_version_line_and_that_no_digest_is_given(server, record):
     named = "claude-haiku-5-5-made-up-date"
     door = Door(serve(server, lambda body: message(json.dumps(ALARM_QUIET), named)), record, CLAUDE)

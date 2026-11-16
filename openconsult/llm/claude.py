@@ -91,7 +91,7 @@ class ClaudeEngine:
         self.address = own_address(address, expected or ADDRESS)
         self._key = key
         self._urlopen = urlopen
-        self._context: int | None = None
+        self._contexts: dict[str, int | None] = {}    # each model's room, by its name
 
     # ------------------------------------------------------------ the wire
 
@@ -149,12 +149,14 @@ class ClaudeEngine:
     def chat(self, call: Call) -> Reply:
         sent = encode(self.build_request(call))
         request = sent.decode("utf-8")
-        if self._context is None:
-            self._context = self.context(call.tag)   # read once, so no call carries it in its time
-        if self._context is None:
+        if self._contexts.get(call.tag) is None:
+            # Read once for each model, so no call carries it in its time; a model the list does not name is never called.
+            self._contexts[call.tag] = self.context(call.tag)
+        room = self._contexts[call.tag]
+        if room is None:
             raise EngineUnreachable("the service did not say what context the model runs at", request)
-        if self._context < call.context:
-            return Reply("error", None, None, f"the service runs the model at a context of {self._context}, "
+        if room < call.context:
+            return Reply("error", None, None, f"the service runs the model at a context of {room}, "
                          f"below the call's {call.context}", None, None, None, None, None, None, 0, request, None)
         waited_ms = self.before_send(call, len(sent))
         started = time.perf_counter()
