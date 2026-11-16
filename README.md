@@ -119,6 +119,31 @@ This branch is where OpenConsult v2.0 is being built.
   name, the transcript as sent, the note lines, the passages with their
   sources, the query), the reply word for word, and the prompt by name
   and hash, never its text.
+  A consultation can run on cloud services, on a computer with no
+  suitable graphics card or by the doctor's choice in Settings: Claude
+  Haiku 5.5 for the language model, with Claude Sonnet 5.5 for the
+  drug-name call alone, and Speechmatics for the transcription. Each is
+  connected on its own screen with a key that is tested before it is
+  kept, and kept only in the computer's secure store; the screen for
+  Claude has the line Why this model. Before anything leaves the
+  computer the app shows a statement built for the choices made, of what
+  is sent, what stays and what each service keeps, and asks for a tick;
+  a changed word asks for the tick again. A consultation keeps the path
+  it started with to its end and never falls back to another, and a
+  cloud path carries a Cloud mark on the Start screen, the live page and
+  the review page. When the connection to the transcription service is
+  lost the page says so at once, the recording goes on, the app tries
+  again every 10 seconds, the speakers are asked about for each part,
+  and at Stop the doctor is told which stretch has no transcript and may
+  send the recording once for the whole transcript or go on without it.
+  With transcription on this computer, a tick for better accuracy sends
+  the whole recording to Speechmatics once after Stop for the final
+  transcript; the app deletes it there as soon as the transcript is
+  back, asks the service to confirm that it is gone, keeps that proof,
+  and says so on the review page when it cannot be proven. The first run
+  walks through connecting what the computer needs, the self-test run
+  from its page, and a microphone test whose sound is not stored and not
+  sent; a folder set up before these steps meets them once.
   Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line
@@ -128,9 +153,10 @@ This branch is where OpenConsult v2.0 is being built.
   (vLLM first on Linux with a suitable graphics card, Ollama otherwise)
   with the two calls of a pass sent together, the room on the card read
   once, the recording converter found once (ffmpeg carried by the
-  imageio-ffmpeg package, or the computer's own), and speech in four ways
-  behind one door: WhisperX with pyannote, Nemotron, Speechmatics and
-  AssemblyAI, each proven by a self-test on a bundled clip; a replay bench
+  imageio-ffmpeg package, or the computer's own), and speech in three ways
+  behind one door: WhisperX with pyannote, Nemotron and Speechmatics,
+  each proven by a self-test on a bundled clip (AssemblyAI is kept for
+  the bench alone); a replay bench
   that feeds a banked recording through that door as if live and scores it
   against the script; and a bench of the three models together on one
   card. Every bench figure so far is from a rehearsal on old recordings and
@@ -200,8 +226,12 @@ sentence in every letter of one case because the model wrote four times
 a day where the note wrote qds, which the check did not yet read as the
 same figure. A pass took 4.5 seconds in the middle and 12.8 at the
 slowest; one pass of 1,898 took over 10 seconds. Cost: about 9 US cents
-for a 15-minute consultation. The service does not keep what is sent by
-default and does not train on it. Like the host above, it gives no
+for a 15-minute consultation. The service does not train on what is
+sent without permission. On what it keeps, two of its own pages differed
+when they were read on 15 November: one says prompts and replies are not
+kept by default, the other that they are deleted within 30 days. The
+app's cloud statement gives the more cautious of the two. Like the host
+above, it gives no
 digest, so a later run cannot be proven to be the same build.
 
 **The ruling, 7 and 8 November.** Claude Haiku 5.5 is the cloud language
@@ -235,9 +265,10 @@ marks on a word written rightly against a line of 27: the third mark
 missed by 5. On the second asking it marked 111 names and made 19 such
 marks. Of its 139 entries, 127 were the same both times. Code dropped 2
 entries whose words did not stand on their line, against the local
-model's 3. Whether the drug-name marks are offered in cloud mode with
-Claude Sonnet waits for the owner's ruling; nothing is built for cloud
-mode yet, and until then a doctor in cloud mode gets no drug-name marks.
+model's 3. On 15 November the owner ruled, with the missed mark in front
+of him, that in cloud mode Claude Sonnet 5.5 does the drug-name call
+alone and Claude Haiku 5.5 does every other job. That one call costs
+under one US cent for a consultation.
 
 What this comparison cannot say: which model picks the better
 differential or asks the better next question. The four benches measure
