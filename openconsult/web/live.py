@@ -16,7 +16,7 @@ from openconsult import words
 from openconsult.consult import earlier, speakers, stop as stop_module
 from openconsult.consult.live import ANSWERED, FINAL, LIVE, Capture
 from openconsult.settings.path import path_of
-from openconsult.settings.statement import mark_lines
+from openconsult.settings.statement import mark_lines, statement_for
 from openconsult.web import guards, review
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -104,19 +104,50 @@ def stopping_page(request: Request, user, consultation, refused=None):
     # The question only until the answer is taken; then the page says so and moves on by itself (15.12 ruling 28; R15).
     asking = state["stop_stage"] == "who_spoke" and not state["answered"]
     stage = ANSWERED if state["stop_stage"] == "who_spoke" and state["answered"] else state["stop_stage"]
+    # The question after a lost connection (15.13, ruling 29): it waits, as the question which speaker was you does.
+    pressing = state["stop_stage"] == "lost" and consultation.send_after_loss is None
+    started = consultation.stage_started
+    seconds = max(0, round((consultation.clock() - started).total_seconds())) if started is not None else 0
     rows = consultation.rows.transcript_lines(consultation.id) if asking else []
     # One question for each speech session that has a speaker (ruling 29): one part where the connection held.
     asked = speakers.parts_to_ask(rows)
     context = dict(user=user, active="new_patient", consultation=consultation, state=state, asking=asking,
-                   stage_line=words.STAGE_LINES.get(stage or "", ""), patient=consultation.patient,
-                   page_path=f"/consultations/{consultation.id}", refresh_every=0 if asking else 1,
+                   stage_line=words.STAGE_LINES.get(stage or "", "").format(seconds=seconds), patient=consultation.patient,
+                   page_path=f"/consultations/{consultation.id}", refresh_every=0 if asking or pressing else 1,
+                   pressing=pressing,
                    options=speakers.options(rows) if asking else [], parts_asked=asked if len(asked) > 1 else [],
                    # The stretch a lost connection left with no transcript, named by its times.
                    lost=[words.WARN_NO_TRANSCRIPT.format(start=start, end=end)
                          for start, end in stop_module.lost_stretches(consultation)] if asking else [])
+    if pressing:
+        context.update(lost_question(request, consultation))
     if refused:
         return refuse(request, "stopping.html", refused[0], refused[1], **context)
     return render(request, "stopping.html", **context)
+
+
+def lost_question(request: Request, consultation) -> dict:
+    """What the question after a lost connection shows: the stretch by its
+    times, and the statement of the consultation's own path with the lines
+    of ruling 33 in their places, whose checksum goes with the press."""
+    row = parts(request).consultations.get(consultation.id)
+    return {"lost": [words.LOST_QUESTION.format(start=start, end=end) for start, end in stop_module.lost_stretches(consultation)],
+            "at_the_press": statement_for(path_of(row), at_the_press=True)}
+
+
+@router.post("/consultations/{consultation_id}/whole")
+async def whole(request: Request, consultation_id: int, user=Depends(guards.logged_in)):
+    """The one press after a lost connection (15.13, ruling 29): send the
+    recording once for the whole transcript, or go on without. Never by
+    itself; a press that is not one of the two is refused on the control."""
+    consultation = running(request, consultation_id)
+    fields = await form_fields(request)
+    if consultation.stop_stage != "lost" or consultation.send_after_loss is not None:
+        raise Redirect(f"/consultations/{consultation.id}")     # pressed already: the page has moved on
+    if fields.get("send") not in ("yes", "no"):
+        return stopping_page(request, user, consultation, refused=("send-whole", words.PICK_ONE))
+    stop_module.press(consultation, fields["send"] == "yes", fields.get("sha256"))
+    raise Redirect(f"/consultations/{consultation.id}")
 
 
 @router.post("/consultations/{consultation_id}/speakers")

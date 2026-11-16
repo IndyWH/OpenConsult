@@ -285,6 +285,7 @@ def _settings_page(request: Request, user, refused=None, pending=None):
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],
                    path_sections=cloud_web.path_sections(parts(request), pending),
+                   better_accuracy=cloud_web.better_accuracy_view(parts(request), pending),
                    to_tick=None if pending else cloud_web.statement_view(parts(request), "/settings"))
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)

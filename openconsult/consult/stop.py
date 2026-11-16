@@ -22,7 +22,7 @@ import math
 import statistics
 from datetime import datetime
 
-from openconsult.consult import drug_marks, gate, note, opus, speakers
+from openconsult.consult import drug_marks, gate, note, opus, speakers, whole
 from openconsult.consult.consultations import line_as_row, row_as_line
 from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
@@ -31,7 +31,7 @@ from openconsult.consult.transcript import moved
 from openconsult.speech.lines import Line
 from openconsult.speech.loudness import WINDOW_S
 
-STAGES = ("speech", "who_spoke", "checks", "gate", "drug_name", "note")
+STAGES = ("speech", "lost", "upload", "who_spoke", "checks", "gate", "drug_name", "note")
 # A consultation found at a restart in the stage that Stop no longer has goes on
 # from the checks for missing speech, with no check of who spoke (15.9 ruling 37).
 STAGE_GONE = {"label_check": "checks"}
@@ -41,6 +41,13 @@ def finalise(c: Consultation) -> None:
     """The steps from the consultation's stage on. Runs on the Stop thread."""
     if c.stop_stage == "speech":
         final_lines(c)
+        c.set_stage(after_the_lines(c))
+    if c.stop_stage == "lost":
+        if not wait_for_press(c):
+            return                       # the app closed while waiting: the stage is kept for the next start
+        c.set_stage("upload" if c.send_after_loss else "who_spoke")
+    if c.stop_stage == "upload":
+        send_recording(c)
         c.set_stage("who_spoke")
     if c.stop_stage == "who_spoke":
         if not wait_for_answer(c):
@@ -55,6 +62,54 @@ def finalise(c: Consultation) -> None:
     opus.convert_consultation(c)
 
 
+def after_the_lines(c: Consultation) -> str:
+    """The stage after the final lines (15.13, rulings 29 and 33): the
+    question after a lost connection, on a path whose transcription runs
+    in the cloud; the recording sent, where the tick for better accuracy
+    stood at Start; otherwise the question which speaker was you."""
+    row = c.rows.get(c.id)
+    if c.whole is None:
+        return "who_spoke"
+    if row["transcription_path"] == "speechmatics" and any(s["lost_at_s"] is not None for s in c.rows.sessions(c.id)):
+        return "lost"
+    return "upload" if whole.way_of(row, None) == whole.TICK else "who_spoke"
+
+
+def wait_for_press(c: Consultation) -> bool:
+    """The question after a lost connection waits with no limit, as the
+    question which speaker was you does (2.2). False only when the app
+    closed while waiting."""
+    while c.send_after_loss is None:
+        c.press_event.wait()
+        if c.closed and c.send_after_loss is None:
+            return False
+    return True
+
+
+def press(c: Consultation, send: bool, statement_sha256: str | None = None) -> bool:
+    """The doctor's press: send the recording once for the whole
+    transcript, or go on without. Written to the audit log with the
+    checksum of the lines that stood beside it. False when it is not the time."""
+    with c.lock:
+        if c.state != STOPPING or c.stop_stage != "lost" or c.send_after_loss is not None:
+            return False
+        c.send_after_loss = bool(send)
+        said = f"send the recording once; the statement shown, sha256 {statement_sha256}" if send else "go on without"
+        c.audit.record("recording.pressed", f"consultation {c.id}: {said}")
+        c._changed()
+    c.press_event.set()
+    return True
+
+
+def send_recording(c: Consultation) -> None:
+    """The recording sent once, by the tick or by the press, and never by
+    itself. Whatever happens in it, Stop goes on (R30)."""
+    way = whole.way_of(c.rows.get(c.id), c.send_after_loss)
+    if way is None and c.rows.upload(c.id) is None:
+        return
+    c.whole.run(c, way or c.rows.upload(c.id)["way"])
+
+
 def checks(c: Consultation) -> None:
     """Four: the two checks for missing speech on the stored lines and the
     stored loudness (11.5 rule 2)."""
@@ -64,9 +119,11 @@ def checks(c: Consultation) -> None:
     windows = json.loads(row["loudness"] or "[]")
     for warning in gate.missing_speech(live, final, windows, c.speech_door.declares.second_transcript):
         c.rows.add_warning(c.id, **warning)
-    # The stretch a lost connection left with no transcript, named by its times (ruling 29).
-    for start, end in lost_stretches(c):
-        c.rows.add_warning(c.id, "no_transcript", start_s=start, end_s=end)
+    # The stretch a lost connection left with no transcript, named by its times (ruling 29); not where the whole
+    # recording was sent and its transcript made, which has no such stretch.
+    if not any(w["kind"] == whole.MADE for w in c.rows.warnings(c.id)):
+        for start, end in lost_stretches(c):
+            c.rows.add_warning(c.id, "no_transcript", start_s=start, end_s=end)
 
 
 def judge(c: Consultation) -> None:
@@ -312,7 +369,7 @@ def resume(p, row: dict) -> Consultation:
     door = p.doors[row["speech_choice"]]
     c = Consultation(row["id"], patient, row["intended_minutes"], datetime.fromisoformat(row["started_at"]), door,
                      p.door_for(row["id"]), p.consultations, p.audit, p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes,
-                     converter=p.converter, guidelines=p.guidelines)
+                     converter=p.converter, guidelines=p.guidelines, whole=p.whole)
     c.state = STOPPING
     stage = STAGE_GONE.get(row["stop_stage"], row["stop_stage"])
     c.stop_stage = stage if stage in STAGES[1:] else "who_spoke"

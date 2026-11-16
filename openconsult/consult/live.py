@@ -38,7 +38,7 @@ SPEAKERS = 2          # the doctor and the patient (ruling 9)
 WITHIN, OVER = "within", "over"
 LIVE, STOPPING, FINAL = "live", "stopping", "final"
 # The named in-progress states a spinner may show (V1_LESSONS 5.3).
-SPINNING = ("speech_starting", "pass_running", "speech", "checks", "gate", "drug_name", "note")
+SPINNING = ("speech_starting", "pass_running", "speech", "upload", "checks", "gate", "drug_name", "note")
 # The moment after the who-spoke answer and before the Stop thread moves
 # the stage on: the page shows it as its own named state, so the question
 # never stands on screen with the answer taken (15.12 ruling 28; R15).
@@ -92,9 +92,13 @@ class Consultation:
                  speech: SpeechDoor, llm: Door, rows: Consultations, audit: Audit, data_folder: Path,
                  clock: Clock = now_local, timer: Callable[[], float] = time.perf_counter,
                  on_stop: Callable | None = None, notes: Notes | None = None, converter=None,
-                 background: str | None = None, guidelines=None):
+                 background: str | None = None, guidelines=None, whole=None):
         self.id = consultation_id
         self.notes = notes                # the note's rows (6b), given by the app
+        self.whole = whole                # the sender of a recording after Stop (9b), given by the app; None sends nothing
+        self.send_after_loss: bool | None = None    # the press at Stop after a lost connection: send, go on without, or not yet
+        self.press_event = threading.Event()
+        self.stage_started = None         # when the Stop stage in hand began, for the seconds a page counts
         self.converter = converter        # the recording converter (7a), given by the app; None keeps the WAV
         self.background = background      # the block of 15.11 ruling 5 for the two calls, or None (7b)
         self.guideline = PanelState(guidelines, self) if guidelines is not None else None   # the panel (8b), given by the app
@@ -330,6 +334,7 @@ class Consultation:
     def set_stage(self, stage: str | None) -> None:
         with self.lock:
             self.stop_stage = stage
+            self.stage_started = self.clock()
             self.rows.set(self.id, stop_stage=stage)
             self._changed()
 
@@ -340,6 +345,7 @@ class Consultation:
         a pass in flight lands and is recorded."""
         self.closed = True
         self.answer_event.set()
+        self.press_event.set()
         if self._stop_thread is not None and self._stop_thread is not threading.current_thread():
             self._stop_thread.join()
         self._pool.shutdown(wait=True)

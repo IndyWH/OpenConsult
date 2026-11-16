@@ -40,6 +40,30 @@
       {{ refusal("save-" ~ s.which) }}
       {% if notice == words.PATH_SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
     </form>
+    {% if s.which == "transcription" and better_accuracy %}
+    {# The tick for better accuracy (15.9, rulings 36 and 42): offered while the transcription runs on this computer,
+       off until the doctor sets it, set only with Speechmatics connected and the lines of ruling 33 ticked. #}
+    <form method="post" action="/settings/better-accuracy" id="better-accuracy">
+      <label class="tick"><input type="checkbox" name="better_accuracy" value="yes"{% if better_accuracy.checked %} checked{% endif %}> {{ words.BETTER_ACCURACY }}</label>
+      {% if better_accuracy.statement %}
+      <div class="statement-to-tick" id="statement-better-accuracy">
+        <h3>{{ better_accuracy.statement.heading }}</h3>
+        <p>{{ better_accuracy.statement.intro }}</p>
+        <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
+        <ul class="panel-list">{% for line in better_accuracy.statement.sent %}<li>{{ line }}</li>{% endfor %}</ul>
+        <h4>{{ words.CLOUD_STAYS_HEADING }}</h4>
+        <ul class="panel-list">{% for line in better_accuracy.statement.stays %}<li>{{ line }}</li>{% endfor %}</ul>
+        {% for heading, lines in better_accuracy.statement.parts %}<h4>{{ heading }}</h4>
+        <ul class="panel-list">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endfor %}
+        <p class="statement">{{ better_accuracy.statement.prototype }}</p>
+        <input type="hidden" name="sha256" value="{{ better_accuracy.statement.sha256 }}">
+        <label class="tick"><input type="checkbox" name="understand" value="yes"> {{ better_accuracy.statement.tick }}</label>
+      </div>
+      {% endif %}
+      <button class="primary" id="save-better-accuracy" aria-describedby="save-better-accuracy-refusal">{{ words.SAVE }}</button>
+      {{ refusal("save-better-accuracy") }}
+    </form>
+    {% endif %}
   </div>
 </section>
 {% endfor %}

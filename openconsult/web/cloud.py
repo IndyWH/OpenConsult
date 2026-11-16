@@ -259,3 +259,47 @@ async def save_path(request: Request, which: str, user=Depends(guards.logged_in)
     else:
         p.stored.set_path(p.machine.case, after)
     raise Redirect(f"/settings?done=path#{which}")
+
+
+# --------------------------------------------- the tick for better accuracy
+
+def better_accuracy_view(p, pending: dict | None = None) -> dict | None:
+    """The tick under Transcription (15.9, rulings 36 and 42): offered
+    when the transcription runs on this computer, off until the doctor
+    sets it. None where it is not offered: in cloud transcription
+    nothing is sent a second time."""
+    path = p.stored.path(p.machine.case)
+    if path.speechmatics_live:
+        return None
+    waiting = pending if pending and pending["which"] == "better-accuracy" else None
+    return {"checked": waiting["choice"] if waiting else path.better_accuracy, "statement": waiting["made"] if waiting else None}
+
+
+@router.post("/settings/better-accuracy")
+async def save_better_accuracy(request: Request, user=Depends(guards.logged_in)):
+    """The tick, set or taken off. It is set only with Speechmatics
+    connected and the lines of ruling 33 ticked, in the statement of the
+    path as it would then stand, on this same form."""
+    from openconsult.web import routes
+    p = parts(request)
+    control = "save-better-accuracy"
+    fields = await form_fields(request)
+    before = p.stored.path(p.machine.case)
+    if before.speechmatics_live:
+        raise Redirect("/settings#transcription")          # not offered in cloud transcription: no such control
+    wanted = fields.get("better_accuracy") == "yes"
+    after = dataclasses.replace(before, better_accuracy=wanted)
+    if wanted and not p.connections.connected(SPEECHMATICS):
+        return routes._settings_page(request, user, (control, words.CONNECT_FIRST.format(service=words.SERVICE_TITLES[SPEECHMATICS])))
+    made = statement_for(after)
+    if made is not None and not p.stored.ticked(made):
+        pending = {"which": "better-accuracy", "choice": wanted, "made": made}
+        if fields.get("sha256") not in (None, made.sha256):
+            return routes._settings_page(request, user, (control, words.STATEMENT_CHANGED), pending)
+        if fields.get("understand") != "yes" or fields.get("sha256") != made.sha256:
+            return routes._settings_page(request, user, (control, words.STATEMENT_TICK_FIRST), pending)
+        p.stored.set_path(p.machine.case, after)
+        p.stored.tick_statement(made.sha256, after)
+    else:
+        p.stored.set_path(p.machine.case, after)
+    raise Redirect("/settings?done=path#transcription")

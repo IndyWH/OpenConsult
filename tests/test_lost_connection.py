@@ -130,7 +130,7 @@ def test_15_13_ruling_29_a_lost_session_is_said_with_its_reason_the_recording_go
     assert [l["n"] for l in c.page_state()["transcript"]["lines"]] == [1, 2, 3, 4]
 
 
-def test_15_13_ruling_29_a_try_that_fails_is_tried_again_and_a_local_worker_that_dies_is_never_started_again(tmp_path, clock, server, monkeypatch):
+def test_15_13_ruling_29_a_try_that_fails_is_tried_again_at_the_next_interval(tmp_path, clock, server, monkeypatch):
     worker = SessionsWorker([FIRST, SECOND], open_fails=0)
     app, client, c, worker, now = lost_and_found(tmp_path, clock, server, monkeypatch, worker)
     worker.open_fails = 2                                                                        # the internet is still gone for two tries
@@ -143,7 +143,9 @@ def test_15_13_ruling_29_a_try_that_fails_is_tried_again_and_a_local_worker_that
     c.sound(LOUD)
     assert until(lambda: c.speech.state == "open") and worker.requests.count("open") == 4
     assert [s["n"] for s in app.state.parts.consultations.sessions(1)] == [1, 2]                 # a failed try opens no session
-    # A consultation on this computer: its worker dies, the page says so as before, and nothing is tried again.
+
+
+def test_15_13_ruling_29_a_local_worker_that_dies_is_said_as_before_and_never_started_again(tmp_path, clock, server):
     app, client, local, workers, testers = cloud_app(tmp_path / "local", clock, server, machine=SUITABLE)
     p = app.state.parts
     dying = SessionsWorker([{"lose_at": 2}])
@@ -172,6 +174,9 @@ def through_to_question(tmp_path, clock, server, monkeypatch, lost_pieces=4):
     c.sound(LOUD)
     c.wait_for_pass()
     client.post("/consultations/1/stop")
+    # After a lost connection Stop asks first whether to send the recording (the press of half two): here, go on without.
+    assert until(lambda: c.stop_stage == "lost")
+    assert client.post("/consultations/1/whole", data={"send": "no"}).status_code == 303
     assert until(lambda: c.stop_stage == "who_spoke")
     return app, client, c
 
@@ -226,6 +231,8 @@ def test_15_13_ruling_29_stop_while_a_session_is_lost_keeps_what_was_heard_and_a
     p = app.state.parts
     c.sound(LOUD)
     client.post("/consultations/1/stop")                                                         # Stop while the connection is still lost
+    assert until(lambda: c.stop_stage == "lost")
+    client.post("/consultations/1/whole", data={"send": "no"})                                   # go on without the whole transcript
     assert until(lambda: c.stop_stage == "who_spoke")
     rows = p.consultations.transcript_lines(1)
     assert [(r["n"], r["session"]) for r in rows] == [(1, 1), (2, 1)]                            # the lines heard live are the transcript

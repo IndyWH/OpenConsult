@@ -19,7 +19,7 @@ from fastapi import APIRouter, Depends, Request
 from fastapi.responses import FileResponse, PlainTextResponse
 
 from openconsult import words
-from openconsult.consult import alarms, deletion, drug_marks, gate, note, reading, who_check
+from openconsult.consult import alarms, deletion, drug_marks, gate, note, reading, who_check, whole
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
@@ -124,8 +124,8 @@ def warning_lines(rows: list[dict], lines: list[dict], choice_title: str) -> lis
         kind, detail = w["kind"], w["detail"] or ""
         if kind == "speech_failed":
             text = words.WARN_SPEECH_FAILED.format(reason=detail) if detail != words.APP_RESTARTED else detail
-        elif kind in CHECK_KINDS:
-            continue
+        elif kind in CHECK_KINDS or kind == whole.MADE:
+            continue            # the check's own lines stand at its control; a better transcript made is no warning: it stands with the details
         else:
             text = words.WARNING_SENTENCES.get(kind, "{detail}").format(
                 start=w["start_s"], end=w["end_s"], n=w["line_n"], detail=detail, words=detail, score=detail, choice=choice_title)
@@ -208,6 +208,21 @@ def ran_with(p, row: dict) -> dict:
             "corrected": words.DETAILS_CORRECTED.format(date=words.plain_date(datetime.fromisoformat(changed))) if changed else None}
 
 
+def sent_lines(p, row: dict) -> tuple[tuple[str, ...], str | None]:
+    """For a consultation whose recording was sent after Stop: the mark's
+    third line in the past, where the one press after a lost connection
+    sent it (the tick's own line stands in the mark already); and the
+    sentence that the final transcript is the service's, with the delete
+    as it was proven."""
+    sent = p.consultations.upload(row["id"])
+    if sent is None:
+        return (), None
+    past = (words.CLOUD_MARK_RECORDING_SENT,) if sent["way"] == whole.PRESS and sent["job_id"] else ()
+    if sent["result_at"] is None:
+        return past, None
+    return past, words.UPLOAD_MADE if sent["gone"] else words.UPLOAD_MADE_ONLY
+
+
 def page_data(p, row: dict) -> dict:
     cid = row["id"]
     lines = [r for r in p.consultations.transcript_lines(cid) if r["n"] is not None]
@@ -256,7 +271,8 @@ def page_data(p, row: dict) -> dict:
     alarm_rows = alarms.alarm_lines(pass_rows, p.consultations.live_lines(cid), datetime.fromisoformat(row["started_at"]),
                                     alarms.acknowledged_keys(p.audit.lines(), cid), words)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
-            "mark": mark_lines(path_of(row)),     # the cloud mark among the details the consultation ran with (ruling 5)
+            # The cloud mark among the details the consultation ran with (ruling 5); and what came of a recording sent after Stop.
+            "mark": mark_lines(path_of(row)) + sent_lines(p, row)[0], "recording_sent": sent_lines(p, row)[1],
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),

@@ -706,6 +706,9 @@ EVENTS = {
     "connection.tested": "Connection to a cloud service tested",
     "key.saved": "Key of a cloud service kept in the secure store",
     "key.removed": "Key of a cloud service taken out of the secure store",
+    "recording.sent": "Recording sent to Speechmatics after Stop",
+    "recording.delete_not_proven": "The delete of a recording sent after Stop could not be confirmed",
+    "recording.pressed": "After a lost connection: the doctor's press at Stop",
     "audio.deleted": "Recordings deleted by the retention sweep",
     "recording.converted": "Recording converted to Opus",
     "recording.conversion_failed": "Recording kept as WAV: conversion failed",
@@ -1105,3 +1108,25 @@ WHO_SPOKE_PARTS = ("The connection was lost during this consultation, so the spe
 WHO_SPOKE_PART = "Part {n}: lines {first} to {last}"
 PICK_ONE_EACH = "Pick one for each part."
 WARN_NO_TRANSCRIPT = WARNING_SENTENCES["no_transcript"]
+# The recording sent after Stop (15.9, rulings 36 and 42; 15.13, rulings 29 and 33; run 9b). Drafts, but for
+# UPLOAD_DELETE_NOT_PROVEN above, which is the owner's.
+BETTER_ACCURACY = "Better accuracy: after Stop, send the whole recording to Speechmatics once, for the final transcript."
+NOT_CONNECTED_SERVICE = "{service} is not connected."
+UPLOAD_TOO_SLOW = "{service} did not answer in {seconds} seconds."
+UPLOAD_WRONG_SETTINGS = "{service} did not use the settings that were asked for."
+UPLOAD_APP_CLOSED = "OpenConsult was closed while the recording was being sent."
+UPLOAD_MADE = ("The final transcript was made by Speechmatics from the whole recording. It was deleted there, and Speechmatics "
+               "confirmed that it is gone.")
+UPLOAD_MADE_ONLY = "The final transcript was made by Speechmatics from the whole recording."
+UPLOAD_FAILED = ("The better transcript could not be made: {detail} The transcript is the one made during the consultation. "
+                 "Nothing is sent again.")
+WARNING_SENTENCES.update({"better_transcript_failed": UPLOAD_FAILED, "delete_not_proven": UPLOAD_DELETE_NOT_PROVEN})
+STAGE_LINES.update({"upload": "Sending the recording to Speechmatics and waiting for the transcript: {seconds} s.",
+                    "lost": "Waiting for your answer."})
+LOST_TITLE = "The connection was lost"
+LOST_QUESTION = "The connection was lost from {start} to {end} s, so that part has no transcript."
+SEND_WHOLE = "Send the recording once for the whole transcript."
+GO_ON_WITHOUT = "Go on without it."
+CLOUD_MARK_RECORDING_SENT = "After Stop the recording went to Speechmatics."
+START_BETTER_MAY_FAIL = ("Speechmatics cannot be reached now: {reason} The consultation can start. The better transcript may not be "
+                         "made after Stop.")

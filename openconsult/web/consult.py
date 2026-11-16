@@ -69,6 +69,7 @@ class StartState:
     problem: str | None = None          # why Start is not offered, for the control itself (R15)
     lead: tuple[str, str] | None = None  # where the doctor mends it: an address and its words
     tests: dict | None = None           # the tests of the connections made for this view
+    notice: str | None = None           # said on the screen while Start is still offered
 
 
 def start_state(p, ask_engine: bool = True) -> StartState:
@@ -97,13 +98,22 @@ def start_state(p, ask_engine: bool = True) -> StartState:
             return StartState(words.START_NO_SPEECH.format(reason=choice.reason))
     if not p.stored.ticked(statement_for(path)):
         return StartState(words.START_STATEMENT, ("/settings#cloud-statement", words.NAV_SETTINGS))
-    tests = p.connections.test_all(path.needed_while_it_runs) if ask_engine else {
-        service: p.connections.state(service).last for service in path.needed_while_it_runs}
+    tests = p.connections.test_all(path.services) if ask_engine else {
+        service: p.connections.state(service).last for service in path.services}
     for service in path.needed_while_it_runs:
         tested = tests.get(service)
         if tested is not None and not tested.ok:
             return StartState(words.START_TEST_FAILED.format(reason=tested.sentence), (f"/connect/{service}", words.SERVICE_TITLES[service]), tests)
-    return StartState(tests=tests)
+    # The tick for better accuracy needs its service only after Stop (the owner's word, 16 Nov 2026): Start is offered,
+    # and the screen says plainly that the better transcript may not be made.
+    notice = None
+    if path.recording_after_stop:
+        tested = tests.get(SPEECHMATICS)
+        if tested is None and not p.connections.state(SPEECHMATICS).has_key:
+            notice = words.START_BETTER_MAY_FAIL.format(reason=words.NOT_CONNECTED_SERVICE.format(service=words.SERVICE_TITLES[SPEECHMATICS]))
+        elif tested is not None and not tested.ok:
+            notice = words.START_BETTER_MAY_FAIL.format(reason=tested.sentence)
+    return StartState(tests=tests, notice=notice)
 
 
 def start_problem(p, ask_engine: bool = True) -> str | None:
@@ -158,7 +168,7 @@ def _start_context(request: Request, user, patient, ask_engine: bool = True) -> 
                 speech=(words.CHOICE_SPEECHMATICS if path.speechmatics_live else choice.door.choice.title) if choice.door else None,
                 # The path in two rows (7.3; 9b): where the language model runs, beside the speech choice.
                 model=words.CHOICE_CLAUDE if path.claude else words.CHOICE_THIS_COMPUTER, lead=state.lead, tests=state.tests,
-                mark=mark_lines(path),
+                mark=mark_lines(path), start_notice=state.notice,
                 # A patient with an approved note gets the list and the switch, on by default (ruling 3; D25).
                 earlier=earlier_lines(notes), switch=bool(notes),
                 problem=state.problem, page_path=f"/consultations/start/{patient.id}")
@@ -214,7 +224,7 @@ def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, ear
     block = background.block_for(p.notes, patient.id, started_at, cid) if earlier_notes_shown else None
     consultation = Consultation(cid, patient, minutes, started_at, door, llm, p.consultations, p.audit,
                                 p.settings.data_folder, p.clock, on_stop=p.finaliser, notes=p.notes, converter=p.converter,
-                                background=block, guidelines=p.guidelines)
+                                background=block, guidelines=p.guidelines, whole=p.whole)
     consultation.on_final = _on_final(p)
     p.running[cid] = consultation
     p.audit.record("consultation.started", f"consultation {cid}, patient {patient.id}, {minutes} minutes")

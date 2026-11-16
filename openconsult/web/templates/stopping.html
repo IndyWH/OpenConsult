@@ -4,6 +4,31 @@
 <h1 class="page">{{ words.STOPPING_TITLE }}</h1>
 {% if asking %}
 {% include "who_spoke.html" %}
+{% elif pressing %}
+{# After a lost connection (15.13, ruling 29): the stretch with no transcript, the lines of ruling 33, and two presses.
+   Nothing is sent unless the doctor presses the first; the page waits. #}
+<div class="pane"><div class="pane-body" id="lost-question">
+  <p class="statement"><b>{{ patient.name }}</b></p>
+  <h2 class="question">{{ words.LOST_TITLE }}</h2>
+  {% for line in lost %}<p class="failed lost-stretch">{{ line }}</p>{% endfor %}
+  <div class="statement-to-tick" id="statement-at-the-press">
+    <h3>{{ at_the_press.heading }}</h3>
+    <p>{{ at_the_press.intro }}</p>
+    <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
+    <ul class="panel-list">{% for line in at_the_press.sent %}<li>{{ line }}</li>{% endfor %}</ul>
+    <h4>{{ words.CLOUD_STAYS_HEADING }}</h4>
+    <ul class="panel-list">{% for line in at_the_press.stays %}<li>{{ line }}</li>{% endfor %}</ul>
+    {% for heading, lines in at_the_press.parts %}<h4>{{ heading }}</h4>
+    <ul class="panel-list">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endfor %}
+    <p class="statement">{{ at_the_press.prototype }}</p>
+  </div>
+  <form method="post" action="/consultations/{{ consultation.id }}/whole">
+    <input type="hidden" name="sha256" value="{{ at_the_press.sha256 }}">
+    <button class="primary" id="send-whole" name="send" value="yes" aria-describedby="send-whole-refusal">{{ words.SEND_WHOLE }}</button>
+    <button id="go-on-without" name="send" value="no">{{ words.GO_ON_WITHOUT }}</button>
+    <p class="refusal" id="send-whole-refusal" role="alert">{% if refused and refused.control == "send-whole" %}{{ refused.message }}{% endif %}</p>
+  </form>
+</div></div>
 {% else %}
 <div class="pane"><div class="pane-body">
   <p class="statement"><b>{{ patient.name }}</b></p>

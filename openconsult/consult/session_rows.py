@@ -52,6 +52,24 @@ class SessionRows:
                                   (consultation_id, way, self._now(), file_name, int(size)))
         return int(cursor.lastrowid)
 
+    def note_upload_job(self, consultation_id: int, job_id: str) -> None:
+        """The job's name at the service, written the moment the service
+        takes the recording, so that a delete can be asked whatever follows."""
+        self._db.execute("UPDATE recording_upload SET job_id = ? WHERE consultation_id = ?", (job_id, consultation_id))
+
+    def replace_transcript_lines(self, consultation_id: int, rows: list[dict]) -> None:
+        """The final transcript made anew from a recording sent whole: the
+        lines at Stop give way to the service's, in one transaction. The
+        live lines are another table and stay as what was heard live."""
+        with self._db.transaction() as con:
+            con.execute("DELETE FROM transcript_line WHERE consultation_id = ?", (consultation_id,))
+            for row in rows:
+                con.execute(
+                    "INSERT INTO transcript_line (consultation_id, n, line_id, start_s, end_s, text, confidence, raw_speaker, "
+                    "label, changed_by_check, revised_by_service, unsure, refused, session) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, 0, ?, 0, ?)",
+                    (consultation_id, row["n"], row.get("line_id"), row["start_s"], row["end_s"], row["text"], row.get("confidence"),
+                     row.get("raw_speaker"), row["label"], int(bool(row.get("unsure"))), int(row.get("session") or 1)))
+
     def end_upload(self, consultation_id: int, job_id: str | None, seconds_to_result: float | None, counted_s: float | None,
                    applied: dict | None, delete_answer: dict | None, asked_again: list, gone: bool | None, proof: str | None,
                    failure: str | None, result: bool) -> None:

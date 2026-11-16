@@ -13,6 +13,7 @@ import asyncio
 
 from openconsult.consult import opus, retention, stop
 from openconsult.consult.who_check import WhoChecks
+from openconsult.consult.whole import WholeRecording
 from openconsult.consult.consultations import Consultations
 from openconsult.consult.letter_rows import Letters
 from openconsult.consult.note_rows import Notes
@@ -38,7 +39,7 @@ from openconsult.settings import room
 from openconsult.settings.connections import Connections
 from openconsult.settings.decisions import Decisions, converter_element, language_model_element
 from openconsult.settings.machine import Machine, read_machine
-from openconsult.settings.path import CLAUDE, THIS_COMPUTER
+from openconsult.settings.path import CLAUDE, SPEECHMATICS, THIS_COMPUTER
 from openconsult.settings.secure import SystemStore
 from openconsult.settings.store import Settings
 from openconsult.settings.stored import Stored
@@ -59,6 +60,14 @@ def make_claude_engine(key: str):
     puts an engine in this function's place that fails a test which would
     call the real service."""
     return ClaudeEngine(key=key)
+
+
+def default_upload_send():
+    """How a recording is sent after Stop: none named here, so the upload's
+    own sender to the service's EU address stands. The suite puts a
+    sender in this function's place that fails a test which would reach
+    the real service."""
+    return None
 
 
 def default_testers() -> dict:
@@ -99,6 +108,7 @@ class Parts:
     connections: Connections = None                # the key in use and the last test of each cloud service (9b)
     calls: ModelCalls = None                       # the record of every model call
     claude_doors: ClaudeDoors = None               # the door to Claude with the key in use (9b)
+    whole: WholeRecording = None                   # the sender of a recording after Stop, with the key in use (9b)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -120,7 +130,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
               engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None, card_programs: Callable | None = None,
               find_converter: Callable | None = None, embedder=None, secure_store=None, testers: dict | None = None,
-              claude_engine: Callable | None = None) -> FastAPI:
+              claude_engine: Callable | None = None, upload_send: Callable | None = None) -> FastAPI:
     """engines, speech, doors, card_programs, find_converter, embedder and
     secure_store are passed in by tests, and testers, the tests of the
     two cloud connections, so the suite needs no vLLM, no Ollama, no
@@ -185,6 +195,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         connections=connections,
         calls=calls,
         claude_doors=claude_doors,
+        whole=WholeRecording(lambda: connections.key(SPEECHMATICS), upload_send or default_upload_send()),
         sources=sources,
         embedder=embedder,
         guidelines=Guidelines(sources, Index(sources), embedder, door, audit, door_for=lambda cid: parts.door_for(cid)),

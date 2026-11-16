@@ -21,6 +21,7 @@
 <p class="statement print-keep"><b>{{ ran_with.name }}</b> <span class="mark">{{ date }}</span></p>
 <p class="mark no-print" id="ran-with">{{ words.RAN_WITH }} {{ ran_with.name }}, {{ ran_with.born }}, {{ ran_with.sex }}. <a href="/patients/{{ patient.id }}">{{ words.PATIENTS_PAGE_LINK }}</a>{% if ran_with.corrected %}<br>{{ ran_with.corrected }}{% endif %}</p>
 {% if mark %}<div class="no-print">{{ cloud_mark(mark) }}</div>{% endif %}
+{% if recording_sent %}<p class="mark no-print" id="recording-sent">{{ recording_sent }}</p>{% endif %}
 
 {# One: the draft note (ruling 11). #}
 <section class="pane note print-keep" id="note">

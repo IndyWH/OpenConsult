@@ -26,6 +26,7 @@
     <button class="primary" id="start" aria-describedby="start-refusal" {% if problem %}disabled{% endif %}>{{ words.START }}</button>
     <p class="refusal" id="start-refusal" role="alert">{% if refused and refused.control == "start" %}{{ refused.message }}{% elif problem %}{{ problem }}{% endif %}</p>
     {% if problem and lead %}<p id="start-lead"><a href="{{ lead[0] }}">{{ lead[1] }}</a></p>{% endif %}
+    {% if start_notice and not problem %}<p class="failed" id="start-notice">{{ start_notice }}</p>{% endif %}
   </div>
 </form>
 {% endblock %}

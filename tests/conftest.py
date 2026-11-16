@@ -96,6 +96,12 @@ def r18_guard(tmp_path, monkeypatch):
             super().__init__("https://api.anthropic.com")
 
     monkeypatch.setattr(app_module, "make_claude_engine", NoRealClaude)
+
+    # And no recording ever leaves a test: an app built without naming its sender gets one that fails the test.
+    def refuse_real_upload(method, url, headers, body):
+        pytest.fail("a test sent a recording to a real service")
+
+    monkeypatch.setattr(app_module, "default_upload_send", lambda: refuse_real_upload)
     import keyring
 
     def refuse_real_store(*args, **kwargs):
