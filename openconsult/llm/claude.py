@@ -82,6 +82,19 @@ def thinking_off(tag: str) -> dict:
     return dict(THINKING_OFF_FOR.get(tag, THINKING_OFF))
 
 
+# The test of a connection (7.2): one very small message. Its words are words a model reads, and they are the
+# owner's (15.8, ruling 1; his word of 16 Nov 2026): sent by the test of the connection alone, and by nothing else.
+TEST_WORDS = "Connection test. Reply with OK."
+TEST_MAX_TOKENS = 8
+TEST_JOB = "connection_test"
+
+
+def test_request(tag: str) -> dict:
+    """The request of the test, in full: no system message and no form."""
+    return {"model": tag, "max_tokens": TEST_MAX_TOKENS, "messages": [{"role": "user", "content": TEST_WORDS}],
+            "thinking": thinking_off(tag)}
+
+
 class ClaudeEngine:
     name = "claude"
 
@@ -195,6 +208,15 @@ class ClaudeEngine:
 
     def did_not_fit(self, status: int, text: str) -> bool:
         return status == 400 and "too long" in text.lower()
+
+    def test(self, tag: str, timeout_s: float) -> tuple[int, str, str]:
+        """The test of the connection for one model: the status, the reply
+        and the request as sent. The reply's words are not read by anyone:
+        an answer of 200 says the key is taken, the account can pay for a
+        call today and the model answers under this name."""
+        sent = encode(test_request(tag))
+        status, text, _ = self._exchange("/v1/messages", sent, timeout_s)
+        return status, text, sent.decode("utf-8")
 
     # ------------------------------------------------------------ the identity
 

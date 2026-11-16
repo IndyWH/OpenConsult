@@ -214,6 +214,17 @@ class Door:
                      dict(reply.get("seconds") or {}), revisions=revisions,
                      speakers={"open": self._speakers_at_open, "stop": speakers}, notes=dict(reply.get("notes") or {}))
 
+    def end(self) -> None:
+        """Close the open session at once, with nothing asked of it and no
+        sound sent: the worker closes its connection to the service. For
+        the test of a connection (7.2), which opens a session and ends it."""
+        session, self._session = self._session, None
+        if session is not None and self._worker is not None:
+            try:
+                self._worker.request({"type": "close", "session": session})
+            except WorkerGone:
+                pass
+
     def close(self) -> None:
         self._session = None
         if self._worker is not None:

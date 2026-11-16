@@ -837,6 +837,9 @@ SERVICE_DOWN = "{service} is not answering. Try again later."
 LIMIT_REACHED = "{service} refused to start: a limit on the account was reached."
 ADDRESS_REFUSED = "{detail} is not the EU address of {service}, so nothing was sent to it."
 CONNECTION_LOST = "The connection to {service} was lost. Nothing more was sent, and the session has ended."
+# The test of a connection (7.2; run 9b): the two services by name, and the one reason the speech door has no word for. Drafts.
+SERVICE_TITLES = {"claude": "Claude", "speechmatics": "Speechmatics"}
+TOO_SLOW = "{service} did not answer within {seconds} seconds. Try again."
 DOOR_SPEAKERS_NEEDED = "This speech choice must be told the number of speakers when the session opens."
 # This machine: one line for each choice (15.9). Drafts.
 ROW_NEMOTRON = "Nemotron"
