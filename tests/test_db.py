@@ -362,7 +362,7 @@ def test_6_5_a_version_9_database_with_its_drug_marks_comes_forward_to_10(tmp_pa
     old.close()
     monkeypatch.undo()
     new = open_database(path)
-    assert new.version() == 10 == schema.VERSION
+    assert new.version() >= 10          # 9b's version 11 comes with it, as the version 4 test allows for 5
     marks = [dict(r) for r in new.query("SELECT * FROM drug_mark ORDER BY id")]
     assert [(m["heard"], m["standing"], m["settled_at"], m["heard_first"], m["heard_last"], m["cleared_at"]) for m in marks] == [
         ("made up", "made up", None, 1, 2, None), ("up made", "up made", None, 3, 3, None), ("gone", "gone", None, 5, 5, "t9")]

@@ -48,6 +48,8 @@ ROW_DELETIONS = (
     ("drug_name_calls", "DELETE FROM drug_name_call WHERE consultation_id = ?"),
     ("check_changes", "DELETE FROM speaker_check_change WHERE check_id IN (SELECT id FROM speaker_check WHERE consultation_id = ?)"),
     ("check_runs", "DELETE FROM speaker_check WHERE consultation_id = ?"),
+    ("speech_sessions", "DELETE FROM speech_session WHERE consultation_id = ?"),
+    ("recordings_sent", "DELETE FROM recording_upload WHERE consultation_id = ?"),
     ("lines", "DELETE FROM transcript_line WHERE consultation_id = ?"),
     ("live_lines", "DELETE FROM live_line WHERE consultation_id = ?"),
     ("warnings", "DELETE FROM warning WHERE consultation_id = ?"),
@@ -56,6 +58,9 @@ ROW_DELETIONS = (
     ("model_calls", "DELETE FROM model_call WHERE consultation_id = ?"),
     ("consultation", "DELETE FROM consultation WHERE id = ?"),
 )
+
+
+WHEN_ANY = ("speech_sessions", "recordings_sent")
 
 
 @dataclass(frozen=True)
@@ -69,7 +74,10 @@ class Deleted:
 
     def line(self) -> str:
         """The audit line: numbers only, never words."""
-        parts = ", ".join(f"{self.counts[name]} {name.replace('_', ' ')}" for name, _ in ROW_DELETIONS if name != "consultation")
+        # The rows of run 9b are named only where a consultation has any: a consultation whose connection was never
+        # lost and whose recording was never sent has none, and its line reads as it always did.
+        parts = ", ".join(f"{self.counts[name]} {name.replace('_', ' ')}" for name, _ in ROW_DELETIONS
+                          if name != "consultation" and (name not in WHEN_ANY or self.counts[name]))
         file_part = f"1 recording file, {self.file_bytes} bytes" if self.file_name else "no recording file"
         return f"patient {self.patient_id}, consultation {self.consultation_id} of {self.date}: {parts}, {file_part}"
 

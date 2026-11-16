@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 10
+VERSION = 11
 
 MIGRATIONS = {
     1: """
@@ -574,5 +574,57 @@ ALTER TABLE drug_mark ADD COLUMN heard_first INTEGER NOT NULL DEFAULT 0;
 ALTER TABLE drug_mark ADD COLUMN heard_last INTEGER NOT NULL DEFAULT 0;
 UPDATE drug_mark SET heard_first = first_line,
     heard_last = COALESCE((SELECT MAX(json_extract(j.value, '$.line')) FROM json_each(drug_mark.places) AS j), first_line);
+""",
+    # Run 9b (spec 15.13, the details of the run: The record; rulings 5, 29 and 33; 7.3): the path a consultation
+    # started with, where its language model and its transcription ran and whether its recording is sent after
+    # Stop, with the checksum of the cloud statement that stood ticked; the speech sessions of a consultation whose
+    # connection was lost, each with the second of the recording at which it opened and was lost, and that
+    # session's own answer to which speaker was you; the session of every line; the recording sent after Stop,
+    # with the job's name at the service, the delete and its proof, and never a key; and the first-run steps left
+    # with Not now. The two settings and the tick are rows of the setting table, which needs no change. A version
+    # 10 folder comes forward with every row: an older consultation reads this computer for both, and every line
+    # of it is of session 1.
+    11: """
+ALTER TABLE consultation ADD COLUMN language_model_path TEXT NOT NULL DEFAULT 'this_computer';
+ALTER TABLE consultation ADD COLUMN transcription_path TEXT NOT NULL DEFAULT 'this_computer';
+ALTER TABLE consultation ADD COLUMN better_accuracy INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE consultation ADD COLUMN statement_sha256 TEXT;
+ALTER TABLE live_line ADD COLUMN session INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE transcript_line ADD COLUMN session INTEGER NOT NULL DEFAULT 1;
+
+CREATE TABLE speech_session (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL REFERENCES consultation(id),
+    n INTEGER NOT NULL,
+    opened_at_s REAL NOT NULL,
+    lost_at_s REAL,
+    reason TEXT,
+    doctor_speaker TEXT,
+    UNIQUE (consultation_id, n)
+);
+
+CREATE TABLE recording_upload (
+    id INTEGER PRIMARY KEY,
+    consultation_id INTEGER NOT NULL UNIQUE REFERENCES consultation(id),
+    way TEXT NOT NULL CHECK (way IN ('tick', 'press')),
+    sent_at TEXT NOT NULL,
+    file_name TEXT NOT NULL,
+    bytes INTEGER NOT NULL,
+    job_id TEXT,
+    result_at TEXT,
+    seconds_to_result REAL,
+    counted_s REAL,
+    applied TEXT,
+    delete_answer TEXT,
+    asked_again TEXT,
+    gone INTEGER,
+    proof TEXT,
+    failure TEXT
+);
+
+CREATE TABLE first_run_left (
+    step TEXT PRIMARY KEY,
+    left_at TEXT NOT NULL
+);
 """,
 }

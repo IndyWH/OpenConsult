@@ -14,6 +14,7 @@ import json
 from dataclasses import asdict
 
 from openconsult.consult.check_rows import CheckRows
+from openconsult.consult.session_rows import SessionRows
 from openconsult.db import Database
 from openconsult.patients.audit import Clock, now_local
 from openconsult.speech.lines import Line
@@ -29,7 +30,7 @@ SETTABLE = ("stopped_at", "final_at", "speech_stamp", "echo_cancellation", "nois
 FORMATS = ("wav", "opus")
 
 
-class Consultations(CheckRows):
+class Consultations(CheckRows, SessionRows):
     def __init__(self, db: Database, clock: Clock = now_local):
         self._db = db
         self._clock = clock
@@ -41,12 +42,16 @@ class Consultations(CheckRows):
 
     def start(self, patient_id: int, intended_minutes: int, speech_choice: str, engine: str,
               engine_version: str | None, model_tag: str, model_digest: str | None, speakers_given: int,
-              earlier_notes_shown: bool | None = None, earlier_notes: list[int] | None = None) -> int:
+              earlier_notes_shown: bool | None = None, earlier_notes: list[int] | None = None, path=None,
+              statement_sha256: str | None = None) -> int:
         """The row at Start. The patient's three details are copied as they
         stand at this moment, so the consultation keeps what the doctor saw
         and the model read whatever is corrected later (15.11 ruling 2;
         R11; R17). earlier_notes_shown is the switch of ruling 3: None where
-        no switch was offered; earlier_notes the numbers listed at Start."""
+        no switch was offered; earlier_notes the numbers listed at Start.
+        path is the path the consultation starts with and holds to its end
+        (7.3; 9b), with the checksum of the cloud statement that stands
+        ticked for it; with none given, this computer for both."""
         patient = self._db.query_one("SELECT name, date_of_birth, sex FROM patient WHERE id = ?", (patient_id,))
         if patient is None:
             raise ValueError(f"no patient {patient_id}")
@@ -58,6 +63,11 @@ class Consultations(CheckRows):
              model_digest, int(speakers_given), patient["name"], patient["date_of_birth"], patient["sex"],
              None if earlier_notes_shown is None else int(bool(earlier_notes_shown)),
              json.dumps(list(earlier_notes or []))))
+        if path is not None:
+            self._db.execute("UPDATE consultation SET language_model_path = ?, transcription_path = ?, better_accuracy = ?, "
+                             "statement_sha256 = ? WHERE id = ?",
+                             (path.language_model, path.transcription, int(path.recording_after_stop), statement_sha256,
+                              int(cursor.lastrowid)))
         return int(cursor.lastrowid)
 
     def get(self, consultation_id: int) -> dict | None:
@@ -97,12 +107,12 @@ class Consultations(CheckRows):
 
     # -------------------------------------------------------- the live lines
 
-    def add_live_line(self, consultation_id: int, n: int, line: Line, refused: bool, shown_at_s: float) -> None:
+    def add_live_line(self, consultation_id: int, n: int, line: Line, refused: bool, shown_at_s: float, session: int = 1) -> None:
         self._db.execute(
             "INSERT INTO live_line (consultation_id, n, line_id, speaker, start_s, end_s, text, confidence, refused, "
-            "shown_at_s) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            "shown_at_s, session) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
             (consultation_id, n, line.id, line.speaker, line.start, line.end, line.text, line.confidence,
-             1 if refused else 0, shown_at_s))
+             1 if refused else 0, shown_at_s, int(session)))
 
     def live_lines(self, consultation_id: int) -> list[dict]:
         rows = self._db.query("SELECT * FROM live_line WHERE consultation_id = ? ORDER BY n", (consultation_id,))
@@ -112,16 +122,18 @@ class Consultations(CheckRows):
 
     def add_transcript_lines(self, consultation_id: int, rows: list[dict]) -> None:
         """Each row: n, line_id, start_s, end_s, text, confidence, raw_speaker,
-        label, changed_by_check, revised_by_service, unsure, refused."""
+        label, changed_by_check, revised_by_service, unsure, refused; and
+        its speech session, 1 where none is given."""
         for row in rows:
             if row["label"] not in LABELS:
                 raise ValueError(f"not a label: {row['label']}")
             self._db.execute(
                 "INSERT INTO transcript_line (consultation_id, n, line_id, start_s, end_s, text, confidence, raw_speaker, "
-                "label, changed_by_check, revised_by_service, unsure, refused) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "label, changed_by_check, revised_by_service, unsure, refused, session) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (consultation_id, row.get("n"), row.get("line_id"), row["start_s"], row["end_s"], row["text"],
                  row.get("confidence"), row.get("raw_speaker"), row["label"], int(bool(row.get("changed_by_check"))),
-                 int(bool(row.get("revised_by_service"))), int(bool(row.get("unsure"))), int(bool(row.get("refused")))))
+                 int(bool(row.get("revised_by_service"))), int(bool(row.get("unsure"))), int(bool(row.get("refused"))),
+                 int(row.get("session") or 1)))
 
     def transcript_lines(self, consultation_id: int) -> list[dict]:
         rows = self._db.query("SELECT * FROM transcript_line WHERE consultation_id = ? ORDER BY id", (consultation_id,))

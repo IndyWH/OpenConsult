@@ -1,0 +1,75 @@
+"""The rows of run 9b (spec 15.13, the details of the run: The record;
+rulings 29 and 33): the speech sessions of a consultation whose
+connection was lost, and the recording sent after Stop. A part of the
+consultation's rows (consultations.py), kept apart for its size.
+
+A consultation whose one session was never lost has no session row:
+every line of it is of session 1. The rows begin when a session is
+lost: the session that was lost, then each later one as it opens. Each
+holds the second of the recording at which it opened and was lost, why,
+and its own answer to which speaker was you, because a service names
+its speakers afresh in every session.
+
+The recording sent after Stop has one row for a consultation: when it
+was sent and by which of the two ways, the job's name at the service,
+when the result came, the delete's answer and each answer when the job
+was asked for again. Never a key."""
+
+from __future__ import annotations
+
+import json
+
+WAYS = ("tick", "press")
+
+
+class SessionRows:
+    """Mixed into Consultations, which gives _db and _now."""
+
+    # ------------------------------------------------------ the speech sessions
+
+    def add_session(self, consultation_id: int, n: int, opened_at_s: float) -> None:
+        self._db.execute("INSERT OR IGNORE INTO speech_session (consultation_id, n, opened_at_s) VALUES (?, ?, ?)",
+                         (consultation_id, int(n), float(opened_at_s)))
+
+    def lose_session(self, consultation_id: int, n: int, lost_at_s: float, reason: str) -> None:
+        self._db.execute("UPDATE speech_session SET lost_at_s = ?, reason = ? WHERE consultation_id = ? AND n = ? AND lost_at_s IS NULL",
+                         (float(lost_at_s), reason, consultation_id, int(n)))
+
+    def answer_session(self, consultation_id: int, n: int, doctor_speaker: str) -> None:
+        self._db.execute("UPDATE speech_session SET doctor_speaker = ? WHERE consultation_id = ? AND n = ?",
+                         (doctor_speaker, consultation_id, int(n)))
+
+    def sessions(self, consultation_id: int) -> list[dict]:
+        rows = self._db.query("SELECT * FROM speech_session WHERE consultation_id = ? ORDER BY n", (consultation_id,))
+        return [dict(r) for r in rows]
+
+    # ------------------------------------------- the recording sent after Stop
+
+    def add_upload(self, consultation_id: int, way: str, file_name: str, size: int) -> int:
+        if way not in WAYS:
+            raise ValueError(f"not a way the recording is sent: {way}")
+        cursor = self._db.execute("INSERT INTO recording_upload (consultation_id, way, sent_at, file_name, bytes) VALUES (?, ?, ?, ?, ?)",
+                                  (consultation_id, way, self._now(), file_name, int(size)))
+        return int(cursor.lastrowid)
+
+    def end_upload(self, consultation_id: int, job_id: str | None, seconds_to_result: float | None, counted_s: float | None,
+                   applied: dict | None, delete_answer: dict | None, asked_again: list, gone: bool | None, proof: str | None,
+                   failure: str | None, result: bool) -> None:
+        """What came of it, written once: the result's moment when one came,
+        the delete and its proof, the failure in plain words if any."""
+        self._db.execute(
+            "UPDATE recording_upload SET job_id = ?, result_at = ?, seconds_to_result = ?, counted_s = ?, applied = ?, "
+            "delete_answer = ?, asked_again = ?, gone = ?, proof = ?, failure = ? WHERE consultation_id = ?",
+            (job_id, self._now() if result else None, seconds_to_result, counted_s,
+             json.dumps(applied, ensure_ascii=False) if applied is not None else None,
+             json.dumps(delete_answer, ensure_ascii=False) if delete_answer is not None else None,
+             json.dumps(asked_again, ensure_ascii=False), None if gone is None else int(bool(gone)), proof, failure, consultation_id))
+
+    def upload(self, consultation_id: int) -> dict | None:
+        row = self._db.query_one("SELECT * FROM recording_upload WHERE consultation_id = ?", (consultation_id,))
+        if row is None:
+            return None
+        found = dict(row)
+        for name in ("applied", "delete_answer", "asked_again"):
+            found[name] = json.loads(found[name]) if found[name] else None
+        return found
