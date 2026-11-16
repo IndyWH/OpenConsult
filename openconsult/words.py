@@ -37,7 +37,7 @@ ROW_GUIDELINE_SEARCH = "Guideline search"
 ROW_SPEECH_CHOICE = "Speech choice"
 # The decisions of the start (15.8, rulings 36 to 38): one sentence for
 # each, with the reason in words and no figures. Drafts for the owner.
-ENGINE_NAMES = {"vllm": "vLLM", "ollama": "Ollama"}
+ENGINE_NAMES = {"vllm": "vLLM", "ollama": "Ollama", "claude": "Claude"}
 UNFIT = {
     "no_answer": "{engine} did not answer at its address",
     "no_model": "{engine} is running but does not hold Gemma 4 QAT",
@@ -631,7 +631,7 @@ CALLS_HEADING = "The calls, in time order"
 CALL_KINDS = {"alarm": "pass {n}, the alarm", "assessment": "pass {n}, the assessment", "label_check": "the check of who spoke",
               "drug_name": "the check of drug names",
               "note": "note draft {n}, {asked}", "referrals": "the referral list", "letter": "letter {n}, {specialty}",
-              "guideline": "guideline summary after pass {n}"}
+              "guideline": "guideline summary after pass {n}", "connection_test": "the test of the connection to Claude, at Start"}
 CALL_CHECK_PART = "the check of who spoke, part {n} of {parts}"
 CALL_ASKED_BY = {"stop": "at Stop", "draft": "by Draft the note", "again": "by Draft again"}
 CALL_UNKNOWN_KIND = "a call of the job {job}"
@@ -645,7 +645,7 @@ CALL_FAILURE = "Failure: {detail}"
 CALL_TOKENS = "Tokens: {read} read, {written} written."
 KIND_WORDS = {"alarm": "alarm", "assessment": "assessment", "guideline": "guideline summary", "label_check": "check of who spoke",
               "drug_name": "check of drug names",
-              "note": "note", "referrals": "referral list", "letter": "letter"}
+              "note": "note", "referrals": "referral list", "letter": "letter", "connection_test": "test of the connection"}
 WENT_IN_HEADING = "What went in, by source"
 SOURCE_LABELS = {"patient_line": "The patient line, written by code from the details the consultation ran with",
                  "background": "The background block: the earlier approved notes, as background",
@@ -657,11 +657,14 @@ SOURCE_LABELS = {"patient_line": "The patient line, written by code from the det
                  "note_lines": "The note lines as sent, from the approved note",
                  "specialty": "The specialty, from the referral item",
                  "query": "The query, from the top two differentials",
-                 "passages": "The passages sent, from the loaded guidelines, each with its source"}
+                 "passages": "The passages sent, from the loaded guidelines, each with its source",
+                 "test_words": "The words of the test of the connection, the same every time"}
 PASSAGE_SENT = "[{n}] {title}, {publisher}{trail}; similarity {similarity}{cited}"
 PASSAGE_TRAIL = ": {trail}"
 PASSAGE_CITED = "; cited"
 CAME_BACK_HEADING = "What came back, word for word"
+# A call to Claude (15.13, ruling 16). A draft, for the owner to correct.
+CALL_CLAUDE_ADDS = "Claude adds an instruction of its own for the form of the reply. Its words are not published, so they are not shown here."
 # The drug-name call's reply (15.10 rulings 6 and 23). Drafts, for the owner to correct.
 DRUG_NAMED_NOT_SHOWN = "The drug the model named is kept in the record and is not shown on this page."
 DRUG_REPLY_NOT_SHOWN = "The reply could not be read as its form, so it is not shown on this page. It is kept in the record."

@@ -21,7 +21,7 @@ from datetime import datetime
 from openconsult.consult import drug_marks, labels, note as note_module, referral_note
 from openconsult.consult.messages import Patient, alarm_message, assessment_message, patient_line, with_background, with_patient
 from openconsult.guidelines import summary
-from openconsult.llm.jobs import JOBS
+from openconsult.llm.jobs import JOBS, TEST_JOB
 from openconsult.prompts import loader
 
 WITH_PATIENT = ("alarm", "assessment", "referrals", "letter", "guideline")
@@ -97,6 +97,11 @@ def answer_of(reply: str | None) -> str | None:
     except ValueError:
         return reply
     if isinstance(body, dict):
+        blocks = body.get("content")
+        if isinstance(blocks, list):      # the Messages API (Claude, 9b): the text blocks of the reply, joined
+            texts = [b.get("text", "") for b in blocks if isinstance(b, dict) and b.get("type") == "text"]
+            if texts:
+                return "".join(texts)
         choices = body.get("choices")
         if isinstance(choices, list) and choices and isinstance(choices[0], dict):
             content = (choices[0].get("message") or {}).get("content")
@@ -334,6 +339,9 @@ def read_parts(kind: str, user: str, row: dict, call: dict, reference: dict | No
         return read_note_call(kind, user, row, call, reference)
     if kind == "guideline":
         return read_guideline_call(user, row, call, reference)
+    if kind == TEST_JOB:
+        # The test of the connection made at Start (7.2; 9b): its few words are all that was sent.
+        return [Part("test_words", user)], None
     return [], UNKNOWN_JOB
 
 

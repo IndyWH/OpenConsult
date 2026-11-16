@@ -42,6 +42,7 @@
     <details class="call" id="call-{{ c.id }}" data-kind="{{ c.kind }}">
       <summary>{{ c.line }}</summary>
       <p class="mark">{{ c.model }}</p>
+      {% if c.service_adds %}<p class="mark" id="service-adds-{{ c.id }}">{{ c.service_adds }}</p>{% endif %}
       {% if c.search %}<p class="mark">{{ c.search }}</p>{% endif %}
       {% if c.no_row %}<p class="mark">{{ c.no_row }}</p>{% endif %}
       {% if c.failure %}<p class="failed">{{ c.failure }}</p>{% endif %}

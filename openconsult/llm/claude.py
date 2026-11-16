@@ -31,6 +31,7 @@ from typing import Callable
 
 from openconsult.llm.cloud import own_address
 from openconsult.llm.engine import Call, EngineStatus, EngineTimeout, EngineUnreachable, Reply
+from openconsult.llm.jobs import TEST_JOB  # noqa: F401  (the name the record gives the test of a connection)
 from openconsult.llm.ollama import encode
 
 ADDRESS = "https://api.anthropic.com"
@@ -86,7 +87,6 @@ def thinking_off(tag: str) -> dict:
 # owner's (15.8, ruling 1; his word of 16 Nov 2026): sent by the test of the connection alone, and by nothing else.
 TEST_WORDS = "Connection test. Reply with OK."
 TEST_MAX_TOKENS = 8
-TEST_JOB = "connection_test"
 
 
 def test_request(tag: str) -> dict:

@@ -98,6 +98,11 @@ JOBS = {
 }
 
 
+# The one call to a model that is no job of the table: the test of a connection to a cloud model (7.2; run 9b).
+# It has no prompt file, no form and no frame; the record names its rows by this word.
+TEST_JOB = "connection_test"
+
+
 def job(name: str) -> Job:
     try:
         return JOBS[name]

@@ -16,6 +16,7 @@ from fastapi import APIRouter, Depends, Request
 
 from openconsult import words
 from openconsult.consult import seen as seen_module, timeline
+from openconsult.llm.jobs import TEST_JOB
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import render
@@ -73,7 +74,10 @@ def call_row(found: seen_module.Seen) -> dict:
                 time=time_of(call["at"]), kind=kind_words(found.name), seconds=f"{call['wall_ms'] / 1000:.2f}", outcome=outcome),
             "model": words.LETTER_MODEL_LINE.format(model=call["model_tag"], engine=words.ENGINE_NAMES.get(call["engine"], call["engine"]),
                                                     version=call["engine_version"] or ""),
-            "no_row": None if found.name["referenced"] else words.CALL_NO_ROW,
+            # A call to Claude that carries a form: the service adds an instruction of its own, whose words the app
+            # neither writes nor can read (15.13, ruling 16). The test of a connection carries no form.
+            "service_adds": words.CALL_CLAUDE_ADDS if call["engine"] == "claude" and found.kind != TEST_JOB else None,
+            "no_row": None if found.name["referenced"] or found.kind == TEST_JOB else words.CALL_NO_ROW,
             "search": words.CALL_SEARCH_MS.format(ms=found.name["search_ms"]) if "search_ms" in found.name else None,
             "failure": words.CALL_FAILURE.format(detail=call["detail"]) if call["outcome"] != "ok" and call["detail"] else None,
             "tokens": tokens, "prompt": prompt_line(found.prompt), "parts": part_rows(found), "taken_apart": found.taken_apart,
