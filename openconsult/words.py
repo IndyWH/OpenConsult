@@ -699,6 +699,7 @@ EVENTS = {
     "decision.whisperx_choice": "WhisperX choice judged at start",
     "decision.converter": "Recording converter found at start",
     "setting.changed": "Setting changed",
+    "statement.ticked": "Cloud statement ticked",
     "audio.deleted": "Recordings deleted by the retention sweep",
     "recording.converted": "Recording converted to Opus",
     "recording.conversion_failed": "Recording kept as WAV: conversion failed",
@@ -956,3 +957,82 @@ EMBED_WATCHED = "Watched {readings} readings. Written: {path}"
 EMBED_JUDGED = "Judged {setups} setups, {base} base lines of the language model and {wayround} ways round. Tables written to {folder}."
 EMBED_JUDGE_NEEDS_WRITE = "shared-judge needs --write, or --ask-wayround."
 EMBED_NO_FEED = "The feed never began: {file} did not appear. No search was made."
+
+# ---------------------------------------------------------------------------
+# Run 9b: the cloud statement (15.13, rulings 5, 31, 32 and 33). THE OWNER'S
+# WORDS, letter for letter; a test proves each against the spec's own text.
+# settings/statement.py builds the statement of a path from them, and a line
+# shows only when it is true for that path. The dates are part of the text.
+CLOUD_HEADING_BOTH = "Using cloud services"
+CLOUD_HEADING_MODEL = "Using a cloud language model"
+CLOUD_INTRO = "With this choice, part of the consultation leaves this computer."
+CLOUD_SENT_HEADING = "What is sent"
+CLOUD_SENT_SOUND = "The sound of the consultation, as it is spoken. It goes to the transcription service."
+CLOUD_SENT_WORDS = "The words spoken in the consultation. A name spoken aloud is among them. They go to the language model service."
+# Ruling 5: with transcription on this computer these words of the line above are left out.
+CLOUD_SENT_WORDS_GO = " They go to the language model service."
+CLOUD_SENT_AGE = "The patient's age and sex."
+CLOUD_SENT_EARLIER = "The earlier notes of a patient seen before, when they are switched on."
+CLOUD_SENT_NOTE = "The note, when a letter is drafted from it."
+CLOUD_SENT_PASSAGES = "Passages from your guideline documents, when the panel searches them."
+CLOUD_SENT_RECORDING = "The recording of the whole consultation, once, after you press Stop. It goes to the transcription service."
+CLOUD_STAYS_HEADING = "What stays on this computer"
+CLOUD_STAYS_NAME = "The patient's name and date of birth as you typed them."
+CLOUD_STAYS_RECORDING = "The recording."
+CLOUD_STAYS_APPROVED = "Everything you approve: notes and letters."
+CLOUD_CLAUDE_HEADING = "The language model service: Claude, from Anthropic"
+CLOUD_CLAUDE_LINES = (
+    "A company in the United States. A request may be handled on its computers in other countries too.",
+    "On 15 Nov 2026 its own pages said: what is sent and what comes back is deleted within 30 days, and is not used to train its "
+    "models without permission. Anything its safety systems flag may be kept for up to 2 years. OpenConsult cannot check this for you.",
+    "Two of its models are used. Claude Haiku works through the consultation and writes the note and the letters. Claude Sonnet is "
+    "asked once, at Stop, to mark drug names that may have been misheard.",
+    "You pay Anthropic for what you use. At the prices of 15 Nov 2026, a 15-minute consultation costs about 10 US cents.",
+)
+CLOUD_SPEECHMATICS_HEADING = "The transcription service: Speechmatics"
+CLOUD_SPEECHMATICS_LINES = (
+    "A company in the United Kingdom. OpenConsult sends the sound to its computers in the European Union, and to no others.",
+    "On 15 Nov 2026 its own pages said: live sound is never recorded or stored, and the words are discarded once they have been "
+    "sent back. OpenConsult cannot check this for you.",
+    "Speechmatics offers a lower price to an account that lets it train its models on what is sent. That is switched off unless you "
+    "switch it on. Leave it off.",
+    "You pay Speechmatics for what you use. A new account starts with 100 US dollars of credit and needs no card. At the prices of "
+    "15 Nov 2026, a 15-minute consultation costs about 20 US cents.",
+)
+# The third sentence of the last line above: the price of live sound. Where no live sound goes to Speechmatics the
+# line is shown without it, its first two sentences standing letter for letter (the owner's word, 16 Nov 2026).
+CLOUD_SPEECHMATICS_LIVE_COST = " At the prices of 15 Nov 2026, a 15-minute consultation costs about 20 US cents."
+CLOUD_SPEECHMATICS_WHOLE_KEPT = (
+    "On 15 Nov 2026 its own pages said: a recording that is sent whole is kept on its computers for 7 days, unless it is deleted "
+    "sooner. OpenConsult deletes it as soon as the transcript is back, and asks Speechmatics to confirm that it is gone. If that "
+    "fails, OpenConsult tells you."
+)
+CLOUD_SPEECHMATICS_WHOLE_COST = "At the prices of 15 Nov 2026, this costs about 19 US cents for a 15-minute consultation."
+CLOUD_PROTOTYPE = "OpenConsult is a research and education prototype. Acted consultations only. Never real patients."
+CLOUD_TICK_BOTH = "I understand that this sound and these words leave this computer."
+CLOUD_TICK_WORDS = "I understand that these words leave this computer."
+# The owner's words of 16 Nov 2026, brought with the review of the plan of run 9b (its points 6 and 7), letter for
+# letter: the heading and the tick of the two paths ruling 5 does not give, the cloud mark, the delete not proven.
+CLOUD_HEADING_TRANSCRIPTION = "Using a cloud transcription service"
+CLOUD_TICK_SOUND = "I understand that this sound leaves this computer."
+CLOUD_HEADING_RECORDING = "Sending the recording after Stop"
+CLOUD_TICK_RECORDING = "I understand that this recording leaves this computer after Stop."
+CLOUD_MARK = "Cloud"
+CLOUD_MARK_SOUND = "Sound goes to Speechmatics as it is spoken."
+CLOUD_MARK_WORDS = "Words go to Claude."
+CLOUD_MARK_RECORDING = "After Stop the recording goes to Speechmatics."
+UPLOAD_DELETE_NOT_PROVEN = (
+    "OpenConsult asked Speechmatics to delete the recording and could not confirm that it is gone. Its own pages say that it "
+    "deletes such a recording itself after 7 days."
+)
+# The connect screen for Claude (15.13, ruling 34): the owner's words, letter for letter.
+CONNECT_CLAUDE_TITLE = "Connect Claude"
+CONNECT_CLAUDE_LINES = (
+    "OpenConsult needs a key from the Claude Console. A Claude login cannot be used here: Anthropic does not let other apps use it.",
+    "If you pay for Claude Max, Ultra or a Team plan, your plan includes credit for this every month: 100 US dollars on Max 5x. "
+    "Link your plan to the Console once, on claude.ai under Settings, Billing. Then a consultation costs you nothing more until "
+    "that credit is used up.",
+    "On Claude Pro or the free plan there is no such credit. You buy credit in the Console. A 15-minute consultation costs about "
+    "10 US cents.",
+    "Get a key opens the Console. Paste the key here and press Test connection.",
+)
