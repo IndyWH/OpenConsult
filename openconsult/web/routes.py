@@ -271,10 +271,12 @@ async def logout(request: Request):
 # ---------------------------------------------------------------- settings
 
 NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED, "retention": words.RETENTION_SAVED,
-          "tested": words.CONNECTED, "removed": words.KEY_REMOVED}
+          "tested": words.CONNECTED, "removed": words.KEY_REMOVED, "path": words.PATH_SAVED, "ticked": words.SAVED}
 
 
-def _settings_page(request: Request, user, refused=None):
+def _settings_page(request: Request, user, refused=None, pending=None):
+    """pending: a change of the path that waits for its tick, drawn in its
+    own section with the statement of the path as it would then stand."""
     context = dict(user=user, active="settings", machine=parts(request).machine, models=model_line(request),
                    room=room_lines(request),
                    speech=speech_lines(request), choices=choice_lines(request),
@@ -282,7 +284,8 @@ def _settings_page(request: Request, user, refused=None):
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],
-                   to_tick=cloud_web.statement_view(parts(request), "/settings"))
+                   path_sections=cloud_web.path_sections(parts(request), pending),
+                   to_tick=None if pending else cloud_web.statement_view(parts(request), "/settings"))
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)
     return render(request, "settings.html", **context)

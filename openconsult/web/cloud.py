@@ -10,13 +10,14 @@ shown again after it is pasted."""
 from __future__ import annotations
 
 import asyncio
+import dataclasses
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Request
 
 from openconsult import words
 from openconsult.settings import connections, keys
-from openconsult.settings.path import CLAUDE
+from openconsult.settings.path import CLAUDE, LANGUAGE_MODELS, SPEECHMATICS, THIS_COMPUTER, TRANSCRIPTIONS
 from openconsult.settings.statement import statement_for
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
@@ -192,3 +193,69 @@ async def remove_key(request: Request, service: str, user=Depends(guards.logged_
     if not p.connections.remove(service):
         return routes._settings_page(request, user, (f"remove-{service}", words.KEY_NOT_IN_STORE))
     raise Redirect("/settings?done=removed#connections")
+
+
+# ----------------------------- the sections Language model and Transcription
+
+WHICH = {"language-model": ("language_model", LANGUAGE_MODELS), "transcription": ("transcription", TRANSCRIPTIONS)}
+CHOICE_WORDS = {THIS_COMPUTER: words.CHOICE_THIS_COMPUTER, CLAUDE: words.CHOICE_CLAUDE, SPEECHMATICS: words.CHOICE_SPEECHMATICS}
+
+
+def cannot_run_here(p, choice: str) -> str | None:
+    """Why this machine cannot run a choice, for the control itself (7.3,
+    rule 1): this computer's own models need a suitable card."""
+    return p.machine.sentence if choice == THIS_COMPUTER and p.machine.case != "suitable" else None
+
+
+def path_sections(p, pending: dict | None = None) -> list[dict]:
+    """The two sections as the page draws them: each choice with whether
+    it is the one in use, whether this machine can run it and why not;
+    and, for the section whose change waits for its tick, the statement
+    of the path as it would then stand."""
+    path = p.stored.path(p.machine.case)
+    found = []
+    for which, (field, choices) in WHICH.items():
+        waiting = pending if pending and pending["which"] == which else None
+        chosen = waiting["choice"] if waiting else getattr(path, field)
+        found.append({"which": which, "title": words.SECTION_LANGUAGE_MODEL if field == "language_model" else words.SECTION_TRANSCRIPTION,
+                      "choices": [{"value": c, "words": CHOICE_WORDS[c], "checked": c == chosen, "reason": cannot_run_here(p, c)}
+                                  for c in choices],
+                      "statement": waiting["made"] if waiting else None})
+    return found
+
+
+@router.post("/settings/path/{which}")
+async def save_path(request: Request, which: str, user=Depends(guards.logged_in)):
+    """One of the two settings. A choice this machine cannot run is
+    refused with its reason. A path with no cloud service in it is saved
+    at once. Any other is saved only when the cloud service newly chosen
+    is connected and the statement of the path as it would then stand is
+    ticked on this same form, for the text that was shown (7.3; ruling 5)."""
+    from openconsult.web import routes
+    p = parts(request)
+    if which not in WHICH:
+        raise Redirect("/settings")
+    field, choices = WHICH[which]
+    control = f"save-{which}"
+    fields = await form_fields(request)
+    choice = fields.get(field, "")
+    if choice not in choices:
+        return routes._settings_page(request, user, (control, words.PICK_ONE))
+    if cannot_run_here(p, choice):
+        return routes._settings_page(request, user, (control, cannot_run_here(p, choice)))
+    before = p.stored.path(p.machine.case)
+    after = dataclasses.replace(before, **{field: choice})
+    if choice != THIS_COMPUTER and not p.connections.connected(choice):
+        return routes._settings_page(request, user, (control, words.CONNECT_FIRST.format(service=words.SERVICE_TITLES[choice])))
+    made = statement_for(after)
+    if made is not None and not p.stored.ticked(made):
+        pending = {"which": which, "choice": choice, "made": made}
+        if fields.get("sha256") not in (None, made.sha256):
+            return routes._settings_page(request, user, (control, words.STATEMENT_CHANGED), pending)
+        if fields.get("understand") != "yes" or fields.get("sha256") != made.sha256:
+            return routes._settings_page(request, user, (control, words.STATEMENT_TICK_FIRST), pending)
+        p.stored.set_path(p.machine.case, after)
+        p.stored.tick_statement(made.sha256, after)
+    else:
+        p.stored.set_path(p.machine.case, after)
+    raise Redirect(f"/settings?done=path#{which}")

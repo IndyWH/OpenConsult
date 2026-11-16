@@ -9,6 +9,41 @@
   <div class="pane-body">{{ machine_rows(machine, models, room, speech, choices) }}</div>
 </section>
 
+{# Language model and Transcription (7.3): two choices each; one this machine cannot run is shown disabled with the
+   reason on the control; a change that needs the cloud statement shows it here, with its tick, before it is saved. #}
+{% for s in path_sections %}
+<section class="pane" id="{{ s.which }}">
+  <div class="pane-head"><h2>{{ s.title }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/settings/path/{{ s.which }}">
+      {% for c in s.choices %}
+      <label class="tick"><input type="radio" name="{{ s.which|replace('-', '_') }}" value="{{ c.value }}"{% if c.checked %} checked{% endif %}{% if c.reason %} disabled aria-describedby="{{ s.which }}-{{ c.value }}-reason"{% endif %}> {{ c.words }}</label>
+      {% if c.reason %}<p class="mark" id="{{ s.which }}-{{ c.value }}-reason">{{ c.reason }}</p>{% endif %}
+      {% endfor %}
+      <p class="mark">{{ words.PATH_NEXT_CONSULTATION }}</p>
+      {% if s.statement %}
+      <div class="statement-to-tick" id="statement-{{ s.which }}">
+        <h3>{{ s.statement.heading }}</h3>
+        <p>{{ s.statement.intro }}</p>
+        <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
+        <ul class="panel-list">{% for line in s.statement.sent %}<li>{{ line }}</li>{% endfor %}</ul>
+        <h4>{{ words.CLOUD_STAYS_HEADING }}</h4>
+        <ul class="panel-list">{% for line in s.statement.stays %}<li>{{ line }}</li>{% endfor %}</ul>
+        {% for heading, lines in s.statement.parts %}<h4>{{ heading }}</h4>
+        <ul class="panel-list">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endfor %}
+        <p class="statement">{{ s.statement.prototype }}</p>
+        <input type="hidden" name="sha256" value="{{ s.statement.sha256 }}">
+        <label class="tick"><input type="checkbox" name="understand" value="yes"> {{ s.statement.tick }}</label>
+      </div>
+      {% endif %}
+      <button class="primary" id="save-{{ s.which }}" aria-describedby="save-{{ s.which }}-refusal">{{ words.SAVE }}</button>
+      {{ refusal("save-" ~ s.which) }}
+      {% if notice == words.PATH_SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
+    </form>
+  </div>
+</section>
+{% endfor %}
+
 {# Connections (7.2; 7.3): each cloud service Connected or Not connected, with Test and Remove, and nothing of the key. #}
 <section class="pane" id="connections">
   <div class="pane-head"><h2>{{ words.SECTION_CONNECTIONS }}</h2></div>
