@@ -109,6 +109,8 @@ def r18_guard(tmp_path, monkeypatch):
 
     for name in ("get_keyring", "get_password", "set_password", "delete_password", "get_credential"):
         monkeypatch.setattr(keyring, name, refuse_real_store)
+    # A test that starts a fresh Python is outside those guards: the package's own switch for no store goes with it.
+    monkeypatch.setenv("PYTHON_KEYRING_BACKEND", "keyring.backends.null.Keyring")
 
 
 @pytest.fixture(autouse=True)

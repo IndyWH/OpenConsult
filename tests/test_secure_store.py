@@ -5,6 +5,8 @@ store, and the guard fails one that tries."""
 
 from __future__ import annotations
 
+import subprocess
+import sys
 import time
 
 import pytest
@@ -117,6 +119,32 @@ def test_R18_a_test_that_reaches_the_systems_real_store_fails_and_an_app_built_i
     assert isinstance(app.state.parts.store, MadeStore) and app.state.parts.store.held == {}
     with pytest.raises(pytest.fail.Exception):
         SystemStore().get(NAME)                             # the app's own wrapper with no made package: the real one, refused
+
+
+def test_R18_a_fresh_python_started_by_a_test_builds_the_app_and_reaches_no_real_store(tmp_path):
+    """Pins the fault of run 9b: four older tests start a fresh Python that builds the app, outside the guards of
+    the test's own process, and that child asked the system's real store for the app's names."""
+    code = (
+        "import socket, sys\n"
+        "dialled = []\n"
+        "real = socket.socket.connect\n"
+        "def noting(self, address):\n"
+        "    dialled.append(address)\n"
+        "    return real(self, address)\n"
+        "socket.socket.connect = noting\n"
+        "from openconsult.app import build_app\n"
+        "from openconsult.settings import store\n"
+        "from openconsult.settings.machine import describe\n"
+        "app = build_app(store.build(sys.argv[1], 8765), machine=describe('Linux', 'x86_64', []))\n"
+        "parts = app.state.parts\n"
+        "import keyring\n"
+        "print(type(keyring.get_keyring()).__module__, parts.store.answers(), parts.connections.connected('claude'),\n"
+        "      [a for a in dialled if not isinstance(a, tuple)])\n"
+    )
+    done = subprocess.run([sys.executable, "-c", code, str(tmp_path)], capture_output=True, text=True, timeout=60)
+    assert done.returncode == 0, done.stderr[-800:]
+    # The package's own stand-in for no store; the app says it has none; and nothing was dialled but ports of this machine.
+    assert done.stdout.strip() == "keyring.backends.null False False []"
 
 
 def test_rule_1_of_9a_the_bench_reads_its_key_from_the_key_folder_alone_and_never_from_a_store(tmp_path):
