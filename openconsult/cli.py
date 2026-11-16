@@ -161,14 +161,13 @@ def self_test(data_folder: Path | None, choice: Choice, say: Callable, make_spee
         return 1
     say(words.SELF_TEST_RUNNING_CLOUD.format(service=choice.title) if choice.key else words.SELF_TEST_RUNNING)
     try:
-        outcome = selftest.run(door, sleep=sleep)
+        # The same code as the first-run step runs from the page (7.1): the clip through the door, and the result stored.
+        outcome = selftest.run_and_store(door, selftest.SelfTests(open_database(settings.database_path)), sleep=sleep)
     except selftest.ClipChanged:
         say(words.SELF_TEST_CLIP_CHANGED)
         return 1
     finally:
         door.close()
-    db = open_database(settings.database_path)
-    selftest.SelfTests(db).add(door.choice.name, outcome)
     live, stop = " ".join(outcome.live_words), " ".join(outcome.stop_words)
     if outcome.passed:
         say(words.SELF_TEST_RESULT_PASSED.format(live=live, stop=stop))

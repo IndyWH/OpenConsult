@@ -126,6 +126,15 @@ def run(door: Door, sleep: Callable = time.sleep, clip: Path = CLIP) -> Outcome:
     return Outcome(passed, reason, live_words, stop_words, detail)
 
 
+def run_and_store(door: Door, self_tests: "SelfTests", sleep: Callable = time.sleep) -> Outcome:
+    """The self-test as the command runs it and as the first-run step runs
+    it from the page (7.1; D46): the clip through the door, then Stop, and
+    the result stored under the choice's name. One code for both."""
+    outcome = run(door, sleep=sleep)
+    self_tests.add(door.choice.name, outcome)
+    return outcome
+
+
 def _failed(failure: str, reason: str, detail: dict, door: Door) -> Outcome:
     return Outcome(False, reason, [], [], {**detail, "failure": failure, "stamp": _stamp(door), "worker": _worker(door)})
 

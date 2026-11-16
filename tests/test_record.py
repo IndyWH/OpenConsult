@@ -41,7 +41,12 @@ def test_6_5_a_version_1_database_with_its_user_comes_forward_with_nothing_lost(
     # And the user logs in through the app, with no first run asked again.
     app = build_app(store.build(tmp_path, PORT), machine=machine, clock=clock)
     client = browser(app)
-    assert log_in(client).headers["location"] == "/"
+    # Restated in run 9b (7.1; the details of the run): the three steps of stage 2 are not asked again, and the steps
+    # that are new in 9b are met once, at this first login: the self-test and the microphone test, each with Not now.
+    assert log_in(client).headers["location"] == "/first-run"
+    for step in ("self_test", "microphone"):
+        assert client.post("/first-run/leave", data={"step": step}).headers["location"] == "/first-run"
+    assert client.get("/first-run").headers["location"] == "/" and log_in(client).headers["location"] == "/"
     assert client.get("/").status_code == 200
 
 

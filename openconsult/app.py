@@ -46,6 +46,7 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
+from openconsult.web import steps as steps_web
 from openconsult.web import calls as calls_web, cloud as cloud_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, pages, patients as patients_web, review, routes, who_check as who_check_web
 from openconsult.web.first_run import FirstRun
 
@@ -109,6 +110,7 @@ class Parts:
     calls: ModelCalls = None                       # the record of every model call
     claude_doors: ClaudeDoors = None               # the door to Claude with the key in use (9b)
     whole: WholeRecording = None                   # the sender of a recording after Stop, with the key in use (9b)
+    self_testing: object = None                    # the self-test asked for from its first-run step, while it runs (9b)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -217,7 +219,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     app.state.parts = parts
     guards.install(app, settings.port, settings.address)
     app.mount("/static", pages.AskedEachTime(directory=pages.STATIC), name="static")
-    for module in (routes, consult, live, review, who_check_web, patients_web, letters_web, guidelines_web, calls_web, cloud_web):
+    for module in (routes, consult, live, review, who_check_web, patients_web, letters_web, guidelines_web, calls_web, cloud_web, steps_web):
         app.include_router(module.router)
     return app
 

@@ -18,5 +18,14 @@
   </form>
 </div></div>
 {% if to_tick %}{{ cloud_statement(to_tick) }}{% endif %}
+{% if walk %}
+{# A step of the first run (7.1): it can be left with Not now, and the walk goes on; done, it offers Continue. #}
+<div class="pane"><div class="pane-body" id="walk" data-step="{{ walk.step }}">
+  {% if walk.new %}<p class="mark" id="new-steps">{{ walk.new }}</p>{% endif %}
+  <p class="mark">{{ walk.title }}</p>
+  {% if walk.done %}<p><a class="button" id="continue" href="/first-run">{{ words.CONTINUE }}</a></p>
+  {% else %}<form method="post" action="/first-run/leave"><input type="hidden" name="step" value="{{ walk.step }}"><button id="not-now">{{ words.NOT_NOW }}</button></form>{% endif %}
+</div></div>
+{% endif %}
 {% if user %}<p><a href="/settings#connections">{{ words.NAV_SETTINGS }}</a></p>{% endif %}
 {% endblock %}

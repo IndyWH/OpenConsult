@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.FIRST_RUN_SELF_TEST_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.FIRST_RUN_SELF_TEST_TITLE }}</h1>
+<div class="pane"><div class="pane-body" id="self-test-step">
+  {% if new_steps %}<p class="mark" id="new-steps">{{ new_steps }}</p>{% endif %}
+  <p>{{ words.FIRST_RUN_SELF_TEST_INTRO }}</p>
+  {% if cloud_line %}<p class="mark" id="self-test-leaves">{{ cloud_line }}</p>{% endif %}
+  {% if running %}
+  <p id="self-test-running"><span class="spinner"></span> {{ words.SELF_TEST_STEP_RUNNING }}</p>
+  {% else %}
+  {% if result %}<p class="{{ 'failed' if failed else 'notice' }}" id="self-test-result">{{ result }}</p>{% endif %}
+  <form method="post" action="/first-run/self-test">
+    <button class="primary" id="run-self-test" aria-describedby="run-self-test-refusal"{% if cannot %} disabled{% endif %}>{{ words.RUN_SELF_TEST }}</button>
+    <p class="refusal" id="run-self-test-refusal" role="alert">{% if refused and refused.control == "run-self-test" %}{{ refused.message }}{% elif cannot %}{{ cannot }}{% endif %}</p>
+  </form>
+  {% endif %}
+  {% if done %}
+  <p><a class="button" id="continue" href="/first-run">{{ words.CONTINUE }}</a></p>
+  {% elif not running %}
+  <form method="post" action="/first-run/leave"><input type="hidden" name="step" value="self_test"><button id="not-now">{{ words.NOT_NOW }}</button></form>
+  {% endif %}
+</div></div>
+{% endblock %}

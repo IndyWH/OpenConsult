@@ -13,7 +13,8 @@ from openconsult.patients import patients as patients_module
 from openconsult.patients.users import MIN_PASSWORD, name_problem, password_problem
 from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
 from openconsult.settings.connections import SERVICES
-from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web
+from openconsult.settings.path import CLAUDE
+from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web, steps as steps_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -163,15 +164,36 @@ STEP_PAGE = {
 
 @router.get("/first-run")
 async def first_run(request: Request):
-    step = parts(request).first_run.next_step()
-    if step is None:
-        raise Redirect("/login")
+    """The walk (7.1): the statement, This machine, then each step between
+    them and the user that is needed and not yet met, then the user. A
+    data folder that has its user meets the steps that are new to it
+    here, once, behind its login."""
+    p = parts(request)
+    step = p.first_run.next_step()
+    if step in (None, "user"):
+        user = guards.logged_in(request) if step is None else None      # no user yet: from this computer; a user: the login
+        if step == "user":
+            guards.this_computer(request)
+        middle = steps_web.walk_step(p)
+        if middle is not None:
+            return steps_web.step_page(request, user, middle)
+        if step is None:
+            raise Redirect("/")
     models = model_line(request) if step == "machine" else None
     room = room_lines(request) if step == "machine" else []
     speech = speech_lines(request) if step == "machine" else None
     choices = choice_lines(request) if step == "machine" else None
     return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, room=room,
-                  speech=speech, choices=choices)
+                  speech=speech, choices=choices, pointer=pointer(request) if step == "machine" else None,
+                  least=MIN_PASSWORD)
+
+
+def pointer(request: Request) -> str | None:
+    """Where no local model runs and no cloud model is connected, This
+    machine says so and leads to the connect screen (15.8, ruling 37)."""
+    p = parts(request)
+    local = p.machine.case == "suitable" and p.decisions.start_offered
+    return None if local or p.connections.state(CLAUDE).has_key else words.POINTER_TO_CONNECT
 
 
 def _at_step(request: Request, step: str) -> None:
@@ -248,7 +270,8 @@ async def login(request: Request):
     p.logins.right_password()
     token = p.logins.start(p.users.get().generation)
     p.audit.record("login")
-    response = RedirectResponse("/", status_code=303)
+    # A set-up step this data folder has not met yet is met once, at the login (7.1; the details of 9b).
+    response = RedirectResponse("/first-run" if steps_web.walk_step(p) is not None else "/", status_code=303)
     # No expiry, so the cookie lasts only for the browser session (15.6).
     response.set_cookie(guards.COOKIE, token, httponly=True, samesite="strict")
     return response
@@ -278,7 +301,7 @@ def _settings_page(request: Request, user, refused=None, pending=None):
     """pending: a change of the path that waits for its tick, drawn in its
     own section with the statement of the path as it would then stand."""
     context = dict(user=user, active="settings", machine=parts(request).machine, models=model_line(request),
-                   room=room_lines(request),
+                   room=room_lines(request), pointer=pointer(request),
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,

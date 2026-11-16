@@ -7,6 +7,7 @@
   <div class="pane-body">
     <p>{{ words.FIRST_RUN_MACHINE_INTRO }}</p>
     {{ machine_rows(machine, models, room, speech, choices) }}
+    {% if pointer %}<p class="sentence" id="pointer">{{ pointer }} <a href="/connect/claude">{{ words.CONNECT_CLAUDE_TITLE }}</a></p>{% endif %}
     <button class="primary" id="continue" aria-describedby="continue-refusal">{{ words.CONTINUE }}</button>
     {{ refusal("continue") }}
   </div>

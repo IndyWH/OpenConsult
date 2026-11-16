@@ -48,6 +48,15 @@ def test_15_6_the_first_run_resumes_at_the_first_step_not_done(app, machine):
     second.post("/first-run/machine", data={})
     third = browser(app)
     page = third.get("/first-run")
+    # Restated in run 9b (7.1; 15.13, ruling 7; the review of its plan, point 2). Until then the user step came next.
+    # Two steps now stand between This machine and the user, the self-test and the microphone test; each is met in
+    # its order, and the walk still resumes at the first step not met when the browser is closed and opened again.
+    assert words.FIRST_RUN_SELF_TEST_INTRO in text_of(page) and words.FIRST_RUN_USER_INTRO not in page.text
+    third.post("/first-run/leave", data={"step": "self_test"})
+    fourth = browser(app)
+    assert words.MIC_INTRO in text_of(fourth.get("/first-run"))
+    fourth.post("/first-run/leave", data={"step": "microphone"})
+    page = browser(app).get("/first-run")
     assert words.FIRST_RUN_USER_INTRO in page.text
 
 

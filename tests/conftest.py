@@ -197,9 +197,13 @@ def client(app):
 
 
 def set_up(client, title="Dr", name="Example", password=PASSWORD):
-    """Walk the first run."""
+    """Walk the first run. The self-test and the microphone test of run 9b
+    are marked done, as for a doctor who has done them, so that the
+    suite's doctor can press Start (7.1; the review of the plan of 9b)."""
     client.post("/first-run/statement", data={"agree": "yes"})
     client.post("/first-run/machine", data={})
+    for step in ("self_test", "microphone"):
+        client.app.state.parts.first_run.mark_done(step)
     return client.post(
         "/first-run/user",
         data={"title": title, "name": name, "password": password, "password_again": password},

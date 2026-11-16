@@ -19,7 +19,7 @@ from openconsult.patients.patients import parse_date, problem
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, ChosenPath
 from openconsult.settings.statement import mark_lines, statement_for
 from openconsult.speech.choices import NEMOTRON, SPEECHMATICS as SPEECHMATICS_CHOICE, WHISPERX_PYANNOTE
-from openconsult.web import guards
+from openconsult.web import guards, steps as steps_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -81,11 +81,18 @@ def start_state(p, ask_engine: bool = True) -> StartState:
     connection the consultation needs while it runs failing now, with its
     reason. A consultation never begins on a connection that is down."""
     path = p.stored.path(p.machine.case)
+    missing = steps_web.missing_step(p)
+    if missing is not None:
+        # A set-up step that is not done: named on the control, with the way to it (7.1; R15).
+        return StartState(words.START_STEP_MISSING[missing], (f"/first-run/{missing.replace('_', '-')}", words.FIRST_RUN_SELF_TEST_TITLE
+                                                              if missing == "self_test" else words.FIRST_RUN_MIC_TITLE))
     if path.claude:
         if not p.connections.state(CLAUDE).has_key:
             return StartState(words.START_NOT_CONNECTED.format(service=words.SERVICE_TITLES[CLAUDE]), ("/connect/claude", words.CONNECT_CLAUDE_TITLE))
     elif not p.decisions.start_offered:
-        return StartState(words.START_NO_MODEL.format(reason=p.decisions.language_model.sentence))
+        # No local model runs: the control says so, and where Claude is not connected either it leads to the connect screen (15.8, ruling 37).
+        return StartState(words.START_NO_MODEL.format(reason=p.decisions.language_model.sentence),
+                          None if p.connections.state(CLAUDE).has_key else ("/connect/claude", words.CONNECT_CLAUDE_TITLE))
     elif ask_engine and not p.engine.status(p.door.profile.tag, SHORT_WAIT_S).running:
         return StartState(words.START_MODEL_UNREACHABLE.format(engine=words.ENGINE_NAMES.get(p.engine.name, p.engine.name)))
     if path.speechmatics_live:

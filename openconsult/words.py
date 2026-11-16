@@ -709,6 +709,8 @@ EVENTS = {
     "recording.sent": "Recording sent to Speechmatics after Stop",
     "recording.delete_not_proven": "The delete of a recording sent after Stop could not be confirmed",
     "recording.pressed": "After a lost connection: the doctor's press at Stop",
+    "self_test.passed": "Self-test passed from its set-up step",
+    "microphone.tested": "Microphone tested: the level moved",
     "audio.deleted": "Recordings deleted by the retention sweep",
     "recording.converted": "Recording converted to Opus",
     "recording.conversion_failed": "Recording kept as WAV: conversion failed",
@@ -1130,3 +1132,25 @@ GO_ON_WITHOUT = "Go on without it."
 CLOUD_MARK_RECORDING_SENT = "After Stop the recording went to Speechmatics."
 START_BETTER_MAY_FAIL = ("Speechmatics cannot be reached now: {reason} The consultation can start. The better transcript may not be "
                          "made after Stop.")
+# The first-run steps of run 9b (7.1; 15.13, ruling 7). Drafts.
+FIRST_RUN_NEW_STEPS = "OpenConsult has new set-up steps since you last used it. You are asked once."
+FIRST_RUN_CONNECT_MODEL_TITLE = "Connect the language model"
+FIRST_RUN_CONNECT_SPEECH_TITLE = "Connect transcription"
+NOT_NOW = "Not now"
+FIRST_RUN_SELF_TEST_TITLE = "Self-test"
+FIRST_RUN_SELF_TEST_INTRO = "OpenConsult transcribes a short clip that comes with it and checks the words. A broken install is found here."
+RUN_SELF_TEST = "Run the self-test"
+SELF_TEST_STEP_RUNNING = "The self-test is running. The first time, loading the speech model can take a few minutes."
+SELF_TEST_STEP_PASSED = "The self-test passed."
+SELF_TEST_STEP_FAILED = "The self-test failed: {reason}"
+SELF_TEST_BUSY = "A consultation is running, so the self-test cannot run now."
+FIRST_RUN_MIC_TITLE = "Microphone test"
+MIC_INTRO = "Say a sentence. The level should move."
+MIC_LEVEL = "Level"
+MIC_NO_SOUND = "No sound yet."
+MIC_MOVED = "The level moved: the microphone works."
+MIC_NOT_SENT = "This sound is not stored and is not sent anywhere."
+MIC_NEEDS_SCRIPT = "The microphone test needs the page's script. It did not run."
+START_STEP_MISSING = {"self_test": "Start is not offered: the self-test has not passed. Open the set-up steps.",
+                      "microphone": "Start is not offered: the microphone has not been tested. Open the set-up steps."}
+POINTER_TO_CONNECT = "No language model runs on this computer and Claude is not connected. Connect Claude to use OpenConsult."

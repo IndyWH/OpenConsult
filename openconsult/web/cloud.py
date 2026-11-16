@@ -94,6 +94,20 @@ def statement_view(p, back: str) -> dict | None:
     return {"made": made, "back": back}
 
 
+def walk_view(p, user, service: str) -> dict | None:
+    """The connect screen as a step of the first run (7.1): its name, Not
+    now, and Continue once the step is done. Shown during the first run,
+    and to a set-up folder for which this step is the next it has not met."""
+    from openconsult.web import steps
+    step = steps.STEP_OF[service]
+    if user is not None and steps.walk_step(p) != step:
+        return None
+    if not steps.needed(p, step):
+        return None
+    return {"step": step, "done": steps.is_done(p, step), "new": words.FIRST_RUN_NEW_STEPS if user is not None else None,
+            "title": words.FIRST_RUN_CONNECT_MODEL_TITLE if service == CLAUDE else words.FIRST_RUN_CONNECT_SPEECH_TITLE}
+
+
 def connect_page(request: Request, user, service: str, refused=None):
     p = parts(request)
     store_reason = p.connections.store_reason()
@@ -107,7 +121,7 @@ def connect_page(request: Request, user, service: str, refused=None):
                    notice=DONE.get(request.query_params.get("done", "")),
                    # The statement stands on this screen once the service is connected, when the path as chosen uses it.
                    to_tick=statement_view(p, f"/connect/{service}") if view["connected"] and service in path.services else None,
-                   page_path=f"/connect/{service}")
+                   page_path=f"/connect/{service}", walk=walk_view(p, user, service))
     if refused:
         return refuse(request, "connect.html", refused[0], refused[1], **context)
     return render(request, "connect.html", **context)

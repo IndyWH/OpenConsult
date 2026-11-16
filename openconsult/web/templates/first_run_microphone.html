@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal with context %}
+{% set title = words.FIRST_RUN_MIC_TITLE %}
+{% block main %}
+<h1 class="page">{{ words.FIRST_RUN_MIC_TITLE }}</h1>
+{# The microphone test (7.1): the browser is asked for the microphone exactly as the live page asks, the level is read
+   in the page alone and shown on a meter with its figure in words. Nothing of the sound is stored or sent: the page
+   has no socket, and its form carries one word, that the level moved. #}
+<div class="pane"><div class="pane-body" id="mic-test" data-moved="{{ words.MIC_MOVED }}" data-no-sound="{{ words.MIC_NO_SOUND }}"
+     data-refused="{{ words.MIC_REFUSED }}" data-rate="{{ words.RATE_NOT_GIVEN }}">
+  {% if new_steps %}<p class="mark" id="new-steps">{{ new_steps }}</p>{% endif %}
+  <p>{{ words.MIC_INTRO }}</p>
+  <p><label for="mic-level">{{ words.MIC_LEVEL }}</label> <meter id="mic-level" min="0" max="100" value="0"></meter> <span id="mic-figure" aria-live="polite"></span></p>
+  <p class="mark" id="mic-said">{{ words.MIC_NO_SOUND }}</p>
+  <p class="mark">{{ words.MIC_NOT_SENT }}</p>
+  <noscript><p class="failed">{{ words.MIC_NEEDS_SCRIPT }}</p></noscript>
+  {% if done %}
+  <p class="notice" id="mic-done">{{ words.MIC_MOVED }}</p>
+  <p><a class="button" id="continue-link" href="/first-run">{{ words.CONTINUE }}</a></p>
+  {% else %}
+  <form method="post" action="/first-run/microphone" id="mic-form">
+    <input type="hidden" name="moved" id="mic-moved" value="">
+    <button class="primary" id="continue" aria-describedby="continue-refusal" disabled>{{ words.CONTINUE }}</button>
+    <p class="refusal" id="continue-refusal" role="alert">{% if refused and refused.control == "continue" %}{{ refused.message }}{% endif %}</p>
+  </form>
+  <form method="post" action="/first-run/leave"><input type="hidden" name="step" value="microphone"><button id="not-now">{{ words.NOT_NOW }}</button></form>
+  {% endif %}
+</div></div>
+<script src="{{ static('mictest.js') }}"></script>
+{% endblock %}
