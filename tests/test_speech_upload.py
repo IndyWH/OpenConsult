@@ -20,6 +20,8 @@ from tests.made_up_recordings import entry, made_sound, made_up_recordings, writ
 from tests.made_up_upload_services import MADE_UP_KEY, WORDS, MadeUpAssemblyAI, MadeUpSpeechmatics
 
 REPO = Path(openconsult.__file__).resolve().parents[1]
+# The one module of the app that sends a recording: the stage of Stop, reached by the tick or by the one press (run 9b).
+APP_SENDS_BY = {"openconsult/consult/whole.py"}
 BOTH = {"recording": True, "tests_on_this_computer": True, "cloud": ["speechmatics", "assemblyai"],
         "cloud_whole": ["speechmatics", "assemblyai"]}
 
@@ -261,13 +263,20 @@ def test_ruling_28_what_a_service_still_holds_is_asked_once_more_and_counted(ben
                                               say=said.append, send=made) == upload_commands.NOT_PROVEN
 
 
-def test_ruling_9_and_R31_the_app_cannot_reach_the_pass_at_stop():
-    # Not a speech choice, not an arm the replay can feed, and nothing outside the bench imports it.
+def test_ruling_9_and_R31_the_pass_at_stop_is_no_speech_choice_and_the_app_reaches_it_by_its_own_two_modules_alone():
+    # Restated in run 9b (15.13, the details of the run: the recording sent after Stop; the review of its plan, point
+    # 2). Until then this test pinned that nothing outside the bench imports the upload. The upload of Speechmatics is
+    # now the app's own, for the recording sent after Stop, so what stands is: it is not a speech choice and not an
+    # arm the replay can feed; in the app only the modules that are the upload name it or its host; and the second
+    # service's upload, and the bench's commands, stay the bench's alone.
     for name in ("speechmatics_upload", "assemblyai_upload"):
         assert name not in CHOICES and name not in ARMS
+    the_upload = {"openconsult/speech/upload.py", "openconsult/speech/speechmatics_upload.py"}
     for path in (REPO / "openconsult").rglob("*.py"):
+        where = path.relative_to(REPO).as_posix()
         if "bench" in path.relative_to(REPO).parts:
             continue
         text = path.read_text(encoding="utf-8")
-        assert "upload_commands" not in text and "speechmatics_upload" not in text and "assemblyai_upload" not in text
-        assert "eu1.asr.api.speechmatics.com" not in text and "api.eu.assemblyai.com" not in text
+        assert "upload_commands" not in text and "assemblyai_upload" not in text and "api.eu.assemblyai.com" not in text, where
+        if where not in the_upload | APP_SENDS_BY:
+            assert "speechmatics_upload" not in text and "eu1.asr.api.speechmatics.com" not in text, where
