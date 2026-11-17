@@ -13,3 +13,5 @@ openconsult/prompts/label_check.prompt.txt -text
 openconsult/bench/speech/prompts/*.form.json text eol=lf
 # The lists of the searches of 5d are hashed by a test: Git never changes a byte of them.
 openconsult/bench/shared/searches.json -text
+# The account Why this model is hashed byte for byte by a test (15.13, ruling 30): Git never changes a byte of it.
+openconsult/web/why_this_model.md -text

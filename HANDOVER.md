@@ -16,6 +16,8 @@ Twenty-two commits, none pushed. The suite: 1114 passed in about
 111 s, none skipped (985 at the start). No prompt file, frame or form changed: the two
 prompt folders are as at 0631413. vLLM was left as found; the Ollama
 service was not touched.
+Pushed on 17 Nov 2026 and met (the spec says how). The Windows check failed on one
+test, the hash of why_this_model.md, for the line ends; its line in .gitattributes mends it.
 
 For the patient. Until this run nothing a patient said could leave the
 computer, and a computer with no suitable card could not run a
