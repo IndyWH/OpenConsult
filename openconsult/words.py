@@ -1053,7 +1053,8 @@ CONNECT_CLAUDE_LINES = (
 
 # Run 9b: the connect screens and the section Connections (7.2; 15.13, the details of the run). Drafts, for the
 # owner to correct on screen. Get a key, Test connection and Why this model are his own words of ruling 34 and 30,
-# used as the names of the link, the button and the line.
+# used as the names of the link, the button and the line. THE OWNER'S since 17 Nov 2026, letter for letter (15.13,
+# ruling 53): KEY_SAVED, the three lines of KEY_WHERE and KEY_REMOVED, which say where a key is.
 SECTION_CONNECTIONS = "Connections"
 CONNECT_SPEECHMATICS_TITLE = "Connect Speechmatics"
 CONNECT_SPEECHMATICS_LINE = ("OpenConsult needs a key from your Speechmatics account. Get a key opens its page. Paste the key here "
@@ -1101,7 +1102,8 @@ ROW_MODEL_IN_USE = "Language model"
 START_NOT_CONNECTED = "Start is not offered: {service} is not connected. Connect it in Settings."
 START_STATEMENT = "Start is not offered: the statement for your choices is not ticked. Read and tick it in Settings."
 START_TEST_FAILED = "Start is not offered: {reason}"
-# A lost connection in a consultation (15.13, ruling 29). Drafts.
+# A lost connection in a consultation (15.13, ruling 29). Drafts, but for ALARM_NOT_LISTENING, which is the owner's
+# since 17 Nov 2026 (ruling 53): it shows when the connection is lost and when this computer's speech choice stops.
 ALARM_NOT_LISTENING = "The emergency alarm has stopped listening."
 TRYING_AGAIN = "OpenConsult is trying to connect again."
 CONNECTION_BACK = "The connection is back. The transcript and the alarm go on."
@@ -1111,7 +1113,9 @@ WHO_SPOKE_PART = "Part {n}: lines {first} to {last}"
 PICK_ONE_EACH = "Pick one for each part."
 WARN_NO_TRANSCRIPT = WARNING_SENTENCES["no_transcript"]
 # The recording sent after Stop (15.9, rulings 36 and 42; 15.13, rulings 29 and 33; run 9b). Drafts, but for
-# UPLOAD_DELETE_NOT_PROVEN above, which is the owner's.
+# UPLOAD_DELETE_NOT_PROVEN above, which is the owner's. THE OWNER'S too since 17 Nov 2026, letter for letter (15.13,
+# rulings 52 and 53): BETTER_ACCURACY, UPLOAD_MADE with UPLOAD_MADE_ONLY, its first sentence, the line of the stage
+# upload, SEND_WHOLE, GO_ON_WITHOUT, and CLOUD_MARK_RECORDING_SENT, the mark's line on the review page.
 BETTER_ACCURACY = "Better accuracy: after Stop, send the whole recording to Speechmatics once, for the final transcript."
 NOT_CONNECTED_SERVICE = "{service} is not connected."
 UPLOAD_TOO_SLOW = "{service} did not answer in {seconds} seconds."
@@ -1132,7 +1136,7 @@ GO_ON_WITHOUT = "Go on without it."
 CLOUD_MARK_RECORDING_SENT = "After Stop the recording went to Speechmatics."
 START_BETTER_MAY_FAIL = ("Speechmatics cannot be reached now: {reason} The consultation can start. The better transcript may not be "
                          "made after Stop.")
-# The first-run steps of run 9b (7.1; 15.13, ruling 7). Drafts.
+# The first-run steps of run 9b (7.1; 15.13, ruling 7). Drafts, but for MIC_NOT_SENT, the owner's (ruling 53).
 FIRST_RUN_NEW_STEPS = "OpenConsult has new set-up steps since you last used it. You are asked once."
 FIRST_RUN_CONNECT_MODEL_TITLE = "Connect the language model"
 FIRST_RUN_CONNECT_SPEECH_TITLE = "Connect transcription"
