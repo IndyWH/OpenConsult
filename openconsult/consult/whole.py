@@ -35,7 +35,9 @@ from openconsult.speech.lines import Line
 TICK, PRESS = "tick", "press"
 FILE_NAME = "recording.wav"          # a plain name with no date, no number and no person
 # The limit of time for the result: two minutes and a quarter of the recording's length (a 15-minute consultation:
-# 345 s). A design choice set beside the 13 to 41 s of the bench's results; after it the job is deleted.
+# 345 s). A design choice set beside the 13 to 41 s of the bench's results; after it the job is deleted. The delete and
+# the two asks come after the limit, each one request; an ask with no answer is made once more (ruling 49), which can
+# add at most 30 s to the stage: twice the wait of 5 s and the second try's own limit of 10 s (speech/upload.py).
 LIMIT_BASE_S, LIMIT_SHARE = 120.0, 0.25
 MADE, FAILED, NOT_PROVEN = "better_transcript", "better_transcript_failed", "delete_not_proven"
 KINDS = (MADE, FAILED, NOT_PROVEN)
@@ -179,7 +181,7 @@ class WholeRecording:
         key = self._key()
         if noted["job_id"] and key is not None:
             try:
-                upload._delete_and_prove(service, self.http(), key, up["job"], [], up)
+                upload._delete_and_prove(service, self.http(), key, up["job"], [], up, self._sleep)
             except Exception as broke:  # noqa: BLE001
                 up["gone"], up["proof"] = None, f"the delete broke: {type(broke).__name__}"
         self._ended(c, noted["way"], up, {"at": "restart", "detail": "the app was closed while the recording was being sent"}, lines=[], limit=0.0)

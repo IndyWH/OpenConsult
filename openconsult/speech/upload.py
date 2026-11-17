@@ -41,6 +41,11 @@ REQUEST_TIMEOUT_S = 300.0
 GONE_STATUSES = (404, 410)
 WORDS_IN_A_ROW = 3             # an answer after the delete may hold no three words in a row of the result
 BODY_KEPT = 4000               # of an answer that is not JSON, this much is kept
+# After the delete, an ask that brought no answer at all is made once more, this long after, and never a third time
+# (15.13, ruling 49: a failed request is not an answer). The second try has a limit of its own, the limit of the test
+# of a connection: a design choice, so that the two second tries add at most 2 x (5 + 10) = 30 s to the stage at Stop.
+SECOND_ASK_WAIT_S = 5.0
+SECOND_ASK_LIMIT_S = 10.0
 
 
 class AddressRefused(Exception):
@@ -71,11 +76,11 @@ class _NoRedirect(urllib.request.HTTPRedirectHandler):
         return None            # a redirect is an answer, never a second connection
 
 
-def _urllib_send(method: str, url: str, headers: dict, body: bytes | None) -> Answer:
+def _urllib_send(method: str, url: str, headers: dict, body: bytes | None, timeout_s: float = REQUEST_TIMEOUT_S) -> Answer:
     request = urllib.request.Request(url, data=body, headers=headers, method=method)
     opener = urllib.request.build_opener(_NoRedirect)
     try:
-        with opener.open(request, timeout=REQUEST_TIMEOUT_S) as reply:
+        with opener.open(request, timeout=timeout_s) as reply:
             return Answer(reply.status, reply.read())
     except urllib.error.HTTPError as refused:
         return Answer(refused.code, refused.read() or b"")
@@ -91,11 +96,12 @@ class Http:
         self._send = send or _urllib_send
         self.sent: list[dict] = []     # method, url and status of every request, never a header
 
-    def request(self, method: str, url: str, headers: dict, body: bytes | None = None) -> Answer:
+    def request(self, method: str, url: str, headers: dict, body: bytes | None = None, timeout_s: float | None = None) -> Answer:
+        """timeout_s: a limit of its own for this one request; with none the sender's own stands."""
         parts = urlsplit(url)
         if parts.scheme != "https" or parts.hostname != self.eu_host or parts.port not in (None, 443):
             raise AddressRefused(url)
-        answer = self._send(method, url, headers, body)
+        answer = self._send(method, url, headers, body) if timeout_s is None else self._send(method, url, headers, body, timeout_s)
         self.sent.append({"method": method, "url": url, "status": answer.status, "bytes_sent": len(body or b"")})
         return answer
 
@@ -212,14 +218,20 @@ def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, descri
                     if problem:
                         failed("model", problem)
     finally:
-        _delete_and_prove(service, http, key, job, lines, upload)
+        _delete_and_prove(service, http, key, job, lines, upload, sleep)
     result["stop"] = {"t": upload["seconds_to_result"], "t_asked": 0.0, "lines": lines, "last_live": [], "refused": [],
                       "raw": [], "seconds": {"sent_to_result": upload["seconds_to_result"]}, "revisions": [],
                       "speakers": {}, "notes": {"requests": list(http.sent)}}
     return result
 
 
-def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: list[dict], upload: dict) -> None:
+def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: list[dict], upload: dict,
+                      sleep: Callable = time.sleep) -> None:
+    """The delete, then each ask of the service once; an ask that brought
+    no answer at all is made once more, a few seconds later, and never a
+    third time (ruling 49). An ask that brought any answer is never made
+    again. The last answer of each ask is judged by the rule above
+    (ruling 44), and every try is kept, in order."""
     if not job:
         upload["gone"], upload["proof"] = True, "nothing was taken by the service"
         return
@@ -232,13 +244,25 @@ def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: li
     if deleted.status not in (200, 204, *GONE_STATUSES):
         upload["gone"], upload["proof"] = False, f"the delete was answered HTTP {deleted.status}" if deleted.status else "the delete got no answer"
         return
-    proofs, gone = [], True
-    for what, answer in service.ask_again(http, key, job):
+    proofs, judged = [], {}
+
+    def judge(what: str, answer: Answer, second: bool) -> None:
         ok, why = proves_gone(answer, result_words, service.must_not_hold(job), service.lines_of)
-        upload["asked_again"].append({"what": what, **answer.kept(), "gone": ok, "why": why})
-        proofs.append(f"{what}: {why}")
-        gone = gone and ok
-    upload["gone"], upload["proof"] = gone, "; ".join(proofs)
+        upload["asked_again"].append({"what": what, **answer.kept(), "gone": ok, "why": why, **({"try": 2} if second else {})})
+        proofs.append(f"{what}, asked again after {SECOND_ASK_WAIT_S:.0f} s: {why}" if second else f"{what}: {why}")
+        judged[what] = ok
+
+    silent = []
+    for what, answer in service.ask_again(http, key, job):
+        judge(what, answer, False)
+        if answer.status == 0:
+            silent.append(what)
+    if silent:
+        sleep(SECOND_ASK_WAIT_S)
+        for what in silent:
+            for again, answer in service.ask_again(http, key, job, only=what, timeout_s=SECOND_ASK_LIMIT_S):
+                judge(again, answer, True)
+    upload["gone"], upload["proof"] = all(judged.values()), "; ".join(proofs)
 
 
 def line(words: list[dict], speaker: str | None) -> dict:

@@ -109,8 +109,9 @@ def delete(http: Http, key: str, job: dict) -> Answer:
     return http.request("DELETE", f"{BASE}/transcript/{job['id']}", _auth(key))
 
 
-def ask_again(http: Http, key: str, job: dict) -> list[tuple[str, Answer]]:
-    return [("the transcript", _get(http, key, job))]
+def ask_again(http: Http, key: str, job: dict, only: str | None = None, timeout_s: float | None = None) -> list[tuple[str, Answer]]:
+    """The one ask after a delete; made once more when it brought no answer, with a limit of its own (15.13, ruling 49)."""
+    return [("the transcript", http.request("GET", f"{BASE}/transcript/{job['id']}", _auth(key), timeout_s=timeout_s))]
 
 
 def must_not_hold(job: dict) -> str | None:

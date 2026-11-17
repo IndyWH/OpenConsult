@@ -125,9 +125,11 @@ def delete(http: Http, key: str, job: dict) -> Answer:
     return http.request("DELETE", f"{BASE}/jobs/{job['id']}?force=true", _auth(key))
 
 
-def ask_again(http: Http, key: str, job: dict) -> list[tuple[str, Answer]]:
-    return [("the job", http.request("GET", f"{BASE}/jobs/{job['id']}", _auth(key))),
-            ("its transcript", http.request("GET", f"{BASE}/jobs/{job['id']}/transcript?format=json-v2", _auth(key)))]
+def ask_again(http: Http, key: str, job: dict, only: str | None = None, timeout_s: float | None = None) -> list[tuple[str, Answer]]:
+    """The two asks after a delete, each once; only: the one ask to make
+    once more, with a limit of its own (15.13, ruling 49)."""
+    asks = {"the job": f"{BASE}/jobs/{job['id']}", "its transcript": f"{BASE}/jobs/{job['id']}/transcript?format=json-v2"}
+    return [(what, http.request("GET", url, _auth(key), timeout_s=timeout_s)) for what, url in asks.items() if only in (None, what)]
 
 
 def must_not_hold(job: dict) -> str | None:
