@@ -5,6 +5,7 @@ web/live.py."""
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 
 from fastapi import APIRouter, Depends, Request
@@ -16,6 +17,7 @@ from openconsult.consult.live import SPEAKERS, Consultation
 from openconsult.llm import claude
 from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.patients.patients import parse_date, problem
+from openconsult.settings.connections import LIMIT_S
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, ChosenPath
 from openconsult.settings.statement import mark_lines, statement_for
 from openconsult.speech.choices import NEMOTRON, SPEECHMATICS as SPEECHMATICS_CHOICE, WHISPERX_PYANNOTE
@@ -72,14 +74,19 @@ class StartState:
     notice: str | None = None           # said on the screen while Start is still offered
 
 
-def start_state(p, ask_engine: bool = True) -> StartState:
+def start_state(p, ask_engine: bool = True, read_tests: bool = True) -> StartState:
     """Why Start is not offered (R15; 10.4; 7.2), by the path as chosen.
     This computer, as since 6a: the room check's element, the engine not
     answering the joint's short wait at this view, or no local speech
     choice usable. A cloud service: not connected; the statement of the
     path not ticked, or ticked for other words; or the test of a
     connection the consultation needs while it runs failing now, with its
-    reason. A consultation never begins on a connection that is down."""
+    reason. A consultation never begins on a connection that is down.
+    ask_engine False: nothing is asked and no connection is tested; the
+    last test of each connection is read (the Consultation box of This
+    machine). read_tests False as well: no test is read either, so only
+    what the app knows at once is said (the Start screen shown at once,
+    ruling 51)."""
     path = p.stored.path(p.machine.case)
     missing = steps_web.missing_step(p)
     if missing is not None:
@@ -106,6 +113,8 @@ def start_state(p, ask_engine: bool = True) -> StartState:
     # Ticked itself, or sending less than the statement that was ticked (15.13, ruling 48).
     if not p.stored.covers(statement_for(path)):
         return StartState(words.START_STATEMENT, ("/settings#cloud-statement", words.NAV_SETTINGS))
+    if not read_tests:
+        return StartState()
     tests = p.connections.test_all(path.services) if ask_engine else {
         service: p.connections.state(service).last for service in path.services}
     for service in path.needed_while_it_runs:
@@ -164,28 +173,104 @@ def earlier_lines(notes: list) -> list[dict]:
         number=note.consultation_id, date=words.plain_date(note.started_at), line=note.headline())} for note in notes]
 
 
-def _start_context(request: Request, user, patient, ask_engine: bool = True) -> dict:
+def _start_context(request: Request, user, patient, state: StartState, run=None, testing: bool = False, poll: bool = False) -> dict:
+    """run: the tests that run beside this view, named by the page so that
+    its script can ask for their result and Start can read it. testing:
+    the control waits for them, disabled, and says so (ruling 51)."""
     p = parts(request)
     path = p.stored.path(p.machine.case)
     choice = speech_choice_for(p, path)
     notes = earlier.approved_notes(p.notes, patient.id)
-    state = start_state(p, ask_engine)
     return dict(user=user, active="new_patient", patient=patient, age=words.plain_age(patient.age_on(p.patients.today())),
                 born=words.plain_date(patient.date_of_birth), sex=words.SEX_WORDS[patient.sex],
                 minutes=INTENDED_MINUTES, chosen=p.consultations.last_intended() or DEFAULT_MINUTES,
                 speech=(words.CHOICE_SPEECHMATICS if path.speechmatics_live else choice.door.choice.title) if choice.door else None,
                 # The path in two rows (7.3; 9b): where the language model runs, beside the speech choice.
                 model=words.CHOICE_CLAUDE if path.claude else words.CHOICE_THIS_COMPUTER, lead=state.lead, tests=state.tests,
-                mark=mark_lines(path), start_notice=state.notice,
+                mark=mark_lines(path), start_notice=state.notice, run=run.id if run is not None else None, testing=testing, poll=poll,
                 # A patient with an approved note gets the list and the switch, on by default (ruling 3; D25).
                 earlier=earlier_lines(notes), switch=bool(notes),
                 problem=state.problem, page_path=f"/consultations/start/{patient.id}")
 
 
+# How long a page with no script waits for the tests it asked the result of: their own limits, and a little more.
+RESULT_WAIT_S = LIMIT_S + SHORT_WAIT_S + 2.0
+
+
+async def start_view(p, named: str | None = None) -> tuple[StartState, object, bool, bool]:
+    """What a view of the Start screen is made from: the control's state,
+    the run of tests beside it, and whether the control waits for them
+    (15.13, ruling 51). A path on this computer alone is as it was: all
+    is asked before the page is sent. On any other path, what the app
+    knows at once is said at once, and nothing is tested for it. Else
+    the tests run beside the page. The control waits for them where the
+    consultation needs a service while it runs. Where it needs none
+    until after Stop (ruling 37), Start is offered at once, the engine
+    asked as on this computer, and the test of the service only brings
+    the notice. named: the run a page with no script asks the result of."""
+    path = p.stored.path(p.machine.case)
+    if not path.services:
+        return start_state(p), None, False, False
+    known = start_state(p, ask_engine=False, read_tests=False)
+    if known.problem:
+        return known, None, False, False
+    run = p.start_tests.get(named, path.key())
+    if run is not None:
+        await asyncio.to_thread(run.answered.wait, RESULT_WAIT_S)
+        if p.start_tests.fresh(run):
+            return run.state, run, False, False
+    run = p.start_tests.begin(path.key(), lambda: start_state(p))
+    if path.needed_while_it_runs:
+        return StartState(), run, True, True
+    return start_state(p, ask_engine=True, read_tests=False), run, False, True
+
+
+def press_state(p, named: str | None) -> StartState | None:
+    """The state a press of Start is judged by. The rule that a
+    consultation never begins on a connection that is down is kept here,
+    by the app, and not by the page alone (ruling 51). The run the page
+    named: still running, the press is refused (None) where the
+    consultation needs a service while it runs; answered a short while
+    ago, it is used; older, or none named, the connections are tested at
+    the press itself, as in run 9b."""
+    path = p.stored.path(p.machine.case)
+    if not path.services:
+        return start_state(p)
+    known = start_state(p, ask_engine=False, read_tests=False)
+    if known.problem:
+        return known
+    run = p.start_tests.get(named, path.key())
+    if run is None:
+        return start_state(p)
+    if not run.answered.is_set():
+        return None if path.needed_while_it_runs else start_state(p, ask_engine=True, read_tests=False)
+    if p.start_tests.fresh(run):
+        return run.state
+    return start_state(p)
+
+
 @router.get("/consultations/start/{patient_id}")
 async def start_page(request: Request, patient_id: int, user=Depends(guards.logged_in)):
     patient = _patient_or_404(request, patient_id)
-    return render(request, "start.html", **_start_context(request, user, patient))
+    state, run, testing, poll = await start_view(parts(request), request.query_params.get("tests"))
+    return render(request, "start.html", **_start_context(request, user, patient, state, run, testing, poll))
+
+
+@router.get("/consultations/start/{patient_id}/tests")
+async def start_tests_result(request: Request, patient_id: int, user=Depends(guards.logged_in_not_use)):
+    """What the page's script asks while the tests run: running, or their
+    answer in the app's own sentences, which the script writes into the
+    places the page has. Read only, and no use of the page (15.10,
+    ruling 41). gone: the run is not the one for the path as it stands."""
+    p = parts(request)
+    run = p.start_tests.get(request.query_params.get("run"), p.stored.path(p.machine.case).key())
+    if run is None:
+        return JSONResponse({"state": "gone"})
+    if not run.answered.is_set() or run.state is None:
+        return JSONResponse({"state": "running"})
+    state = run.state
+    return JSONResponse({"state": "answered", "problem": state.problem, "lead": list(state.lead) if state.problem and state.lead else None,
+                         "notice": None if state.problem else state.notice})
 
 
 @router.post("/consultations/start/{patient_id}")
@@ -196,7 +281,14 @@ async def start(request: Request, patient_id: int, user=Depends(guards.logged_in
     p = parts(request)
     patient = _patient_or_404(request, patient_id)
     fields = await form_fields(request)
-    context = _start_context(request, user, patient)
+    state = press_state(p, fields.get("tests"))
+    run = p.start_tests.get(fields.get("tests"), p.stored.path(p.machine.case).key())
+    if state is None:
+        # The tests of the page that was pressed have not answered: refused, and the page goes on waiting for them.
+        return refuse(request, "start.html", "start", words.START_STILL_TESTING,
+                      **_start_context(request, user, patient, StartState(), run, True, True))
+    # A page sent back for a tick that is missing still names its run, so the next press need not test again.
+    context = _start_context(request, user, patient, state, run if run is not None and p.start_tests.fresh(run) else None)
     if context["problem"]:
         return refuse(request, "start.html", "start", context["problem"], **context)
     if fields.get("right_patient") != "yes" or fields.get("acted") != "yes":
@@ -211,6 +303,7 @@ async def start(request: Request, patient_id: int, user=Depends(guards.logged_in
     for tested in (context["tests"] or {}).values():
         if tested is not None:
             p.calls.tie(tested.call_ids, consultation.id)
+    p.start_tests.spent(fields.get("tests"))         # its tests began this consultation: a later press is tested afresh
     raise Redirect(f"/consultations/{consultation.id}")
 
 

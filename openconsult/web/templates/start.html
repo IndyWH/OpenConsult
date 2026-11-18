@@ -23,10 +23,20 @@
     <table class="plain facts"><tr><th>{{ words.ROW_SPEECH_IN_USE }}</th><td>{{ speech or problem }}</td></tr></table>
     <table class="plain facts" id="path"><tr><th>{{ words.ROW_MODEL_IN_USE }}</th><td>{{ model }}</td></tr></table>
     {% if mark %}{{ cloud_mark(mark) }}{% endif %}
-    <button class="primary" id="start" aria-describedby="start-refusal" {% if problem %}disabled{% endif %}>{{ words.START }}</button>
-    <p class="refusal" id="start-refusal" role="alert">{% if refused and refused.control == "start" %}{{ refused.message }}{% elif problem %}{{ problem }}{% endif %}</p>
+    {# On a path with a cloud service the page is sent at once and its tests run beside it (15.13, ruling 51). The
+       form names their run, so that Start can read it: the rule that a consultation never begins on a connection
+       that is down is the app's. While the control waits it is disabled and says so; start.js asks for the result
+       and writes it here, without the page loading again. The line is for a page whose script has not run. #}
+    {% if run %}<input type="hidden" name="tests" value="{{ run }}">{% endif %}
+    <button class="primary" id="start" aria-describedby="start-refusal" {% if problem or testing %}disabled{% endif %}>{{ words.START }}</button>
+    <p class="refusal" id="start-refusal" role="alert">{% if refused and refused.control == "start" %}{{ refused.message }}{% elif problem %}{{ problem }}{% elif testing %}{{ words.START_TESTING }}{% endif %}</p>
     {% if problem and lead %}<p id="start-lead"><a href="{{ lead[0] }}">{{ lead[1] }}</a></p>{% endif %}
     {% if start_notice and not problem %}<p class="failed" id="start-notice">{{ start_notice }}</p>{% endif %}
+    {% if poll %}
+    <p class="mark" id="start-no-script">{{ words.START_NO_SCRIPT }} <a href="/consultations/start/{{ patient.id }}?tests={{ run }}">{{ words.START_SHOW_RESULT }}</a></p>
+    <div id="start-tests" data-address="/consultations/start/{{ patient.id }}/tests?run={{ run }}" data-waits="{{ 'yes' if testing else 'no' }}" hidden></div>
+    {% endif %}
   </div>
 </form>
+{% if poll %}<script src="{{ static('start.js') }}"></script>{% endif %}
 {% endblock %}

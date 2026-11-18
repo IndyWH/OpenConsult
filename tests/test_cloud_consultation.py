@@ -189,14 +189,20 @@ def test_R15_and_7_2_start_says_on_its_control_why_a_cloud_path_cannot_start_and
     page = client.get("/consultations/start/1")
     assert refusal_on(page.text, "start") == words.START_STATEMENT and testers.asked.count((CLAUDE, GOOD)) == 1   # tested at start, not at this view
     # Ticked, and a connection the consultation needs is down now: said with its exact reason, at the view and at Start.
+    # Since run 9c the view does not wait for its tests (15.13, ruling 51): the page comes at once with the control
+    # disabled and saying that the connection is being tested, and the result is read where the page's script reads it.
+    from tests.test_start_at_once import answer_of_tests
     app, client, local, workers, testers = cloud_app(tmp_path / "d", clock, server)
     tested_before = len(testers.asked)
-    assert not disabled_on(client.get("/consultations/start/1").text)
+    page = client.get("/consultations/start/1")
+    assert disabled_on(page.text) and refusal_on(page.text, "start") == "Testing the connection. Start is offered when the test has answered."
+    assert answer_of_tests(client, page.text) == {"state": "answered", "problem": None, "lead": None, "notice": None}   # offered
     assert len(testers.asked) == tested_before + 2                                            # each view tests both connections (7.2)
     testers.fail[SPEECHMATICS] = "no_internet"
     page = client.get("/consultations/start/1")
     expected = "Start is not offered: Speechmatics could not be reached. Check the internet connection and try again."
-    assert disabled_on(page.text) and refusal_on(page.text, "start") == expected
+    found = answer_of_tests(client, page.text)
+    assert found["problem"] == expected and found["lead"] == ["/connect/speechmatics", "Speechmatics"]
     refused = client.post("/consultations/start/1", data=TICKS)
     assert refused.status_code == 400 and refusal_on(refused.text, "start") == expected
     assert app.state.parts.consultations.get(1) is None and app.state.parts.running == {}     # a consultation never begins on a connection that is down
@@ -220,7 +226,9 @@ def test_15_8_ruling_1_the_test_of_the_connection_made_at_start_is_on_the_page_o
     assert len(tests) == 2 and sorted(json.loads(call["request"])["model"] for call in tests) == [HAIKU, SONNET]
     page = text_of(client.get("/consultations/1/calls"))
     assert page.count("the test of the connection to Claude, at Start") == 2 and "Connection test. Reply with OK." in page
-    # A test made at a view of the Start screen began no consultation, so it is tied to none.
-    client.get("/consultations/start/1")
+    # A test made at a view of the Start screen began no consultation, so it is tied to none. Since run 9c the tests
+    # of a view run beside it (15.13, ruling 51), so their rows are counted once they have answered.
+    from tests.test_start_at_once import answer_of_tests
+    answer_of_tests(client, client.get("/consultations/start/1").text)
     untied = [row for row in p.calls.rows() if row["job"] == "connection_test" and row["consultation_id"] is None]
     assert len(untied) >= 2 and len([c for c in p.consultations.model_calls(1) if c["job"] == "connection_test"]) == 2

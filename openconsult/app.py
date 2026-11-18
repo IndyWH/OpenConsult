@@ -49,6 +49,7 @@ from openconsult.speech.selftest import SelfTests
 from openconsult.web import steps as steps_web
 from openconsult.web import calls as calls_web, cloud as cloud_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, pages, patients as patients_web, review, routes, who_check as who_check_web
 from openconsult.web.first_run import FirstRun
+from openconsult.web.start_tests import StartTests
 
 # The finder the app uses at start; tests stand a quiet one in its place.
 find_converter_at_start = opus.find_converter
@@ -111,6 +112,7 @@ class Parts:
     claude_doors: ClaudeDoors = None               # the door to Claude with the key in use (9b)
     whole: WholeRecording = None                   # the sender of a recording after Stop, with the key in use (9b)
     self_testing: object = None                    # the self-test asked for from its first-run step, while it runs (9b)
+    start_tests: StartTests = None                 # the tests that run beside a view of the Start screen (9c)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -203,6 +205,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         guidelines=Guidelines(sources, Index(sources), embedder, door, audit, door_for=lambda cid: parts.door_for(cid)),
         converter=converter,
         store=secure_store,
+        start_tests=StartTests(),
         clock=clock,
         finaliser=_finalise,
     )

@@ -1110,6 +1110,13 @@ ROW_MODEL_IN_USE = "Language model"
 START_NOT_CONNECTED = "Start is not offered: {service} is not connected. Connect it in Settings."
 START_STATEMENT = "Start is not offered: the statement for your choices is not ticked. Read and tick it in Settings."
 START_TEST_FAILED = "Start is not offered: {reason}"
+# Run 9c: the Start screen is shown at once and its tests fill in after (15.13, ruling 51). Drafts. The first stands
+# on the control while the tests run; the second answers a press that came before they had answered; the last two are
+# served for a page whose script has not run, and taken away by the script.
+START_TESTING = "Testing the connection. Start is offered when the test has answered."
+START_STILL_TESTING = "Start is not offered yet: the connection is still being tested."
+START_NO_SCRIPT = "The page's script did not run."
+START_SHOW_RESULT = "Show the result of the test"
 # A lost connection in a consultation (15.13, ruling 29). Drafts, but for ALARM_NOT_LISTENING, which is the owner's
 # since 17 Nov 2026 (ruling 53): it shows when the connection is lost and when this computer's speech choice stops.
 ALARM_NOT_LISTENING = "The emergency alarm has stopped listening."

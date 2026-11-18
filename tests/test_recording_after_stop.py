@@ -354,6 +354,10 @@ def test_review_point_8_start_is_offered_with_the_tick_set_and_speechmatics_down
     testers.fail[SPEECHMATICS] = "no_internet"
     page = client.get("/consultations/start/1")
     assert 'id="start" aria-describedby="start-refusal" disabled' not in page.text and refusal_on(page.text, "start") == ""
-    assert ("Speechmatics cannot be reached now: Speechmatics could not be reached. Check the internet connection and try again. "
-            "The consultation can start. The better transcript may not be made after Stop.") in text_of(page)
+    # Since run 9c the test of the service runs beside the page (15.13, ruling 51), and its notice is read where the
+    # page's script reads it; Start is offered at once, for nothing of this consultation needs the service before Stop.
+    from tests.test_start_at_once import answer_of_tests
+    assert answer_of_tests(client, page.text)["notice"] == (
+        "Speechmatics cannot be reached now: Speechmatics could not be reached. Check the internet connection and try again. "
+        "The consultation can start. The better transcript may not be made after Stop.")
     assert client.post("/consultations/start/1", data=TICKS).status_code == 303 and p.consultations.get(1)["better_accuracy"] == 1
