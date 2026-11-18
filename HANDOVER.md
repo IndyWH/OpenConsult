@@ -11,8 +11,8 @@ Run on 17 and 18 Nov 2026 by the mailbox, as one run in two halves
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Twenty-three commits, none pushed. The
-suite: 1273 passed in about 129 s, none skipped (1114 at the start). No
+plan and its review beside it. Twenty-five commits, none pushed. The
+suite: 1284 passed in about 140 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
@@ -32,6 +32,46 @@ in the browser: saved, refused one step outside each bound, each
 bound taken, and three made consultations each judged by the values
 it started with while Settings held others.
 
+STOP DOES NOT WAIT FOR THE DELETE OF A RECORDING OR FOR ITS PROOF
+(85ecea5; the owner's ruling of 18 Nov, 06:55, by mail 3: a doctor
+wants the note as soon as Stop is pressed).
+- The limit: the delete and each ask after it wait 30 s at most, not
+  300; the second try of ruling 49 as it was (5 s later, 10 s).
+- As soon as the transcript from the whole recording is stored, Stop
+  goes on. The delete, the two asks and their second tries run beside
+  it on a thread of their own (consult/whole.py: prove, _prove) and
+  write each answer to the record as it comes. The sending is logged
+  at its end, the delete in its own line when it is judged
+  (recording.deleted, or recording.delete_not_proven as before).
+- Above the note, one of three lines by the record's state
+  (whole.proof_state: awaited, proven, not_proven): the owner's new
+  sentence while the answer is awaited; his line of ruling 53; its
+  first sentence alone with his warning of ruling 41. While awaited
+  the page asks /consultations/N/sent (static/sent.js) and, when the
+  answer has come, takes the changed parts from the app's own page
+  (/sent/page) by fresh.js: no load, the window held. Neither ask is
+  use. With no script, one line with a link. Approve is not held.
+- At the next start (WholeRecording.finish_open, from build_app) every
+  recording the service took whose delete is neither proven nor
+  judged is finished beside the start: the delete first where none
+  was answered; an answered ask never again; one silent try gets its
+  second and no more. One already judged is not asked about again.
+- The record: recording_upload.judged_at, in version 12.
+- The bench's upload waits for its proof as before (run_upload,
+  prove=True) and reads the same delete, asks and limits.
+- Seen in the browser against a made service: the asks answered 20 s
+  late, the review page stood 7.4 s after Stop with the note and the
+  awaited line, and the line changed at 47 s with no load and the
+  window not moved (0 px); the asks never answered: at 92 s the first
+  sentence alone and the warning with no load, the count on Approve
+  from 2 to 3, the text in the window held where it stood; scripts
+  off: the line with its link.
+- Older tests restated: the line of the log in two tests of
+  test_recording_after_stop (one line said the sending and the delete
+  together); the limit of a first ask in two tests of test_second_ask
+  (30 s, where none was given); and a wait for the delete in the
+  tests that read its record.
+
 For the patient. Before a consultation the doctor sees on one picture
 whether the path chosen is ready and what leaves the computer: four
 columns, Microphone, Transcription, Language model, Consultation, each
@@ -50,14 +90,16 @@ Half one, the mends (15.13, rulings 47 to 53).
 - The second ask after a delete (49; speech/upload.py): an ask that
   brought no answer at all is made once more, 5 s later, with a limit
   of 10 s, never a third time; an answered ask never again. Both tries
-  in the record. The first asks keep the upload's 300 s.
+  in the record. The first asks kept the upload's 300 s until mail 3
+  (below: 30 s).
 - The mark's line (52): on the review page After Stop the recording
   went to Speechmatics. wherever the request that carried it was made
   and the record cannot show that nothing left; left out only where
   no connection was opened at all, or the request was never made. The
-  record gained that fact: THE TABLES ARE VERSION 12, three columns:
-  recording_upload.request, and the two thresholds on a consultation
-  (Cowork's word: they join 12). A folder of version 11 comes forward.
+  record gained that fact: THE TABLES ARE VERSION 12, four columns:
+  recording_upload.request and judged_at, and the two thresholds on a
+  consultation (Cowork's word: they all join 12). A folder of version
+  11 comes forward.
 - The gate judges by the speech choice that made the final transcript
   (consult/stop.py), and the model line names both where the service
   made it.
@@ -138,8 +180,10 @@ foresee: test_db_v11 (it ended at today's version) and test_pages
 Flags for the owner, each in the report: the review page does not say
 which two values a consultation was judged with, except the fewest
 words in a refusal's own sentence; a refused value leaves the field
-showing the saved one; the first asks after a delete keep 300 s
-each; the details
+showing the saved one; a consultation deleted while the answer to
+its recording's delete is awaited loses the job's name if the app is
+closed in that moment; no line is shown while a delete is awaited
+for a recording that gave no transcript; the details
 say a speech choice's models are in the data folder, and they are in
 the hub's own cache, so Local models counts the environment and says
 so; the self-test of Speechmatics as a speech choice is no longer on

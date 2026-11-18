@@ -146,7 +146,12 @@ This branch is where OpenConsult v2.0 is being built.
   transcript; the app deletes it there as soon as the transcript is
   back, asks the service to confirm that it is gone, asks once more
   where an ask gets no answer at all, keeps that proof, and says so on
-  the review page when it cannot be proven. The first run
+  the review page when it cannot be proven. Stop does not wait for
+  that delete or for its proof: the note is drafted as soon as the
+  transcript is back, the review page says that the service's answer
+  is awaited and takes the answer when it comes, and an app closed
+  before the service has answered finishes the delete at its next
+  start. The first run
   walks through connecting what the computer needs, the self-test run
   from its page, and a microphone test whose sound is not stored and not
   sent; a folder set up before these steps meets them once. This
