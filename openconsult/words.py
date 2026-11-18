@@ -859,27 +859,17 @@ CONNECTION_LOST = "The connection to {service} was lost. Nothing more was sent, 
 SERVICE_TITLES = {"claude": "Claude", "speechmatics": "Speechmatics"}
 TOO_SLOW = "{service} did not answer within {seconds} seconds. Try again."
 DOOR_SPEAKERS_NEEDED = "This speech choice must be told the number of speakers when the session opens."
-# This machine: one line for each choice (15.9). Drafts.
+# The names of the speech choices (15.9). Until run 9c each also headed a row of This machine. Those rows left the
+# table when the control panel came (15.13, ruling 56): what they said stands in a box now. The words kept below
+# are those a page still shows, and those by which an older test proves that a row or its sentence is gone.
 ROW_NEMOTRON = "Nemotron"
 ROW_SPEECHMATICS = "Speechmatics"
 ROW_ASSEMBLYAI = "AssemblyAI"
-NEMOTRON_NOT_INSTALLED = "Not installed."
-NEMOTRON_NOT_RUN = "Installed. The self-test has not been run yet."
-NEMOTRON_PASSED = "Installed. The self-test passed on {date} at {time}."
-NEMOTRON_FAILED = "Installed. The self-test failed on {date} at {time}: {reason}"
-CLOUD_NO_KEY = "No key yet."
-CLOUD_NOT_RUN = "A key is present. The self-test has not been run yet."
 CLOUD_PASSED = "The self-test passed on {date} at {time}."
-CLOUD_FAILED = "The self-test failed on {date} at {time}: {reason}"
-# The two WhisperX rows, on a suitable card only (15.9). Drafts.
 ROW_SPEECH = "Speech"
 ROW_SELF_TEST = "Self-test"
 SPEECH_INSTALLED = "WhisperX with pyannote is installed."
-SPEECH_NOT_INSTALLED = "WhisperX with pyannote is not installed."
-SELF_TEST_NOT_RUN = "Not yet run."
-SELF_TEST_NOT_POSSIBLE = "Not run, because the speech choice is not installed."
 SELF_TEST_PASSED = "Passed on {date} at {time}."
-SELF_TEST_FAILED = "Failed on {date} at {time}: {reason}"
 
 # The speech bench (spec 15.9, the details of 5c). Said in the terminal
 # by openconsult-bench. Drafts for the owner.
