@@ -24,14 +24,13 @@ from datetime import datetime
 
 from openconsult import words
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, THIS_COMPUTER, ChosenPath
+from openconsult.settings.statement import AFTER_STOP, LIVE, NOTHING, goes_sentence, goes_to  # noqa: F401 - goes_to is read from here too
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 
 READY, NOT_SET_UP, CANNOT_RUN = "ready", "not_set_up", "cannot_run"
 MICROPHONE, SPEECH_LOCAL, SPEECHMATICS_BOX, MODEL_LOCAL, CLAUDE_BOX, CONSULTATION = (
     "microphone", "speech_local", "speechmatics", "model_local", "claude", "consultation")
 CONNECT, TEST, CHOOSE = "connect", "test", "choose"
-# What goes to a cloud service on the path as chosen (the plan review of run 9c, point 1).
-LIVE, AFTER_STOP, NOTHING = "live", "after_stop", "nothing"
 
 
 @dataclass(frozen=True)
@@ -117,13 +116,6 @@ def _when(stamp) -> tuple[str, str]:
     return f"{at.day} {at:%b %Y}", f"{at:%H:%M}"
 
 
-def goes_to(path: ChosenPath, service: str) -> str:
-    """What goes to a cloud service on a path: live, after Stop only, or nothing."""
-    if service == CLAUDE:
-        return LIVE if path.claude else NOTHING
-    return LIVE if path.speechmatics_live else AFTER_STOP if path.recording_after_stop else NOTHING
-
-
 def microphone_box(p) -> Box:
     done = p.first_run.done_at("microphone")
     if done is None:
@@ -189,7 +181,9 @@ def cloud_box(p, path: ChosenPath, service: str, first_run: bool) -> Box:
     chosen = (path.claude if service == CLAUDE else path.speechmatics_live)
     goes = goes_to(path, service)
     common = dict(model=words.PANEL_CLAUDE_MODEL if service == CLAUDE else None, cloud=True, on_path=chosen, chosen=chosen,
-                  also=words.PANEL_USED_AFTER_STOP if goes == AFTER_STOP else None, goes=words.PANEL_GOES[service][goes])
+                  # What goes to it on the path chosen: the owner's sentence, from the one function that also makes
+                  # the notice of a path that sends less (ruling 48; his words of 18 Nov 2026).
+                  also=words.PANEL_USED_AFTER_STOP if goes == AFTER_STOP else None, goes=goes_sentence(path, service))
     figures = {"key": state.where or "none", "last test": "none" if state.last is None else "passed" if state.last.ok else state.last.reason}
     connect = Action(CONNECT, f"/connect/{service}")
     test = Action(TEST, f"/connect/{service}", (("key", ""),))             # the connect screen's own test of the key in use

@@ -84,11 +84,18 @@
 </section>
 {%- endmacro %}
 
-{# The statement of a path that sends less than the one that was ticked (15.13, ruling 48): shown with no tick, under
-   the line that less leaves the computer, so that the doctor reads what leaves now. Nothing in it can be pressed. #}
-{% macro statement_less(made, id) -%}
+{# A path that sends less than the one that was ticked (15.13, ruling 48), in the owner's shape of 18 Nov 2026, from
+   the doctor's side: what runs on this computer and what runs in the cloud, as the picture names the two jobs. Right
+   after the save, under the control, with his head; on a later view, where a statement to tick would stand, the two
+   lines alone. The full statement of the path is one press away, closed until pressed, with no script and no tick. #}
+{% macro statement_less(covered, id, saved) -%}
+{% set made = covered.made %}
 <div class="statement-shown" id="{{ id }}">
-  <p class="waiting" role="status">{{ words.PATH_SENDS_LESS }}</p>
+  <div class="waiting where-lines"{% if saved %} role="status"{% endif %}>
+    {% if saved %}<p class="less-head">{{ words.LESS_HEAD }}</p>{% endif %}
+    {% for line in covered.where %}<p class="where-line">{{ line }}</p>{% endfor %}
+  </div>
+  <details class="statement-full"><summary>{{ words.LESS_FULL_STATEMENT }}</summary>
   <h3>{{ made.heading }}</h3>
   <p>{{ made.intro }}</p>
   <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
@@ -98,6 +105,7 @@
   {% for heading, lines in made.parts %}<h4>{{ heading }}</h4>
   <ul class="panel-list">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endfor %}
   <p class="statement">{{ made.prototype }}</p>
+  </details>
 </div>
 {%- endmacro %}
 

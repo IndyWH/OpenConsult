@@ -17,7 +17,7 @@ import re
 from dataclasses import dataclass
 
 from openconsult import words
-from openconsult.settings.path import LANGUAGE_MODELS, TRANSCRIPTIONS, ChosenPath
+from openconsult.settings.path import CLAUDE, LANGUAGE_MODELS, SPEECHMATICS, TRANSCRIPTIONS, ChosenPath
 
 
 @dataclass(frozen=True)
@@ -136,6 +136,49 @@ def words_checksum() -> str:
                     if made is not None:
                         texts.append(made.text)
     return hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
+
+
+LIVE, AFTER_STOP, NOTHING = "live", "after_stop", "nothing"
+
+
+def goes_to(path: ChosenPath, service: str) -> str:
+    """What goes to a cloud service on a path: live, after Stop only, or nothing."""
+    if service == CLAUDE:
+        return LIVE if path.claude else NOTHING
+    return LIVE if path.speechmatics_live else AFTER_STOP if path.recording_after_stop else NOTHING
+
+
+def goes_sentence(path: ChosenPath, service: str) -> str:
+    """What goes to a cloud service on a path, in the owner's sentence (his
+    words of 18 Nov 2026). The one function that gives it: a cloud box
+    of the picture shows it, and the notice of a path that sends less is
+    made of it below, so the two can never differ."""
+    return words.GOES[service][goes_to(path, service)]
+
+
+def where_lines(path: ChosenPath) -> tuple[str, ...]:
+    """What runs on this computer and what runs in the cloud on a path, as
+    the picture names the two jobs: one line that begins On this
+    computer, where a job runs here, and one that begins In the cloud
+    for each service something goes to (15.13, ruling 48; the owner's
+    shape of 18 Nov 2026, from the doctor's side). Where one job runs
+    here and nothing at all goes to its service, the line says so."""
+    here = [job for job, runs_here in (("language_model", not path.claude), ("transcription", not path.speechmatics_live)) if runs_here]
+    service_of = {"language_model": CLAUDE, "transcription": SPEECHMATICS}
+    lines = []
+    if here:
+        line = f"{words.ON_THIS_COMPUTER} {words.JOBS_HERE[tuple(here)]}"
+        if len(here) == 1 and goes_to(path, service_of[here[0]]) == NOTHING:
+            line += " " + goes_sentence(path, service_of[here[0]])
+        lines.append(line)
+    for service in (SPEECHMATICS, CLAUDE):
+        goes, sentence = goes_to(path, service), goes_sentence(path, service)
+        if goes == LIVE:
+            lines.append(f"{words.IN_THE_CLOUD} {words.JOB_IN_CLOUD[service]} {sentence}")
+        elif goes == AFTER_STOP:
+            # His sentence begins the box with a capital; here it follows the heading on its line.
+            lines.append(f"{words.IN_THE_CLOUD} {sentence[0].lower()}{sentence[1:]}")
+    return tuple(lines)
 
 
 def mark_lines(path: ChosenPath) -> tuple[str, ...]:

@@ -30,7 +30,12 @@ PATHS = {"L": ChosenPath(THIS_COMPUTER, THIS_COMPUTER), "R": ChosenPath(THIS_COM
 # The table of the plan of run 9c, item 3. Rows: the statement last ticked. For each, the paths that then ask for no tick.
 NO_TICK = {None: "L", "R": "L R", "S": "L S", "C": "L C", "CR": "L R C CR", "CS": "L S C CS"}
 CELLS = [(ticked, now, now in NO_TICK[ticked].split()) for ticked in NO_TICK for now in PATHS]
-LESS = "Less leaves this computer than you agreed to, so no new tick is asked. This is what leaves now."
+# Restated on the owner's shape of 18 Nov 2026 (mail 4 of run 9c). OLD, my draft, one line: Less leaves this computer
+# than you agreed to, so no new tick is asked. This is what leaves now. NEW, his: the head, then what runs on this
+# computer and what runs in the cloud, a line each; the full statement closed under them.
+LESS = "Saved. No new tick is asked, because less leaves this computer than you agreed to."
+HERE_S = "On this computer: the language model. Nothing goes to Claude."
+CLOUD_S = "In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken."
 
 
 def stored_in(tmp_path, clock) -> tuple[Stored, Audit]:
@@ -126,16 +131,20 @@ def test_15_13_ruling_48_a_path_that_sends_less_is_saved_under_the_wider_tick_wi
     # Right after the save: under the control that was changed, with no tick; Saved beside it; and on the page once.
     after = client.get(saved.headers["location"])
     section = after.text.split('<section class="pane" id="language-model">', 1)[1].split("</section>", 1)[0]
-    assert 'id="less-language-model"' in section and LESS in section and words.PATH_SAVED in section and LESS == words.PATH_SENDS_LESS
+    assert 'id="less-language-model"' in section and LESS in section and words.PATH_SAVED in section and LESS == words.LESS_HEAD
+    assert section.index(LESS) < section.index(HERE_S) < section.index(CLOUD_S) and not hasattr(words, "PATH_SENDS_LESS")
     assert sound.heading in section and all(line in text_of(after) for line in sound.sent) and sound.tick not in text_of(after)
     assert text_of(after).count(LESS) == 1 and 'name="sha256"' not in after.text and 'id="cloud-statement"' not in after.text
-    # On a later view: where a statement to tick would stand, read only.
+    # On a later view: where a statement to tick would stand, read only: what runs where, once, and no head, since
+    # nothing was saved by this view.
     later = client.get("/settings")
-    assert 'id="statement-covered"' in later.text and text_of(later).count(LESS) == 1 and 'name="understand"' not in later.text
+    assert 'id="statement-covered"' in later.text and text_of(later).count(HERE_S) == 1 and text_of(later).count(CLOUD_S) == 1
+    assert LESS not in text_of(later) and 'name="understand"' not in later.text
     # The wider path asks nothing on the way back, while its words are unchanged; and then nothing more is shown.
     back = client.post("/settings/path/language-model", data={"language_model": CLAUDE})
     assert back.status_code == 303 and back.headers["location"].startswith("/settings?done=path&at=language-model")
     assert p.stored.path("suitable") == PATHS["CS"] and LESS not in text_of(client.get("/settings"))
+    assert HERE_S not in text_of(client.get("/settings")) and "On this computer:" not in text_of(client.get("/settings"))
     assert len([l for l in p.audit.lines() if l.event == "statement.ticked"]) == 2
     # A path that sends something new from there still waits for its tick: the recording after Stop.
     client.post("/settings/path/transcription", data={"transcription": THIS_COMPUTER})                 # C under CS: less

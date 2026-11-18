@@ -56,7 +56,7 @@
       {{ refusal("save-" ~ s.which) }}
       {% if saved_at == s.which %}<p class="notice" id="saved-{{ s.which }}" role="status">{{ words.PATH_SAVED }}</p>{% endif %}
     </form>
-    {% if covered and less_at == s.which %}{{ statement_less(covered.made, "less-" ~ s.which) }}{% endif %}
+    {% if covered and less_at == s.which %}{{ statement_less(covered, "less-" ~ s.which, true) }}{% endif %}
     {% if s.which == "transcription" and speech_model %}
     {# The speech model of this computer (7.3; run 9c): offered where the transcription runs on this computer. It
        saves by itself; a model that cannot be chosen is disabled with the reason on the control (7.3, rule 1). #}
@@ -99,7 +99,7 @@
       {{ refusal("save-better-accuracy") }}
       {% if saved_at == "better-accuracy" %}<p class="notice" id="saved-better-accuracy" role="status">{{ words.PATH_SAVED }}</p>{% endif %}
     </form>
-    {% if covered and less_at == "better-accuracy" %}{{ statement_less(covered.made, "less-better-accuracy") }}{% endif %}
+    {% if covered and less_at == "better-accuracy" %}{{ statement_less(covered, "less-better-accuracy", true) }}{% endif %}
     {% endif %}
   </div>
 </section>
@@ -130,7 +130,7 @@
 {% if to_tick %}{{ cloud_statement(to_tick) }}{% endif %}
 {# A path under a wider tick: what leaves now, where a statement to tick would stand; right after its save it stands
    under the control that was changed instead, so it is on the page once. #}
-{% if covered and not less_at %}<section class="pane" id="statement-covered"><div class="pane-body">{{ statement_less(covered.made, "less-apart") }}</div></section>{% endif %}
+{% if covered and not less_at %}<section class="pane" id="statement-covered"><div class="pane-body">{{ statement_less(covered, "less-apart", false) }}</div></section>{% endif %}
 {% if done == "ticked" %}<p class="notice" id="statement-saved" role="status">{{ words.SAVED }}</p>{% endif %}
 
 {# Local models (7.3; 15.13, ruling 57): a list that is read. Nothing in it can be pressed: every download on a click

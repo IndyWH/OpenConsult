@@ -198,16 +198,20 @@ def test_15_13_ruling_56_the_chosen_path_is_marked_for_each_path_by_the_border_t
 def test_review_point_1_a_cloud_box_says_what_goes_to_it_on_the_path_as_chosen_and_nothing_else(tmp_path, clock, name, speechmatics, claude):
     app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS[name])
     made_panel = panel.build(app.state.parts)
-    says = {"live": "On the path you chose, the sound of the consultation goes to Speechmatics as it is spoken.",
-            "after_stop": "On the path you chose, the recording goes to Speechmatics once, after Stop. No sound goes to it during the consultation.",
-            "nothing": "On the path you chose, nothing goes to Speechmatics."}
+    # Restated on the owner's words of 18 Nov 2026 (mail 4 of run 9c): one wording in the boxes and in the notice of a
+    # path that sends less. OLD, my drafts: On the path you chose, the sound of the consultation goes to Speechmatics
+    # as it is spoken. / On the path you chose, the recording goes to Speechmatics once, after Stop. No sound goes to
+    # it during the consultation. / On the path you chose, nothing goes to Speechmatics. / On the path you chose, the
+    # words of the consultation go to Claude. / On the path you chose, nothing goes to Claude. NEW: his sentences.
+    says = {"live": "The sound of the consultation goes to it as it is spoken.",
+            "after_stop": "After Stop, the recording goes to Speechmatics once. No sound goes to it during the consultation.",
+            "nothing": "Nothing goes to Speechmatics."}
     assert made_panel.box("speechmatics").goes == says[speechmatics]
-    assert made_panel.box("claude").goes == {"live": "On the path you chose, the words of the consultation go to Claude.",
-                                             "nothing": "On the path you chose, nothing goes to Claude."}[claude]
+    assert made_panel.box("claude").goes == {"live": "The words of the consultation go to it.", "nothing": "Nothing goes to Claude."}[claude]
     # Connected and not chosen, as on the owner's own machine: the box is ready and does not say that sound goes to it.
     page = text_of(client.get("/settings"))
-    assert ("goes to Speechmatics as it is spoken" in box_of(page, "speechmatics")) is (speechmatics == "live")
-    assert ("go to Claude" in box_of(page, "claude")) is (claude == "live")
+    assert ("goes to it as it is spoken" in box_of(page, "speechmatics")) is (speechmatics == "live")          # restated with the sentences above
+    assert ("The words of the consultation go to it." in box_of(page, "claude")) is (claude == "live")
     # With the tick for better accuracy the Speechmatics box says Used after Stop, and the line of the path adds the owner's own.
     assert (made_panel.box("speechmatics").also == "Used after Stop") is (speechmatics == "after_stop")
     assert (words.CLOUD_MARK_RECORDING in made_panel.path_line) is (speechmatics == "after_stop")

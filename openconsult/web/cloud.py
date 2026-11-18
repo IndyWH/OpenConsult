@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends, Request
 from openconsult import words
 from openconsult.settings import connections, keys
 from openconsult.settings.path import CLAUDE, LANGUAGE_MODELS, SPEECHMATICS, THIS_COMPUTER, TRANSCRIPTIONS
-from openconsult.settings.statement import statement_for
+from openconsult.settings.statement import statement_for, where_lines
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -98,10 +98,12 @@ def covered_view(p) -> dict | None:
     """The statement of the path as it stands, where it asks for no tick
     because it sends less than the one that was ticked (15.13, ruling 48):
     shown with no tick, so that the doctor reads what leaves now."""
-    made = statement_for(p.stored.path(p.machine.case))
+    path = p.stored.path(p.machine.case)
+    made = statement_for(path)
     if made is None or p.stored.ticked(made) or not p.stored.covers(made):
         return None
-    return {"made": made, "covered": True}
+    # where: what runs on this computer and what in the cloud, in the owner's lines (his shape of 18 Nov 2026).
+    return {"made": made, "covered": True, "where": where_lines(path)}
 
 
 def walk_view(p, user, service: str) -> dict | None:

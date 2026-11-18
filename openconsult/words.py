@@ -1105,9 +1105,28 @@ PATH_SAVED = "Saved. It takes effect at the next consultation."
 # has not run and taken away by the script; the second stands over a statement that waits for its tick.
 SETTINGS_NO_SCRIPT = "This page's script did not run. Press Save after you change a choice or a tick."
 PATH_NOT_SAVED_YET = "This choice is not saved yet. Read the statement below and tick it. The tick saves the choice."
-# A path that sends less than the statement that was ticked asks for no new tick (15.13, ruling 48); the page shows
-# the statement of that path with no tick under this line. A draft: it speaks of what leaves the computer.
-PATH_SENDS_LESS = "Less leaves this computer than you agreed to, so no new tick is asked. This is what leaves now."
+# A path that sends less than the statement that was ticked asks for no new tick (15.13, ruling 48). The notice under
+# the control is THE OWNER'S, in shape and letter for letter (his words of 18 Nov 2026, 07:07 to 07:25, from the
+# doctor's point of view): the head; a line that begins On this computer and holds what runs here; a line that begins
+# In the cloud and holds what runs there, with what goes to it. The full statement of the path stays one press away.
+LESS_HEAD = "Saved. No new tick is asked, because less leaves this computer than you agreed to."
+ON_THIS_COMPUTER = "On this computer:"
+IN_THE_CLOUD = "In the cloud:"
+# What runs here, by the jobs that do. His: both, and the language model alone. Transcription alone is Cowork's draft
+# after his pattern, which he has not seen.
+JOBS_HERE = {("language_model", "transcription"): "the language model and transcription.", ("language_model",): "the language model.",
+             ("transcription",): "transcription."}
+JOB_IN_CLOUD = {"speechmatics": "transcription, by Speechmatics.", "claude": "the language model, by Claude."}
+# What goes to a cloud service on a path: his sentences, one wording for the notice and for the boxes of the picture
+# (settings/statement.py gives them to both). Nothing goes to Speechmatics. is Cowork's draft after his pattern.
+GOES = {
+    "speechmatics": {"live": "The sound of the consultation goes to it as it is spoken.",
+                     "after_stop": "After Stop, the recording goes to Speechmatics once. No sound goes to it during the consultation.",
+                     "nothing": "Nothing goes to Speechmatics."},
+    "claude": {"live": "The words of the consultation go to it.", "nothing": "Nothing goes to Claude."},
+}
+# A draft: the press that opens the full statement under the notice.
+LESS_FULL_STATEMENT = "Read the full statement for these choices"
 CONNECT_FIRST = "Connect {service} first."
 # The Start screen in cloud mode (7.2; 7.3; R15; run 9b). Drafts.
 ROW_MODEL_IN_USE = "Language model"
@@ -1116,8 +1135,8 @@ START_STATEMENT = "Start is not offered: the statement for your choices is not t
 START_TEST_FAILED = "Start is not offered: {reason}"
 # Run 9c: the control panel of This machine (15.13, rulings 6 and 56 and the details of the run). The shape is the
 # owner's, by his sketch of 17 Nov 2026; every word in a box is a draft for him to correct on screen. A box says its
-# state by a sign and a word, never by colour alone (R15). PANEL_GOES says what goes to a cloud service on the path
-# as chosen and nothing else (the plan review, point 1): drafts that speak of where sound and words go.
+# state by a sign and a word, never by colour alone (R15). A cloud box says what goes to its service on the path as
+# chosen and nothing else (the plan review, point 1), in the owner's sentences of GOES above.
 PANEL_INTRO = "How OpenConsult runs on this computer. Press a box to see more."
 PANEL_COLUMNS = {"microphone": "Microphone", "transcription": "Transcription", "language_model": "Language model",
                  "consultation": "Consultation"}
@@ -1150,14 +1169,6 @@ PANEL_REASONS = {
     "engine_not_set_up": "{sentence} The engine is set up by hand until the installers arrive. The README says how.",
     "consultation_ready": "Ready to start.",
     "consultation_not_tested": "{service} has not been tested since OpenConsult started. The Start screen tests it.",
-}
-PANEL_GOES = {
-    "speechmatics": {"live": "On the path you chose, the sound of the consultation goes to Speechmatics as it is spoken.",
-                     "after_stop": ("On the path you chose, the recording goes to Speechmatics once, after Stop. No sound goes to it "
-                                    "during the consultation."),
-                     "nothing": "On the path you chose, nothing goes to Speechmatics."},
-    "claude": {"live": "On the path you chose, the words of the consultation go to Claude.",
-               "nothing": "On the path you chose, nothing goes to Claude."},
 }
 PANEL_PATH_LINE = "The path you chose: the microphone, then transcription {transcription}, then the language model {model}."
 PANEL_PATH_BY = {"this_computer": "on this computer", "speechmatics": "by Speechmatics", "claude": "by Claude"}

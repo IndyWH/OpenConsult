@@ -75,6 +75,11 @@ label.tick { display: flex; align-items: flex-start; color: var(--ink); font-siz
 /* A choice that waits for the tick of its statement (15.13, ruling 47): said in the page's own ink, in bold, with a rule
    at its side, so that it is not told by colour. */
 .waiting { font-weight: 600; margin: .8rem 0 .4rem; padding-left: .6rem; border-left: 4px solid var(--ink); }
+/* A path that sends less (ruling 48, the owner's shape): the head in bold, then what runs here and what in the cloud,
+   a line each; the full statement under it is closed until its line is pressed. */
+.where-lines p { margin: .2rem 0; }
+.where-lines .where-line { font-weight: 400; }
+.statement-full > summary { cursor: pointer; margin: .4rem 0; }
 /* A line or a section the page goes to by itself stands clear of the app's bar, which stays at the top of the window. */
 .waiting, section.pane { scroll-margin-top: 4.2rem; }
 

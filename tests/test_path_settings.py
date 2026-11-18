@@ -97,7 +97,11 @@ def test_15_13_rulings_5_and_48_a_wider_path_asks_for_its_tick_one_that_sends_le
     assert saved.status_code == 303 and saved.headers["location"] == "/settings?done=less&at=language-model#language-model"
     assert p.stored.path("suitable") == ChosenPath(THIS_COMPUTER, SPEECHMATICS) and p.stored.ticked(both) and not p.stored.ticked(alone)
     shown = text_of(client.get(saved.headers["location"]))
-    assert "Less leaves this computer than you agreed to, so no new tick is asked. This is what leaves now." in shown
+    # Restated on the owner's shape of 18 Nov 2026 (mail 4 of run 9c). OLD: my draft line, Less leaves this computer
+    # than you agreed to, so no new tick is asked. This is what leaves now. NEW: his head and his two lines.
+    assert "Saved. No new tick is asked, because less leaves this computer than you agreed to." in shown
+    assert "On this computer: the language model. Nothing goes to Claude." in shown
+    assert "In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken." in shown
     assert "Using a cloud transcription service" in shown and "I understand that this sound leaves this computer." not in shown
     # The last cloud choice given up: nothing leaves this computer, so nothing is asked.
     saved = client.post("/settings/path/transcription", data={"transcription": THIS_COMPUTER})
