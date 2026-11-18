@@ -65,7 +65,9 @@ input {
   border-radius: 8px; padding: .45rem .7rem; width: 100%; margin-top: .2rem;
 }
 input:focus { outline: none; border-color: #D8CEC3; }
-input[type="checkbox"] { width: auto; margin: 0 .5rem 0 0; }
+/* A tick box and a round button keep their own width and stand directly before their words. Until run 9c only the
+   tick box did: a round button took the full width every input is given, and stood apart from its label. */
+input[type="checkbox"], input[type="radio"] { width: auto; margin: 0 .5rem 0 0; flex: none; }
 label { display: block; font-size: .85rem; color: var(--ink-soft); margin: .6rem 0 .2rem; }
 label.tick { display: flex; align-items: flex-start; color: var(--ink); font-size: .95rem; margin-top: 1rem; }
 .refusal { color: var(--red); font-size: .85rem; min-height: 1.2em; margin: .4rem 0 0; }
