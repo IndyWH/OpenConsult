@@ -143,11 +143,15 @@ def background_read(row: dict) -> bool:
     return bool(row["earlier_notes_shown"]) and json.loads(row["earlier_notes"] or "[]") != []
 
 
-def model_line_of(row: dict) -> str:
-    """R20: from the row's stamps, not the running engine, so it is true after a restart."""
+def model_line_of(row: dict, whole_made: bool = False) -> str:
+    """R20: from the row's stamps, not the running engine, so it is true
+    after a restart. whole_made: the final transcript was made by the
+    service from the whole recording, so the line does not name the
+    consultation's own speech choice alone for lines another made."""
     choice = CHOICES.get(row["speech_choice"])
-    return words.MODEL_LINE.format(speech=choice.title if choice else row["speech_choice"], model=row["model_tag"],
-                                   engine=words.ENGINE_NAMES.get(row["engine"], row["engine"]), version=row["engine_version"] or "")
+    line = words.MODEL_LINE_WHOLE if whole_made and row["speech_choice"] != "speechmatics" else words.MODEL_LINE
+    return line.format(speech=choice.title if choice else row["speech_choice"], model=row["model_tag"],
+                       engine=words.ENGINE_NAMES.get(row["engine"], row["engine"]), version=row["engine_version"] or "")
 
 
 def _when(stamp: str) -> tuple[str, str]:
@@ -282,7 +286,8 @@ def page_data(p, row: dict) -> dict:
             "conversion_failed": words.CONVERSION_FAILED.format(reason=row["conversion_failure"]) if row.get("conversion_failure") else None,
             "warning_count": words.WARNING_ONE if counted == 1 else words.WARNINGS_COUNT.format(count=counted),
             "differentials": differentials,
-            "gate_refused": gate_refused, "gate_reason": gate_reason, "model_line": model_line_of(row),
+            "gate_refused": gate_refused, "gate_reason": gate_reason,
+            "model_line": model_line_of(row, any(w["kind"] == whole.MADE for w in warning_rows)),
             "date": words.plain_date(datetime.fromisoformat(row["started_at"])), **state,
             "approved_line": words.APPROVED_LINE.format(date=_when(state["approval"]["at"])[0], time=_when(state["approval"]["at"])[1])
             if state["approval"] else None}

@@ -28,6 +28,7 @@ from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
 from openconsult.patients.patients import PatientRow
 from openconsult.consult.transcript import moved
+from openconsult.speech.choices import SPEECHMATICS as SPEECHMATICS_CHOICE
 from openconsult.speech.lines import Line
 from openconsult.speech.loudness import WINDOW_S
 
@@ -126,10 +127,24 @@ def checks(c: Consultation) -> None:
             c.rows.add_warning(c.id, "no_transcript", start_s=start, end_s=end)
 
 
+def final_choice(c: Consultation):
+    """The speech choice that made the final transcript: the service's,
+    where the record holds that the transcript from the whole recording
+    was made; otherwise the consultation's own. Where the upload failed
+    the live lines stay final, and so does the choice that made them."""
+    made = any(w["kind"] == whole.MADE for w in c.rows.warnings(c.id))
+    return SPEECHMATICS_CHOICE if made else c.speech_door.choice
+
+
 def judge(c: Consultation) -> None:
-    """Five: the gate (ruling 8)."""
+    """Five: the gate (ruling 8), by the speech choice that made the final
+    transcript and not by the one that wrote the live lines: in the room
+    check of 17 Nov 2026 the page said that confidence was not measured
+    and named this computer's choice, though the lines shown were the
+    service's and carried scores."""
     rows = [r for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
-    verdict = gate.judge(rows, c.speech_door.declares, c.speech_door.choice.title)
+    choice = final_choice(c)
+    verdict = gate.judge(rows, choice.declares, choice.title)
     for warning in verdict.warnings:
         c.rows.add_warning(c.id, **warning)
     c.final.refused = verdict.refused

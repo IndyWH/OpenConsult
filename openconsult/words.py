@@ -1134,6 +1134,10 @@ LOST_QUESTION = "The connection was lost from {start} to {end} s, so that part h
 SEND_WHOLE = "Send the recording once for the whole transcript."
 GO_ON_WITHOUT = "Go on without it."
 CLOUD_MARK_RECORDING_SENT = "After Stop the recording went to Speechmatics."
+# The model line of the review page where the service made the final transcript from the whole recording (run 9c;
+# the plan review, point b): it must not name this computer's speech choice alone for lines another made. A draft.
+MODEL_LINE_WHOLE = ("Speech: {speech} during the consultation, Speechmatics for the final transcript. "
+                    "Language model: {model} on {engine} {version}.")
 START_BETTER_MAY_FAIL = ("Speechmatics cannot be reached now: {reason} The consultation can start. The better transcript may not be "
                          "made after Stop.")
 # The first-run steps of run 9b (7.1; 15.13, ruling 7). Drafts, but for MIC_NOT_SENT, the owner's (ruling 53).
