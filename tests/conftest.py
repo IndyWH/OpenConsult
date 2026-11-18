@@ -28,11 +28,25 @@ from tests.made_up_store import MadeStore
 pytest_plugins = ["pytester", "tests.noskip"]
 
 
+@pytest.fixture
+def guard_patcher():
+    """The patcher of the suite's guards, their own. A test that undoes its
+    own patches in its middle (monkeypatch.undo()) used to take the guards
+    off with them, because both were set by the one patcher a test is
+    given: what it built after that had the machine's real secure store,
+    engines and card behind it. In run 9c two such tests then asked the
+    real store for the app's key names, as soon as the app read the store
+    at its start. The guards now hold to the end of every test."""
+    with pytest.MonkeyPatch.context() as patcher:
+        yield patcher
+
+
 @pytest.fixture(autouse=True)
-def r18_guard(tmp_path, monkeypatch):
+def r18_guard(tmp_path, guard_patcher):
     """Fail a test that opens a database outside its temporary folder, reads
     the app's environment, or opens a real browser (R18; ruling 2;
     V1_LESSONS 8.5, 10.1, 12)."""
+    monkeypatch = guard_patcher
     monkeypatch.chdir(tmp_path)
     for name in list(os.environ):
         if name.startswith("OPENCONSULT"):
