@@ -41,11 +41,12 @@
     <ul class="panel-list statement-part">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>
     {% endfor %}
     <p class="statement">{{ statement.made.prototype }}</p>
-    <form method="post" action="/statement/tick">
+    {# The statement's own tick saves it (15.13, ruling 47): the page's script sends the form when the tick is set. #}
+    <form method="post" action="/statement/tick" id="form-statement" data-saves data-stay>
       <input type="hidden" name="sha256" value="{{ statement.made.sha256 }}">
       <input type="hidden" name="back" value="{{ statement.back }}">
-      <label class="tick"><input type="checkbox" name="understand" value="yes"> {{ statement.made.tick }}</label>
-      <button class="primary" id="tick-statement" aria-describedby="tick-statement-refusal">{{ words.SAVE }}</button>
+      <div data-statement><label class="tick"><input type="checkbox" name="understand" value="yes" aria-describedby="tick-statement-refusal"> {{ statement.made.tick }}</label></div>
+      <button class="primary" id="tick-statement" aria-describedby="tick-statement-refusal" data-save>{{ words.SAVE }}</button>
       {{ refusal("tick-statement") }}
     </form>
   </div>

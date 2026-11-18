@@ -2,7 +2,12 @@
 {% from "_parts.html" import refusal, machine_rows, cloud_statement with context %}
 {% set title = words.SETTINGS_TITLE %}
 {% block main %}
+{# data-keeps-place: place.js keeps the window where it stood over the load that a save makes (15.10, ruling 34). #}
+<div id="settings" data-keeps-place data-path="/settings">
 <h1 class="page">{{ words.SETTINGS_TITLE }}</h1>
+{# Served for a page whose script has not run: settings.js takes this line and the Save controls of the forms that
+   save by themselves away (15.13, ruling 47). A page of the app is never dead. #}
+<p class="mark" id="no-script" data-no-script>{{ words.SETTINGS_NO_SCRIPT }}</p>
 
 <section class="pane">
   <div class="pane-head"><h2>{{ words.SECTION_MACHINE }}</h2></div>
@@ -16,14 +21,21 @@
 <section class="pane" id="{{ s.which }}">
   <div class="pane-head"><h2>{{ s.title }}</h2></div>
   <div class="pane-body">
-    <form method="post" action="/settings/path/{{ s.which }}">
+    {# A choice saves by itself (15.13, ruling 47): the page's script sends this same form when a choice changes, or
+       when the statement's tick is set. data-stay: the page keeps its place (15.10, ruling 34). The Save control is
+       served for a page whose script has not run; the script takes it away. The refusal's slot is named by the
+       group of choices too, so a reader meets it at the control that was used (R15). #}
+    <form method="post" action="/settings/path/{{ s.which }}" id="form-{{ s.which }}" data-saves data-stay>
+      <div role="radiogroup" aria-label="{{ s.title }}" aria-describedby="save-{{ s.which }}-refusal">
       {% for c in s.choices %}
       <label class="tick"><input type="radio" name="{{ s.which|replace('-', '_') }}" value="{{ c.value }}"{% if c.checked %} checked{% endif %}{% if c.reason %} disabled aria-describedby="{{ s.which }}-{{ c.value }}-reason"{% endif %}> {{ c.words }}</label>
       {% if c.reason %}<p class="mark" id="{{ s.which }}-{{ c.value }}-reason">{{ c.reason }}</p>{% endif %}
       {% endfor %}
+      </div>
       <p class="mark">{{ words.PATH_NEXT_CONSULTATION }}</p>
       {% if s.statement %}
-      <div class="statement-to-tick" id="statement-{{ s.which }}">
+      <p class="waiting" id="not-saved-{{ s.which }}" role="status">{{ words.PATH_NOT_SAVED_YET }}</p>
+      <div class="statement-to-tick" id="statement-{{ s.which }}" data-statement>
         <h3>{{ s.statement.heading }}</h3>
         <p>{{ s.statement.intro }}</p>
         <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
@@ -37,17 +49,18 @@
         <label class="tick"><input type="checkbox" name="understand" value="yes"> {{ s.statement.tick }}</label>
       </div>
       {% endif %}
-      <button class="primary" id="save-{{ s.which }}" aria-describedby="save-{{ s.which }}-refusal">{{ words.SAVE }}</button>
+      <button class="primary" id="save-{{ s.which }}" aria-describedby="save-{{ s.which }}-refusal" data-save>{{ words.SAVE }}</button>
       {{ refusal("save-" ~ s.which) }}
-      {% if notice == words.PATH_SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
+      {% if saved_at == s.which %}<p class="notice" id="saved-{{ s.which }}" role="status">{{ words.PATH_SAVED }}</p>{% endif %}
     </form>
     {% if s.which == "transcription" and better_accuracy %}
     {# The tick for better accuracy (15.9, rulings 36 and 42): offered while the transcription runs on this computer,
        off until the doctor sets it, set only with Speechmatics connected and the lines of ruling 33 ticked. #}
-    <form method="post" action="/settings/better-accuracy" id="better-accuracy">
-      <label class="tick"><input type="checkbox" name="better_accuracy" value="yes"{% if better_accuracy.checked %} checked{% endif %}> {{ words.BETTER_ACCURACY }}</label>
+    <form method="post" action="/settings/better-accuracy" id="better-accuracy" data-saves data-stay>
+      <div role="group" aria-describedby="save-better-accuracy-refusal"><label class="tick"><input type="checkbox" name="better_accuracy" value="yes"{% if better_accuracy.checked %} checked{% endif %}> {{ words.BETTER_ACCURACY }}</label></div>
       {% if better_accuracy.statement %}
-      <div class="statement-to-tick" id="statement-better-accuracy">
+      <p class="waiting" id="not-saved-better-accuracy" role="status">{{ words.PATH_NOT_SAVED_YET }}</p>
+      <div class="statement-to-tick" id="statement-better-accuracy" data-statement>
         <h3>{{ better_accuracy.statement.heading }}</h3>
         <p>{{ better_accuracy.statement.intro }}</p>
         <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
@@ -61,8 +74,9 @@
         <label class="tick"><input type="checkbox" name="understand" value="yes"> {{ better_accuracy.statement.tick }}</label>
       </div>
       {% endif %}
-      <button class="primary" id="save-better-accuracy" aria-describedby="save-better-accuracy-refusal">{{ words.SAVE }}</button>
+      <button class="primary" id="save-better-accuracy" aria-describedby="save-better-accuracy-refusal" data-save>{{ words.SAVE }}</button>
       {{ refusal("save-better-accuracy") }}
+      {% if saved_at == "better-accuracy" %}<p class="notice" id="saved-better-accuracy" role="status">{{ words.PATH_SAVED }}</p>{% endif %}
     </form>
     {% endif %}
   </div>
@@ -92,6 +106,7 @@
   </div>
 </section>
 {% if to_tick %}{{ cloud_statement(to_tick) }}{% endif %}
+{% if done == "ticked" %}<p class="notice" id="statement-saved" role="status">{{ words.SAVED }}</p>{% endif %}
 
 <section class="pane" id="guidelines">
   <div class="pane-head"><h2>{{ words.SECTION_GUIDELINES }}</h2></div>
@@ -141,7 +156,7 @@
       <label>{{ words.FIELD_CURRENT_PASSWORD }}<input name="current_password" type="password" autocomplete="current-password"></label>
       <button class="primary" id="save-you" aria-describedby="save-you-refusal">{{ words.SAVE }}</button>
       {{ refusal("save-you") }}
-      {% if notice == words.SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
+      {% if done == "you" %}<p class="notice">{{ words.SAVED }}</p>{% endif %}
     </form>
   </div>
 </section>
@@ -159,4 +174,7 @@
     </form>
   </div>
 </section>
+</div>
+<script src="{{ static('settings.js') }}"></script>
+<script src="{{ static('place.js') }}"></script>
 {% endblock %}

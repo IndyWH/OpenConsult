@@ -176,7 +176,9 @@ def test_15_13_ruling_33_the_tick_is_saved_only_with_speechmatics_connected_and_
     shown = client.post("/settings/better-accuracy", data={"better_accuracy": "yes"})
     made = statement_for(TICKED)
     said = text_of(shown)
-    assert refusal_on(shown.text, "save-better-accuracy") == words.STATEMENT_TICK_FIRST and not p.stored.path("suitable").better_accuracy
+    # Since run 9c the tick saves by itself (15.13, ruling 47): sent alone it is no press that is refused. The page comes
+    # back with its lines and says that the tick is not saved yet; the tick under the lines saves both.
+    assert shown.status_code == 200 and words.PATH_NOT_SAVED_YET in said and not p.stored.path("suitable").better_accuracy
     assert "Sending the recording after Stop" in said and "I understand that this recording leaves this computer after Stop." in said
     assert words.CLOUD_SENT_RECORDING in said and words.CLOUD_SPEECHMATICS_WHOLE_KEPT in said and "19 US cents" in said and "20 US cents" not in said
     saved = client.post("/settings/better-accuracy", data={"better_accuracy": "yes", "understand": "yes", "sha256": made.sha256})

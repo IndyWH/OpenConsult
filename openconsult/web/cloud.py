@@ -261,18 +261,41 @@ async def save_path(request: Request, which: str, user=Depends(guards.logged_in)
     after = dataclasses.replace(before, **{field: choice})
     if choice != THIS_COMPUTER and not p.connections.connected(choice):
         return routes._settings_page(request, user, (control, words.CONNECT_FIRST.format(service=words.SERVICE_TITLES[choice])))
+    return _save_or_wait(request, user, p, fields, control, {"which": which, "choice": choice}, after, which)
+
+
+def _save_or_wait(request: Request, user, p, fields: dict, control: str, pending: dict, after, anchor: str):
+    """A choice saves by itself (15.13, ruling 47), but for one whose path
+    needs a cloud statement that is not ticked: that one comes back with
+    the statement under its control and the line that it is not saved
+    yet, and nothing is saved or kept of it. The statement's own tick,
+    sent with the choice and the checksum of the text shown, saves the
+    choice and the tick together. A Save pressed with the statement
+    shown and no tick, on a page whose script has not run, is refused on
+    the control; so is a tick for other words."""
+    from openconsult.web import routes
     made = statement_for(after)
-    if made is not None and not p.stored.ticked(made):
-        pending = {"which": which, "choice": choice, "made": made}
-        if fields.get("sha256") not in (None, made.sha256):
+    asked = made is not None and not p.stored.ticked(made)
+    if asked:
+        pending = {**pending, "made": made}
+        if "sha256" not in fields:
+            return routes._settings_page(request, user, None, pending)
+        if fields["sha256"] != made.sha256:
             return routes._settings_page(request, user, (control, words.STATEMENT_CHANGED), pending)
-        if fields.get("understand") != "yes" or fields.get("sha256") != made.sha256:
+        if fields.get("understand") != "yes":
             return routes._settings_page(request, user, (control, words.STATEMENT_TICK_FIRST), pending)
-        p.stored.set_path(p.machine.case, after)
+    p.stored.set_path(p.machine.case, after)
+    if asked:
         p.stored.tick_statement(made.sha256, after)
-    else:
-        p.stored.set_path(p.machine.case, after)
-    raise Redirect(f"/settings?done=path#{which}")
+    raise Redirect(_saved(fields, pending["which"], anchor))
+
+
+def _saved(fields: dict, at: str, anchor: str) -> str:
+    """Where a save leads: the settings page, which says Saved beside the
+    control that was changed. With no script it comes back at the
+    section; the page's script keeps the window's place itself and asks
+    for no anchor (15.10, ruling 34)."""
+    return f"/settings?done=path&at={at}" + ("" if fields.get("place") == "keep" else f"#{anchor}")
 
 
 # --------------------------------------------- the tick for better accuracy
@@ -305,15 +328,4 @@ async def save_better_accuracy(request: Request, user=Depends(guards.logged_in))
     after = dataclasses.replace(before, better_accuracy=wanted)
     if wanted and not p.connections.connected(SPEECHMATICS):
         return routes._settings_page(request, user, (control, words.CONNECT_FIRST.format(service=words.SERVICE_TITLES[SPEECHMATICS])))
-    made = statement_for(after)
-    if made is not None and not p.stored.ticked(made):
-        pending = {"which": "better-accuracy", "choice": wanted, "made": made}
-        if fields.get("sha256") not in (None, made.sha256):
-            return routes._settings_page(request, user, (control, words.STATEMENT_CHANGED), pending)
-        if fields.get("understand") != "yes" or fields.get("sha256") != made.sha256:
-            return routes._settings_page(request, user, (control, words.STATEMENT_TICK_FIRST), pending)
-        p.stored.set_path(p.machine.case, after)
-        p.stored.tick_statement(made.sha256, after)
-    else:
-        p.stored.set_path(p.machine.case, after)
-    raise Redirect("/settings?done=path#transcription")
+    return _save_or_wait(request, user, p, fields, control, {"which": "better-accuracy", "choice": wanted}, after, "transcription")

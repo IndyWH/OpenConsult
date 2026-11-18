@@ -17,7 +17,9 @@
     {% if notice %}<p class="notice" id="connect-notice">{{ notice }}</p>{% endif %}
   </form>
 </div></div>
-{% if to_tick %}{{ cloud_statement(to_tick) }}{% endif %}
+{# The statement's tick saves it by itself (15.13, ruling 47); the line is for a page whose script has not run. #}
+{% if to_tick %}<p class="mark" id="no-script" data-no-script>{{ words.SETTINGS_NO_SCRIPT }}</p>{{ cloud_statement(to_tick) }}
+<script src="{{ static('settings.js') }}"></script>{% endif %}
 {% if walk %}
 {# A step of the first run (7.1): it can be left with Not now, and the walk goes on; done, it offers Continue. #}
 <div class="pane"><div class="pane-body" id="walk" data-step="{{ walk.step }}">

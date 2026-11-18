@@ -49,9 +49,15 @@ def test_details_of_9b_a_cloud_choice_is_refused_without_the_connection_and_with
     assert p.stored.path("suitable") == ChosenPath(THIS_COMPUTER, THIS_COMPUTER) and setting_lines(p) == []
     client.post("/connect/claude", data={"key": GOOD})
     # Connected, not ticked: the page shows the statement of the path as it would then stand, in that section, and saves nothing.
+    # Since run 9c a choice saves by itself (15.13, ruling 47), so the choice sent alone is no press that is refused: the
+    # page comes back with the statement and the line that the choice is not saved yet.
     shown = client.post("/settings/path/language-model", data={"language_model": CLAUDE})
     made = statement_for(ChosenPath(CLAUDE, THIS_COMPUTER))
-    assert shown.status_code == 400 and refusal_on(shown.text, "save-language-model") == words.STATEMENT_TICK_FIRST
+    assert shown.status_code == 200 and refusal_on(shown.text, "save-language-model") == ""
+    assert "This choice is not saved yet. Read the statement below and tick it. The tick saves the choice." in text_of(shown)
+    # A Save pressed with the statement shown and no tick, on a page whose script has not run, is refused on the control.
+    no_tick = client.post("/settings/path/language-model", data={"language_model": CLAUDE, "sha256": made.sha256})
+    assert no_tick.status_code == 400 and refusal_on(no_tick.text, "save-language-model") == words.STATEMENT_TICK_FIRST
     page = text_of(shown)
     assert 'id="statement-language-model"' in shown.text and made.heading == words.CLOUD_HEADING_MODEL and made.heading in page
     assert all(line in page for line in (*made.sent, *made.stays, made.tick)) and f'name="sha256" value="{made.sha256}"' in shown.text
@@ -61,12 +67,14 @@ def test_details_of_9b_a_cloud_choice_is_refused_without_the_connection_and_with
     stale = client.post("/settings/path/language-model", data={"language_model": CLAUDE, "understand": "yes", "sha256": "0" * 64})
     assert refusal_on(stale.text, "save-language-model") == words.STATEMENT_CHANGED and setting_lines(p) == []
     saved = client.post("/settings/path/language-model", data={"language_model": CLAUDE, "understand": "yes", "sha256": made.sha256})
-    assert saved.status_code == 303 and saved.headers["location"] == "/settings?done=path#language-model"
+    assert saved.status_code == 303 and saved.headers["location"] == "/settings?done=path&at=language-model#language-model"
     assert p.stored.path("suitable") == ChosenPath(CLAUDE, THIS_COMPUTER) and p.stored.ticked(made)
     assert setting_lines(p) == ["language_model from this_computer to claude"]                 # 7.3 rule 4: from what to what
     assert (p.audit.lines()[0].event, p.audit.lines()[0].detail) == (
         "statement.ticked", f"language model claude, transcription this_computer, recording after Stop no; sha256 {made.sha256}")
-    assert words.PATH_SAVED in text_of(client.get("/settings?done=path")) and 'id="cloud-statement"' not in client.get("/settings").text
+    after = client.get("/settings?done=path&at=language-model").text                          # said beside the control changed, and only there
+    assert f'id="saved-language-model" role="status">{words.PATH_SAVED}</p>' in after and after.count(words.PATH_SAVED) == 1
+    assert 'id="cloud-statement"' not in client.get("/settings").text
 
 
 def test_15_13_ruling_5_a_changed_choice_asks_for_the_tick_of_the_new_statement_and_a_path_with_no_cloud_is_saved_at_once(tmp_path, clock):
@@ -77,14 +85,14 @@ def test_15_13_ruling_5_a_changed_choice_asks_for_the_tick_of_the_new_statement_
     # The second cloud choice: the statement is another text now, the one for both, and the earlier tick does not stand for it.
     both = statement_for(ChosenPath(CLAUDE, SPEECHMATICS))
     shown = client.post("/settings/path/transcription", data={"transcription": SPEECHMATICS})
-    assert refusal_on(shown.text, "save-transcription") == words.STATEMENT_TICK_FIRST and words.CLOUD_HEADING_BOTH in text_of(shown)
+    assert words.PATH_NOT_SAVED_YET in text_of(shown) and words.CLOUD_HEADING_BOTH in text_of(shown)      # it waits for its tick (ruling 47)
     client.post("/settings/path/transcription", data={"transcription": SPEECHMATICS, "understand": "yes", "sha256": both.sha256})
     assert p.stored.path("suitable") == ChosenPath(CLAUDE, SPEECHMATICS) and p.stored.ticked(both) and not p.stored.ticked(first)
     # Back to this computer for the language model, with the transcription still in the cloud: the owner's heading
     # for that path, and its own tick, before the change is saved.
     alone = statement_for(ChosenPath(THIS_COMPUTER, SPEECHMATICS))
     shown = client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER})
-    assert refusal_on(shown.text, "save-language-model") == words.STATEMENT_TICK_FIRST
+    assert words.PATH_NOT_SAVED_YET in text_of(shown)
     assert "Using a cloud transcription service" in text_of(shown) and "I understand that this sound leaves this computer." in text_of(shown)
     assert p.stored.path("suitable").language_model == CLAUDE
     client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER, "understand": "yes", "sha256": alone.sha256})

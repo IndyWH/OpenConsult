@@ -1096,6 +1096,10 @@ CHOICE_CLAUDE = "Claude Haiku 5.5, a cloud service"
 CHOICE_SPEECHMATICS = "Speechmatics, a cloud service"
 PATH_NEXT_CONSULTATION = "A change takes effect at the next consultation, never during one."
 PATH_SAVED = "Saved. It takes effect at the next consultation."
+# Run 9c: a tick or a choice saves by itself (15.13, ruling 47). Drafts. The first is served for a page whose script
+# has not run and taken away by the script; the second stands over a statement that waits for its tick.
+SETTINGS_NO_SCRIPT = "This page's script did not run. Press Save after you change a choice or a tick."
+PATH_NOT_SAVED_YET = "This choice is not saved yet. Read the statement below and tick it. The tick saves the choice."
 CONNECT_FIRST = "Connect {service} first."
 # The Start screen in cloud mode (7.2; 7.3; R15; run 9b). Drafts.
 ROW_MODEL_IN_USE = "Language model"

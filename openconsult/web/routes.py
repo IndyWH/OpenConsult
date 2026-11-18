@@ -304,6 +304,9 @@ def _settings_page(request: Request, user, refused=None, pending=None):
                    room=room_lines(request), pointer=pointer(request),
                    speech=speech_lines(request), choices=choice_lines(request),
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
+                   # Saved is said beside the control that was changed, and only there (15.13, ruling 47).
+                   done=request.query_params.get("done", ""),
+                   saved_at=request.query_params.get("at") if request.query_params.get("done") == "path" else None,
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],

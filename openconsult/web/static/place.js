@@ -9,9 +9,11 @@
 // the keyboard on it. Where the control is gone, as Undo is once pressed,
 // the nearest part of the page around it stands in. A row's form then asks
 // the app to send it to no anchor. What is noted is a place and the names
-// of controls, never a word of the consultation.
+// of controls, never a word of the consultation. Since run 9c the settings
+// page keeps its place the same way, over the load that a save makes
+// (15.13, ruling 47): any page marked data-keeps-place.
 (function () {
-  const page = document.getElementById('review');
+  const page = document.getElementById('review') || document.querySelector('[data-keeps-place]');
   if (!page) return;
   let store;
   try { store = window.sessionStorage; store.getItem('x'); } catch (error) { return; }     // no store: the page comes back as with no script
