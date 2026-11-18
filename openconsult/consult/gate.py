@@ -13,18 +13,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+from openconsult.settings.thresholds import FEWEST_WORDS_DEFAULT, LOW_SCORE_DEFAULT
 from openconsult.speech.lines import Declares, Line
 from openconsult.speech.loudness import WINDOW_S
 from openconsult.speech.matching import normalise
 from openconsult.speech.missing import missing_from_final, uncovered_speech
 
-# Too short: a design choice, not a measurement, a tenth of the shortest
-# script of the bank (script 01, 667 words by the bench's parser; the
-# shortest of the sixteen cases is 07 at 619). The room may move it.
-TOO_SHORT_WORDS = 60
-# The low-confidence line: v1's 0.60, for a choice that gives a score
-# (V1_LESSONS 1.10: 468, a news broadcast, was refused at 0.549).
-LOW_CONFIDENCE = 0.60
+# The two thresholds as they stand when nothing was set: the doctor may move
+# each within its bounds in Settings (7.3), and a consultation is judged by
+# the two values it started with (settings/thresholds.py).
+TOO_SHORT_WORDS = FEWEST_WORDS_DEFAULT
+LOW_CONFIDENCE = LOW_SCORE_DEFAULT
 
 
 # The two warnings that are a refusal by rule one: no note is drafted for such a transcript.
@@ -62,17 +61,19 @@ def missing_speech(live: list[Line], final: list[Line], windows: list, second_tr
     return found
 
 
-def judge(rows: list[dict], declares: Declares, choice_title: str) -> Verdict:
+def judge(rows: list[dict], declares: Declares, choice_title: str,
+          fewest_words: int = TOO_SHORT_WORDS, low_score: float = LOW_CONFIDENCE) -> Verdict:
     """The three rules over the numbered lines as they stand after the
-    answer to which speaker was you."""
+    answer to which speaker was you. fewest_words and low_score are the
+    consultation's own, held in its row from Start."""
     words = word_count(rows)
     if not rows or words == 0:
         return Verdict(True, [{"kind": "empty"}])
     warnings = []
-    refused = words < TOO_SHORT_WORDS
+    refused = words < fewest_words
     if refused:
         from openconsult import words as sentences
-        warnings.append({"kind": "too_short", "detail": sentences.WARN_TOO_SHORT.format(words=words, least=TOO_SHORT_WORDS)})
+        warnings.append({"kind": "too_short", "detail": sentences.WARN_TOO_SHORT.format(words=words, least=fewest_words)})
     for row in rows:
         if row.get("unsure") or row.get("label") == "unsure":
             warnings.append({"kind": "no_speaker", "line_n": row["n"]})
@@ -81,6 +82,6 @@ def judge(rows: list[dict], declares: Declares, choice_title: str) -> Verdict:
     else:
         for row in rows:
             score = row.get("confidence")
-            if score is not None and score < LOW_CONFIDENCE:
+            if score is not None and score < low_score:
                 warnings.append({"kind": "low_confidence", "line_n": row["n"], "detail": f"{score:.2f}"})
     return Verdict(refused, warnings)

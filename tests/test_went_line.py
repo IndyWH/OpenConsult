@@ -21,6 +21,7 @@ from openconsult import schema, words
 from openconsult.consult.consultations import Consultations
 from openconsult.consult.live import FINAL
 from openconsult.db import open_database
+from openconsult.settings import thresholds
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, THIS_COMPUTER, ChosenPath
 from openconsult.settings.statement import mark_lines, review_mark_lines
 from openconsult.speech import upload
@@ -155,4 +156,10 @@ def test_6_5_a_version_11_database_comes_forward_to_12_with_every_row_and_an_old
     assert review_mark_lines(TICKED, rows.upload(sent)["request"]) == (WENT,) and mark_lines(TICKED) == (GOES,)
     with pytest.raises(ValueError):
         rows.end_upload(sent, None, None, None, None, None, [], None, None, None, result=False, request="made up")
+    # The other two columns of version 12 (7.3; mail 2 of run 9c): the two thresholds of the gate a consultation
+    # started with. A row of version 11 holds neither and reads the defaults; a row started now holds what it is given.
+    assert {"fewest_words", "low_score"} <= {c["name"] for c in new.query("PRAGMA table_info(consultation)")}
+    assert (rows.get(sent)["fewest_words"], rows.get(sent)["low_score"]) == (None, None) and thresholds.of_row(rows.get(sent)) == (60, 0.60)
+    now = rows.start(1, 15, "nemotron", "vllm", None, "tag", None, 2, path=TICKED, fewest_words=45, low_score=0.7)
+    assert thresholds.of_row(rows.get(now)) == (45, 0.70)
     new.close()

@@ -22,7 +22,7 @@ from openconsult import words
 from openconsult.consult import alarms, deletion, drug_marks, gate, note, reading, who_check, whole
 from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
-from openconsult.consult.gate import LOW_CONFIDENCE
+from openconsult.settings import thresholds
 from openconsult.settings.path import path_of
 from openconsult.settings.statement import review_mark_lines
 from openconsult.speech.choices import CHOICES
@@ -228,10 +228,12 @@ def sent_lines(p, row: dict) -> tuple[str | None, str | None]:
 def page_data(p, row: dict) -> dict:
     cid = row["id"]
     lines = [r for r in p.consultations.transcript_lines(cid) if r["n"] is not None]
+    # A line is marked by the score the consultation started with, as its gate judged it (7.3).
+    _, low_score = thresholds.of_row(row)
     for line in lines:
         score = line.get("confidence")
         line["low_confidence"] = (words.LOW_CONFIDENCE_MARK.format(score=f"{score:.2f}")
-                                  if score is not None and score < LOW_CONFIDENCE else None)
+                                  if score is not None and score < low_score else None)
     warning_rows = p.consultations.warnings(cid)
     gate_refused = any(w["kind"] in GATE_REFUSALS for w in warning_rows)
     gate_reason = " ".join(w["detail"] or words.WARNING_SENTENCES.get(w["kind"], "") for w in warning_rows if w["kind"] in GATE_REFUSALS)

@@ -28,6 +28,7 @@ from openconsult.consult.live import FINAL, STOPPING, Consultation
 from openconsult.consult.recording import finish, folder_of
 from openconsult.patients.patients import PatientRow
 from openconsult.consult.transcript import moved
+from openconsult.settings import thresholds
 from openconsult.speech.choices import SPEECHMATICS as SPEECHMATICS_CHOICE
 from openconsult.speech.lines import Line
 from openconsult.speech.loudness import WINDOW_S
@@ -144,7 +145,9 @@ def judge(c: Consultation) -> None:
     service's and carried scores."""
     rows = [r for r in c.rows.transcript_lines(c.id) if r["n"] is not None]
     choice = final_choice(c)
-    verdict = gate.judge(rows, choice.declares, choice.title)
+    # By the two thresholds the consultation started with, never by what Settings holds now (7.3).
+    fewest_words, low_score = thresholds.of_row(c.rows.get(c.id))
+    verdict = gate.judge(rows, choice.declares, choice.title, fewest_words=fewest_words, low_score=low_score)
     for warning in verdict.warnings:
         c.rows.add_warning(c.id, **warning)
     c.final.refused = verdict.refused

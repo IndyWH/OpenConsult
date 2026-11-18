@@ -349,7 +349,9 @@ def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, ear
     cid = p.consultations.start(patient.id, minutes, door.choice.name, llm.engine_name, version, llm.profile.tag,
                                 digest, SPEAKERS, earlier_notes_shown, earlier_notes, path=path,
                                 # The checksum of the statement of its own path, which may stand under a wider tick (ruling 48).
-                                statement_sha256=statement_for(path).sha256 if path.holds_cloud else None)
+                                statement_sha256=statement_for(path).sha256 if path.holds_cloud else None,
+                                # The two thresholds of the gate, read here once like the path (7.3).
+                                fewest_words=p.stored.fewest_words, low_score=p.stored.low_score)
     started_at = p.clock()
     # The block of 15.11 ruling 5 goes to the two calls of every pass while the switch is on (8.4); off or none sends nothing.
     block = background.block_for(p.notes, patient.id, started_at, cid) if earlier_notes_shown else None

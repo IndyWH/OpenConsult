@@ -14,11 +14,14 @@ from __future__ import annotations
 import json
 
 from openconsult.db import Database
+from openconsult.settings import thresholds
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.settings.path import LANGUAGE_MODELS, TRANSCRIPTIONS, ChosenPath, beginning
 from openconsult.settings.statement import sentences_of, words_checksum
 
 AUDIO_RETENTION_DAYS = "audio_retention_days"
+FEWEST_WORDS = "gate_fewest_words"
+LOW_SCORE = "gate_low_score"
 # The path of a consultation (7.3; 15.13, the details of run 9b): where the language model and the transcription
 # run, the tick for better accuracy, and the checksum of the cloud statement as it was last ticked.
 LANGUAGE_MODEL, TRANSCRIPTION, BETTER_ACCURACY, STATEMENT_TICKED = "language_model", "transcription", "better_accuracy", "statement_ticked"
@@ -69,6 +72,32 @@ class Stored:
             raise ValueError("days is a whole number from 0 up")
         if days != self.audio_retention_days or self._get(AUDIO_RETENTION_DAYS) is None:
             self._set(AUDIO_RETENTION_DAYS, str(days))
+
+    # --------------------------------------- the two thresholds of the gate (9c)
+
+    @property
+    def fewest_words(self) -> int:
+        """Read at Start, where the consultation takes it into its own row.
+        A stored value outside the bounds reads the default."""
+        value = thresholds.fewest_words_of(self._get(FEWEST_WORDS) or "")
+        return value if value is not None else thresholds.FEWEST_WORDS_DEFAULT
+
+    def set_fewest_words(self, number: int) -> None:
+        if isinstance(number, bool) or thresholds.fewest_words_of(str(number)) != number:
+            raise ValueError("the fewest words is a whole number within its bounds")
+        if number != self.fewest_words or self._get(FEWEST_WORDS) is None:
+            self._set(FEWEST_WORDS, str(number))
+
+    @property
+    def low_score(self) -> float:
+        value = thresholds.low_score_of(self._get(LOW_SCORE) or "")
+        return value if value is not None else thresholds.LOW_SCORE_DEFAULT
+
+    def set_low_score(self, score: float) -> None:
+        if isinstance(score, bool) or thresholds.low_score_of(f"{score:.2f}") != score:
+            raise ValueError("the low score is a number of two places within its bounds")
+        if score != self.low_score or self._get(LOW_SCORE) is None:
+            self._set(LOW_SCORE, f"{score:.2f}")
 
     # ------------------------------------------------------- the path (9b)
 

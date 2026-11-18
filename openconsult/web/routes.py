@@ -8,6 +8,7 @@ from fastapi.responses import RedirectResponse
 from openconsult import words
 from openconsult.patients import patients as patients_module
 from openconsult.patients.users import MIN_PASSWORD, name_problem, password_problem
+from openconsult.settings import thresholds
 from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
 from openconsult.settings.connections import SERVICES
 from openconsult.settings.path import CLAUDE
@@ -216,6 +217,7 @@ def _settings_page(request: Request, user, refused=None, pending=None, from_pane
                    less_at=request.query_params.get("at") if request.query_params.get("done") == "less" else None,
                    covered=None if pending else cloud_web.covered_view(parts(request)),
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
+                   thresholds=thresholds_view(parts(request)),
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],
                    path_sections=cloud_web.path_sections(parts(request), pending),
@@ -291,6 +293,47 @@ async def change_retention(request: Request, user=Depends(guards.logged_in)):
         return _settings_page(request, user, ("save-retention", words.RETENTION_BAD))
     p.stored.set_audio_retention_days(days)
     raise Redirect("/settings?done=retention")
+
+
+def thresholds_view(p) -> dict:
+    """The two thresholds of the gate as Settings shows them (7.3): each
+    with its value, its default and its bounds, the score with two places."""
+    t = thresholds
+    return {"fewest_words": {"value": p.stored.fewest_words, "default": t.FEWEST_WORDS_DEFAULT,
+                             "low": t.FEWEST_WORDS_LOW, "high": t.FEWEST_WORDS_HIGH},
+            "low_score": {"value": f"{p.stored.low_score:.2f}", "default": f"{t.LOW_SCORE_DEFAULT:.2f}",
+                          "low": f"{t.LOW_SCORE_LOW:.2f}", "high": f"{t.LOW_SCORE_HIGH:.2f}"}}
+
+
+@router.post("/settings/fewest-words")
+async def change_fewest_words(request: Request, user=Depends(guards.logged_in)):
+    """The fewest words a note is drafted from (7.3; the details of run
+    9c): a whole number within the owner's bounds, refused on the control
+    outside them; audited from what to what; taken by a consultation at
+    its Start and held there, so one that has begun is not touched."""
+    p = parts(request)
+    fields = await form_fields(request)
+    number = thresholds.fewest_words_of(fields.get("words", ""))
+    if number is None:
+        view = thresholds_view(p)["fewest_words"]
+        return _settings_page(request, user, ("save-fewest-words", words.FEWEST_WORDS_BAD.format(**view)))
+    p.stored.set_fewest_words(number)
+    # With no script the page comes back at the field; the page's script keeps the window's place itself (ruling 47).
+    raise Redirect("/settings?done=fewest-words" + ("" if fields.get("place") == "keep" else "#fewest-words"))
+
+
+@router.post("/settings/low-score")
+async def change_low_score(request: Request, user=Depends(guards.logged_in)):
+    """The score under which a line is marked as low confidence: as the
+    fewest words, a number of at most two places."""
+    p = parts(request)
+    fields = await form_fields(request)
+    score = thresholds.low_score_of(fields.get("score", ""))
+    if score is None:
+        view = thresholds_view(p)["low_score"]
+        return _settings_page(request, user, ("save-low-score", words.LOW_SCORE_BAD.format(**view)))
+    p.stored.set_low_score(score)
+    raise Redirect("/settings?done=low-score" + ("" if fields.get("place") == "keep" else "#low-score"))
 
 
 # --------------------------------------------------------------------- log

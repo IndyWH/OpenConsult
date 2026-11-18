@@ -588,6 +588,13 @@ FIELD_RETENTION_DAYS = ("Days a recording is kept after its consultation, then d
                         "0 keeps every recording until its consultation is deleted. The default is {default}.")
 RETENTION_SAVED = "Saved. The next sweep uses it."
 RETENTION_BAD = "Enter a whole number of days, 0 or more."
+# The two thresholds of the gate (7.3; the details of run 9c). Drafts; the bounds are the owner's, 18 Nov 2026.
+FIELD_FEWEST_WORDS = ("The fewest words a note is drafted from. With fewer, no note is drafted. "
+                      "From {low} to {high}; default {default}.")
+FIELD_LOW_SCORE = "The score under which a line is marked as low confidence. From {low} to {high}; default {default}."
+FEWEST_WORDS_BAD = "Enter a whole number from {low} to {high}."
+LOW_SCORE_BAD = "Enter a number from {low} to {high}, such as {default}."
+THRESHOLD_SAVED = "Saved. A consultation started from now on uses it. One already started keeps the value it started with."
 SECTION_YOU = "You"
 SECTION_PASSWORD = "Change password"
 FIELD_CURRENT_PASSWORD = "Current password"

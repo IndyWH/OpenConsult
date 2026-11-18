@@ -182,6 +182,19 @@
       {{ refusal("save-retention") }}
       {% if notice == words.RETENTION_SAVED %}<p class="notice">{{ notice }}</p>{% endif %}
     </form>
+    {# The two thresholds of the gate (7.3): typed, so each keeps its Save; a consultation takes both at Start. #}
+    <form method="post" action="/settings/fewest-words" id="fewest-words" data-stay>
+      <label>{{ words.FIELD_FEWEST_WORDS.format(low=thresholds.fewest_words.low, high=thresholds.fewest_words.high, default=thresholds.fewest_words.default) }}<input name="words" value="{{ thresholds.fewest_words.value }}" inputmode="numeric" autocomplete="off"></label>
+      <button class="primary" id="save-fewest-words" aria-describedby="save-fewest-words-refusal">{{ words.SAVE }}</button>
+      {{ refusal("save-fewest-words") }}
+      {% if done == "fewest-words" %}<p class="notice" id="saved-fewest-words">{{ words.THRESHOLD_SAVED }}</p>{% endif %}
+    </form>
+    <form method="post" action="/settings/low-score" id="low-score" data-stay>
+      <label>{{ words.FIELD_LOW_SCORE.format(low=thresholds.low_score.low, high=thresholds.low_score.high, default=thresholds.low_score.default) }}<input name="score" value="{{ thresholds.low_score.value }}" inputmode="decimal" autocomplete="off"></label>
+      <button class="primary" id="save-low-score" aria-describedby="save-low-score-refusal">{{ words.SAVE }}</button>
+      {{ refusal("save-low-score") }}
+      {% if done == "low-score" %}<p class="notice" id="saved-low-score">{{ words.THRESHOLD_SAVED }}</p>{% endif %}
+    </form>
   </div>
 </section>
 

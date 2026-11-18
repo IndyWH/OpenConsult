@@ -43,7 +43,8 @@ class Consultations(CheckRows, SessionRows):
     def start(self, patient_id: int, intended_minutes: int, speech_choice: str, engine: str,
               engine_version: str | None, model_tag: str, model_digest: str | None, speakers_given: int,
               earlier_notes_shown: bool | None = None, earlier_notes: list[int] | None = None, path=None,
-              statement_sha256: str | None = None) -> int:
+              statement_sha256: str | None = None, fewest_words: int | None = None,
+              low_score: float | None = None) -> int:
         """The row at Start. The patient's three details are copied as they
         stand at this moment, so the consultation keeps what the doctor saw
         and the model read whatever is corrected later (15.11 ruling 2;
@@ -51,7 +52,11 @@ class Consultations(CheckRows, SessionRows):
         no switch was offered; earlier_notes the numbers listed at Start.
         path is the path the consultation starts with and holds to its end
         (7.3; 9b), with the checksum of the cloud statement that stands
-        ticked for it; with none given, this computer for both."""
+        ticked for it; with none given, this computer for both.
+        fewest_words and low_score are the two thresholds of the gate as
+        Settings held them at this moment (7.3): the consultation is judged
+        by them to its end; with none given the row holds none and reads
+        the defaults, as a row from before they could be set."""
         patient = self._db.query_one("SELECT name, date_of_birth, sex FROM patient WHERE id = ?", (patient_id,))
         if patient is None:
             raise ValueError(f"no patient {patient_id}")
@@ -68,6 +73,9 @@ class Consultations(CheckRows, SessionRows):
                              "statement_sha256 = ? WHERE id = ?",
                              (path.language_model, path.transcription, int(path.recording_after_stop), statement_sha256,
                               int(cursor.lastrowid)))
+        if fewest_words is not None or low_score is not None:
+            self._db.execute("UPDATE consultation SET fewest_words = ?, low_score = ? WHERE id = ?",
+                             (fewest_words, low_score, int(cursor.lastrowid)))
         return int(cursor.lastrowid)
 
     def get(self, consultation_id: int) -> dict | None:

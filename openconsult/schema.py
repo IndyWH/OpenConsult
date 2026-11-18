@@ -631,8 +631,12 @@ CREATE TABLE first_run_left (
     # that carried a recording after Stop: never made; made with no connection to the service ever opened, so that
     # nothing left this computer; or made, where the app cannot show that nothing left. An upload of version 11 kept
     # only the bytes it was about to send: with any, its request counts as made.
+    # And the two thresholds of the gate a consultation started with (7.3): none in a row from before they could be
+    # set, which reads the defaults. Their bounds are the code's, not the table's.
     12: """
 ALTER TABLE recording_upload ADD COLUMN request TEXT CHECK (request IN ('not_made', 'never_connected', 'made'));
 UPDATE recording_upload SET request = CASE WHEN bytes > 0 THEN 'made' ELSE 'not_made' END;
+ALTER TABLE consultation ADD COLUMN fewest_words INTEGER;
+ALTER TABLE consultation ADD COLUMN low_score REAL;
 """,
 }
