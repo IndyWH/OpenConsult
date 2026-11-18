@@ -124,14 +124,19 @@ This branch is where OpenConsult v2.0 is being built.
   Haiku 5.5 for the language model, with Claude Sonnet 5.5 for the
   drug-name call alone, and Speechmatics for the transcription. Each is
   connected on its own screen with a key that is tested before it is
-  kept, and kept only in the computer's secure store; the screen for
-  Claude has the line Why this model. Before anything leaves the
-  computer the app shows a statement built for the choices made, of what
-  is sent, what stays and what each service keeps, and asks for a tick;
-  a changed word asks for the tick again. A consultation keeps the path
-  it started with to its end and never falls back to another, and a
-  cloud path carries a Cloud mark on the Start screen, the live page and
-  the review page. When the connection to the transcription service is
+  kept. The screen keeps the key in the computer's secure store and
+  nowhere else. A developer running from source may put a key in the
+  file .env instead. The screen for Claude has the line Why this model.
+  Before anything leaves the computer the app shows a statement built
+  for the choices made, of what is sent, what stays and what each
+  service keeps, and asks for a tick; a changed word asks for the tick
+  again. In Settings a choice or a tick saves by itself; a choice that
+  sends something new off the computer is saved only by the tick under
+  its statement, and a path that sends less than one already ticked
+  asks for no new tick. A consultation keeps the path it started with
+  to its end and never falls back to another, and a cloud path carries
+  a Cloud mark on the Start screen, the live page and the review page.
+  When the connection to the transcription service is
   lost the page says so at once, the recording goes on, the app tries
   again every 10 seconds, the speakers are asked about for each part,
   and at Stop the doctor is told which stretch has no transcript and may
@@ -139,8 +144,9 @@ This branch is where OpenConsult v2.0 is being built.
   With transcription on this computer, a tick for better accuracy sends
   the whole recording to Speechmatics once after Stop for the final
   transcript; the app deletes it there as soon as the transcript is
-  back, asks the service to confirm that it is gone, keeps that proof,
-  and says so on the review page when it cannot be proven. The first run
+  back, asks the service to confirm that it is gone, asks once more
+  where an ask gets no answer at all, keeps that proof, and says so on
+  the review page when it cannot be proven. The first run
   walks through connecting what the computer needs, the self-test run
   from its page, and a microphone test whose sound is not stored and not
   sent; a folder set up before these steps meets them once.
