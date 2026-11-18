@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 
 WAYS = ("tick", "press")
+REQUESTS = ("not_made", "never_connected", "made")
 
 
 class SessionRows:
@@ -72,16 +73,21 @@ class SessionRows:
 
     def end_upload(self, consultation_id: int, job_id: str | None, seconds_to_result: float | None, counted_s: float | None,
                    applied: dict | None, delete_answer: dict | None, asked_again: list, gone: bool | None, proof: str | None,
-                   failure: str | None, result: bool) -> None:
+                   failure: str | None, result: bool, request: str = "made") -> None:
         """What came of it, written once: the result's moment when one came,
-        the delete and its proof, the failure in plain words if any."""
+        the delete and its proof, the failure in plain words if any; and
+        request, what the record can show of the request that carried the
+        recording: not_made, never_connected or made (15.13, ruling 52)."""
+        if request not in REQUESTS:
+            raise ValueError(f"not what a request can be: {request}")
         self._db.execute(
             "UPDATE recording_upload SET job_id = ?, result_at = ?, seconds_to_result = ?, counted_s = ?, applied = ?, "
-            "delete_answer = ?, asked_again = ?, gone = ?, proof = ?, failure = ? WHERE consultation_id = ?",
+            "delete_answer = ?, asked_again = ?, gone = ?, proof = ?, failure = ?, request = ? WHERE consultation_id = ?",
             (job_id, self._now() if result else None, seconds_to_result, counted_s,
              json.dumps(applied, ensure_ascii=False) if applied is not None else None,
              json.dumps(delete_answer, ensure_ascii=False) if delete_answer is not None else None,
-             json.dumps(asked_again, ensure_ascii=False), None if gone is None else int(bool(gone)), proof, failure, consultation_id))
+             json.dumps(asked_again, ensure_ascii=False), None if gone is None else int(bool(gone)), proof, failure, request,
+             consultation_id))
 
     def upload(self, consultation_id: int) -> dict | None:
         row = self._db.query_one("SELECT * FROM recording_upload WHERE consultation_id = ?", (consultation_id,))

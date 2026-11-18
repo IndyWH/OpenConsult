@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 11
+VERSION = 12
 
 MIGRATIONS = {
     1: """
@@ -626,5 +626,13 @@ CREATE TABLE first_run_left (
     step TEXT PRIMARY KEY,
     left_at TEXT NOT NULL
 );
+""",
+    # Run 9c (spec 15.13, ruling 52 and the details of the run: The record). What the record can show of the request
+    # that carried a recording after Stop: never made; made with no connection to the service ever opened, so that
+    # nothing left this computer; or made, where the app cannot show that nothing left. An upload of version 11 kept
+    # only the bytes it was about to send: with any, its request counts as made.
+    12: """
+ALTER TABLE recording_upload ADD COLUMN request TEXT CHECK (request IN ('not_made', 'never_connected', 'made'));
+UPDATE recording_upload SET request = CASE WHEN bytes > 0 THEN 'made' ELSE 'not_made' END;
 """,
 }

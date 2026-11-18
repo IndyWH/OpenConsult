@@ -119,7 +119,8 @@ class WholeRecording:
         key = self._key()
         if key is None or path is None or not path.is_file():
             c.rows.add_upload(c.id, way, FILE_NAME, 0)
-            self._ended(c, way, None, {"at": "key" if key is None else "send", "detail": "no key in use" if key is None else "no recording file"},
+            self._ended(c, way, {"request": upload.NOT_MADE},
+                        {"at": "key" if key is None else "send", "detail": "no key in use" if key is None else "no recording file"},
                         lines=[], limit=0.0)
             return
         wav = path.read_bytes()
@@ -127,13 +128,14 @@ class WholeRecording:
         limit = limit_s(recording_s)
         c.rows.add_upload(c.id, way, FILE_NAME, len(wav))
         noting = _Noting(lambda job: c.rows.note_upload_job(c.id, job["id"]))
+        http = self.http()
         try:
-            result = upload.run_upload(noting, self.http(), key, wav, FILE_NAME, {"recording": FILE_NAME}, b"", int(row["sample_rate"] or 48000),
+            result = upload.run_upload(noting, http, key, wav, FILE_NAME, {"recording": FILE_NAME}, b"", int(row["sample_rate"] or 48000),
                                        clock=self._clock, sleep=self._sleep, timeout_s=limit)
         except Exception as broke:  # noqa: BLE001 - the delete was asked in run_upload's own ending; what broke is said by its name
             noted = c.rows.upload(c.id)
             self._ended(c, way, {"job": {"id": noted["job_id"]} if noted and noted["job_id"] else None, "gone": None,
-                                 "proof": f"the upload broke: {type(broke).__name__}"},
+                                 "proof": f"the upload broke: {type(broke).__name__}", "request": upload.request_made(http.sent)},
                         {"at": "send", "detail": f"the upload broke: {type(broke).__name__}"}, lines=[], limit=limit)
             return
         self._ended(c, way, result["upload"], result["failure"], lines=result["stop"]["lines"], limit=limit)
@@ -148,7 +150,10 @@ class WholeRecording:
             self._make_final(c, lines)
         reason = None if made else reason_of(failure, limit)
         c.rows.end_upload(c.id, job.get("id"), up.get("seconds_to_result"), up.get("counted_s"), up.get("applied"), up.get("delete"),
-                          up.get("asked_again") or [], up.get("gone"), up.get("proof"), reason, result=made)
+                          up.get("asked_again") or [], up.get("gone"), up.get("proof"), reason, result=made,
+                          # Where the record cannot show it, the request counts as made: the app never says that
+                          # nothing left when it cannot show so (ruling 52).
+                          request=up.get("request") or upload.MADE)
         if made:
             c.rows.add_warning(c.id, MADE, detail=way)
         else:

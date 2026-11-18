@@ -23,8 +23,10 @@ after a lost connection."""
 from __future__ import annotations
 
 import datetime as dt
+import errno
 import json
 import re
+import socket
 import time
 import urllib.error
 import urllib.request
@@ -57,6 +59,7 @@ class Answer:
     status: int                # 0 when no answer came
     body: bytes
     error: str | None = None
+    never_connected: bool = False   # no answer, and the failure shows that no connection to the service was opened at all
 
     def json(self):
         try:
@@ -85,7 +88,19 @@ def _urllib_send(method: str, url: str, headers: dict, body: bytes | None, timeo
     except urllib.error.HTTPError as refused:
         return Answer(refused.code, refused.read() or b"")
     except (urllib.error.URLError, OSError, TimeoutError) as gone:
-        return Answer(0, b"", f"{type(gone).__name__}"[:80])
+        return Answer(0, b"", f"{type(gone).__name__}"[:80], never_connected(gone))
+
+
+def never_connected(gone: Exception) -> bool:
+    """Whether a failure shows that no connection to the service was opened
+    at all: its name was not found, the connection was refused, or there
+    is no route to it. Then nothing can have left this computer. Anything
+    else, a limit of time among them, may have come after the connection
+    was open, and shows nothing (15.13, ruling 52)."""
+    reason = gone.reason if isinstance(gone, urllib.error.URLError) else gone
+    if isinstance(reason, (socket.gaierror, ConnectionRefusedError)):
+        return True
+    return isinstance(reason, OSError) and reason.errno in (errno.ENETUNREACH, errno.EHOSTUNREACH)
 
 
 class Http:
@@ -102,7 +117,8 @@ class Http:
         if parts.scheme != "https" or parts.hostname != self.eu_host or parts.port not in (None, 443):
             raise AddressRefused(url)
         answer = self._send(method, url, headers, body) if timeout_s is None else self._send(method, url, headers, body, timeout_s)
-        self.sent.append({"method": method, "url": url, "status": answer.status, "bytes_sent": len(body or b"")})
+        self.sent.append({"method": method, "url": url, "status": answer.status, "bytes_sent": len(body or b""),
+                          **({"never_connected": True} if answer.never_connected else {})})
         return answer
 
 
@@ -180,7 +196,7 @@ def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, descri
               "stamp": service.stamp(), "pieces": [], "stop": None, "loudness": loudness_of(pcm, rate), "failure": None}
     upload = {"service": service.NAME, "address": service.BASE, "file_name": file_name, "bytes": len(wav),
               "job": None, "reply": None, "counted_s": None, "seconds_to_result": None, "applied": None,
-              "delete": None, "asked_again": [], "gone": None, "proof": None}
+              "delete": None, "asked_again": [], "gone": None, "proof": None, "request": NOT_MADE}
     result["upload"] = upload
     started = clock()
 
@@ -189,9 +205,11 @@ def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, descri
             result["failure"] = {"at": at, "failure": "upload_failed", "detail": detail}
 
     job, reply, lines = None, None, []
+    before = len(http.sent)
     try:
         job, problem = service.submit(http, key, wav, file_name)
         upload["job"] = job
+        upload["request"] = request_made(http.sent[before:])
         if problem:
             failed("send", problem)
         else:
@@ -223,6 +241,21 @@ def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, descri
                       "raw": [], "seconds": {"sent_to_result": upload["seconds_to_result"]}, "revisions": [],
                       "speakers": {}, "notes": {"requests": list(http.sent)}}
     return result
+
+
+NOT_MADE, NEVER_CONNECTED, MADE = "not_made", "never_connected", "made"
+
+
+def request_made(sent: list[dict]) -> str:
+    """What the record can show of the request that carries the recording,
+    the first of a sending (15.13, ruling 52): never made; made, with no
+    connection to the service ever opened, so that nothing left this
+    computer; or made, with any answer of the service, a refusal too, or
+    a failure that may have come after the connection was open, so that
+    the app cannot show that nothing left."""
+    if not sent:
+        return NOT_MADE
+    return NEVER_CONNECTED if sent[0].get("never_connected") else MADE
 
 
 def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: list[dict], upload: dict,

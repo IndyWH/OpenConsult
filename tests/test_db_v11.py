@@ -30,9 +30,9 @@ def test_6_5_a_version_10_database_comes_forward_to_11_with_every_row_and_an_old
     old.execute("INSERT INTO first_run (step, done_at) VALUES ('statement', 't')")
     counts = {t: old.query_one(f"SELECT COUNT(*) AS n FROM {t}")["n"] for t in old.tables()}
     old.close()
-    monkeypatch.undo()
+    monkeypatch.setattr(schema, "VERSION", 11)              # the step from 10 to 11 by itself, now that a later version exists (run 9c)
     new = open_database(path)
-    assert new.version() == 11 == schema.VERSION
+    assert new.version() == 11
     assert {t: new.query_one(f"SELECT COUNT(*) AS n FROM {t}")["n"] for t in counts} == counts          # every row came forward
     assert {"speech_session", "recording_upload", "first_run_left"} <= set(new.tables())
     rows = Consultations(new, clock)

@@ -125,9 +125,11 @@ def test_15_9_ruling_36_with_the_tick_the_recording_is_sent_once_after_stop_and_
     # 15.10 ruling 21: the drug-name call read the lines that became final.
     drug_call = [call for call in local.calls if call.job == "drug_name"]
     assert len(drug_call) == 1 and "first0" in drug_call[0].user and "second39" in drug_call[0].user
-    # The review page says where the transcript came from; the mark holds its third line; the log holds the sending, never the key.
+    # The review page says where the transcript came from; the mark's third line says that the recording went (15.13,
+    # ruling 52: by then it has gone, so goes would be untrue); the log holds the sending, never the key.
     page = text_of(client.get("/consultations/1"))
-    assert words.UPLOAD_MADE in page and words.CLOUD_MARK_RECORDING in page and words.CLOUD_MARK_SOUND not in page
+    assert words.UPLOAD_MADE in page and words.CLOUD_MARK_RECORDING_SENT in page and words.CLOUD_MARK_RECORDING not in page
+    assert words.CLOUD_MARK_SOUND not in page
     assert not any(w["kind"] == "delete_not_proven" for w in p.consultations.warnings(1))
     assert next(l.detail for l in p.audit.lines() if l.event == "recording.sent") == (
         "consultation 1: by the tick; the transcript made from it; deleted and proven gone")

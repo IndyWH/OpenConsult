@@ -24,7 +24,7 @@ from openconsult.consult.recording import folder_of
 from openconsult.consult.consultations import LABELS
 from openconsult.consult.gate import LOW_CONFIDENCE
 from openconsult.settings.path import path_of
-from openconsult.settings.statement import mark_lines
+from openconsult.settings.statement import review_mark_lines
 from openconsult.speech.choices import CHOICES
 from openconsult.speech.loudness import WINDOW_S
 from openconsult.web import guards
@@ -208,19 +208,17 @@ def ran_with(p, row: dict) -> dict:
             "corrected": words.DETAILS_CORRECTED.format(date=words.plain_date(datetime.fromisoformat(changed))) if changed else None}
 
 
-def sent_lines(p, row: dict) -> tuple[tuple[str, ...], str | None]:
-    """For a consultation whose recording was sent after Stop: the mark's
-    third line in the past, where the one press after a lost connection
-    sent it (the tick's own line stands in the mark already); and the
-    sentence that the final transcript is the service's, with the delete
-    as it was proven."""
+def sent_lines(p, row: dict) -> tuple[str | None, str | None]:
+    """For a consultation whose recording was to be sent after Stop: what
+    its record can show of the request that carried it, for the mark's
+    third line (ruling 52); and the sentence that the final transcript
+    is the service's, with the delete as it was proven."""
     sent = p.consultations.upload(row["id"])
     if sent is None:
-        return (), None
-    past = (words.CLOUD_MARK_RECORDING_SENT,) if sent["way"] == whole.PRESS and sent["job_id"] else ()
+        return None, None
     if sent["result_at"] is None:
-        return past, None
-    return past, words.UPLOAD_MADE if sent["gone"] else words.UPLOAD_MADE_ONLY
+        return sent["request"], None
+    return sent["request"], words.UPLOAD_MADE if sent["gone"] else words.UPLOAD_MADE_ONLY
 
 
 def page_data(p, row: dict) -> dict:
@@ -272,7 +270,7 @@ def page_data(p, row: dict) -> dict:
                                     alarms.acknowledged_keys(p.audit.lines(), cid), words)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
             # The cloud mark among the details the consultation ran with (ruling 5); and what came of a recording sent after Stop.
-            "mark": mark_lines(path_of(row)) + sent_lines(p, row)[0], "recording_sent": sent_lines(p, row)[1],
+            "mark": review_mark_lines(path_of(row), sent_lines(p, row)[0]), "recording_sent": sent_lines(p, row)[1],
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),

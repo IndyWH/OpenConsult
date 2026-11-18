@@ -116,3 +116,18 @@ def mark_lines(path: ChosenPath) -> tuple[str, ...]:
     if path.recording_after_stop:
         lines.append(words.CLOUD_MARK_RECORDING)
     return tuple(lines)
+
+
+def review_mark_lines(path: ChosenPath, request: str | None) -> tuple[str, ...]:
+    """The mark on the review page (15.13, ruling 52). The lines for the
+    sound and the words as the path gives them. The third says that the
+    recording went, in the owner's words, by the tick or by the one
+    press, wherever the request that carried it was made and the record
+    cannot show that nothing left: any answer of the service, a refusal
+    too. It is left out where the request was never made, or no
+    connection to the service was ever opened. request: what the
+    consultation's own record holds, or None when nothing was to be sent."""
+    lines = [line for line in mark_lines(path) if line != words.CLOUD_MARK_RECORDING]
+    if request == "made":
+        lines.append(words.CLOUD_MARK_RECORDING_SENT)
+    return tuple(lines)
