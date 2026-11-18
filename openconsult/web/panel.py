@@ -67,6 +67,10 @@ class Box:
 
     @property
     def state_words(self) -> str:
+        """The state in words, for the box's face. The Consultation box,
+        ready, says what it is ready for, as the Start control would."""
+        if self.name == CONSULTATION and self.state == READY:
+            return words.PANEL_READY_TO_START
         return words.PANEL_STATES[self.state]
 
     @property
@@ -80,7 +84,7 @@ class Box:
     @property
     def audit_detail(self) -> str:
         shown = ", ".join(f"{key} {value}" for key, value in self.figures.items())
-        return f"{self.state_words}. {self.sentence}" + (f" Figures: {shown}." if shown else "")
+        return f"{words.PANEL_STATES[self.state]}. {self.sentence}" + (f" Figures: {shown}." if shown else "")
 
 
 @dataclass(frozen=True)

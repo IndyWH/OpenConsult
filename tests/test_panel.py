@@ -262,6 +262,9 @@ def test_review_point_2_the_consultation_box_rests_only_on_tests_that_were_made(
     p.connections.test_all((CLAUDE, SPEECHMATICS))
     box = panel.build(p).box("consultation")
     assert state_of(box) == ("ready", "Ready to start.") and box.when == ("Speechmatics was tested at 09:00.", "Claude was tested at 09:00.")
+    # Its face says what it is ready for, as the owner's sketch has it; every other box says Ready.
+    assert box.state_words == "Ready to start" and panel.build(p).box("microphone").state_words == "Ready"
+    assert '<span class="box-sign" aria-hidden="true">✓</span> Ready to start</span>' in box_of(text_of(client.get("/settings")), "consultation")
     # On this computer the box says that the engine was asked at the start; it is not asked again for a view.
     app, client, *_ = made(tmp_path / "local", clock)
     assert panel.build(app.state.parts).box("consultation").when == ("The engine was asked when OpenConsult started.",)

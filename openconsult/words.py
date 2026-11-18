@@ -1117,6 +1117,7 @@ PANEL_BOXES = {"microphone": "Microphone", "speech_local": "This computer", "spe
                "model_local": "This computer", "claude": "Claude, cloud", "consultation": "Consultation"}
 PANEL_STATES = {"ready": "Ready", "not_set_up": "Not set up", "cannot_run": "Cannot run here"}
 PANEL_SIGNS = {"ready": "✓", "not_set_up": "–", "cannot_run": "✕"}     # a tick, a dash, a cross
+PANEL_READY_TO_START = "Ready to start"
 PANEL_CHOSEN = "Chosen"
 PANEL_USED_AFTER_STOP = "Used after Stop"
 PANEL_LOCAL_MODEL = "Gemma 4 QAT"

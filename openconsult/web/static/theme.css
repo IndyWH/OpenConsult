@@ -75,6 +75,8 @@ label.tick { display: flex; align-items: flex-start; color: var(--ink); font-siz
 /* A choice that waits for the tick of its statement (15.13, ruling 47): said in the page's own ink, in bold, with a rule
    at its side, so that it is not told by colour. */
 .waiting { font-weight: 600; margin: .8rem 0 .4rem; padding-left: .6rem; border-left: 4px solid var(--ink); }
+/* A line or a section the page goes to by itself stands clear of the app's bar, which stays at the top of the window. */
+.waiting, section.pane { scroll-margin-top: 4.2rem; }
 
 /* Panes */
 .pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 1rem; }
