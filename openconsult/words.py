@@ -722,6 +722,7 @@ EVENTS = {
     "key.removed": "Key of a cloud service taken out of the secure store",
     "recording.sent": "Recording sent to Speechmatics after Stop",
     "recording.delete_not_proven": "The delete of a recording sent after Stop could not be confirmed",
+    "recording.deleted": "A recording sent after Stop was deleted at Speechmatics, and the service confirmed that it is gone",
     "recording.pressed": "After a lost connection: the doctor's press at Stop",
     "self_test.passed": "Self-test passed from its set-up step",
     "microphone.tested": "Microphone tested: the level moved",
@@ -1207,6 +1208,13 @@ UPLOAD_APP_CLOSED = "OpenConsult was closed while the recording was being sent."
 UPLOAD_MADE = ("The final transcript was made by Speechmatics from the whole recording. It was deleted there, and Speechmatics "
                "confirmed that it is gone.")
 UPLOAD_MADE_ONLY = "The final transcript was made by Speechmatics from the whole recording."
+# THE OWNER'S, letter for letter (his word at 06:58 on 18 Nov 2026): above the note while the service's answer to the
+# delete is awaited. Stop no longer waits for the delete or its proof (his ruling of 06:55 that day).
+UPLOAD_MADE_AWAITED = ("The final transcript was made by Speechmatics from the whole recording. OpenConsult has asked Speechmatics "
+                       "to delete it there and is waiting for the answer.")
+# Drafts: the line for a page whose script did not run while the answer is awaited, and its link.
+SENT_NO_SCRIPT = "The page's script did not run."
+SENT_LOAD_AGAIN = "Load the page again to see whether the answer has come"
 UPLOAD_FAILED = ("The better transcript could not be made: {detail} The transcript is the one made during the consultation. "
                  "Nothing is sent again.")
 WARNING_SENTENCES.update({"better_transcript_failed": UPLOAD_FAILED, "delete_not_proven": UPLOAD_DELETE_NOT_PROVEN})

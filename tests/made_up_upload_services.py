@@ -23,7 +23,7 @@ class MadeUpSpeechmatics:
     delete_status: what the delete is answered with."""
 
     def __init__(self, after_delete="gone", delete_status=200, model="enhanced", domain="medical", runs=1):
-        self.requests, self.deleted = [], False
+        self.requests, self.deleted, self.limits = [], False, []
         self.after_delete, self.delete_status, self.model, self.domain, self.runs = after_delete, delete_status, model, domain, runs
 
     def transcript(self) -> dict:
@@ -39,8 +39,10 @@ class MadeUpSpeechmatics:
                                                       "diarization": "speaker"}},
                 "results": results}
 
-    def __call__(self, method, url, headers, body):
+    def __call__(self, method, url, headers, body, timeout_s=None):
+        # timeout_s: the limit a request is given (the delete and each ask after it, since the ruling of 18 Nov 2026).
         self.requests.append({"method": method, "url": url, "headers": dict(headers), "body": body})
+        self.limits.append((method, url.split("/v2", 1)[1].split("?")[0], timeout_s))
         path = url.split("/v2", 1)[1]
         if method == "POST" and path == "/jobs":
             return _json(201, {"id": "job-1"})
@@ -78,7 +80,7 @@ class MadeUpAssemblyAI:
 
     def __init__(self, after_delete="replaced", delete_status=200, model="universal-3-5-pro", domain="medical-v1",
                  transcript_status=200):
-        self.requests, self.deleted = [], False
+        self.requests, self.deleted, self.limits = [], False, []
         self.after_delete, self.delete_status, self.model, self.domain = after_delete, delete_status, model, domain
         self.transcript_status, self.polls = transcript_status, 0
 
@@ -102,8 +104,9 @@ class MadeUpAssemblyAI:
         return _json(200, {"id": "tr-1", "status": "completed", "audio_url": url, "text": said, "words": None,
                            "utterances": None, "audio_duration": 7})
 
-    def __call__(self, method, url, headers, body):
+    def __call__(self, method, url, headers, body, timeout_s=None):
         self.requests.append({"method": method, "url": url, "headers": dict(headers), "body": body})
+        self.limits.append((method, url.split("/v2", 1)[1].split("?")[0], timeout_s))
         path = url.split("/v2", 1)[1]
         if method == "POST" and path == "/upload":
             return _json(200, {"upload_url": self.UPLOAD_URL})

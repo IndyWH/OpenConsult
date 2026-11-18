@@ -43,9 +43,12 @@ REQUEST_TIMEOUT_S = 300.0
 GONE_STATUSES = (404, 410)
 WORDS_IN_A_ROW = 3             # an answer after the delete may hold no three words in a row of the result
 BODY_KEPT = 4000               # of an answer that is not JSON, this much is kept
+# The request that deletes, and each ask after it, waits this long at most (the owner's ruling of 18 Nov 2026: 30
+# seconds, not the 300 of the upload). No answer in that time is no answer at all.
+DELETE_LIMIT_S = 30.0
 # After the delete, an ask that brought no answer at all is made once more, this long after, and never a third time
 # (15.13, ruling 49: a failed request is not an answer). The second try has a limit of its own, the limit of the test
-# of a connection: a design choice, so that the two second tries add at most 2 x (5 + 10) = 30 s to the stage at Stop.
+# of a connection.
 SECOND_ASK_WAIT_S = 5.0
 SECOND_ASK_LIMIT_S = 10.0
 
@@ -185,12 +188,18 @@ def loudness_of(pcm: bytes, rate: int) -> dict:
 
 def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, described: dict, pcm: bytes, rate: int,
                clock: Callable = time.monotonic, sleep: Callable = time.sleep, now: Callable = dt.datetime.now,
-               timeout_s: float = RESULT_TIMEOUT_S) -> dict:
+               timeout_s: float = RESULT_TIMEOUT_S, prove: bool = True) -> dict:
     """One file sent whole, the result read, the job deleted and asked for
     again. The result is in the form of a replay's, so every count of the
     bench can be made on its page: no live pieces, and the lines at Stop.
     Whatever happened after a job exists at the service, the delete is
-    still sent and proven."""
+    still sent and proven.
+
+    prove: the bench waits here for the delete and its proof, because a
+    delete not proven must stop what it sends next. The app gives False:
+    it returns as soon as the result is read, so that Stop goes on, and
+    runs the same delete and the same asks beside it (the owner's ruling
+    of 18 Nov 2026; consult/whole.py), from the job's name in its record."""
     result = {"arm": service.ARM, **described, "rate": rate, "piece_s": None, "window_s": WINDOW_S,
               "quiet_dbfs": QUIET_DBFS, "time_slack_s": 0.0, "started_at": now().isoformat(timespec="seconds"),
               "stamp": service.stamp(), "pieces": [], "stop": None, "loudness": loudness_of(pcm, rate), "failure": None}
@@ -236,7 +245,8 @@ def run_upload(service, http: Http, key: str, wav: bytes, file_name: str, descri
                     if problem:
                         failed("model", problem)
     finally:
-        _delete_and_prove(service, http, key, job, lines, upload, sleep)
+        if prove:
+            _delete_and_prove(service, http, key, job, lines, upload, sleep)
     result["stop"] = {"t": upload["seconds_to_result"], "t_asked": 0.0, "lines": lines, "last_live": [], "refused": [],
                       "raw": [], "seconds": {"sent_to_result": upload["seconds_to_result"]}, "revisions": [],
                       "speakers": {}, "notes": {"requests": list(http.sent)}}
@@ -259,43 +269,65 @@ def request_made(sent: list[dict]) -> str:
 
 
 def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: list[dict], upload: dict,
-                      sleep: Callable = time.sleep) -> None:
+                      sleep: Callable = time.sleep, note: Callable | None = None) -> None:
     """The delete, then each ask of the service once; an ask that brought
     no answer at all is made once more, a few seconds later, and never a
     third time (ruling 49). An ask that brought any answer is never made
     again. The last answer of each ask is judged by the rule above
-    (ruling 44), and every try is kept, in order."""
+    (ruling 44), and every try is kept, in order. The delete and each
+    first ask wait DELETE_LIMIT_S at most.
+
+    It can be taken up where it stood (the owner's ruling of 18 Nov 2026:
+    the app runs it beside Stop, and an app closed in its middle finishes
+    it at its next start). upload may already hold the delete's answer
+    and tries of the asks: a delete that was answered is not sent again,
+    an ask that was answered is not made again, and an ask whose one try
+    brought no answer gets its second try and no more. note is called
+    after the delete and after each try, so that the record holds them."""
     if not job:
         upload["gone"], upload["proof"] = True, "nothing was taken by the service"
         return
     if not service.deletable(job):
         upload["gone"], upload["proof"] = False, "the service holds an uploaded file and gives no call that deletes it alone"
         return
+    told = note or (lambda: None)
     result_words = words_of(" ".join(line["text"] for line in lines))
-    deleted = service.delete(http, key, job)
-    upload["delete"] = deleted.kept()
-    if deleted.status not in (200, 204, *GONE_STATUSES):
-        upload["gone"], upload["proof"] = False, f"the delete was answered HTTP {deleted.status}" if deleted.status else "the delete got no answer"
+    if upload.get("delete") is None:
+        upload["delete"] = service.delete(http, key, job, timeout_s=DELETE_LIMIT_S).kept()
+        told()
+    status = upload["delete"]["status"]
+    if status not in (200, 204, *GONE_STATUSES):
+        upload["gone"], upload["proof"] = False, f"the delete was answered HTTP {status}" if status else "the delete got no answer"
         return
-    proofs, judged = [], {}
+    proofs, judged, tries = [], {}, {}
 
-    def judge(what: str, answer: Answer, second: bool) -> None:
+    def said(entry: dict) -> None:
+        second = entry.get("try") == 2
+        proofs.append(f"{entry['what']}, asked again after {SECOND_ASK_WAIT_S:.0f} s: {entry['why']}" if second else f"{entry['what']}: {entry['why']}")
+        judged[entry["what"]] = entry["gone"]
+        tries.setdefault(entry["what"], []).append(entry)
+
+    for entry in upload["asked_again"]:              # the tries the record already holds, from before the app was closed
+        said(entry)
+
+    def ask(what: str, second: bool) -> int:
+        (_, answer), = service.ask_again(http, key, job, only=what, timeout_s=SECOND_ASK_LIMIT_S if second else DELETE_LIMIT_S)
         ok, why = proves_gone(answer, result_words, service.must_not_hold(job), service.lines_of)
-        upload["asked_again"].append({"what": what, **answer.kept(), "gone": ok, "why": why, **({"try": 2} if second else {})})
-        proofs.append(f"{what}, asked again after {SECOND_ASK_WAIT_S:.0f} s: {why}" if second else f"{what}: {why}")
-        judged[what] = ok
+        entry = {"what": what, **answer.kept(), "gone": ok, "why": why, **({"try": 2} if second else {})}
+        upload["asked_again"].append(entry)
+        said(entry)
+        told()
+        return answer.status
 
-    silent = []
-    for what, answer in service.ask_again(http, key, job):
-        judge(what, answer, False)
-        if answer.status == 0:
+    silent = [what for what in service.ASKS if len(tries.get(what, [])) == 1 and tries[what][0]["status"] == 0]
+    for what in service.ASKS:
+        if what not in tries and ask(what, False) == 0:
             silent.append(what)
     if silent:
         sleep(SECOND_ASK_WAIT_S)
-        for what in silent:
-            for again, answer in service.ask_again(http, key, job, only=what, timeout_s=SECOND_ASK_LIMIT_S):
-                judge(again, answer, True)
-    upload["gone"], upload["proof"] = all(judged.values()), "; ".join(proofs)
+        for what in [w for w in service.ASKS if w in silent]:
+            ask(what, True)
+    upload["gone"], upload["proof"] = all(judged.get(what) for what in service.ASKS), "; ".join(proofs)
 
 
 def line(words: list[dict], speaker: str | None) -> dict:

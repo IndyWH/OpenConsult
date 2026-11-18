@@ -82,12 +82,36 @@ class SessionRows:
             raise ValueError(f"not what a request can be: {request}")
         self._db.execute(
             "UPDATE recording_upload SET job_id = ?, result_at = ?, seconds_to_result = ?, counted_s = ?, applied = ?, "
-            "delete_answer = ?, asked_again = ?, gone = ?, proof = ?, failure = ?, request = ? WHERE consultation_id = ?",
+            "failure = ?, request = ? WHERE consultation_id = ?",
             (job_id, self._now() if result else None, seconds_to_result, counted_s,
-             json.dumps(applied, ensure_ascii=False) if applied is not None else None,
-             json.dumps(delete_answer, ensure_ascii=False) if delete_answer is not None else None,
-             json.dumps(asked_again, ensure_ascii=False), None if gone is None else int(bool(gone)), proof, failure, request,
-             consultation_id))
+             json.dumps(applied, ensure_ascii=False) if applied is not None else None, failure, request, consultation_id))
+        # The delete and its proof are written here only where they are given: since the ruling of 18 Nov 2026 they
+        # run beside Stop and write for themselves, and this end of the sending must not take away what they wrote.
+        if delete_answer is not None or asked_again:
+            self.note_proof(consultation_id, delete_answer, asked_again)
+        if gone is not None or proof is not None:
+            self.judge_upload(consultation_id, gone, proof)
+
+    def note_proof(self, consultation_id: int, delete_answer: dict | None, asked_again: list) -> None:
+        """The delete's answer and every try of the asks so far, in order,
+        written as they come: an app closed in their middle takes the
+        proof up from here at its next start."""
+        self._db.execute("UPDATE recording_upload SET delete_answer = ?, asked_again = ? WHERE consultation_id = ?",
+                         (json.dumps(delete_answer, ensure_ascii=False) if delete_answer is not None else None,
+                          json.dumps(asked_again, ensure_ascii=False), consultation_id))
+
+    def judge_upload(self, consultation_id: int, gone: bool | None, proof: str | None) -> None:
+        """The proof judged: proven gone, or not proven after its full
+        tries, with the moment. A recording that the service took and
+        that holds no such moment is one whose answer is still awaited."""
+        self._db.execute("UPDATE recording_upload SET gone = ?, proof = ?, judged_at = ? WHERE consultation_id = ?",
+                         (None if gone is None else int(bool(gone)), proof, self._now() if gone is not None else None, consultation_id))
+
+    def open_proofs(self) -> list[int]:
+        """The consultations whose recording the service took and whose
+        delete is neither proven nor judged not proven: found at start."""
+        return [r["consultation_id"] for r in self._db.query(
+            "SELECT consultation_id FROM recording_upload WHERE job_id IS NOT NULL AND judged_at IS NULL ORDER BY consultation_id")]
 
     def upload(self, consultation_id: int) -> dict | None:
         row = self._db.query_one("SELECT * FROM recording_upload WHERE consultation_id = ?", (consultation_id,))

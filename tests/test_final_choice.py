@@ -70,6 +70,7 @@ def test_details_of_9c_after_the_one_press_in_cloud_transcription_the_model_line
     assert until(lambda: c.stop_stage == "who_spoke")
     client.post("/consultations/1/speakers", data={"speaker": "S1"})
     assert until(lambda: c.state == FINAL)
+    assert p.whole.wait()                # the delete and its proof run beside Stop (ruling of 18 Nov 2026): no thread outlives the test
     page = text_of(client.get("/consultations/1"))
     assert "Speech: Speechmatics. Language model: " in page and "during the consultation" not in page
     assert "Confidence was not measured" not in page

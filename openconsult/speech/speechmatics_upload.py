@@ -121,13 +121,16 @@ def deletable(job: dict) -> bool:
     return bool(job.get("id"))
 
 
-def delete(http: Http, key: str, job: dict) -> Answer:
-    return http.request("DELETE", f"{BASE}/jobs/{job['id']}?force=true", _auth(key))
+def delete(http: Http, key: str, job: dict, timeout_s: float | None = None) -> Answer:
+    return http.request("DELETE", f"{BASE}/jobs/{job['id']}?force=true", _auth(key), timeout_s=timeout_s)
+
+
+ASKS = ("the job", "its transcript")       # the asks after a delete, by name, in the order they are made
 
 
 def ask_again(http: Http, key: str, job: dict, only: str | None = None, timeout_s: float | None = None) -> list[tuple[str, Answer]]:
-    """The two asks after a delete, each once; only: the one ask to make
-    once more, with a limit of its own (15.13, ruling 49)."""
+    """The two asks after a delete, each once; only: the one ask to make,
+    with a limit of its own (15.13, ruling 49; the ruling of 18 Nov 2026)."""
     asks = {"the job": f"{BASE}/jobs/{job['id']}", "its transcript": f"{BASE}/jobs/{job['id']}/transcript?format=json-v2"}
     return [(what, http.request("GET", url, _auth(key), timeout_s=timeout_s)) for what, url in asks.items() if only in (None, what)]
 

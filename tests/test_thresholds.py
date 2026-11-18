@@ -196,6 +196,7 @@ def finish_it(app, client, c, cid=1):
     if c.state != FINAL:
         client.post(f"/consultations/{cid}/speakers", data={"speaker": "S1"})
     assert until(lambda: c.state == FINAL)
+    assert app.state.parts.whole.wait()          # the delete and its proof run beside Stop: no thread outlives the test
 
 
 def test_7_3_the_gate_and_the_review_page_mark_a_line_by_the_score_the_consultation_started_with(tmp_path, clock, server):

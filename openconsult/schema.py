@@ -633,10 +633,16 @@ CREATE TABLE first_run_left (
     # only the bytes it was about to send: with any, its request counts as made.
     # And the two thresholds of the gate a consultation started with (7.3): none in a row from before they could be
     # set, which reads the defaults. Their bounds are the code's, not the table's.
+    # And the moment the delete of a recording was judged, proven or not (the owner's ruling of 18 Nov 2026): the delete
+    # and its proof run beside Stop, so a recording the service took may have no judgement yet, and the app finds
+    # those at its start. Until version 11 an upload was judged before it ended; one that never ended is found.
     12: """
 ALTER TABLE recording_upload ADD COLUMN request TEXT CHECK (request IN ('not_made', 'never_connected', 'made'));
 UPDATE recording_upload SET request = CASE WHEN bytes > 0 THEN 'made' ELSE 'not_made' END;
 ALTER TABLE consultation ADD COLUMN fewest_words INTEGER;
 ALTER TABLE consultation ADD COLUMN low_score REAL;
+ALTER TABLE recording_upload ADD COLUMN judged_at TEXT;
+UPDATE recording_upload SET judged_at = COALESCE(result_at, sent_at)
+    WHERE job_id IS NOT NULL AND (result_at IS NOT NULL OR failure IS NOT NULL);
 """,
 }

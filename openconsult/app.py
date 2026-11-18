@@ -220,6 +220,9 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     # A consultation left live or stopping by the last run goes on (review point 3).
     for consultation in stop.sweep(parts):
         consultation.on_final = consult._on_final(parts)
+    # A recording the service took whose delete the last run left neither proven nor judged: deleted and asked for
+    # now, beside the start and never holding it, so that a closed app leaves none there (ruling of 18 Nov 2026).
+    parts.whole.finish_open(parts.consultations, audit)
     # The sweeps of 7a: orphan files reported, old recordings deleted (ruling 7; ruling 8).
     retention.orphans(parts)
     retention.sweep(parts)

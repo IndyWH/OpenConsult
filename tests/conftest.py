@@ -112,7 +112,7 @@ def r18_guard(tmp_path, guard_patcher):
     monkeypatch.setattr(app_module, "make_claude_engine", NoRealClaude)
 
     # And no recording ever leaves a test: an app built without naming its sender gets one that fails the test.
-    def refuse_real_upload(method, url, headers, body):
+    def refuse_real_upload(method, url, headers, body, timeout_s=None):
         pytest.fail("a test sent a recording to a real service")
 
     monkeypatch.setattr(app_module, "default_upload_send", lambda: refuse_real_upload)

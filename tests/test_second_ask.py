@@ -42,7 +42,7 @@ def silent(made_class, quiet: dict):
                     self.left[path] -= 1
                     self.requests.append({"method": method, "url": url, "headers": dict(headers), "body": body})
                     return Answer(0, b"", "URLError")
-            return super().__call__(method, url, headers, body)
+            return super().__call__(method, url, headers, body, timeout_s)
 
     return Silent
 
@@ -77,8 +77,9 @@ def test_15_13_ruling_49_an_ask_with_no_answer_is_made_once_more_5_seconds_later
     assert tries(up) == [("the job", 0, False, 1), ("its transcript", 404, True, 1), ("the job", 404, True, 2)]   # both tries, in order
     assert up["gone"] is True and up["proof"] == "the job: no answer came; its transcript: HTTP 404; the job, asked again after 5 s: HTTP 404"
     assert clock.sleeps[-1] == 5.0 == upload.SECOND_ASK_WAIT_S                              # the wait, between the first asks and the second try
-    # The first asks keep the upload's own limit; the second try has the limit of 10 s. The answered ask was not made again.
-    assert made.asks == [(JOB, None), (TRANSCRIPT, None), (JOB, 10.0)] and upload.SECOND_ASK_LIMIT_S == 10.0
+    # Restated on the owner's ruling of 18 Nov 2026: each first ask waits 30 s at most, where it kept the upload's own
+    # 300 s (no limit given: None). The second try has the limit of 10 s, as before. The answered ask was not made again.
+    assert made.asks == [(JOB, 30.0), (TRANSCRIPT, 30.0), (JOB, 10.0)] and upload.SECOND_ASK_LIMIT_S == 10.0 and upload.DELETE_LIMIT_S == 30.0
 
 
 def test_15_13_ruling_49_no_answer_twice_proves_nothing_and_there_is_never_a_third_try():
@@ -113,7 +114,7 @@ def test_15_13_ruling_49_the_benchs_upload_reads_the_same_code_for_the_second_se
     made = silent(MadeUpAssemblyAI, {"/transcript/tr-1": 1})(after_delete="gone")
     up = one(assemblyai_upload, made, clock)
     assert tries(up) == [("the transcript", 0, False, 1), ("the transcript", 404, True, 2)] and up["gone"] is True
-    assert made.asks == [("/transcript/tr-1", None), ("/transcript/tr-1", 10.0)]
+    assert made.asks == [("/transcript/tr-1", 30.0), ("/transcript/tr-1", 10.0)]      # restated: 30 s on the first ask (ruling of 18 Nov 2026)
 
 
 def test_15_13_rulings_41_and_49_in_the_app_a_second_try_that_answers_confirms_and_two_with_no_answer_say_not_proven(tmp_path, clock, server):

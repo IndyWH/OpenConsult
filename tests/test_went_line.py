@@ -42,7 +42,7 @@ class NeverConnected(LongPage):
     """The made service not reached at all: the request that carries the
     recording fails before any connection is open."""
 
-    def __call__(self, method, url, headers, body):
+    def __call__(self, method, url, headers, body, timeout_s=None):
         self.requests.append({"method": method, "url": url, "headers": dict(headers), "body": body})
         return Answer(0, b"", "URLError", never_connected=True)
 

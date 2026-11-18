@@ -21,7 +21,13 @@
 <p class="statement print-keep"><b>{{ ran_with.name }}</b> <span class="mark">{{ date }}</span></p>
 <p class="mark no-print" id="ran-with">{{ words.RAN_WITH }} {{ ran_with.name }}, {{ ran_with.born }}, {{ ran_with.sex }}. <a href="/patients/{{ patient.id }}">{{ words.PATIENTS_PAGE_LINK }}</a>{% if ran_with.corrected %}<br>{{ ran_with.corrected }}{% endif %}</p>
 {% if mark %}<div class="no-print">{{ cloud_mark(mark) }}</div>{% endif %}
+{# What came of a recording sent after Stop: one of three lines, by what the record holds of the delete at this
+   moment (the owner's ruling of 18 Nov 2026). While the service's answer is awaited the page asks the app for it
+   (sent.js) and takes the changed parts from the app's own page, with no load; with no script, the line with its link. #}
+<div id="recording-sent-slot" class="no-print" data-part{% if sent_awaited %} data-awaited data-address="/consultations/{{ cid }}/sent" data-page="/consultations/{{ cid }}/sent/page"{% endif %}>
 {% if recording_sent %}<p class="mark no-print" id="recording-sent">{{ recording_sent }}</p>{% endif %}
+{% if sent_awaited %}<p class="mark" id="sent-no-script">{{ words.SENT_NO_SCRIPT }} <a href="/consultations/{{ cid }}">{{ words.SENT_LOAD_AGAIN }}</a></p>{% endif %}
+</div>
 
 {# One: the draft note (ruling 11). #}
 <section class="pane note print-keep" id="note">
@@ -241,6 +247,7 @@
 <script src="{{ static('alarmdialog.js') }}"></script>
 <script src="{{ static('review.js') }}"></script>
 <script src="{{ static('fresh.js') }}"></script>
+{% if sent_awaited %}<script src="{{ static('sent.js') }}"></script>{% endif %}
 <script src="{{ static('rows.js') }}"></script>
 <script src="{{ static('place.js') }}"></script>
 <script src="{{ static('letters.js') }}"></script>

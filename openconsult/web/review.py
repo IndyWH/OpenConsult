@@ -16,7 +16,7 @@ from datetime import datetime
 import json
 
 from fastapi import APIRouter, Depends, Request
-from fastapi.responses import FileResponse, PlainTextResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from openconsult import words
 from openconsult.consult import alarms, deletion, drug_marks, gate, note, reading, who_check, whole
@@ -212,17 +212,24 @@ def ran_with(p, row: dict) -> dict:
             "corrected": words.DETAILS_CORRECTED.format(date=words.plain_date(datetime.fromisoformat(changed))) if changed else None}
 
 
-def sent_lines(p, row: dict) -> tuple[str | None, str | None]:
+SENT_LINES = {whole.AWAITED: words.UPLOAD_MADE_AWAITED, whole.PROVEN: words.UPLOAD_MADE, whole.UNPROVEN: words.UPLOAD_MADE_ONLY}
+
+
+def sent_lines(p, row: dict) -> tuple[str | None, str | None, str | None]:
     """For a consultation whose recording was to be sent after Stop: what
     its record can show of the request that carried it, for the mark's
-    third line (ruling 52); and the sentence that the final transcript
-    is the service's, with the delete as it was proven."""
+    third line (ruling 52); the sentence that the final transcript is
+    the service's, one of three by what the record holds of the delete
+    at this moment (the owner's ruling of 18 Nov 2026): the answer
+    awaited, proven, or not proven; and that state itself, which is
+    there also when no transcript came of a recording the service took."""
     sent = p.consultations.upload(row["id"])
     if sent is None:
-        return None, None
+        return None, None, None
+    state = whole.proof_state(sent)
     if sent["result_at"] is None:
-        return sent["request"], None
-    return sent["request"], words.UPLOAD_MADE if sent["gone"] else words.UPLOAD_MADE_ONLY
+        return sent["request"], None, state
+    return sent["request"], SENT_LINES.get(state, words.UPLOAD_MADE_ONLY), state
 
 
 def page_data(p, row: dict) -> dict:
@@ -274,9 +281,12 @@ def page_data(p, row: dict) -> dict:
     marks = alarms.review_marks(pass_rows, [d.get("condition") for d in differentials if isinstance(d, dict)])
     alarm_rows = alarms.alarm_lines(pass_rows, p.consultations.live_lines(cid), datetime.fromisoformat(row["started_at"]),
                                     alarms.acknowledged_keys(p.audit.lines(), cid), words)
+    sent = sent_lines(p, row)
     return {"cid": cid, "row": row, "patient": p.patients.get(row["patient_id"]), "ran_with": ran_with(p, row),
             # The cloud mark among the details the consultation ran with (ruling 5); and what came of a recording sent after Stop.
-            "mark": review_mark_lines(path_of(row), sent_lines(p, row)[0]), "recording_sent": sent_lines(p, row)[1],
+            "mark": review_mark_lines(path_of(row), sent[0]), "recording_sent": sent[1],
+            # While the service's answer to the delete is awaited the page asks for it by itself (sent.js).
+            "sent_awaited": sent[2] == whole.AWAITED,
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
@@ -295,10 +305,14 @@ def page_data(p, row: dict) -> dict:
             if state["approval"] else None}
 
 
-def review_page(request: Request, user, consultation_id: int, refused: tuple | None = None, asking_delete: bool = False):
+def review_page(request: Request, user, consultation_id: int, refused: tuple | None = None, asking_delete: bool = False,
+                by_itself: bool = False):
+    """by_itself: the page asked for by its own script, not by the doctor:
+    nothing is started for it."""
     p = parts(request)
     row = final_row(request, consultation_id)
-    letters_web.ensure_list(p, consultation_id)      # the list call, once, at the first opening after Approve (15.12 ruling 2)
+    if not by_itself:
+        letters_web.ensure_list(p, consultation_id)  # the list call, once, at the first opening after Approve (15.12 ruling 2)
     data = page_data(p, row)
     # A turn is sent closed (ruling 43), but for two cases that work with no script: every turn after a press on the
     # control that opens all, and the turn of a line whose Save or Undo was refused, so that the sentence is seen (R15).
@@ -556,6 +570,29 @@ async def recording(request: Request, consultation_id: int, user=Depends(guards.
         return PlainTextResponse(words.AUDIO_GONE.format(date=words.plain_date(datetime.fromisoformat(row["started_at"]))),
                                  status_code=404)
     return FileResponse(path, media_type="audio/ogg" if path.suffix == ".ogg" else "audio/wav")
+
+
+@router.get("/consultations/{consultation_id}/sent")
+async def sent_state(request: Request, consultation_id: int, user=Depends(guards.logged_in_not_use)):
+    """What the record holds, at this moment, of the delete of a recording
+    sent after Stop: awaited, proven or not_proven, with the line that
+    stands above the note for it (the owner's ruling of 18 Nov 2026).
+    The review page asks this by itself while the answer is awaited, so
+    it is never use (15.10 ruling 41). Every sentence is the app's."""
+    p = parts(request)
+    row = final_row(request, consultation_id)
+    _, line, state = sent_lines(p, row)
+    return JSONResponse({"state": state or "none", "line": line}, headers={"Cache-Control": "no-store"})
+
+
+@router.get("/consultations/{consultation_id}/sent/page")
+async def sent_page(request: Request, consultation_id: int, user=Depends(guards.logged_in_not_use)):
+    """The review page as it stands, for its own script to take the
+    changed parts from when the service has answered: the line above
+    the note, the warning where the delete is not proven, the count on
+    Approve. Asked by the page itself, so never use, and nothing is
+    started for it."""
+    return review_page(request, user, consultation_id, by_itself=True)
 
 
 @router.get("/consultations/{consultation_id}/recording/file", dependencies=[Depends(guards.this_computer)])

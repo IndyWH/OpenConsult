@@ -105,8 +105,11 @@ def deletable(job: dict) -> bool:
     return bool(job.get("id"))
 
 
-def delete(http: Http, key: str, job: dict) -> Answer:
-    return http.request("DELETE", f"{BASE}/transcript/{job['id']}", _auth(key))
+def delete(http: Http, key: str, job: dict, timeout_s: float | None = None) -> Answer:
+    return http.request("DELETE", f"{BASE}/transcript/{job['id']}", _auth(key), timeout_s=timeout_s)
+
+
+ASKS = ("the transcript",)                 # the ask after a delete, by name
 
 
 def ask_again(http: Http, key: str, job: dict, only: str | None = None, timeout_s: float | None = None) -> list[tuple[str, Answer]]:

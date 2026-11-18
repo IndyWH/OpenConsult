@@ -52,12 +52,12 @@ class LongPage(MadeUpSpeechmatics):
             results.append({"type": "punctuation", "start_time": t, "end_time": t, "is_eos": True, "alternatives": [{"content": ".", "speaker": speaker}]})
         return {**made, "results": results}
 
-    def __call__(self, method, url, headers, body):
+    def __call__(self, method, url, headers, body, timeout_s=None):
         path = url.split("/v2", 1)[1]
         if self.mode[:1] == ["submit"] and method == "POST":
             self.requests.append({"method": method, "url": url, "headers": dict(headers), "body": body})
             return Answer(int(self.mode[1]), b"{}") if self.mode[1] != "0" else Answer(0, b"", "URLError")
-        answer = super().__call__(method, url, headers, body)
+        answer = super().__call__(method, url, headers, body, timeout_s)
         if method == "GET" and path == "/jobs/job-1" and not self.deleted and self.mode in (["rejected"], ["never"]):
             status = "rejected" if self.mode == ["rejected"] else "running"
             return Answer(200, json.dumps({"job": {"id": "job-1", "status": status}}).encode())
@@ -92,6 +92,9 @@ def consult(app, client, cid=1, answer="S1", pieces=8):
     assert until(lambda: c.stop_stage == "who_spoke")
     client.post(f"/consultations/{cid}/speakers", data={"speaker": answer})
     assert until(lambda: c.state == FINAL)
+    # Since the ruling of 18 Nov 2026 the delete and its proof run beside Stop: what a test reads of them it reads
+    # when they have ended.
+    assert app.state.parts.whole.wait()
     return c
 
 
@@ -131,8 +134,11 @@ def test_15_9_ruling_36_with_the_tick_the_recording_is_sent_once_after_stop_and_
     assert words.UPLOAD_MADE in page and words.CLOUD_MARK_RECORDING_SENT in page and words.CLOUD_MARK_RECORDING not in page
     assert words.CLOUD_MARK_SOUND not in page
     assert not any(w["kind"] == "delete_not_proven" for w in p.consultations.warnings(1))
-    assert next(l.detail for l in p.audit.lines() if l.event == "recording.sent") == (
-        "consultation 1: by the tick; the transcript made from it; deleted and proven gone")
+    # Restated on the ruling of 18 Nov 2026: the sending is logged when it ends and the delete, which runs beside
+    # Stop, when it is proven; until then one line said both ("...; deleted and proven gone").
+    events = {l.event: l.detail for l in p.audit.lines()}
+    assert events["recording.sent"] == "consultation 1: by the tick; the transcript made from it; the service asked to delete it, beside Stop"
+    assert events["recording.deleted"] == "consultation 1: the job: HTTP 404; its transcript: HTTP 404"
     assert GOOD not in everything_written(p)
 
 
@@ -163,6 +169,7 @@ def test_7_3_the_tick_is_read_at_start_and_held_taken_off_during_the_consultatio
     assert until(lambda: c.stop_stage == "who_spoke") and len([r for r in made.requests if r["method"] == "POST"]) == 1
     client.post("/consultations/1/speakers", data={"speaker": "S1"})
     assert until(lambda: c.state == FINAL)
+    assert p.whole.wait()                # the delete and its proof run beside Stop (ruling of 18 Nov 2026): no thread outlives the test
 
 
 def test_15_13_ruling_33_the_tick_is_saved_only_with_speechmatics_connected_and_its_lines_ticked_and_is_not_offered_in_cloud_transcription(tmp_path, clock, server):
@@ -209,7 +216,10 @@ def test_details_of_9b_a_delete_that_is_not_proven_is_said_on_the_review_page_in
               "Its own pages say that it deletes such a recording itself after 7 days.")
     assert owners in page and words.UPLOAD_MADE_ONLY in page and words.UPLOAD_MADE not in page
     events = {l.event: l.detail for l in p.audit.lines()}
-    assert events["recording.delete_not_proven"].startswith("consultation 1: ") and events["recording.sent"].endswith("the delete not proven")
+    # Restated on the ruling of 18 Nov 2026: the line of the sending no longer ends with the delete's outcome
+    # ("the delete not proven"), which is not known when the sending ends; the delete's own line says it, as before.
+    assert events["recording.delete_not_proven"].startswith("consultation 1: ") and "recording.deleted" not in events
+    assert events["recording.sent"].endswith("the service asked to delete it, beside Stop")
     assert FIRST_WORDS.split()[0] not in events["recording.delete_not_proven"]                # counts and states, never a word of the page
 
 
@@ -323,6 +333,7 @@ def test_15_13_ruling_29_the_one_press_sends_the_recording_once_for_the_whole_tr
     assert until(lambda: c.state == FINAL)
     assert [r["text"] for r in p.consultations.transcript_lines(1)] == [FIRST_WORDS + ".", SECOND_WORDS + "."]
     assert not any(w["kind"] == "no_transcript" for w in p.consultations.warnings(1))          # the whole transcript has no such stretch
+    assert p.whole.wait()                # the delete and its proof run beside Stop (ruling of 18 Nov 2026): read when they have ended
     review = text_of(client.get("/consultations/1"))
     assert words.CLOUD_MARK_RECORDING_SENT in review and words.UPLOAD_MADE in review and words.CLOUD_MARK_SOUND in review
     assert not stop.press(c, True)                                                             # a press after its time changes nothing
@@ -341,6 +352,7 @@ def test_review_point_13_a_consultation_found_at_the_upload_after_a_restart_is_n
     p.consultations.note_upload_job(1, "job-1")
     client.post("/consultations/1/stop")
     assert until(lambda: c.stop_stage == "who_spoke")
+    assert p.whole.wait()                # the delete and its proof run beside Stop (ruling of 18 Nov 2026): read when they have ended
     assert [r["method"] for r in made.requests] == ["DELETE", "GET", "GET"]                    # no upload: the delete, and the job asked for again
     sent = p.consultations.upload(1)
     assert sent["failure"] == words.UPLOAD_APP_CLOSED and sent["gone"] == 1 and sent["delete_answer"]["status"] == 200
