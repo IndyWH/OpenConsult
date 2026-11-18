@@ -184,16 +184,21 @@ def test_details_of_9b_at_start_the_tests_run_for_the_services_the_chosen_path_u
     assert sorted(testers.asked) == [(CLAUDE, GOOD), (SPEECHMATICS, GOOD)]                 # no card: both begin in the cloud (10.3)
     lines = [l.detail for l in app.state.parts.audit.lines() if l.event == "connection.tested"]
     assert sorted(lines) == ["Claude: answered", "Speechmatics: answered"]
-    # This machine says each connection as it stands, with the reason of a failed test (R15).
+    # This machine says each connection as it stands, with the reason of a failed test (R15). Since run 9c the same
+    # three sentences stand in the service's box of the picture, and no longer as a row of the table.
+    from tests.test_machine_status import box_of
     page = text_of(client.get("/settings"))
-    assert f"<th>{words.ROW_CONNECTION.format(service='Claude')}</th><td>{words.MACHINE_CONNECTED.format(time='09:00')}</td>" in page
+    row = f"<th>{words.ROW_CONNECTION.format(service='Claude')}</th>"
+    assert words.MACHINE_CONNECTED.format(time="09:00") in box_of(page, "claude") and "Ready" in box_of(page, "claude") and row not in page
     testers.fail[CLAUDE] = "no_credit"
     client.post("/connections/claude/test")
     failed = words.MACHINE_TEST_FAILED.format(time="09:00", reason="Claude refused to start: the account has no credit left.")
-    assert f"<th>{words.ROW_CONNECTION.format(service='Claude')}</th><td>{failed}</td>" in text_of(client.get("/settings"))
+    page = text_of(client.get("/settings"))
+    assert failed in box_of(page, "claude") and "Cannot run here" in box_of(page, "claude") and row not in page
     app, client, store, testers = made_app(tmp_path / "none", clock, machine=NO_CARD)
     assert testers.asked == []                                                             # no key, no test
-    assert f"<th>{words.ROW_CONNECTION.format(service='Claude')}</th><td>{words.NOT_CONNECTED}</td>" in text_of(client.get("/settings"))
+    page = text_of(client.get("/settings"))
+    assert words.NOT_CONNECTED in box_of(page, "claude") and "Not set up" in box_of(page, "claude") and row not in page
 
 
 def test_15_13_ruling_5_the_statement_stands_on_the_connect_screen_once_connected_and_its_tick_is_taken_only_for_the_text_shown(tmp_path, clock):

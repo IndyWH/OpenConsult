@@ -1,15 +1,21 @@
 {% extends "base.html" %}
-{% from "_parts.html" import refusal, machine_rows with context %}
+{% from "_parts.html" import refusal, machine_rows, control_panel with context %}
 {% set title = words.FIRST_RUN_MACHINE_TITLE %}
+{# The picture has four columns: this step's page is as wide as the pages behind the login. #}
+{% set wide = true %}
 {% block main %}
 <h1 class="page">{{ words.FIRST_RUN_MACHINE_TITLE }}</h1>
-<form method="post" action="/first-run/machine" class="pane">
+{# The picture stands outside the form of this step: a box may hold a form of its own, and a form is never inside another. #}
+<div class="pane">
   <div class="pane-body">
     <p>{{ words.FIRST_RUN_MACHINE_INTRO }}</p>
-    {{ machine_rows(machine, models, room, speech, choices) }}
+    {{ control_panel(panel) }}
+    {{ machine_rows(machine, room) }}
     {% if pointer %}<p class="sentence" id="pointer">{{ pointer }} <a href="/connect/claude">{{ words.CONNECT_CLAUDE_TITLE }}</a></p>{% endif %}
-    <button class="primary" id="continue" aria-describedby="continue-refusal">{{ words.CONTINUE }}</button>
-    {{ refusal("continue") }}
+    <form method="post" action="/first-run/machine">
+      <button class="primary" id="continue" aria-describedby="continue-refusal">{{ words.CONTINUE }}</button>
+      {{ refusal("continue") }}
+    </form>
   </div>
-</form>
+</div>
 {% endblock %}

@@ -25,7 +25,7 @@
   </div>
 </header>
 {% endif %}
-<main class="wrap{% if not user %} narrow{% endif %}">
+<main class="wrap{% if not user and not wide %} narrow{% endif %}">
 {% block main %}{% endblock %}
 </main>
 <footer class="disclaimer">{{ statement }}</footer>

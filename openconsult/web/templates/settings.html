@@ -1,6 +1,9 @@
 {% extends "base.html" %}
-{% from "_parts.html" import refusal, machine_rows, cloud_statement, statement_less with context %}
+{% from "_parts.html" import refusal, machine_rows, control_panel, cloud_statement, statement_less with context %}
 {% set title = words.SETTINGS_TITLE %}
+{# A choice pressed in the picture that waits for its statement: the page goes to the statement by itself, within
+   the page that was sent and with no script: nothing loads again. #}
+{% block head %}{% if go_to %}<meta http-equiv="refresh" content="0;url=#{{ go_to }}">{% endif %}{% endblock %}
 {% block main %}
 {# data-keeps-place: place.js keeps the window where it stood over the load that a save makes (15.10, ruling 34). #}
 <div id="settings" data-keeps-place data-path="/settings">
@@ -9,9 +12,9 @@
    save by themselves away (15.13, ruling 47). A page of the app is never dead. #}
 <p class="mark" id="no-script" data-no-script>{{ words.SETTINGS_NO_SCRIPT }}</p>
 
-<section class="pane">
+<section class="pane" id="this-machine">
   <div class="pane-head"><h2>{{ words.SECTION_MACHINE }}</h2></div>
-  <div class="pane-body">{{ machine_rows(machine, models, room, speech, choices) }}
+  <div class="pane-body">{{ control_panel(panel) }}{{ machine_rows(machine, room) }}
     {% if pointer %}<p class="sentence" id="pointer">{{ pointer }} <a href="/connect/claude">{{ words.CONNECT_CLAUDE_TITLE }}</a></p>{% endif %}</div>
 </section>
 

@@ -2,9 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from datetime import datetime
-
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import RedirectResponse
 
@@ -14,118 +11,24 @@ from openconsult.patients.users import MIN_PASSWORD, name_problem, password_prob
 from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
 from openconsult.settings.connections import SERVICES
 from openconsult.settings.path import CLAUDE
-from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web, settings_local, steps as steps_web
+from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web, panel as panel_web, settings_local, steps as steps_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
 router = APIRouter()
 
 
-def model_line(request: Request) -> str | None:
-    """This machine's line about the language model: the engine chosen at
-    start and held for the run, from the decisions, in one sentence with
-    no figures (spec 15.8, rulings 36 and 37). Only on a machine with a
-    suitable card; elsewhere no engine is asked and nothing is shown
-    (15.7). No engine is asked at a view."""
-    p = parts(request)
-    if p.machine.case != "suitable":
-        return None
-    return p.decisions.language_model.sentence
-
-
 def room_lines(request: Request) -> list[tuple[str, str]]:
-    """The rows of the room check, from the decisions held since start:
-    where the guideline search sits, and whether the WhisperX choice is
-    offered (rulings 32, 33, 36), on a suitable card only, as the speech
-    rows of 15.9 are; and the recording converter (15.11 ruling 7), on
-    every machine. The elements are held everywhere."""
+    """The rows of the small table under the picture of This machine
+    (15.13, the details of run 9c): what the boxes do not say. Where the
+    guideline search sits (15.8, rulings 32 and 36), on a suitable card
+    only; and the recording converter (15.11 ruling 7), on every
+    machine. From the decisions held since start: nothing is asked at a
+    view. What a box says, the language model and its engine, the speech
+    models and each connection, is not said a second time here."""
     p = parts(request)
-    found = []
-    if p.machine.case == "suitable":
-        found += [(words.ROW_GUIDELINE_SEARCH, p.decisions.guideline_search.sentence),
-                  (words.ROW_SPEECH_CHOICE, p.decisions.whisperx_choice.sentence)]
-    return found + [(words.ROW_CONVERTER, p.decisions.converter.sentence)] + connection_lines(p)
-
-
-def connection_lines(p) -> list[tuple[str, str]]:
-    """One row for each cloud service the chosen path uses, with its
-    connection as it stands and the reason of a failed test (7.2; R15).
-    Read from what the app holds: no test is made at a view of this page."""
-    found = []
-    for service in p.stored.path(p.machine.case).services:
-        state = p.connections.state(service)
-        if state.last is not None and state.last.ok:
-            line = words.MACHINE_CONNECTED.format(time=f"{state.last_at:%H:%M}")
-        elif state.last is not None:
-            line = words.MACHINE_TEST_FAILED.format(time=f"{state.last_at:%H:%M}", reason=state.last.sentence)
-        else:
-            line = words.CONNECTED if state.connected else words.NOT_CONNECTED
-        found.append((words.ROW_CONNECTION.format(service=words.SERVICE_TITLES[service]), line))
-    return found
-
-
-@dataclass(frozen=True)
-class SpeechLines:
-    installed: str
-    self_test: str
-
-
-def speech_lines(request: Request) -> SpeechLines | None:
-    """The two lines about the speech choice, on a suitable card only
-    (spec 15.9): whether it is installed, from the data folder, and the
-    last self-test, from the stored result. No worker is started and no
-    model is loaded, so the page never hangs."""
-    p = parts(request)
-    if p.machine.case != "suitable":
-        return None
-    if not p.speech.installed:
-        return SpeechLines(words.SPEECH_NOT_INSTALLED, words.SELF_TEST_NOT_POSSIBLE)
-    last = p.self_tests.last(p.speech.choice.name)
-    if last is None:
-        return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_NOT_RUN)
-    date, time = _when(last)
-    if last["passed"]:
-        return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_PASSED.format(date=date, time=time))
-    reason = last["detail"].get("reason") or ""
-    return SpeechLines(words.SPEECH_INSTALLED, words.SELF_TEST_FAILED.format(date=date, time=time, reason=reason))
-
-
-def _when(last: dict) -> tuple[str, str]:
-    when = datetime.fromisoformat(last["at"])
-    return f"{when.day} {when:%b %Y}", f"{when:%H:%M}"
-
-
-def choice_lines(request: Request) -> list[tuple[str, str]]:
-    """One line for each choice of 5b (spec 15.9): Nemotron on a suitable
-    card only, installed or not and the last self-test; each cloud service
-    on every machine, no key yet or the last self-test. The page reads a
-    path, the key's presence and the stored result: no connection is
-    opened, no worker started, no model loaded."""
-    p = parts(request)
-    lines = []
-    for name, door in p.doors.items():
-        choice = door.choice
-        if choice.name == "whisperx_pyannote" or (choice.environment and p.machine.case != "suitable"):
-            continue
-        local = choice.environment
-        if local and not door.installed:
-            lines.append((choice.title, words.NEMOTRON_NOT_INSTALLED))
-            continue
-        if not local and not door.has_key:
-            lines.append((choice.title, words.CLOUD_NO_KEY))
-            continue
-        last = p.self_tests.last(name)
-        if last is None:
-            lines.append((choice.title, words.NEMOTRON_NOT_RUN if local else words.CLOUD_NOT_RUN))
-            continue
-        date, time = _when(last)
-        if last["passed"]:
-            lines.append((choice.title, (words.NEMOTRON_PASSED if local else words.CLOUD_PASSED).format(date=date, time=time)))
-        else:
-            reason = last["detail"].get("reason") or ""
-            lines.append((choice.title, (words.NEMOTRON_FAILED if local else words.CLOUD_FAILED).format(
-                date=date, time=time, reason=reason)))
-    return lines
+    found = [(words.ROW_GUIDELINE_SEARCH, p.decisions.guideline_search.sentence)] if p.machine.case == "suitable" else []
+    return found + [(words.ROW_CONVERTER, p.decisions.converter.sentence)]
 
 
 @router.get("/")
@@ -179,13 +82,11 @@ async def first_run(request: Request):
             return steps_web.step_page(request, user, middle)
         if step is None:
             raise Redirect("/")
-    models = model_line(request) if step == "machine" else None
-    room = room_lines(request) if step == "machine" else []
-    speech = speech_lines(request) if step == "machine" else None
-    choices = choice_lines(request) if step == "machine" else None
-    return render(request, STEP_PAGE[step], machine=parts(request).machine, models=models, room=room,
-                  speech=speech, choices=choices, pointer=pointer(request) if step == "machine" else None,
-                  least=MIN_PASSWORD)
+    at_machine = step == "machine"
+    # Step 2 shows the same picture as Settings (15.13, ruling 56); there is no user yet, so no box offers Choose.
+    return render(request, STEP_PAGE[step], machine=parts(request).machine, room=room_lines(request) if at_machine else [],
+                  panel=panel_web.build(p, first_run=True) if at_machine else None,
+                  pointer=pointer(request) if at_machine else None, least=MIN_PASSWORD)
 
 
 def pointer(request: Request) -> str | None:
@@ -297,12 +198,15 @@ NOTICE = {"you": words.SAVED, "password": words.PASSWORD_CHANGED, "retention": w
           "tested": words.CONNECTED, "removed": words.KEY_REMOVED, "path": words.PATH_SAVED, "ticked": words.SAVED}
 
 
-def _settings_page(request: Request, user, refused=None, pending=None):
+def _settings_page(request: Request, user, refused=None, pending=None, from_panel: bool = False):
     """pending: a change of the path that waits for its tick, drawn in its
-    own section with the statement of the path as it would then stand."""
-    context = dict(user=user, active="settings", machine=parts(request).machine, models=model_line(request),
-                   room=room_lines(request), pointer=pointer(request),
-                   speech=speech_lines(request), choices=choice_lines(request),
+    own section with the statement of the path as it would then stand.
+    from_panel: the change was pressed in the picture at the top."""
+    context = dict(user=user, active="settings", machine=parts(request).machine,
+                   # The picture of This machine, with the small table of what its boxes do not say (15.13, ruling 56).
+                   panel=panel_web.build(parts(request)), room=room_lines(request), pointer=pointer(request),
+                   # A choice pressed in the picture that waits for its statement: the page goes to it by itself.
+                   go_to=f"not-saved-{pending['which']}" if pending and from_panel else None,
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    # Saved is said beside the control that was changed, and only there (15.13, ruling 47).
                    done=request.query_params.get("done", ""),

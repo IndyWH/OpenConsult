@@ -44,5 +44,6 @@ def test_15_6_the_log_page_lists_the_newest_first_and_is_read_only(logged_in, ap
     assert positions == sorted(positions)
     assert "from Example to Sample" in page
     assert logged_in.post("/log", data={}).status_code == 405
-    at_start = [line for line in app.state.parts.audit.lines() if line.event.startswith("decision.")]
-    assert len(app.state.parts.audit.lines()) == 4 + len(at_start)   # the decisions of 3c are written at start
+    # The decisions of 3c are written at start; since run 9c the six boxes of the picture of This machine with them.
+    at_start = [line for line in app.state.parts.audit.lines() if line.event.startswith(("decision.", "panel."))]
+    assert len(app.state.parts.audit.lines()) == 4 + len(at_start) and len([l for l in at_start if l.event.startswith("panel.")]) == 6

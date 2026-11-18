@@ -701,6 +701,12 @@ EVENTS = {
     "decision.guideline_search": "Guideline search placed at start",
     "decision.whisperx_choice": "WhisperX choice judged at start",
     "decision.converter": "Recording converter found at start",
+    "panel.microphone": "This machine at start: the microphone",
+    "panel.speech_local": "This machine at start: transcription on this computer",
+    "panel.speechmatics": "This machine at start: Speechmatics",
+    "panel.model_local": "This machine at start: the language model on this computer",
+    "panel.claude": "This machine at start: Claude",
+    "panel.consultation": "This machine at start: the consultation",
     "setting.changed": "Setting changed",
     "statement.ticked": "Cloud statement ticked",
     "statement.covered": "A path saved under a wider tick",
@@ -1110,6 +1116,53 @@ ROW_MODEL_IN_USE = "Language model"
 START_NOT_CONNECTED = "Start is not offered: {service} is not connected. Connect it in Settings."
 START_STATEMENT = "Start is not offered: the statement for your choices is not ticked. Read and tick it in Settings."
 START_TEST_FAILED = "Start is not offered: {reason}"
+# Run 9c: the control panel of This machine (15.13, rulings 6 and 56 and the details of the run). The shape is the
+# owner's, by his sketch of 17 Nov 2026; every word in a box is a draft for him to correct on screen. A box says its
+# state by a sign and a word, never by colour alone (R15). PANEL_GOES says what goes to a cloud service on the path
+# as chosen and nothing else (the plan review, point 1): drafts that speak of where sound and words go.
+PANEL_INTRO = "How OpenConsult runs on this computer. Press a box to see more."
+PANEL_COLUMNS = {"microphone": "Microphone", "transcription": "Transcription", "language_model": "Language model",
+                 "consultation": "Consultation"}
+PANEL_BOXES = {"microphone": "Microphone", "speech_local": "This computer", "speechmatics": "Speechmatics, cloud",
+               "model_local": "This computer", "claude": "Claude, cloud", "consultation": "Consultation"}
+PANEL_STATES = {"ready": "Ready", "not_set_up": "Not set up", "cannot_run": "Cannot run here"}
+PANEL_SIGNS = {"ready": "✓", "not_set_up": "–", "cannot_run": "✕"}     # a tick, a dash, a cross
+PANEL_CHOSEN = "Chosen"
+PANEL_USED_AFTER_STOP = "Used after Stop"
+PANEL_LOCAL_MODEL = "Gemma 4 QAT"
+PANEL_CLAUDE_MODEL = "Claude Haiku 5.5"
+PANEL_ACTIONS = {"connect": "Connect", "test": "Test", "choose": "Choose"}
+PANEL_TESTED_ON = "tested on {date} at {time}"
+PANEL_ENGINE_ASKED = "The engine was asked when OpenConsult started."
+PANEL_SERVICE_TESTED = "{service} was tested at {time}."
+PANEL_KINDS = {"speechmatics": "transcription service", "claude": "language model"}
+PANEL_REASONS = {
+    "as_said": "{sentence}",
+    "mic_tested": "The microphone was tested on {date} at {time}: the level moved.",
+    "mic_not_tested": "The microphone has not been tested on this computer yet.",
+    "speech_ready": "{model} is installed and its self-test passed on {date} at {time}.",
+    "speech_no_self_test": "{model} is installed. Its self-test has not been run yet.",
+    "speech_self_test_failed": "{model} is installed. Its self-test failed on {date} at {time}: {reason}",
+    "speech_not_installed": "{model} is not installed. Install it with: uv run openconsult install-speech --choice {name}",
+    "cloud_ready": "{service} is connected. It is the cloud {kind}.",
+    "cloud_not_connected": "{service} is not connected. It is the cloud {kind}, for a computer that cannot run its own.",
+    "cloud_not_tested": "{service} has a key that has not been tested since OpenConsult started. It is the cloud {kind}.",
+    "cloud_test_failed": "{service} cannot be used now. It is the cloud {kind}.",
+    "engine_not_set_up": "{sentence} The engine is set up by hand until the installers arrive. The README says how.",
+    "consultation_ready": "Ready to start.",
+    "consultation_not_tested": "{service} has not been tested since OpenConsult started. The Start screen tests it.",
+}
+PANEL_GOES = {
+    "speechmatics": {"live": "On the path you chose, the sound of the consultation goes to Speechmatics as it is spoken.",
+                     "after_stop": ("On the path you chose, the recording goes to Speechmatics once, after Stop. No sound goes to it "
+                                    "during the consultation."),
+                     "nothing": "On the path you chose, nothing goes to Speechmatics."},
+    "claude": {"live": "On the path you chose, the words of the consultation go to Claude.",
+               "nothing": "On the path you chose, nothing goes to Claude."},
+}
+PANEL_PATH_LINE = "The path you chose: the microphone, then transcription {transcription}, then the language model {model}."
+PANEL_PATH_BY = {"this_computer": "on this computer", "speechmatics": "by Speechmatics", "claude": "by Claude"}
+PANEL_CHOOSE_IN_SETTINGS = "You can choose it in Settings once OpenConsult is set up."
 # Run 9c: the choice between the two speech models of this computer, under Transcription (7.3). Drafts. The line
 # beside Nemotron was carried since the details of run 9a, for when Nemotron became the default.
 SPEECH_MODEL_LEGEND = "The speech model of this computer"

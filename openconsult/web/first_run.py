@@ -42,6 +42,11 @@ class FirstRun:
     def done(self) -> set[str]:
         return {row["step"] for row in self._db.query("SELECT step FROM first_run")}
 
+    def done_at(self, step: str) -> str | None:
+        """When a step was done, or None when it is not done."""
+        row = self._db.query_one("SELECT done_at FROM first_run WHERE step = ?", (step,))
+        return row["done_at"] if row else None
+
     def left(self) -> set[str]:
         """The steps left with Not now: met, and not done."""
         return {row["step"] for row in self._db.query("SELECT step FROM first_run_left")}

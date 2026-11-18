@@ -293,7 +293,7 @@ def _save_or_wait(request: Request, user, p, fields: dict, control: str, pending
     if asked:
         pending = {**pending, "made": made}
         if "sha256" not in fields:
-            return routes._settings_page(request, user, None, pending)
+            return routes._settings_page(request, user, None, pending, from_panel=fields.get("from") == "panel")
         if fields["sha256"] != made.sha256:
             return routes._settings_page(request, user, (control, words.STATEMENT_CHANGED), pending)
         if fields.get("understand") != "yes":

@@ -294,6 +294,41 @@ details.call .part { margin: .5rem 0; }
 details.call .part h4 { margin: 0 0 .2rem; font-size: .72rem; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-faint); font-weight: 600; }
 details.call pre { white-space: pre-wrap; font-family: var(--sans); font-size: .88rem; line-height: 1.45; margin: 0; padding: .5rem .7rem; background: var(--paper); border-radius: 6px; max-height: 24rem; overflow: auto; }
 
+/* The control panel of This machine (run 9c; 15.13, rulings 6 and 56). Four columns side by side, the arrows in the
+   gutters between them; a box in its column's cell, this computer above its cloud service. A state is told by its
+   sign and its word; the colour of the sign is added and never alone. The path the doctor chose has the heavier
+   border, in the page's own ink. Under 760 px the columns stack in the order of the path and each arrow points down. */
+.panel-grid { display: grid; grid-template-columns: 1fr 2rem 1fr 2rem 1fr 2rem 1fr; column-gap: .3rem; row-gap: .5rem; align-items: start; margin: .6rem 0 1rem; }
+.panel-head { grid-row: 1; margin: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-faint); font-weight: 600; }
+.panel-grid .col-1 { grid-column: 1; } .panel-grid .col-2 { grid-column: 3; } .panel-grid .col-3 { grid-column: 5; } .panel-grid .col-4 { grid-column: 7; }
+.panel-grid .row-0 { grid-row: 2; } .panel-grid .row-1 { grid-row: 3; }
+details.box { border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel); padding: .5rem .7rem; min-width: 0; }
+details.box.on-path { border: 3px solid var(--ink); padding: calc(.5rem - 2px) calc(.7rem - 2px); }
+details.box > summary { color: var(--ink); font-size: .9rem; line-height: 1.45; list-style-position: outside; margin-left: 1rem; }
+details.box > summary > span, details.box > summary > b { display: block; }
+.box-title { font-weight: 600; }
+.box-title .cloud-shape { vertical-align: -2px; }
+.box-model, .box-when, .box-also { color: var(--ink-soft); font-size: .82rem; }
+.box-state { font-weight: 600; }
+.box.ready .box-sign { color: var(--green); } .box.cannot_run .box-sign { color: var(--red); } .box.not_set_up .box-sign { color: var(--ink-soft); }
+.box-chosen { letter-spacing: .02em; }
+.box-more { border-top: 1px solid var(--line); margin-top: .5rem; padding-top: .4rem; font-size: .88rem; }
+.box-more p { margin: 0 0 .4rem; }
+.box-more form { margin: 0; }
+.box-more button, .box-more a.button { margin-top: .2rem; padding: .3rem .9rem; font-size: .82rem; }
+.panel-arrow { grid-row: 2; align-self: start; justify-self: center; margin-top: .9rem; color: var(--ink); line-height: 0; }
+.panel-arrow.gutter-1 { grid-column: 2; } .panel-arrow.gutter-2 { grid-column: 4; } .panel-arrow.gutter-3 { grid-column: 6; }
+.panel-arrow.from-1 { grid-row: 3; }
+.panel-arrow.from-0.to-1 svg { transform: rotate(40deg); }
+.panel-arrow.from-1.to-0 svg { transform: rotate(-40deg); }
+@media (max-width: 760px) {
+  .panel-grid { display: block; }
+  .panel-head { margin-top: .6rem; }
+  details.box { margin: .4rem 0; }
+  .panel-arrow, .panel-arrow.from-1 { display: block; text-align: center; margin: .5rem 0; }
+  .panel-arrow svg, .panel-arrow.from-0.to-1 svg, .panel-arrow.from-1.to-0 svg { transform: rotate(90deg); }
+}
+
 /* The cloud mark (run 9b): a border, a drawn cloud and words in the page's own ink, so it reads the same without colour. */
 .cloud-mark { display: inline-grid; grid-template-columns: auto auto; align-items: center; column-gap: .4rem; border: 2px solid var(--ink); border-radius: var(--radius); padding: .25rem .6rem; margin: .3rem 0; color: var(--ink); background: var(--panel); }
 .cloud-mark .cloud-word { font-weight: 700; letter-spacing: .02em; }

@@ -27,6 +27,14 @@ def sentence(key, **fill):
     return words.REASONS[key].format(**fill)
 
 
+def box_of(page: str, name: str) -> str:
+    """One box of the picture of This machine, as the page holds it (15.13,
+    rulings 6 and 56): since run 9c a fact that stood as a row of the
+    table stands in its box."""
+    assert f'id="box-{name}"' in page, f"no box {name}"
+    return page.split(f'id="box-{name}"', 1)[1].split("</details>", 1)[0]
+
+
 CASES = [
     # (vllm, ollama, the sentence)
     (VLLM, OLLAMA, sentence("engine_running", engine="vLLM", version="0.31-made-up", model=words.MODEL_PRESENT)),
@@ -60,7 +68,8 @@ def pages_of(tmp_path, clock, machine, vllm, ollama, programs=None):
 def test_ruling_36_this_machine_says_the_engine_the_model_and_the_reason(tmp_path, clock, vllm, ollama, line):
     engines, first_run, settings = pages_of(tmp_path, clock, SUITABLE, vllm, ollama)
     for page in (first_run, settings):
-        assert f"<th>{words.ROW_MODEL}</th>" in page and line in page
+        # Since run 9c the sentence stands in the box This computer under Language model, and no longer as a row.
+        assert line in box_of(page, "model_local") and f"<th>{words.ROW_MODEL}</th>" not in page
 
 
 def test_ruling_36_the_decisions_are_read_at_start_and_never_at_a_view(tmp_path, clock):
@@ -82,8 +91,10 @@ def test_ruling_36_this_machine_says_where_the_guideline_search_sits_and_whether
     engines, first_run, settings = pages_of(tmp_path, clock, SUITABLE, VLLM, OLLAMA, desktop)
     for page in (first_run, settings):
         assert f"<th>{words.ROW_GUIDELINE_SEARCH}</th><td>{words.REASONS['guideline_card']}</td>" in page
-        assert f"<th>{words.ROW_SPEECH_CHOICE}</th><td>{words.REASONS['whisperx_no_room']}</td>" in page
+        assert f"<th>{words.ROW_SPEECH_CHOICE}</th>" not in page
         assert "24564" not in page and "MiB" not in page
+    # Since run 9c the room check's sentence on the WhisperX choice stands on that choice's own control, in Settings.
+    assert f'id="speech-model-whisperx_pyannote-reason">{words.REASONS["whisperx_no_room"]}</p>' in settings
     crowded = desktop + [Program(2, "/usr/lib/made-up-game", 1500)]
     engines, first_run, settings = pages_of(tmp_path / "c", clock, SUITABLE, VLLM, OLLAMA, crowded)
     assert words.REASONS["guideline_processor"] in settings and words.REASONS["whisperx_no_room"] in settings
