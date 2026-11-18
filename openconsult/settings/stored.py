@@ -24,6 +24,9 @@ AUDIO_RETENTION_DAYS = "audio_retention_days"
 LANGUAGE_MODEL, TRANSCRIPTION, BETTER_ACCURACY, STATEMENT_TICKED = "language_model", "transcription", "better_accuracy", "statement_ticked"
 # Run 9c (15.13, ruling 48): what is kept beside that checksum, so that a path that sends less asks for no new tick.
 STATEMENT_KEPT = "statement_ticked_kept"
+# The speech model of this computer, where the doctor has chosen between the two (7.3; the details of run 9c).
+SPEECH_MODEL = "speech_model"
+LOCAL_SPEECH_MODELS = ("nemotron", "whisperx_pyannote")
 ON, OFF = "on", "off"
 # v1's default (its retention module; V1_LESSONS 10.5).
 DEFAULT_RETENTION_DAYS = 90
@@ -90,6 +93,23 @@ class Stored:
             self._set(TRANSCRIPTION, path.transcription, was=before.transcription)
         if path.better_accuracy != before.better_accuracy:
             self._set(BETTER_ACCURACY, ON if path.better_accuracy else OFF, was=ON if before.better_accuracy else OFF)
+
+    # ------------------------------- the speech model of this computer (9c)
+
+    @property
+    def speech_model(self) -> str | None:
+        """The doctor's choice between the two speech models of this
+        computer (7.3), or None while none was ever saved: then the app
+        takes Nemotron where it is installed, as since 6a."""
+        value = self._get(SPEECH_MODEL)
+        return value if value in LOCAL_SPEECH_MODELS else None
+
+    def set_speech_model(self, name: str, was: str) -> None:
+        """was: the model in use before, where none was ever saved."""
+        if name not in LOCAL_SPEECH_MODELS:
+            raise ValueError("not a speech model of this computer")
+        if name != self.speech_model:
+            self._set(SPEECH_MODEL, name, was=self.speech_model or was)
 
     @property
     def ticked_sha256(self) -> str | None:

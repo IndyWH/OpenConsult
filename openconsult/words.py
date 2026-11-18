@@ -1110,6 +1110,11 @@ ROW_MODEL_IN_USE = "Language model"
 START_NOT_CONNECTED = "Start is not offered: {service} is not connected. Connect it in Settings."
 START_STATEMENT = "Start is not offered: the statement for your choices is not ticked. Read and tick it in Settings."
 START_TEST_FAILED = "Start is not offered: {reason}"
+# Run 9c: the choice between the two speech models of this computer, under Transcription (7.3). Drafts. The line
+# beside Nemotron was carried since the details of run 9a, for when Nemotron became the default.
+SPEECH_MODEL_LEGEND = "The speech model of this computer"
+SPEECH_MODEL_NOT_INSTALLED = "Not installed. Install it with: uv run openconsult install-speech --choice {name}"
+NEMOTRON_US_ENGLISH = "Nemotron's English model was trained on US English."
 # Run 9c: the Start screen is shown at once and its tests fill in after (15.13, ruling 51). Drafts. The first stands
 # on the control while the tests run; the second answers a press that came before they had answered; the last two are
 # served for a page whose script has not run, and taken away by the script.

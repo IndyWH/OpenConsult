@@ -54,6 +54,23 @@
       {% if saved_at == s.which %}<p class="notice" id="saved-{{ s.which }}" role="status">{{ words.PATH_SAVED }}</p>{% endif %}
     </form>
     {% if covered and less_at == s.which %}{{ statement_less(covered.made, "less-" ~ s.which) }}{% endif %}
+    {% if s.which == "transcription" and speech_model %}
+    {# The speech model of this computer (7.3; run 9c): offered where the transcription runs on this computer. It
+       saves by itself; a model that cannot be chosen is disabled with the reason on the control (7.3, rule 1). #}
+    <form method="post" action="/settings/speech-model" id="speech-model" data-saves data-stay>
+      <div role="radiogroup" aria-labelledby="speech-model-legend" aria-describedby="save-speech-model-refusal">
+      <p class="mark" id="speech-model-legend">{{ words.SPEECH_MODEL_LEGEND }}</p>
+      {% for c in speech_model.choices %}
+      <label class="tick"><input type="radio" name="speech_model" value="{{ c.value }}"{% if c.checked %} checked{% endif %}{% if c.reason %} aria-describedby="speech-model-{{ c.value }}-reason" disabled{% endif %}> {{ c.words }}</label>
+      {% if c.note %}<p class="mark" id="speech-model-{{ c.value }}-note">{{ c.note }}</p>{% endif %}
+      {% if c.reason %}<p class="mark" id="speech-model-{{ c.value }}-reason">{{ c.reason }}</p>{% endif %}
+      {% endfor %}
+      </div>
+      <button class="primary" id="save-speech-model" aria-describedby="save-speech-model-refusal" data-save>{{ words.SAVE }}</button>
+      {{ refusal("save-speech-model") }}
+      {% if saved_at == "speech-model" %}<p class="notice" id="saved-speech-model" role="status">{{ words.PATH_SAVED }}</p>{% endif %}
+    </form>
+    {% endif %}
     {% if s.which == "transcription" and better_accuracy %}
     {# The tick for better accuracy (15.9, rulings 36 and 42): offered while the transcription runs on this computer,
        off until the doctor sets it, set only with Speechmatics connected and the lines of ruling 33 ticked. #}

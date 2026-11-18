@@ -117,8 +117,10 @@ def test_15_13_ruling_47_a_typed_field_keeps_its_save_and_is_not_saved_by_the_ch
     app, client, store, testers = made_app(tmp_path, clock, machine=SUITABLE, store=MadeStore(BOTH_KEYS))
     p = app.state.parts
     page = client.get("/settings").text
-    # The forms that save by themselves, and no other: the two choices and the tick for better accuracy.
-    assert forms_that_save(page) == ["/settings/path/language-model", "/settings/path/transcription", "/settings/better-accuracy"]
+    # The forms that save by themselves, and no other: the two choices, the speech model of this computer and the
+    # tick for better accuracy.
+    assert forms_that_save(page) == ["/settings/path/language-model", "/settings/path/transcription", "/settings/speech-model",
+                                     "/settings/better-accuracy"]
     for action, save in (("/settings/retention", "save-retention"), ("/settings/you", "save-you"), ("/settings/password", "change-password"),
                          ("/settings/guidelines/add", "add-guideline")):
         form = page.split(f'action="{action}"', 1)[1].split("</form>", 1)[0]

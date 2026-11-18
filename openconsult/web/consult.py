@@ -52,6 +52,11 @@ def speech_choice_for(p, path: ChosenPath | None = None) -> SpeechChoice:
         return SpeechChoice(p.doors[SPEECHMATICS_CHOICE.name], None)
     if p.machine.case != "suitable":
         return SpeechChoice(None, words.SPEECH_REASONS["no_card"])
+    chosen = p.stored.speech_model
+    if chosen is not None:
+        # The doctor has chosen between the two (7.3; run 9c): that model alone, and nothing in its place (10.4).
+        reason = local_model_reason(p, chosen)
+        return SpeechChoice(None, reason) if reason else SpeechChoice(p.doors[chosen], None)
     nemotron = p.doors[NEMOTRON.name]
     if nemotron.installed:
         return SpeechChoice(nemotron, None)
@@ -64,6 +69,30 @@ def speech_choice_for(p, path: ChosenPath | None = None) -> SpeechChoice:
     else:
         return SpeechChoice(whisperx, None)
     return SpeechChoice(None, " ".join(reasons))
+
+
+def local_model_reason(p, name: str) -> str | None:
+    """Why a speech model of this computer cannot be used now, in the
+    words Start gives: not installed, or, for the WhisperX choice, no
+    room on the card for its pass at Stop. None when it can."""
+    if name == WHISPERX_PYANNOTE.name and not p.decisions.whisperx_choice.green:
+        return words.SPEECH_REASONS["whisperx_no_room"]
+    if not p.doors[name].installed:
+        return words.SPEECH_REASONS["nemotron_not_installed" if name == NEMOTRON.name else "whisperx_not_installed"]
+    return None
+
+
+def local_model_in_use(p) -> str:
+    """The speech model of this computer that a consultation would run on
+    now: the doctor's choice; or, while none was ever saved, what the app
+    takes by itself as since 6a, Nemotron where installed and otherwise
+    the WhisperX choice where it can run. Nemotron where neither can."""
+    chosen = p.stored.speech_model
+    if chosen is not None:
+        return chosen
+    if not p.doors[NEMOTRON.name].installed and local_model_reason(p, WHISPERX_PYANNOTE.name) is None:
+        return WHISPERX_PYANNOTE.name
+    return NEMOTRON.name
 
 
 @dataclass(frozen=True)

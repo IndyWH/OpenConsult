@@ -14,7 +14,7 @@ from openconsult.patients.users import MIN_PASSWORD, name_problem, password_prob
 from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_problem
 from openconsult.settings.connections import SERVICES
 from openconsult.settings.path import CLAUDE
-from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web, steps as steps_web
+from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web, settings_local, steps as steps_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -316,6 +316,7 @@ def _settings_page(request: Request, user, refused=None, pending=None):
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],
                    path_sections=cloud_web.path_sections(parts(request), pending),
                    better_accuracy=cloud_web.better_accuracy_view(parts(request), pending),
+                   speech_model=settings_local.speech_model_view(parts(request)),
                    to_tick=None if pending else cloud_web.statement_view(parts(request), "/settings"))
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)
