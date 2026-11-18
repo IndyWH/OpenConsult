@@ -11,8 +11,8 @@ Run on 17 and 18 Nov 2026 by the mailbox, as one run in two halves
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Twenty-five commits, none pushed. The
-suite: 1284 passed in about 140 s, none skipped (1114 at the start). No
+plan and its review beside it. Twenty-seven commits, none pushed. The
+suite: 1296 passed in about 142 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
@@ -31,6 +31,24 @@ begun. A row from before holds neither and reads the defaults. Seen
 in the browser: saved, refused one step outside each bound, each
 bound taken, and three made consultations each judged by the values
 it started with while Settings held others.
+
+THE NOTICE OF A PATH THAT SENDS LESS, IN THE OWNER'S SHAPE (c6e0eca;
+his words of 18 Nov, 07:07 to 07:25, by mail 4; ruling 48). My draft
+line he did not follow. From the doctor's side the notice now names
+the two jobs as the picture does: his head (Saved. No new tick is
+asked, because less leaves this computer than you agreed to.), a line
+that begins On this computer:, a line that begins In the cloud: with
+what goes there. His lines are in the file of words letter for
+letter (LESS_HEAD, JOBS_HERE, JOB_IN_CLOUD, GOES); one is Cowork's
+draft, not yet seen by him: transcription. Nothing goes to
+Speechmatics. The cloud boxes of the picture say the same sentences
+in place of my drafts (On the path you chose ...): one function,
+settings/statement.py goes_sentence, gives them to both. The full
+statement stays one press away under the notice, closed, with no
+script and no tick. On a later view the two lines stand without the
+head. Seen in the browser for his own case and for the other two
+paths of the table. Three tests that pinned the old words restated
+(test_less_no_tick, test_path_settings, test_panel).
 
 STOP DOES NOT WAIT FOR THE DELETE OF A RECORDING OR FOR ITS PROOF
 (85ecea5; the owner's ruling of 18 Nov, 06:55, by mail 3: a doctor
