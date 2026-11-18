@@ -306,7 +306,11 @@ def _settings_page(request: Request, user, refused=None, pending=None):
                    least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
                    # Saved is said beside the control that was changed, and only there (15.13, ruling 47).
                    done=request.query_params.get("done", ""),
-                   saved_at=request.query_params.get("at") if request.query_params.get("done") == "path" else None,
+                   saved_at=request.query_params.get("at") if request.query_params.get("done") in ("path", "less") else None,
+                   # A path saved under a wider tick shows what leaves now (ruling 48): under its control right after
+                   # the save, and on later views where a statement to tick would stand.
+                   less_at=request.query_params.get("at") if request.query_params.get("done") == "less" else None,
+                   covered=None if pending else cloud_web.covered_view(parts(request)),
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],

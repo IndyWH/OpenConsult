@@ -53,6 +53,23 @@
 </section>
 {%- endmacro %}
 
+{# The statement of a path that sends less than the one that was ticked (15.13, ruling 48): shown with no tick, under
+   the line that less leaves the computer, so that the doctor reads what leaves now. Nothing in it can be pressed. #}
+{% macro statement_less(made, id) -%}
+<div class="statement-shown" id="{{ id }}">
+  <p class="waiting" role="status">{{ words.PATH_SENDS_LESS }}</p>
+  <h3>{{ made.heading }}</h3>
+  <p>{{ made.intro }}</p>
+  <h4>{{ words.CLOUD_SENT_HEADING }}</h4>
+  <ul class="panel-list">{% for line in made.sent %}<li>{{ line }}</li>{% endfor %}</ul>
+  <h4>{{ words.CLOUD_STAYS_HEADING }}</h4>
+  <ul class="panel-list">{% for line in made.stays %}<li>{{ line }}</li>{% endfor %}</ul>
+  {% for heading, lines in made.parts %}<h4>{{ heading }}</h4>
+  <ul class="panel-list">{% for line in lines %}<li>{{ line }}</li>{% endfor %}</ul>{% endfor %}
+  <p class="statement">{{ made.prototype }}</p>
+</div>
+{%- endmacro %}
+
 {# The cloud mark (15.13, ruling 5; 7.3, rule 2): on a consultation whose path holds a cloud service. Told without
    colour: the drawn outline of a cloud, the owner's words and a border. Sent with the page, with no script. #}
 {% macro cloud_mark(lines) -%}

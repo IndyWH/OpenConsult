@@ -703,6 +703,7 @@ EVENTS = {
     "decision.converter": "Recording converter found at start",
     "setting.changed": "Setting changed",
     "statement.ticked": "Cloud statement ticked",
+    "statement.covered": "A path saved under a wider tick",
     "connection.tested": "Connection to a cloud service tested",
     "key.saved": "Key of a cloud service kept in the secure store",
     "key.removed": "Key of a cloud service taken out of the secure store",
@@ -1100,6 +1101,9 @@ PATH_SAVED = "Saved. It takes effect at the next consultation."
 # has not run and taken away by the script; the second stands over a statement that waits for its tick.
 SETTINGS_NO_SCRIPT = "This page's script did not run. Press Save after you change a choice or a tick."
 PATH_NOT_SAVED_YET = "This choice is not saved yet. Read the statement below and tick it. The tick saves the choice."
+# A path that sends less than the statement that was ticked asks for no new tick (15.13, ruling 48); the page shows
+# the statement of that path with no tick under this line. A draft: it speaks of what leaves the computer.
+PATH_SENDS_LESS = "Less leaves this computer than you agreed to, so no new tick is asked. This is what leaves now."
 CONNECT_FIRST = "Connect {service} first."
 # The Start screen in cloud mode (7.2; 7.3; R15; run 9b). Drafts.
 ROW_MODEL_IN_USE = "Language model"

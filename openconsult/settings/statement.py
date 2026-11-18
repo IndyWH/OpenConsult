@@ -13,10 +13,11 @@ whose statement no longer has that checksum has not been ticked."""
 from __future__ import annotations
 
 import hashlib
+import re
 from dataclasses import dataclass
 
 from openconsult import words
-from openconsult.settings.path import ChosenPath
+from openconsult.settings.path import LANGUAGE_MODELS, TRANSCRIPTIONS, ChosenPath
 
 
 @dataclass(frozen=True)
@@ -102,6 +103,39 @@ def statement_for(path: ChosenPath, at_the_press: bool = False) -> Statement | N
         parts.append((words.CLOUD_CLAUDE_HEADING, tuple(words.CLOUD_CLAUDE_LINES)))
     return Statement(heading, words.CLOUD_INTRO, _sent(path, recording), _stays(path, recording), tuple(parts),
                      words.CLOUD_PROTOTYPE, tick)
+
+
+# A sentence of a line ends at a full stop that a space follows; the owner's lines hold no other full stop.
+SENTENCE_END = re.compile(r"(?<=\.)\s+")
+
+
+def sentences_of(statement: Statement) -> tuple[str, ...]:
+    """What a statement says is sent and what it says of each service, as
+    sentences: each line of What is sent and each line of each service's
+    part, taken apart (15.13, ruling 48). The headings, the intro, the
+    list of what stays and the tick's own words are not among them. Two
+    lines stand in the owner's words with or without their last sentence
+    (rulings 5 and 39); by sentence both come out right."""
+    lines = [*statement.sent, *(line for _, part in statement.parts for line in part)]
+    return tuple(dict.fromkeys(sentence for line in lines for sentence in SENTENCE_END.split(line) if sentence))
+
+
+def words_checksum() -> str:
+    """One checksum of every word a statement can be built from, as the
+    file of words holds them now: the statements of every path, and of
+    the one press after a lost connection, each as it would be shown.
+    A path is covered by a wider tick only while this is what it was at
+    that tick, so a changed word, wherever it stands, still asks for the
+    tick (15.13, ruling 48; the plan review of run 9c, point c)."""
+    texts = []
+    for model in LANGUAGE_MODELS:
+        for speech in TRANSCRIPTIONS:
+            for tick in (False, True):
+                for press in (False, True):
+                    made = statement_for(ChosenPath(model, speech, tick), at_the_press=press)
+                    if made is not None:
+                        texts.append(made.text)
+    return hashlib.sha256("\n".join(texts).encode("utf-8")).hexdigest()
 
 
 def mark_lines(path: ChosenPath) -> tuple[str, ...]:

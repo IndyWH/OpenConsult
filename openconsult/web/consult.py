@@ -103,7 +103,8 @@ def start_state(p, ask_engine: bool = True) -> StartState:
         choice = speech_choice_for(p, path)
         if choice.door is None:
             return StartState(words.START_NO_SPEECH.format(reason=choice.reason))
-    if not p.stored.ticked(statement_for(path)):
+    # Ticked itself, or sending less than the statement that was ticked (15.13, ruling 48).
+    if not p.stored.covers(statement_for(path)):
         return StartState(words.START_STATEMENT, ("/settings#cloud-statement", words.NAV_SETTINGS))
     tests = p.connections.test_all(path.services) if ask_engine else {
         service: p.connections.state(service).last for service in path.services}
@@ -225,7 +226,8 @@ def begin(p, patient, minutes: int, earlier_notes_shown: bool | None = None, ear
     door = speech_choice_for(p, path).door
     cid = p.consultations.start(patient.id, minutes, door.choice.name, llm.engine_name, version, llm.profile.tag,
                                 digest, SPEAKERS, earlier_notes_shown, earlier_notes, path=path,
-                                statement_sha256=p.stored.ticked_sha256 if path.holds_cloud else None)
+                                # The checksum of the statement of its own path, which may stand under a wider tick (ruling 48).
+                                statement_sha256=statement_for(path).sha256 if path.holds_cloud else None)
     started_at = p.clock()
     # The block of 15.11 ruling 5 goes to the two calls of every pass while the switch is on (8.4); off or none sends nothing.
     block = background.block_for(p.notes, patient.id, started_at, cid) if earlier_notes_shown else None

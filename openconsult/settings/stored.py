@@ -11,14 +11,19 @@ the table."""
 
 from __future__ import annotations
 
+import json
+
 from openconsult.db import Database
 from openconsult.patients.audit import Audit, Clock, now_local
 from openconsult.settings.path import LANGUAGE_MODELS, TRANSCRIPTIONS, ChosenPath, beginning
+from openconsult.settings.statement import sentences_of, words_checksum
 
 AUDIO_RETENTION_DAYS = "audio_retention_days"
 # The path of a consultation (7.3; 15.13, the details of run 9b): where the language model and the transcription
 # run, the tick for better accuracy, and the checksum of the cloud statement as it was last ticked.
 LANGUAGE_MODEL, TRANSCRIPTION, BETTER_ACCURACY, STATEMENT_TICKED = "language_model", "transcription", "better_accuracy", "statement_ticked"
+# Run 9c (15.13, ruling 48): what is kept beside that checksum, so that a path that sends less asks for no new tick.
+STATEMENT_KEPT = "statement_ticked_kept"
 ON, OFF = "on", "off"
 # v1's default (its retention module; V1_LESSONS 10.5).
 DEFAULT_RETENTION_DAYS = 90
@@ -91,11 +96,21 @@ class Stored:
         """The checksum of the cloud statement as it was last ticked."""
         return self._get(STATEMENT_TICKED)
 
-    def tick_statement(self, sha256: str, path: ChosenPath) -> None:
+    def tick_statement(self, sha256: str, path: ChosenPath, statement=None) -> None:
         """The tick, with the checksum of the text ticked and its path, in
-        the audit log (15.13, ruling 5; 7.3, rule 4)."""
-        self._db.execute("INSERT OR REPLACE INTO setting (name, value, changed_at) VALUES (?, ?, ?)",
-                         (STATEMENT_TICKED, sha256, self._clock().isoformat(timespec="seconds")))
+        the audit log (15.13, ruling 5; 7.3, rule 4). statement: the
+        statement that was ticked, as shown; with it the app also keeps
+        its sentences and one checksum of every word a statement can be
+        built from, so that a later path that sends less can be told
+        (ruling 48). With none, the checksum is kept alone, as before
+        run 9c, and nothing that was kept for an earlier tick stays."""
+        now = self._clock().isoformat(timespec="seconds")
+        self._db.execute("INSERT OR REPLACE INTO setting (name, value, changed_at) VALUES (?, ?, ?)", (STATEMENT_TICKED, sha256, now))
+        if statement is None:
+            self._db.execute("DELETE FROM setting WHERE name = ?", (STATEMENT_KEPT,))
+        else:
+            kept = json.dumps({"sentences": list(sentences_of(statement)), "words": words_checksum()}, ensure_ascii=False)
+            self._db.execute("INSERT OR REPLACE INTO setting (name, value, changed_at) VALUES (?, ?, ?)", (STATEMENT_KEPT, kept, now))
         self._audit.record("statement.ticked", f"{path.key()}; sha256 {sha256}")
 
     def ticked(self, statement) -> bool:
@@ -103,3 +118,29 @@ class Stored:
         with nothing to say, false when a choice or a word has changed
         since the tick."""
         return statement is None or statement.sha256 == self.ticked_sha256
+
+    def covers(self, statement) -> bool:
+        """Whether a path may be used without a new tick (15.13, ruling 48):
+        its statement stands ticked; or it sends less than the statement
+        that was ticked, which is so when every sentence of its own list
+        What is sent and of its own service parts stood, word for word,
+        in that one. That test is made only while no word a statement can
+        be built from has changed since the tick, and only where the
+        sentences were kept with it: a folder that ticked before run 9c
+        holds a checksum alone, and is asked once more."""
+        if self.ticked(statement):
+            return True
+        try:
+            kept = json.loads(self._get(STATEMENT_KEPT) or "null")
+        except ValueError:
+            kept = None
+        if not isinstance(kept, dict) or kept.get("words") != words_checksum():
+            return False
+        return set(sentences_of(statement)) <= set(kept.get("sentences") or [])
+
+    def note_covered(self, path: ChosenPath, statement) -> None:
+        """The audit line of a path saved under the wider tick, with both
+        checksums (ruling 48; 7.3, rule 4). The tick that stands is not
+        touched: it stays the wider one."""
+        self._audit.record("statement.covered", f"{path.key()}; saved under the wider tick; sha256 of this path's statement "
+                           f"{statement.sha256}; sha256 of the statement ticked {self.ticked_sha256}")

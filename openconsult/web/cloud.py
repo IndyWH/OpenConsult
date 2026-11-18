@@ -89,9 +89,19 @@ def statement_view(p, back: str) -> dict | None:
     not ticked: shown where the doctor is, with its tick (ruling 5)."""
     path = p.stored.path(p.machine.case)
     made = statement_for(path)
-    if made is None or p.stored.ticked(made):
+    if made is None or p.stored.covers(made):
         return None
     return {"made": made, "back": back}
+
+
+def covered_view(p) -> dict | None:
+    """The statement of the path as it stands, where it asks for no tick
+    because it sends less than the one that was ticked (15.13, ruling 48):
+    shown with no tick, so that the doctor reads what leaves now."""
+    made = statement_for(p.stored.path(p.machine.case))
+    if made is None or p.stored.ticked(made) or not p.stored.covers(made):
+        return None
+    return {"made": made, "covered": True}
 
 
 def walk_view(p, user, service: str) -> dict | None:
@@ -175,7 +185,7 @@ async def tick_statement(request: Request):
         return _back_page(request, user, back, ("tick-statement", words.STATEMENT_CHANGED))
     if fields.get("understand") != "yes":
         return _back_page(request, user, back, ("tick-statement", words.STATEMENT_TICK_FIRST))
-    p.stored.tick_statement(made.sha256, path)
+    p.stored.tick_statement(made.sha256, path, made)
     raise Redirect(f"{back}?done=ticked")
 
 
@@ -272,10 +282,14 @@ def _save_or_wait(request: Request, user, p, fields: dict, control: str, pending
     sent with the choice and the checksum of the text shown, saves the
     choice and the tick together. A Save pressed with the statement
     shown and no tick, on a page whose script has not run, is refused on
-    the control; so is a tick for other words."""
+    the control; so is a tick for other words. A path that sends less
+    than the one that was ticked asks for no tick (ruling 48): it is
+    saved, the tick that stands is not touched, the audit log says that
+    it was saved under the wider tick, and the page shows what leaves now."""
     from openconsult.web import routes
     made = statement_for(after)
-    asked = made is not None and not p.stored.ticked(made)
+    asked = made is not None and not p.stored.covers(made)
+    less = made is not None and not asked and not p.stored.ticked(made)
     if asked:
         pending = {**pending, "made": made}
         if "sha256" not in fields:
@@ -284,18 +298,22 @@ def _save_or_wait(request: Request, user, p, fields: dict, control: str, pending
             return routes._settings_page(request, user, (control, words.STATEMENT_CHANGED), pending)
         if fields.get("understand") != "yes":
             return routes._settings_page(request, user, (control, words.STATEMENT_TICK_FIRST), pending)
+    changed = after != p.stored.path(p.machine.case)
     p.stored.set_path(p.machine.case, after)
     if asked:
-        p.stored.tick_statement(made.sha256, after)
-    raise Redirect(_saved(fields, pending["which"], anchor))
+        p.stored.tick_statement(made.sha256, after, made)
+    elif less and changed:
+        p.stored.note_covered(after, made)
+    raise Redirect(_saved(fields, pending["which"], anchor, less))
 
 
-def _saved(fields: dict, at: str, anchor: str) -> str:
+def _saved(fields: dict, at: str, anchor: str, less: bool = False) -> str:
     """Where a save leads: the settings page, which says Saved beside the
-    control that was changed. With no script it comes back at the
+    control that was changed, and under it, for a path saved under a
+    wider tick, what leaves now. With no script it comes back at the
     section; the page's script keeps the window's place itself and asks
     for no anchor (15.10, ruling 34)."""
-    return f"/settings?done=path&at={at}" + ("" if fields.get("place") == "keep" else f"#{anchor}")
+    return f"/settings?done={'less' if less else 'path'}&at={at}" + ("" if fields.get("place") == "keep" else f"#{anchor}")
 
 
 # --------------------------------------------- the tick for better accuracy

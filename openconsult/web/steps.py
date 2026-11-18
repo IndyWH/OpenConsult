@@ -51,7 +51,7 @@ def needed(p, step: str) -> bool:
 def is_done(p, step: str) -> bool:
     if step in SERVICE_OF:
         path = p.stored.path(p.machine.case)
-        return p.connections.connected(SERVICE_OF[step]) and p.stored.ticked(statement_for(path))
+        return p.connections.connected(SERVICE_OF[step]) and p.stored.covers(statement_for(path))
     return step in p.first_run.done()
 
 

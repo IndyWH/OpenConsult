@@ -77,7 +77,7 @@ def test_details_of_9b_a_cloud_choice_is_refused_without_the_connection_and_with
     assert 'id="cloud-statement"' not in client.get("/settings").text
 
 
-def test_15_13_ruling_5_a_changed_choice_asks_for_the_tick_of_the_new_statement_and_a_path_with_no_cloud_is_saved_at_once(tmp_path, clock):
+def test_15_13_rulings_5_and_48_a_wider_path_asks_for_its_tick_one_that_sends_less_does_not_and_one_with_no_cloud_is_saved_at_once(tmp_path, clock):
     app, client, store, testers = made_app(tmp_path, clock, machine=SUITABLE, store=MadeStore(BOTH_KEYS))
     p = app.state.parts
     first = statement_for(ChosenPath(CLAUDE, THIS_COMPUTER))
@@ -88,21 +88,23 @@ def test_15_13_ruling_5_a_changed_choice_asks_for_the_tick_of_the_new_statement_
     assert words.PATH_NOT_SAVED_YET in text_of(shown) and words.CLOUD_HEADING_BOTH in text_of(shown)      # it waits for its tick (ruling 47)
     client.post("/settings/path/transcription", data={"transcription": SPEECHMATICS, "understand": "yes", "sha256": both.sha256})
     assert p.stored.path("suitable") == ChosenPath(CLAUDE, SPEECHMATICS) and p.stored.ticked(both) and not p.stored.ticked(first)
-    # Back to this computer for the language model, with the transcription still in the cloud: the owner's heading
-    # for that path, and its own tick, before the change is saved.
+    # Back to this computer for the language model, with the transcription still in the cloud. Until run 9c this path
+    # asked for a tick of its own, and at the room check of 17 Nov 2026 the owner took that for a bug: less was leaving
+    # than he had agreed to. Now it is saved with no tick (15.13, ruling 48), the tick that stands stays the wider
+    # one, and the page shows that path's statement, with the owner's heading and no tick, under the line that says so.
     alone = statement_for(ChosenPath(THIS_COMPUTER, SPEECHMATICS))
-    shown = client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER})
-    assert words.PATH_NOT_SAVED_YET in text_of(shown)
-    assert "Using a cloud transcription service" in text_of(shown) and "I understand that this sound leaves this computer." in text_of(shown)
-    assert p.stored.path("suitable").language_model == CLAUDE
-    client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER, "understand": "yes", "sha256": alone.sha256})
-    assert p.stored.path("suitable") == ChosenPath(THIS_COMPUTER, SPEECHMATICS)
+    saved = client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER})
+    assert saved.status_code == 303 and saved.headers["location"] == "/settings?done=less&at=language-model#language-model"
+    assert p.stored.path("suitable") == ChosenPath(THIS_COMPUTER, SPEECHMATICS) and p.stored.ticked(both) and not p.stored.ticked(alone)
+    shown = text_of(client.get(saved.headers["location"]))
+    assert "Less leaves this computer than you agreed to, so no new tick is asked. This is what leaves now." in shown
+    assert "Using a cloud transcription service" in shown and "I understand that this sound leaves this computer." not in shown
     # The last cloud choice given up: nothing leaves this computer, so nothing is asked.
     saved = client.post("/settings/path/transcription", data={"transcription": THIS_COMPUTER})
     assert saved.status_code == 303 and p.stored.path("suitable") == ChosenPath(THIS_COMPUTER, THIS_COMPUTER)
     assert setting_lines(p) == ["language_model from this_computer to claude", "transcription from this_computer to speechmatics",
                                 "language_model from claude to this_computer", "transcription from speechmatics to this_computer"]
-    assert len([l for l in p.audit.lines() if l.event == "statement.ticked"]) == 3
+    assert len([l for l in p.audit.lines() if l.event == "statement.ticked"]) == 2             # three before ruling 48
 
 
 def test_15_13_ruling_5_a_path_that_begins_in_the_cloud_shows_its_statement_on_the_settings_page_until_it_is_ticked(tmp_path, clock):
