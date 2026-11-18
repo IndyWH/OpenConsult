@@ -1,12 +1,13 @@
 """The command: start, the taken port, reset-password
 (spec 15.6; D26; ruling 6; V1_LESSONS 7.6)."""
 
+import os
 import socket
 
 import pytest
 
 from openconsult import words
-from openconsult.cli import main
+from openconsult.cli import main, port_taken
 from openconsult.patients.users import MIN_PASSWORD
 from openconsult.settings.store import LISTEN_ON
 from tests.conftest import PASSWORD, log_in, set_up
@@ -41,6 +42,31 @@ def test_7_6_a_taken_port_is_said_in_plain_words_and_the_app_stops(tmp_path):
     assert code == 1
     assert words.PORT_TAKEN.format(port=port) in said.text
     assert not (tmp_path / "openconsult.db").exists()
+
+
+def test_run_9c_the_check_before_a_start_does_not_call_the_port_taken_for_the_closed_connections_of_the_last_run():
+    """Measured in run 9c: after every stop of the app with a page open, the
+    check called the port taken for 60 to 63 s, with nothing listening. The
+    system keeps a connection that the app closed for about a minute, and a
+    bind with no reuse option is refused for as long. The server that the
+    check stands before binds with that option, so the check does too."""
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)                       # as the app's own server binds
+    server.bind((LISTEN_ON, 0))
+    server.listen()
+    port = server.getsockname()[1]
+    assert port_taken(LISTEN_ON, port)                                                 # a program listens: taken, on every system
+    client = socket.create_connection((LISTEN_ON, port), timeout=5)
+    accepted, _ = server.accept()
+    accepted.close()                                                                   # the app closes its side first, as at a stop
+    assert client.recv(1) == b""
+    client.close()
+    server.close()
+    # Nothing listens now. The app's side of that connection waits out its time in the system; the check says free.
+    # Linux and macOS, where the fault was: on Windows the probe is the plain one it always was.
+    if os.name == "posix":
+        assert not port_taken(LISTEN_ON, port)
+        assert port_taken(LISTEN_ON, port, system="nt")                                # the plain probe is still refused: the fault as it was
 
 
 def test_ruling_6_the_command_gives_no_way_to_listen_beyond_this_computer(tmp_path, machine):

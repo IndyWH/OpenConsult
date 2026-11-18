@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import getpass
+import os
 import shutil
 import socket
 import subprocess
@@ -90,10 +91,18 @@ def run(data_folder: Path | None, port: int | None, say: Callable, serve: Callab
     return 0
 
 
-def port_taken(host: str, port: int) -> bool:
-    """A plain socket with no reuse option, so every system refuses the
-    bind when another program listens there."""
+def port_taken(host: str, port: int, system: str = os.name) -> bool:
+    """Whether another program listens on the port: a bind that every
+    system refuses then. On Linux and macOS the probe binds as the server
+    it stands before binds, with the reuse option, which a listener still
+    refuses. Without it the bind was also refused for a minute after the
+    app had been stopped, while the system kept the closed connections
+    of the last run: measured in run 9c, 60 to 63 s after every stop with
+    a page open, with nothing listening. On Windows the reuse option
+    would let the bind pass a listener, so the probe stays plain there."""
     probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if system == "posix":
+        probe.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
     try:
         probe.bind((host, port))
     except OSError:
