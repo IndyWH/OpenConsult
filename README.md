@@ -156,6 +156,11 @@ This branch is where OpenConsult v2.0 is being built.
   on a box opens one sentence and one action. In Settings the doctor
   also chooses the speech model of this computer, Nemotron or WhisperX
   with pyannote, and a section Local models lists what is installed.
+  Under Thresholds the doctor can move two values of the gate, each
+  within fixed bounds: the fewest words a note is drafted from (30 to
+  300, default 60) and the score under which a line is marked as low
+  confidence (0.40 to 0.80, default 0.60). A consultation is judged by
+  the two values it started with.
   On a cloud path the Start screen is shown at once and its connection
   tests fill in after; no consultation begins before they have answered.
   Recordings are deleted after a

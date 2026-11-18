@@ -4,24 +4,33 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
-## 2026-11-18. Run 9c: one picture of This machine, a tick or a choice that saves by itself, and the mends from the room check of run 9b. The two thresholds of the gate wait for the owner's bounds
+## 2026-11-18. Run 9c: one picture of This machine, a tick or a choice that saves by itself, the mends from the room check of run 9b, and the two thresholds of the gate within the owner's bounds
 
 Run on 17 and 18 Nov 2026 by the mailbox, as one run in two halves
 (15.13, ruling 58), under the owner's okay given in advance (17 Nov,
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Twenty-one commits, none pushed. The
-suite: 1262 passed in about 128 s, none skipped (1114 at the start). No
+plan and its review beside it. Twenty-three commits, none pushed. The
+suite: 1273 passed in about 129 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
 half two.
 
-NOT BUILT YET: the two thresholds of the gate under Thresholds (7.3).
-Their lowest and highest values are the owner's; proposed to him: the
-fewest words 30 to 300 (default 60), the low score 0.40 to 0.80
-(default 0.60). They are built when his bounds come by mail.
+The two thresholds of the gate (7.3) were built last (158339f), when
+the owner's bounds came by mail 2 on 18 Nov at 06:39: the fewest words
+a note is drafted from, 30 to 300, default 60; the score under which
+a line is marked as low confidence, 0.40 to 0.80, default 0.60
+(settings/thresholds.py, with the reason for each bound). Each is a
+typed field under Thresholds with its own Save; a value outside the
+bounds is refused on the control; a change is audited. A consultation
+takes both at Start into its own row, and its gate and its review
+page read them there: a change in Settings never reaches one that has
+begun. A row from before holds neither and reads the defaults. Seen
+in the browser: saved, refused one step outside each bound, each
+bound taken, and three made consultations each judged by the values
+it started with while Settings held others.
 
 For the patient. Before a consultation the doctor sees on one picture
 whether the path chosen is ready and what leaves the computer: four
@@ -46,8 +55,9 @@ Half one, the mends (15.13, rulings 47 to 53).
   went to Speechmatics. wherever the request that carried it was made
   and the record cannot show that nothing left; left out only where
   no connection was opened at all, or the request was never made. The
-  record gained that fact: THE TABLES ARE VERSION 12, one column,
-  recording_upload.request; a folder of version 11 comes forward.
+  record gained that fact: THE TABLES ARE VERSION 12, three columns:
+  recording_upload.request, and the two thresholds on a consultation
+  (Cowork's word: they join 12). A folder of version 11 comes forward.
 - The gate judges by the speech choice that made the final transcript
   (consult/stop.py), and the model line names both where the service
   made it.
@@ -125,8 +135,11 @@ test_speech_machine, test_connect_screens); and two the plan did not
 foresee: test_db_v11 (it ended at today's version) and test_pages
 (the count of the audit lines written at start).
 
-Flags for the owner, each in the report: the bounds of the two
-thresholds; the first asks after a delete keep 300 s each; the details
+Flags for the owner, each in the report: the review page does not say
+which two values a consultation was judged with, except the fewest
+words in a refusal's own sentence; a refused value leaves the field
+showing the saved one; the first asks after a delete keep 300 s
+each; the details
 say a speech choice's models are in the data folder, and they are in
 the hub's own cache, so Local models counts the environment and says
 so; the self-test of Speechmatics as a speech choice is no longer on
@@ -135,14 +148,13 @@ secure store for both keys at every start, where before it read only
 the keys of the chosen path. words.py and schema.py are over their
 targets.
 
-Made untrue, and put right in this commit: the README (the picture,
-the speech model, Local models, the Start screen), CLAUDE.md's run
-line. Not mine to write: the spec's details of run 9c say version 12
-holds the thresholds and that half one changes no table. No help page
-exists.
+Made untrue, and put right: the README (the picture, the speech
+model, Local models, the Start screen, the two thresholds),
+CLAUDE.md's run line. Not mine to write: the spec's details of run 9c
+say that half one changes no table. No help page exists.
 
-Next: the owner's bounds, then the thresholds; then his room check of
-9c, one sitting, the first step to stop the app and start it again.
+Next: the owner's room check of 9c, one sitting, the first step to
+stop the app and start it again.
 
 ## 2026-11-16. Run 9b: cloud mode. A consultation can run on Claude and Speechmatics, said before anything leaves, marked while it runs; a recording can be sent once after Stop and is deleted there
 
