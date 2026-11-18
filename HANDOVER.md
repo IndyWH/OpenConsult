@@ -4,6 +4,17 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-18. Run 9c, at the half: the mends from the room check of run 9b stand by themselves
+
+Half one of run 9c (15.13, ruling 58) is committed, 85e3f2e, and needs
+nothing of half two: the suite is green at 1228. Built: the owner's
+sentences proven (rulings 52 and 53), the second ask after a delete
+(49), the mark's line and the tables of version 12 (52), the gate by
+the choice that made the final transcript, a save by itself (47), no
+new tick for less (48), the round buttons, the Start screen at once
+(51), the README's sentence (50), and the check before a start, mended
+on its measurement. The run's own entry follows when it ends.
+
 ## 2026-11-16. Run 9b: cloud mode. A consultation can run on Claude and Speechmatics, said before anything leaves, marked while it runs; a recording can be sent once after Stop and is deleted there
 
 Run on 16 Nov 2026 by the mailbox, as one run in two halves (15.13,
