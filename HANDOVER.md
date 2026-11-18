@@ -4,16 +4,145 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
-## 2026-11-18. Run 9c, at the half: the mends from the room check of run 9b stand by themselves
+## 2026-11-18. Run 9c: one picture of This machine, a tick or a choice that saves by itself, and the mends from the room check of run 9b. The two thresholds of the gate wait for the owner's bounds
 
-Half one of run 9c (15.13, ruling 58) is committed, 85e3f2e, and needs
-nothing of half two: the suite is green at 1228. Built: the owner's
-sentences proven (rulings 52 and 53), the second ask after a delete
-(49), the mark's line and the tables of version 12 (52), the gate by
-the choice that made the final transcript, a save by itself (47), no
-new tick for less (48), the round buttons, the Start screen at once
-(51), the README's sentence (50), and the check before a start, mended
-on its measurement. The run's own entry follows when it ends.
+Run on 17 and 18 Nov 2026 by the mailbox, as one run in two halves
+(15.13, ruling 58), under the owner's okay given in advance (17 Nov,
+23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
+78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
+The private report is STAGE9C_REPORT.md in the log folder, with the
+plan and its review beside it. Twenty-one commits, none pushed. The
+suite: 1262 passed in about 128 s, none skipped (1114 at the start). No
+prompt file, frame or form changed: the two prompt folders are as at
+18cc922. No engine was started; the Ollama service was not touched.
+Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
+half two.
+
+NOT BUILT YET: the two thresholds of the gate under Thresholds (7.3).
+Their lowest and highest values are the owner's; proposed to him: the
+fewest words 30 to 300 (default 60), the low score 0.40 to 0.80
+(default 0.60). They are built when his bounds come by mail.
+
+For the patient. Before a consultation the doctor sees on one picture
+whether the path chosen is ready and what leaves the computer: four
+columns, Microphone, Transcription, Language model, Consultation, each
+box Ready, Not set up or Cannot run here, the chosen path marked, and
+each cloud box saying what goes to it on that path, or that nothing
+does. A setting the doctor believes is set is set: a tick or a choice
+saves by itself, and a choice that sends something new off the
+computer is saved only by the tick under its statement. The page no
+longer claims what it cannot show: the mark says went only where the
+recording can have gone, a delete is called confirmed only when it
+is, and no line names a speech model for a transcript another made.
+
+Half one, the mends (15.13, rulings 47 to 53).
+- The owner's sentences (52, 53): fourteen lines proven letter for
+  letter against the file of words (tests/test_owner_sentences.py).
+- The second ask after a delete (49; speech/upload.py): an ask that
+  brought no answer at all is made once more, 5 s later, with a limit
+  of 10 s, never a third time; an answered ask never again. Both tries
+  in the record. The first asks keep the upload's 300 s.
+- The mark's line (52): on the review page After Stop the recording
+  went to Speechmatics. wherever the request that carried it was made
+  and the record cannot show that nothing left; left out only where
+  no connection was opened at all, or the request was never made. The
+  record gained that fact: THE TABLES ARE VERSION 12, one column,
+  recording_upload.request; a folder of version 11 comes forward.
+- The gate judges by the speech choice that made the final transcript
+  (consult/stop.py), and the model line names both where the service
+  made it.
+- A save by itself (47; static/settings.js, place.js): the two
+  choices, the speech model, the tick for better accuracy and a
+  statement's own tick. A choice that needs a statement comes back
+  with it and the line that it is not saved yet; nothing of it is
+  kept. Every form is served with a Save that works with no script.
+- No new tick for less (48; settings/stored.py, statement.py): with a
+  tick the app keeps the sentences of What is sent and of each
+  service's part, and one checksum of every word a statement can be
+  built from. A path whose sentences all stood in the ticked one is
+  saved under the wider tick, audited with both checksums; a changed
+  word anywhere asks again. Every pair of paths is a test.
+- The Start screen at once (51; web/start_tests.py, static/start.js):
+  the tests run beside the page; a press that names a run still
+  running is refused by the app; a run answered within 60 s is used;
+  else tested at the press. With the tick alone Start does not wait.
+- The round buttons: a radio gets what a tick box gets (theme.css).
+- The README's paragraph, with Cowork's four sentences (50).
+
+Half two (15.13, rulings 6, 56 and 57; 7.3).
+- The control panel (web/panel.py; the macro control_panel): one
+  picture at step 2 of the first run and at the top of Settings. A
+  box is the browser's own disclosure: one sentence, one action,
+  Connect, Test or Choose; no Download, no box for Alba. Nothing is
+  tested or asked for a view. The boxes go to the audit log once at
+  start. The small table keeps the system, the card, the guideline
+  search and the converter.
+- The speech model of this computer (web/settings_local.py): Nemotron
+  or WhisperX with pyannote, under Transcription. Chosen, it alone is
+  used; never saved, the app reads as before.
+- Local models: what is installed with its size on the disk, read
+  only (settings/installed.py); sizes measured once in a run.
+
+Measurements, as counts.
+- The port after a stop: 40 stops of a made consultation served as
+  the command serves it, a page connected as a browser holds it. In
+  all 40 the process ended 0.15 to 0.27 s after Ctrl-C and a server
+  could bind within 0.12 s, but the app's own check before a start
+  called the port taken until 60.2 to 64.0 s, held by two or three
+  closed connections waiting out their time in the system. A fault of
+  the check, which bound with no reuse option: mended (85e3f2e). With
+  the mend, 4 stops: free after 0.07 to 0.12 s.
+- The test of the Speechmatics connection, 30 times, 20 s apart, at
+  its EU address, no sound: 30 passed, 0.12 to 0.21 s, middle 0.14;
+  the worker up in 0.03 s. No fault of the app shown; nothing changed.
+- What left the machine: eu.rt.speechmatics.com, 30 connections. No
+  other name in any step. No call to Claude.
+- Seen in a real browser against made services: a profile that had
+  seen 18cc922 ran only the scripts as built; each save by itself with
+  the page's place kept; a statement waiting, ticked, and the page
+  loaded again; less saved with no tick; the round buttons at two
+  widths; the Start screen shown in 8 ms and filled in after 0.6, 3.1
+  and 10 s; the picture for each path, on a fresh folder and in
+  Settings; a made consultation with the tick, the delete confirmed,
+  not proven, and proven at a second try. Two faults found there and
+  mended in a commit of their own.
+
+A fault of this run, found by its own record of connections at the end
+checks and closed in a commit of its own (2b94c65). Two older tests
+undo their own patches in their middle and build the app again; the
+suite's guards were set by the same patcher and came off with them.
+Since the panel writes its boxes to the audit log at start, the app
+asks the secure store for its two key names at every start, so in
+seven runs of the suite those two tests asked the machine's real
+store (8 connections to the session bus in each run; no value
+printed, written or sent; no test of a connection made). The guards
+now have a patcher of their own, and a test pins it.
+
+Older tests restated, each to prove the same fact where it now stands:
+for rulings 47, 48, 51 and 52 seven tests of run 9b; for the panel the
+tests of the rows of This machine (test_machine_status,
+test_speech_machine, test_connect_screens); and two the plan did not
+foresee: test_db_v11 (it ended at today's version) and test_pages
+(the count of the audit lines written at start).
+
+Flags for the owner, each in the report: the bounds of the two
+thresholds; the first asks after a delete keep 300 s each; the details
+say a speech choice's models are in the data folder, and they are in
+the hub's own cache, so Local models counts the environment and says
+so; the self-test of Speechmatics as a speech choice is no longer on
+This machine; version 12 came in half one; the app now reads the
+secure store for both keys at every start, where before it read only
+the keys of the chosen path. words.py and schema.py are over their
+targets.
+
+Made untrue, and put right in this commit: the README (the picture,
+the speech model, Local models, the Start screen), CLAUDE.md's run
+line. Not mine to write: the spec's details of run 9c say version 12
+holds the thresholds and that half one changes no table. No help page
+exists.
+
+Next: the owner's bounds, then the thresholds; then his room check of
+9c, one sitting, the first step to stop the app and start it again.
 
 ## 2026-11-16. Run 9b: cloud mode. A consultation can run on Claude and Speechmatics, said before anything leaves, marked while it runs; a recording can be sent once after Stop and is deleted there
 

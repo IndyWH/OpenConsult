@@ -149,7 +149,15 @@ This branch is where OpenConsult v2.0 is being built.
   the review page when it cannot be proven. The first run
   walks through connecting what the computer needs, the self-test run
   from its page, and a microphone test whose sound is not stored and not
-  sent; a folder set up before these steps meets them once.
+  sent; a folder set up before these steps meets them once. This
+  machine is one picture of the path, from the microphone to the
+  consultation, shown at the first run and at the top of Settings: each
+  box says whether it is ready, the path chosen is marked, and a press
+  on a box opens one sentence and one action. In Settings the doctor
+  also chooses the speech model of this computer, Nemotron or WhisperX
+  with pyannote, and a section Local models lists what is installed.
+  On a cloud path the Start screen is shown at once and its connection
+  tests fill in after; no consultation begins before they have answered.
   Recordings are deleted after a
   retention time the doctor sets, default 90 days; one Delete removes a
   consultation's recording, transcript and note and leaves an audit line
