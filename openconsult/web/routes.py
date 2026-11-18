@@ -221,6 +221,7 @@ def _settings_page(request: Request, user, refused=None, pending=None, from_pane
                    path_sections=cloud_web.path_sections(parts(request), pending),
                    better_accuracy=cloud_web.better_accuracy_view(parts(request), pending),
                    speech_model=settings_local.speech_model_view(parts(request)),
+                   local_models=settings_local.local_models(parts(request)),
                    to_tick=None if pending else cloud_web.statement_view(parts(request), "/settings"))
     if refused:
         return refuse(request, "settings.html", refused[0], refused[1], **context)

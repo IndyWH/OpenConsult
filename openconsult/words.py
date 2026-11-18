@@ -1163,6 +1163,18 @@ PANEL_GOES = {
 PANEL_PATH_LINE = "The path you chose: the microphone, then transcription {transcription}, then the language model {model}."
 PANEL_PATH_BY = {"this_computer": "on this computer", "speechmatics": "by Speechmatics", "claude": "by Claude"}
 PANEL_CHOOSE_IN_SETTINGS = "You can choose it in Settings once OpenConsult is set up."
+# Run 9c: the section Local models (7.3; 15.13, ruling 57): a list that is read. Drafts.
+SECTION_LOCAL_MODELS = "Local models"
+LOCAL_MODELS_INTRO = "What is installed on this computer. Nothing here can be changed yet."
+LOCAL_SPEECH_ROW = "{model}, its environment"
+LOCAL_GUIDELINE_ROW = "Guideline search model"
+LOCAL_LANGUAGE_MODEL_ROW = "Language model of this computer"
+LOCAL_INSTALLED = "Installed, {size} on the disk."
+LOCAL_NOT_INSTALLED = "Not installed."
+LOCAL_MEASURING = "Installed. The size is being measured. Load the page again to see it."
+LOCAL_LESS_THAN_1_MB = "less than 1 MB"
+LOCAL_MODELS_ELSEWHERE = "Its models are kept in this computer's own cache of the model hub and are not counted here."
+LOCAL_LANGUAGE_MODEL = "{model} on {engine} {version}, as the engine reports it. Its files are the engine's own."
 # Run 9c: the choice between the two speech models of this computer, under Transcription (7.3). Drafts. The line
 # beside Nemotron was carried since the details of run 9a, for when Nemotron became the default.
 SPEECH_MODEL_LEGEND = "The speech model of this computer"

@@ -133,6 +133,19 @@
 {% if covered and not less_at %}<section class="pane" id="statement-covered"><div class="pane-body">{{ statement_less(covered.made, "less-apart") }}</div></section>{% endif %}
 {% if done == "ticked" %}<p class="notice" id="statement-saved" role="status">{{ words.SAVED }}</p>{% endif %}
 
+{# Local models (7.3; 15.13, ruling 57): a list that is read. Nothing in it can be pressed: every download on a click
+   arrives with the installers, at stage 15. #}
+<section class="pane" id="local-models">
+  <div class="pane-head"><h2>{{ words.SECTION_LOCAL_MODELS }}</h2></div>
+  <div class="pane-body">
+    <p class="mark">{{ words.LOCAL_MODELS_INTRO }}</p>
+    <table class="plain facts">
+      {% for row in local_models %}<tr data-thing="{{ row.name }}"><th>{{ row.title }}</th><td>{{ row.line }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+</section>
+
 <section class="pane" id="guidelines">
   <div class="pane-head"><h2>{{ words.SECTION_GUIDELINES }}</h2></div>
   <div class="pane-body">

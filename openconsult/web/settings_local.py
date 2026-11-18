@@ -46,6 +46,50 @@ def speech_model_view(p) -> dict | None:
                          "note": words.NEMOTRON_US_ENGLISH if choice is NEMOTRON else None} for choice in LOCAL_MODELS]}
 
 
+def plain_size(size: int) -> str:
+    """A size on the disk as a person reads it: GB with one decimal from
+    1 GB up, else whole MB, in the units of 1000 a disk is sold by."""
+    if size >= 10 ** 9:
+        return f"{size / 10 ** 9:.1f} GB"
+    if size >= 10 ** 6:
+        return f"{size / 10 ** 6:.0f} MB"
+    return words.LOCAL_LESS_THAN_1_MB
+
+
+def local_models(p) -> list[dict]:
+    """The section Local models (7.3; 15.13, ruling 57): each thing the app
+    has installed in the data folder, with its size on the disk, and the
+    language model as the engine chosen at start reports it. A list that
+    is read: nothing in it can be pressed before the installers of stage
+    15. The first view begins the measuring of the sizes and does not
+    wait for it. A speech choice's environment is in the data folder; its
+    models are in this computer's own cache of the hub, which the hub
+    finds by itself, and are not counted here: the row says so."""
+    from openconsult.guidelines import environment as guidelines_environment
+    from openconsult.speech import environment as speech_environment
+    folder = p.settings.data_folder
+    things = [(choice.name, words.LOCAL_SPEECH_ROW.format(model=choice.title), p.doors[choice.name].installed,
+               speech_environment.folder(folder, choice), words.LOCAL_MODELS_ELSEWHERE) for choice in LOCAL_MODELS]
+    things.append(("guideline_search", words.LOCAL_GUIDELINE_ROW, guidelines_environment.installed(folder),
+                   guidelines_environment.folder(folder), None))
+    p.sizes.begin({name: where for name, _, installed, where, _ in things if installed})
+    rows = []
+    for name, title, installed, _, more in things:
+        if not installed:
+            line = words.LOCAL_NOT_INSTALLED
+        else:
+            size = p.sizes.of(name)
+            line = words.LOCAL_MEASURING if size is None else words.LOCAL_INSTALLED.format(size=plain_size(size))
+            line += f" {more}" if more else ""
+        rows.append({"name": name, "title": title, "line": line})
+    if p.machine.case == "suitable":
+        decision = p.decisions.language_model
+        line = (words.LOCAL_LANGUAGE_MODEL.format(model=words.PANEL_LOCAL_MODEL, engine=decision.fill["engine"], version=decision.fill["version"])
+                if decision.green else decision.sentence)
+        rows.append({"name": "language_model", "title": words.LOCAL_LANGUAGE_MODEL_ROW, "line": line})
+    return rows
+
+
 @router.post("/settings/speech-model")
 async def save_speech_model(request: Request, user=Depends(guards.logged_in)):
     from openconsult.web import cloud, routes

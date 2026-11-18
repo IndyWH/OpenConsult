@@ -38,6 +38,7 @@ from openconsult.patients.users import Users
 from openconsult.settings import room
 from openconsult.settings.connections import Connections
 from openconsult.settings.decisions import Decisions, converter_element, language_model_element
+from openconsult.settings.installed import Sizes
 from openconsult.settings.machine import Machine, read_machine
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, THIS_COMPUTER
 from openconsult.settings.secure import SystemStore
@@ -113,6 +114,7 @@ class Parts:
     whole: WholeRecording = None                   # the sender of a recording after Stop, with the key in use (9b)
     self_testing: object = None                    # the self-test asked for from its first-run step, while it runs (9b)
     start_tests: StartTests = None                 # the tests that run beside a view of the Start screen (9c)
+    sizes: Sizes = None                            # the sizes of what is installed in the data folder, measured once (9c)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -206,6 +208,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         converter=converter,
         store=secure_store,
         start_tests=StartTests(),
+        sizes=Sizes(),
         clock=clock,
         finaliser=_finalise,
     )
