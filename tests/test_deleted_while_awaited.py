@@ -228,26 +228,64 @@ def test_ruling_of_20_nov_nothing_is_kept_of_a_consultation_whose_delete_is_judg
     assert [line.event for line in app.state.parts.audit.lines() if line.event.startswith("recording.left")] == []
 
 
-def test_6_5_version_12_holds_the_table_of_a_job_kept_apart_and_a_folder_of_version_11_comes_forward_with_it_empty(tmp_path, monkeypatch, clock):
+COLUMNS = [("job_id", "TEXT"), ("delete_status", "INTEGER"), ("asks", "TEXT")]
+# The sha256 of version 12's script of the tables as it stood at 62e7c0a.
+SCRIPT_12_AT_62E7C0A = "4df71f77b875f02759d69834ece67bd5ab53ab59e72de5b86485f4de8df2e171"
+
+
+@pytest.mark.parametrize("met", [11, 12])
+def test_6_5_version_13_holds_the_table_of_a_job_kept_apart_and_a_folder_of_version_11_or_12_comes_forward_with_it_empty(tmp_path, monkeypatch, clock, met):
+    # The table is a version of its own. The app's command was started from the code of version 12 on 19 Nov 2026,
+    # before this table was written: a folder that met version 12 then must come forward, and so must one of 11.
     from openconsult.consult.consultations import Consultations
+    from openconsult.consult.session_rows import keep_left
     from tests.test_recording_after_stop import TICKED
     path = tmp_path / "openconsult.db"
-    monkeypatch.setattr(schema, "VERSION", 11)
+    monkeypatch.setattr(schema, "VERSION", met)
     old = open_database(path)
-    assert old.version() == 11 and "recording_left" not in old.tables()
+    assert old.version() == met and "recording_left" not in old.tables()       # version 12 as a folder met it before 20 Nov
     old.execute("INSERT INTO patient (name, date_of_birth, sex, created_at) VALUES ('Made-up', '1990-01-01', 'F', 't')")
     cid = Consultations(old, clock).start(1, 15, "nemotron", "vllm", None, "tag", None, 2, path=TICKED)
     old.execute("INSERT INTO recording_upload (consultation_id, way, sent_at, file_name, bytes, job_id) VALUES (?, 'tick', 'sent', 'recording.wav', 1234, 'job-c')", (cid,))
     old.close()
-    monkeypatch.setattr(schema, "VERSION", 12)
+    monkeypatch.setattr(schema, "VERSION", 13)
     new = open_database(path)
     rows = Consultations(new, clock)
-    assert new.version() == 12 and "recording_left" in new.tables() and rows.left_jobs() == []
-    assert [(c["name"], c["type"]) for c in new.query("PRAGMA table_info(recording_left)")] == [("job_id", "TEXT"), ("delete_status", "INTEGER"), ("asks", "TEXT")]
-    # The upload that version 11 left open is still found, and its job can be kept and dropped in the new table.
+    assert new.version() == 13 and "recording_left" in new.tables() and rows.left_jobs() == []
+    assert [(c["name"], c["type"]) for c in new.query("PRAGMA table_info(recording_left)")] == COLUMNS
+    # The upload that the older version left open is still found, and its job can be kept and dropped in the new table.
     assert rows.open_proofs() == [cid]
-    from openconsult.consult.session_rows import keep_left
     with new.transaction() as con:
         assert keep_left(con, cid) == "job-c"
     assert rows.left("job-c") == {"job_id": "job-c", "delete": None, "asked_again": []} and rows.drop_left("job-c") and not rows.drop_left("job-c")
     new.close()
+
+
+def test_6_5_a_folder_that_met_the_table_under_version_12_on_20_nov_comes_forward_to_13_with_what_it_keeps(tmp_path, monkeypatch, clock):
+    # For some commits of 20 Nov 2026 the table stood in version 12's script, in this same shape. A folder opened
+    # between them holds it already, perhaps with a job kept: version 13 makes the table only if it is not there.
+    from openconsult.consult.consultations import Consultations
+    path = tmp_path / "openconsult.db"
+    monkeypatch.setattr(schema, "VERSION", 12)
+    old = open_database(path)
+    old.execute("CREATE TABLE recording_left (job_id TEXT PRIMARY KEY, delete_status INTEGER, asks TEXT NOT NULL DEFAULT '[]')")
+    old.execute("INSERT INTO recording_left (job_id, delete_status) VALUES ('job-k', 200)")
+    old.close()
+    monkeypatch.setattr(schema, "VERSION", 13)
+    new = open_database(path)
+    rows = Consultations(new, clock)
+    assert new.version() == 13 and [(c["name"], c["type"]) for c in new.query("PRAGMA table_info(recording_left)")] == COLUMNS
+    assert rows.left("job-k") == {"job_id": "job-k", "delete": {"status": 200}, "asked_again": []}
+    new.close()
+
+
+def test_6_5_version_12_is_again_what_a_folder_met_before_20_nov_no_table_of_a_job_kept_apart(tmp_path, monkeypatch):
+    # The script of version 12 is never changed again once a folder may have met it: it makes no recording_left.
+    assert "recording_left" not in schema.MIGRATIONS[12] and "recording_left" in schema.MIGRATIONS[13] and max(schema.MIGRATIONS) == schema.VERSION == 13
+    # Its bytes are those of 62e7c0a, the code the app was started from on 19 Nov 2026.
+    import hashlib
+    assert hashlib.sha256(schema.MIGRATIONS[12].encode("utf-8")).hexdigest() == SCRIPT_12_AT_62E7C0A
+    monkeypatch.setattr(schema, "VERSION", 12)
+    old = open_database(tmp_path / "openconsult.db")
+    assert old.version() == 12 and "recording_left" not in old.tables()
+    old.close()

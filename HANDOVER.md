@@ -11,8 +11,8 @@ Run on 17, 18 and 20 Nov 2026 by the mailbox, as one run in two halves
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Thirty-four commits, none pushed. The
-suite: 1321 passed in about 145 s, none skipped (1114 at the start). No
+plan and its review beside it. Thirty-five commits, none pushed. The
+suite: 1324 passed in about 145 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
@@ -32,8 +32,8 @@ owner's word with its time, the first five to flags of mails 2 to 4.
   his two lines above the note, awaited and proven (UPLOAD_NONE_AWAITED,
   UPLOAD_NONE); none when not proven, where his warning says it.
 - A consultation deleted while its recording's delete is awaited
-  (08:14): Delete is never refused. The table recording_left (version
-  12) keeps the job's name, the delete's status and each try cut to
+  (08:14): Delete is never refused. The table recording_left (VERSION
+  13) keeps the job's name, the delete's status and each try cut to
   what, status, gone, why and try; never a body. The thread asking
   goes on; else one starts at the press; the next start finishes it
   (whole.prove_left). Then the name is dropped and one line of the log
@@ -224,9 +224,9 @@ test_speech_machine, test_connect_screens); and two the plan did not
 foresee: test_db_v11 (it ended at today's version) and test_pages
 (the count of the audit lines written at start).
 
-Flags for the owner, each in the report: a folder that met version 12
-before 20 Nov holds no table recording_left, and the app would stop at
-its start there (then the table must be version 13); the line of a
+Flags for the owner, each in the report: mail 5 said the new table
+joins version 12, but the app was started from this tree on 19 Nov
+(bytecode of 19:16 in the repo), so it is version 13; the line of a
 recording that gave no transcript also stands where one came back and
 was not used; after the tick of a long statement the line Saved. is
 above the window; a refused value leaves the field

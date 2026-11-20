@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 12
+VERSION = 13
 
 MIGRATIONS = {
     1: """
@@ -636,9 +636,6 @@ CREATE TABLE first_run_left (
     # And the moment the delete of a recording was judged, proven or not (the owner's ruling of 18 Nov 2026): the delete
     # and its proof run beside Stop, so a recording the service took may have no judgement yet, and the app finds
     # those at its start. Until version 11 an upload was judged before it ended; one that never ended is found.
-    # And a recording still at the service when its consultation is deleted (the owner's ruling of 20 Nov 2026): the
-    # job's name and the state of its delete, kept apart from the consultation, and nothing else: no patient, no
-    # consultation's number, no word, no time. The row is dropped when the delete is proven or judged.
     12: """
 ALTER TABLE recording_upload ADD COLUMN request TEXT CHECK (request IN ('not_made', 'never_connected', 'made'));
 UPDATE recording_upload SET request = CASE WHEN bytes > 0 THEN 'made' ELSE 'not_made' END;
@@ -647,8 +644,14 @@ ALTER TABLE consultation ADD COLUMN low_score REAL;
 ALTER TABLE recording_upload ADD COLUMN judged_at TEXT;
 UPDATE recording_upload SET judged_at = COALESCE(result_at, sent_at)
     WHERE job_id IS NOT NULL AND (result_at IS NOT NULL OR failure IS NOT NULL);
-
-CREATE TABLE recording_left (
+""",
+    # Run 9c, mail 5 (the owner's ruling of 20 Nov 2026). A recording still at the service when its consultation is
+    # deleted: the job's name and the state of its delete, kept apart from the consultation, and nothing else: no
+    # patient, no consultation's number, no word, no time. The row is dropped when the delete is proven or judged.
+    # A version of its own: a folder that met version 12 before this table comes forward here. Made only if it is not
+    # there: a folder opened on 20 Nov 2026, while the table stood in version 12's script, holds it already, in this shape.
+    13: """
+CREATE TABLE IF NOT EXISTS recording_left (
     job_id TEXT PRIMARY KEY,
     delete_status INTEGER,
     asks TEXT NOT NULL DEFAULT '[]'
