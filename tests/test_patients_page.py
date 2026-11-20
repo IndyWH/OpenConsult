@@ -101,3 +101,34 @@ def test_his_word_of_20_nov_1031_the_new_patient_button_stands_at_the_very_top_a
     empty, first = app_with(tmp_path / "empty", clock, machine)
     page = first.get("/").text
     assert 0 <= page.find(button) < page.find('id="none-found"')
+
+
+def test_his_ruling_of_20_nov_1031_the_patients_page_opens_at_its_top_the_search_box_is_given_the_keyboard_by_the_script_and_not_by_the_browser(tmp_path, clock, machine):
+    # The owner at his look of 20 Nov 2026, 11:58 (mail 7 of run 9c): New patient is at the top but as you predicted,
+    # it scrolled down to the search. A browser brings a field with its own attribute for the keyboard into the window
+    # at load, so the page came up moved down to the box and the button was above the window. The suite has no browser:
+    # this pins the page's own mark and the script; the window itself is measured in the look of mail 7.
+    from tests.test_static_marks import marks_hold
+    app, client = app_with(tmp_path, clock, machine)
+    client.post("/patients", data=PATIENT)
+    raw = client.get("/").text
+    box = raw.split('<form method="get" action="/" class="search" id="search-form">', 1)[1].split("</form>", 1)[0]
+    # OLD: <input name="q" value="" autocomplete="off" autofocus>. NEW: the mark the script looks for, and no attribute
+    # of the browser's own anywhere on the page.
+    assert '<input name="q" value="" autocomplete="off" data-keyboard>' in box and "autofocus" not in raw
+    # The page names its one script, marked by its bytes, after the box it gives the keyboard to.
+    assert marks_hold(client, raw) == ["theme.css", "keyboard.js"]
+    assert raw.index("data-keyboard") < raw.index("/static/keyboard.js?v=") < raw.index("</main>")
+    script = client.get("/static/keyboard.js").text
+    assert "document.querySelector('[data-keyboard]')" in script and "box.focus({preventScroll: true});" in script
+    # The page staying where it is comes first: a browser that moves it all the same is put back.
+    assert "const x = window.scrollX, y = window.scrollY;" in script
+    assert "if (window.scrollX !== x || window.scrollY !== y) window.scrollTo(x, y);" in script
+    assert script.count("scrollTo") == 1 and "scrollIntoView" not in script             # it never moves the page anywhere else
+    # A search that was sent stands as it did: the box with its words and the browser's own attribute, and no mark.
+    sent = client.get("/?q=made").text
+    assert '<input name="q" value="made" autocomplete="off" autofocus>' in sent and "data-keyboard" not in sent
+    assert rows_on(sent) == ["1"]
+    # Nothing else on the page changed place: the button, the search box, the list.
+    found = [raw.find('id="new-patient"'), raw.find('id="search-form"'), raw.find('id="patients"')]
+    assert all(f >= 0 for f in found) and found == sorted(found)

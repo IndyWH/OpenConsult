@@ -28,7 +28,10 @@
 </section>
 {% endif %}
 <form method="get" action="/" class="search" id="search-form">
-  <label>{{ words.FIELD_SEARCH }}<input name="q" value="{{ query }}" autocomplete="off" autofocus></label>
+  {# The page opens at its top, with New patient in the window (the owner's ruling of 20 Nov 2026, 10:31, and his
+     words of 11:58): the box is given the keyboard by the page's script, which does not move the page, and no longer
+     by the browser's own attribute, which moves the page down to the box. A search that was sent stands as before. #}
+  <label>{{ words.FIELD_SEARCH }}<input name="q" value="{{ query }}" autocomplete="off"{% if query %} autofocus{% else %} data-keyboard{% endif %}></label>
   <button id="search">{{ words.SEARCH }}</button>
 </form>
 <section class="pane" id="patients">
@@ -44,4 +47,5 @@
   {% else %}<div class="pane-body"><p class="mark" id="none-found">{{ none_found or words.NO_PATIENTS }}</p></div>{% endif %}
 </section>
 <p class="mark">{{ words.HOME_SO_FAR }}</p>
+<script src="{{ static('keyboard.js') }}"></script>
 {% endblock %}
