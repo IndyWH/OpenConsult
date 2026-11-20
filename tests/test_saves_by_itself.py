@@ -102,10 +102,12 @@ def test_15_13_ruling_47_mail_6_after_the_tick_of_a_long_statement_the_line_save
     assert after.count('class="notice"') == 1 and '<div id="settings" data-keeps-place data-path="/settings">' in after
     script = client.get("/static/place.js").text
     assert "page.querySelector('.notice[role=status], .where-lines[role=status]')" in script     # the line of a save, and his line of a path that sends less
-    assert script.count("scrollIntoView({block: 'nearest'})") == 2                               # the form that was used, then the line: the least move
-    assert "function inWindow(box, under, height) { return box.top >= under && box.bottom <= height; }" in script   # only when the line is not whole in the window
-    style = client.get("/static/theme.css").text
-    assert ".notice[role=status], .where-lines[role=status], #settings form[data-stay] { scroll-margin: 4.2rem 0 1rem; }" in style   # clear of the app's bar
+    # Only when the line is not whole in the window, between the app's bar and the window's foot; then the form that was
+    # used and the line, each by the least move.
+    assert "if (said && moveFor(said.getBoundingClientRect(), barBottom(), window.innerHeight) !== 0) {" in script
+    assert "if (box.top >= under && box.bottom <= height) return 0;" in script
+    assert "[k === 0 ? document.getElementById(noted.names[0]) : null, said].forEach(" in script
+    assert "document.querySelector('header.app')" in script and 'class="app"' in after   # the bar it stays clear of is the page's own
     # The line of a path that sends less is of the second class, when it says a save.
     wide = statement_for(ChosenPath(CLAUDE, SPEECHMATICS))
     client.post("/settings/path/transcription", data={"transcription": SPEECHMATICS, "understand": "yes", "sha256": wide.sha256})

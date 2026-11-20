@@ -37,15 +37,22 @@
     // The line that says the save was made stands in the window (15.13, ruling 47; mail 6 of run 9c). After the tick
     // of a long statement the form is short again, and with its top where it was the line stood above the window:
     // the choice was saved and the doctor did not see it said. Only then the window moves, and the least that shows
-    // the form that was used and the line.
+    // the form that was used and then the line, each clear of the app's bar, which is tall in a narrow window.
     const said = page.querySelector('.notice[role=status], .where-lines[role=status]');
-    if (said && !inWindow(said.getBoundingClientRect(), barBottom(), window.innerHeight)) {
-      if (k === 0) document.getElementById(noted.names[0]).scrollIntoView({block: 'nearest'});
-      said.scrollIntoView({block: 'nearest'});
+    if (said && moveFor(said.getBoundingClientRect(), barBottom(), window.innerHeight) !== 0) {
+      [k === 0 ? document.getElementById(noted.names[0]) : null, said].forEach(function (node) {
+        if (node) window.scrollBy(0, moveFor(node.getBoundingClientRect(), barBottom(), window.innerHeight));
+      });
     }
   }
-  // Pure: whether a box stands whole in the window, under the app's bar.
-  function inWindow(box, under, height) { return box.top >= under && box.bottom <= height; }
+  // Pure: how far the window must move to show a box whole between the app's bar and its own foot, with a little air;
+  // 0 when it stands there already. A box taller than that room is shown from its top.
+  function moveFor(box, under, height) {
+    const AIR = 12;
+    if (box.top >= under && box.bottom <= height) return 0;
+    if (box.top < under || box.bottom - box.top > height - under - 2 * AIR) return box.top - under - AIR;
+    return box.bottom - height + AIR;
+  }
   function barBottom() { const bar = document.querySelector('header.app'); return bar ? bar.getBoundingClientRect().bottom : 0; }
   page.addEventListener('submit', function (event) {
     const form = event.target;
