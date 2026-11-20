@@ -6,17 +6,45 @@ The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
 ## 2026-11-18. Run 9c: one picture of This machine, a tick or a choice that saves by itself, the mends from the room check of run 9b, and the two thresholds of the gate within the owner's bounds
 
-Run on 17 and 18 Nov 2026 by the mailbox, as one run in two halves
+Run on 17, 18 and 20 Nov 2026 by the mailbox, as one run in two halves
 (15.13, ruling 58), under the owner's okay given in advance (17 Nov,
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Twenty-seven commits, none pushed. The
-suite: 1296 passed in about 142 s, none skipped (1114 at the start). No
+plan and its review beside it. Thirty-four commits, none pushed. The
+suite: 1321 passed in about 145 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
 half two.
+
+SIX SMALL THINGS BY MAIL 5 (20 Nov 2026; c67b906 to 31973db), each the
+owner's word with its time, the first five to flags of mails 2 to 4.
+- The line above the picture is in his shape (18 Nov, 08:03): the
+  lines of where_lines, which the notice reads too. His: In the cloud:
+  nothing. Cowork's details are drafts: one line a heading; two things
+  in the cloud each with a capital; no line for nothing run here.
+- The model line of a final transcript the service made is his (08:05).
+- One line, not two, under a wider tick (08:06): LESS_HEAD ends It
+  takes effect at the next consultation., and the control's ordinary
+  line is not shown with it; it stands alone in every other case.
+- A recording the service took that gave no transcript (08:11) has
+  his two lines above the note, awaited and proven (UPLOAD_NONE_AWAITED,
+  UPLOAD_NONE); none when not proven, where his warning says it.
+- A consultation deleted while its recording's delete is awaited
+  (08:14): Delete is never refused. The table recording_left (version
+  12) keeps the job's name, the delete's status and each try cut to
+  what, status, gone, why and try; never a body. The thread asking
+  goes on; else one starts at the press; the next start finishes it
+  (whole.prove_left). Then the name is dropped and one line of the log
+  says so, naming no patient. With the words gone, a 200 proves
+  nothing at a later start; a 404 or a 410 proves as ever.
+- Cowork's draft: the review page says the gate's two values among
+  the details it ran with (GATE_RAN_WITH).
+Seen in the browser in one look: the six paths at 1280 and 420 px, the
+one line, the no-transcript line changing with the window not moved,
+a consultation deleted in the wait and the app started again. Restated,
+old words kept: test_panel, test_where_it_runs, test_less_no_tick.
 
 The two thresholds of the gate (7.3) were built last (158339f), when
 the owner's bounds came by mail 2 on 18 Nov at 06:39: the fewest words
@@ -36,7 +64,8 @@ THE NOTICE OF A PATH THAT SENDS LESS, IN THE OWNER'S SHAPE (c6e0eca;
 his words of 18 Nov, 07:07 to 07:25, by mail 4; ruling 48). My draft
 line he did not follow. From the doctor's side the notice now names
 the two jobs as the picture does: his head (Saved. No new tick is
-asked, because less leaves this computer than you agreed to.), a line
+asked, because less leaves this computer than you agreed to.; longer
+since mail 5, above), a line
 that begins On this computer:, a line that begins In the cloud: with
 what goes there. His lines are in the file of words letter for
 letter (LESS_HEAD, JOBS_HERE, JOB_IN_CLOUD, GOES); one is Cowork's
@@ -195,13 +224,13 @@ test_speech_machine, test_connect_screens); and two the plan did not
 foresee: test_db_v11 (it ended at today's version) and test_pages
 (the count of the audit lines written at start).
 
-Flags for the owner, each in the report: the review page does not say
-which two values a consultation was judged with, except the fewest
-words in a refusal's own sentence; a refused value leaves the field
-showing the saved one; a consultation deleted while the answer to
-its recording's delete is awaited loses the job's name if the app is
-closed in that moment; no line is shown while a delete is awaited
-for a recording that gave no transcript; the details
+Flags for the owner, each in the report: a folder that met version 12
+before 20 Nov holds no table recording_left, and the app would stop at
+its start there (then the table must be version 13); the line of a
+recording that gave no transcript also stands where one came back and
+was not used; after the tick of a long statement the line Saved. is
+above the window; a refused value leaves the field
+showing the saved one; the details
 say a speech choice's models are in the data folder, and they are in
 the hub's own cache, so Local models counts the environment and says
 so; the self-test of Speechmatics as a speech choice is no longer on
@@ -210,10 +239,12 @@ secure store for both keys at every start, where before it read only
 the keys of the chosen path. words.py and schema.py are over their
 targets.
 
-Made untrue, and put right: the README (the picture, the speech
-model, Local models, the Start screen, the two thresholds),
+Made untrue, and put right: the README (the picture and its two
+lines, the speech model, Local models, the Start screen, the two
+thresholds, a consultation deleted while a delete is awaited),
 CLAUDE.md's run line. Not mine to write: the spec's details of run 9c
-say that half one changes no table. No help page exists.
+say that half one changes no table, and the spec does not yet hold the
+owner's words of 20 Nov. No help page exists.
 
 Next: the owner's room check of 9c, one sitting, the first step to
 stop the app and start it again.

@@ -151,21 +151,25 @@ This branch is where OpenConsult v2.0 is being built.
   transcript is back, the review page says that the service's answer
   is awaited and takes the answer when it comes, and an app closed
   before the service has answered finishes the delete at its next
-  start. The first run
+  start. A consultation deleted while that answer is awaited leaves
+  only the name the service gave the recording, with no patient and no
+  word of the consultation, until the delete there is finished; then
+  that name is dropped too. The first run
   walks through connecting what the computer needs, the self-test run
   from its page, and a microphone test whose sound is not stored and not
   sent; a folder set up before these steps meets them once. This
   machine is one picture of the path, from the microphone to the
-  consultation, shown at the first run and at the top of Settings: each
-  box says whether it is ready, the path chosen is marked, and a press
-  on a box opens one sentence and one action. In Settings the doctor
+  consultation, shown at the first run and at the top of Settings: two
+  lines above it say what runs on this computer and what in the cloud,
+  each box says whether it is ready, the path chosen is marked, and a
+  press on a box opens one sentence and one action. In Settings the doctor
   also chooses the speech model of this computer, Nemotron or WhisperX
   with pyannote, and a section Local models lists what is installed.
   Under Thresholds the doctor can move two values of the gate, each
   within fixed bounds: the fewest words a note is drafted from (30 to
   300, default 60) and the score under which a line is marked as low
   confidence (0.40 to 0.80, default 0.60). A consultation is judged by
-  the two values it started with.
+  the two values it started with, and its review page says them.
   On a cloud path the Start screen is shown at once and its connection
   tests fill in after; no consultation begins before they have answered.
   Recordings are deleted after a
