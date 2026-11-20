@@ -22,11 +22,36 @@
    opens on a press with no script: its face says name, model, state by a sign and a word, Chosen, and when; opened,
    one sentence, for a cloud service what goes to it on the path chosen, and one action. The arrows are drawn for the
    eye alone: the lines above the picture say in words what runs on this computer and what in the cloud. #}
+
+{# One arrow of the picture (the owner's ruling of 20 Nov 2026): a line from the edge of one box to the edge of the
+   next, with a head at its end; solid during the consultation, dashed after Stop. It is drawn twice, and the style
+   sheet shows one. Side by side: in the gutter between the two columns, straight or by one corner, the solid lines
+   18 px under a box's top and the dashed 40 px, so that two never run in each other. Stacked: down a rail beside the
+   boxes, the solid on the left and the dashed on the right, out of a box 34 px under its top and into the next 14 px
+   under its top. Each drawing begins at the top of the box it leaves; 100% of its height is the top of the next row. #}
+{% macro arrow_drawn(arrow) -%}
+{% set y = 18 if arrow.kind == "during" else 40 %}
+{% set head = '<path class="arrow-head" d="M-9 -5L-1 0L-9 5"/>' %}
+<span class="panel-arrow {{ arrow.kind }} {{ arrow.shape }} gutter-{{ arrow.gutter }} rows-{{ arrow.from_row }}-{{ arrow.to_row }} from-{{ arrow.start }} to-{{ arrow.end }}" data-from="{{ arrow.start }}" data-to="{{ arrow.end }}" data-kind="{{ arrow.kind }}" aria-hidden="true">
+  <svg class="wide" focusable="false">
+    {% if arrow.shape == "straight" %}<line x1="0" y1="{{ y }}" x2="100%" y2="{{ y }}"/><svg x="100%" y="{{ y }}" overflow="visible">{{ head|safe }}</svg>
+    {% elif arrow.shape == "down" %}<line x1="0" y1="{{ y }}" x2="50%" y2="{{ y }}"/><line x1="50%" y1="{{ y }}" x2="50%" y2="100%"/><svg y="100%" overflow="visible"><line x1="50%" y1="0" x2="50%" y2="{{ y }}"/><line x1="50%" y1="{{ y }}" x2="100%" y2="{{ y }}"/><svg x="100%" y="{{ y }}" overflow="visible">{{ head|safe }}</svg></svg>
+    {% else %}<svg y="100%" overflow="visible"><line x1="0" y1="{{ y }}" x2="50%" y2="{{ y }}"/><line x1="50%" y1="{{ y }}" x2="50%" y2="0"/></svg><line x1="50%" y1="100%" x2="50%" y2="{{ y }}"/><line x1="50%" y1="{{ y }}" x2="100%" y2="{{ y }}"/><svg x="100%" y="{{ y }}" overflow="visible">{{ head|safe }}</svg>
+    {% endif %}
+  </svg>
+  <svg class="narrow" focusable="false">
+    {% if arrow.kind == "during" %}<line x1="100%" y1="34" x2="9" y2="34"/><line x1="9" y1="34" x2="9" y2="100%"/><svg y="100%" overflow="visible"><line x1="9" y1="0" x2="9" y2="14"/><line x1="9" y1="14" x2="100%" y2="14"/><svg x="100%" y="14" overflow="visible">{{ head|safe }}</svg></svg>
+    {% else %}<line x1="0" y1="34" x2="16" y2="34"/><line x1="16" y1="34" x2="16" y2="100%"/><svg y="100%" overflow="visible"><line x1="16" y1="0" x2="16" y2="14"/><line x1="16" y1="14" x2="0" y2="14"/><svg x="0" y="14" overflow="visible"><path class="arrow-head" d="M9 -5L1 0L9 5"/></svg></svg>
+    {% endif %}
+  </svg>
+</span>
+{%- endmacro %}
+
 {% macro control_panel(panel) -%}
 <div class="control-panel" id="control-panel" role="group" aria-label="{{ words.SECTION_MACHINE }}">
   <p class="mark" id="panel-intro">{{ words.PANEL_INTRO }}</p>
   <div class="panel-where" id="panel-path">{% for line in panel.path_lines %}<p class="sentence">{{ line }}</p>{% endfor %}</div>
-  <div class="panel-grid">
+  <div class="panel-grid{% if panel.after_stop %} has-after-stop{% endif %}">
     {% for column in panel.columns %}
     <h3 class="panel-head col-{{ column.n }}" id="panel-{{ column.name }}">{{ column.title }}</h3>
     {% for box in column.boxes %}
@@ -50,9 +75,12 @@
       </div>
     </details>
     {% endfor %}
-    {% if column.arrow %}<span class="panel-arrow gutter-{{ column.arrow.gutter }} from-{{ column.arrow.from_row }} to-{{ column.arrow.to_row }}" aria-hidden="true"><svg viewBox="0 0 24 12" width="24" height="12" focusable="false"><path d="M1 6h20M16 1l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></span>{% endif %}
     {% endfor %}
+    {% for arrow in panel.arrows %}{{ arrow_drawn(arrow) }}{% endfor %}
   </div>
+  {# The key: a sample of each kind of line drawn, with its words. Part of the drawing, so hidden from a reader as
+     the lines are: the lines above the picture say the same in words. #}
+  <p class="panel-key" id="panel-key" aria-hidden="true">{% for kind, said in panel.key %}<span class="key-part {{ kind }}" id="panel-key-{{ kind }}"><svg viewBox="0 0 44 10" width="44" height="10" focusable="false"><line x1="1" y1="5" x2="41" y2="5"/><path class="arrow-head" d="M35 1L42 5L35 9"/></svg> {{ said }}</span>{% endfor %}</p>
 </div>
 {%- endmacro %}
 

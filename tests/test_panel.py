@@ -195,7 +195,13 @@ def test_15_13_ruling_56_the_chosen_path_is_marked_for_each_path_by_the_border_t
         in_page = box_of(page, box.name)
         assert ("data-chosen" in in_page.split(">", 1)[0]) is box.chosen and (f'<b class="box-chosen">{words.PANEL_CHOSEN}</b>' in in_page) is box.chosen
         assert (" on-path" in page.split(f'id="box-{box.name}"', 1)[0].rsplit("<details", 1)[1]) is box.on_path
-    assert page.count('class="panel-arrow ') == 3 and page.count('class="panel-arrow ') == page.count('aria-hidden="true"><svg viewBox="0 0 24 12"')
+    # Restated on the owner's ruling of 20 Nov 2026 (mail 6 of run 9c): an arrow is a line from box to box, no longer a
+    # small sign in the gap between two columns. OLD: page.count('class="panel-arrow ') == 3 and
+    # page.count('class="panel-arrow ') == page.count('aria-hidden="true"><svg viewBox="0 0 24 12"'). NEW: three lines
+    # on these four paths, each naming the boxes it joins, each hidden from a reader; tests/test_picture_lines.py pins
+    # the lines of all six paths, the dashed ones and the key.
+    assert page.count('class="panel-arrow ') == 3 == len(re.findall(
+        r'<span class="panel-arrow during [^"]*" data-from="[a-z_]+" data-to="[a-z_]+" data-kind="during" aria-hidden="true">', page))
     assert '<div class="panel-where" id="panel-path">' + "".join(f'<p class="sentence">{line}</p>' for line in by) + "</div>" in page
 
 

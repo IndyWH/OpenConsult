@@ -1157,6 +1157,9 @@ START_TEST_FAILED = "Start is not offered: {reason}"
 PANEL_INTRO = "How OpenConsult runs on this computer. Press a box to see more."
 PANEL_COLUMNS = {"microphone": "Microphone", "transcription": "Transcription", "language_model": "Language model",
                  "consultation": "Consultation"}
+# The key under the picture (the owner's ruling of 20 Nov 2026 on the arrows; the words are Cowork's draft, by mail 6):
+# beside a solid sample and a dashed one. The dashed part shows only where a dashed line is drawn.
+PANEL_KEY = {"during": "During the consultation", "after_stop": "After Stop"}
 PANEL_BOXES = {"microphone": "Microphone", "speech_local": "This computer", "speechmatics": "Speechmatics, cloud",
                "model_local": "This computer", "claude": "Claude, cloud", "consultation": "Consultation"}
 PANEL_STATES = {"ready": "Ready", "not_set_up": "Not set up", "cannot_run": "Cannot run here"}

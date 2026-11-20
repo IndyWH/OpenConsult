@@ -85,7 +85,6 @@ label.tick { display: flex; align-items: flex-start; color: var(--ink); font-siz
 .statement-full > summary { cursor: pointer; margin: .4rem 0; }
 /* A line or a section the page goes to by itself stands clear of the app's bar, which stays at the top of the window. */
 .waiting, section.pane { scroll-margin-top: 4.2rem; }
-
 /* Panes */
 .pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 1rem; }
 form.pane { margin-bottom: 0; }
@@ -307,8 +306,11 @@ details.call pre { white-space: pre-wrap; font-family: var(--sans); font-size: .
 /* The control panel of This machine (run 9c; 15.13, rulings 6 and 56). Four columns side by side, the arrows in the
    gutters between them; a box in its column's cell, this computer above its cloud service. A state is told by its
    sign and its word; the colour of the sign is added and never alone. The path the doctor chose has the heavier
-   border, in the page's own ink. Under 760 px the columns stack in the order of the path and each arrow points down. */
-.panel-grid { display: grid; grid-template-columns: 1fr 2rem 1fr 2rem 1fr 2rem 1fr; column-gap: .3rem; row-gap: .5rem; align-items: start; margin: .6rem 0 1rem; }
+   border, in the page's own ink. An arrow is a line from the edge of one box to the edge of the next (the owner's
+   ruling of 20 Nov 2026): solid during the consultation, dashed after Stop, told by the line itself and the key and
+   never by colour. Under 760 px the boxes stack in the order of the path, each in a row of its own, and the lines
+   run down a rail beside them: the solid on the left, the dashed pair of after Stop on the right. */
+.panel-grid { display: grid; grid-template-columns: minmax(0, 1fr) 2.6rem minmax(0, 1fr) 2.6rem minmax(0, 1fr) 2.6rem minmax(0, 1fr); column-gap: 0; row-gap: .5rem; align-items: start; margin: .6rem 0 .4rem; }
 .panel-head { grid-row: 1; margin: 0; font-size: .72rem; text-transform: uppercase; letter-spacing: .09em; color: var(--ink-faint); font-weight: 600; }
 .panel-grid .col-1 { grid-column: 1; } .panel-grid .col-2 { grid-column: 3; } .panel-grid .col-3 { grid-column: 5; } .panel-grid .col-4 { grid-column: 7; }
 .panel-grid .row-0 { grid-row: 2; } .panel-grid .row-1 { grid-row: 3; }
@@ -326,17 +328,35 @@ details.box > summary > span, details.box > summary > b { display: block; }
 .box-more p { margin: 0 0 .4rem; }
 .box-more form { margin: 0; }
 .box-more button, .box-more a.button { margin-top: .2rem; padding: .3rem .9rem; font-size: .82rem; }
-.panel-arrow { grid-row: 2; align-self: start; justify-self: center; margin-top: .9rem; color: var(--ink); line-height: 0; }
+/* An arrow fills the gutter beside the row of the box it leaves, or of the upper box where it comes up from the cloud
+   row, and takes no room itself. Its drawing reaches over the gap to the top of the next row: the template draws to there. */
+.panel-arrow { grid-row: 2; align-self: stretch; position: relative; min-width: 0; color: var(--ink); pointer-events: none; }
 .panel-arrow.gutter-1 { grid-column: 2; } .panel-arrow.gutter-2 { grid-column: 4; } .panel-arrow.gutter-3 { grid-column: 6; }
-.panel-arrow.from-1 { grid-row: 3; }
-.panel-arrow.from-0.to-1 svg { transform: rotate(40deg); }
-.panel-arrow.from-1.to-0 svg { transform: rotate(-40deg); }
+.panel-arrow.straight.rows-1-1 { grid-row: 3; }
+.panel-arrow > svg { position: absolute; left: 0; top: 0; width: 100%; height: calc(100% + .5rem); overflow: visible; }
+.panel-arrow > svg.narrow { display: none; }
+.panel-arrow line, .panel-key line, .arrow-head { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: square; stroke-linejoin: round; }
+.arrow-head { stroke-linecap: round; }
+.panel-arrow.after_stop line, .panel-key .after_stop line { stroke-dasharray: 4 6; }
+.panel-key { display: flex; flex-wrap: wrap; gap: .3rem 1.4rem; margin: 0 0 1rem; color: var(--ink-soft); font-size: .82rem; }
+.panel-key .key-part { white-space: nowrap; } .panel-key svg { color: var(--ink); vertical-align: -1px; margin-right: .2rem; }
 @media (max-width: 760px) {
-  .panel-grid { display: block; }
-  .panel-head { margin-top: .6rem; }
-  details.box { margin: .4rem 0; }
-  .panel-arrow, .panel-arrow.from-1 { display: block; text-align: center; margin: .5rem 0; }
-  .panel-arrow svg, .panel-arrow.from-0.to-1 svg, .panel-arrow.from-1.to-0 svg { transform: rotate(90deg); }
+  .panel-grid { grid-template-columns: 1.6rem minmax(0, 1fr); }
+  .panel-grid.has-after-stop { grid-template-columns: 1.6rem minmax(0, 1fr) 1.6rem; }
+  .panel-grid .panel-head, .panel-grid details.box { grid-column: 2; }
+  .panel-grid .panel-head { margin-top: .3rem; }
+  .panel-grid .panel-head.col-1 { grid-row: 1; margin-top: 0; } .panel-grid .box.col-1 { grid-row: 2; }
+  .panel-grid .panel-head.col-2 { grid-row: 3; } .panel-grid .box.col-2.row-0 { grid-row: 4; } .panel-grid .box.col-2.row-1 { grid-row: 5; }
+  .panel-grid .panel-head.col-3 { grid-row: 6; } .panel-grid .box.col-3.row-0 { grid-row: 7; } .panel-grid .box.col-3.row-1 { grid-row: 8; }
+  .panel-grid .panel-head.col-4 { grid-row: 9; } .panel-grid .box.col-4 { grid-row: 10; }
+  .panel-grid .panel-arrow.during { grid-column: 1; } .panel-grid .panel-arrow.after_stop { grid-column: 3; }
+  .panel-grid .panel-arrow.from-microphone { grid-row-start: 2; } .panel-grid .panel-arrow.from-speech_local { grid-row-start: 4; }
+  .panel-grid .panel-arrow.from-speechmatics { grid-row-start: 5; } .panel-grid .panel-arrow.from-model_local { grid-row-start: 7; }
+  .panel-grid .panel-arrow.from-claude { grid-row-start: 8; }
+  .panel-grid .panel-arrow.to-speech_local { grid-row-end: 4; } .panel-grid .panel-arrow.to-speechmatics { grid-row-end: 5; }
+  .panel-grid .panel-arrow.to-model_local { grid-row-end: 7; } .panel-grid .panel-arrow.to-claude { grid-row-end: 8; }
+  .panel-grid .panel-arrow.to-consultation { grid-row-end: 10; }
+  .panel-arrow > svg.wide { display: none; } .panel-arrow > svg.narrow { display: block; }
 }
 
 /* The cloud mark (run 9b): a border, a drawn cloud and words in the page's own ink, so it reads the same without colour. */

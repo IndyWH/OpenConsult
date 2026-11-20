@@ -31,6 +31,7 @@ READY, NOT_SET_UP, CANNOT_RUN = "ready", "not_set_up", "cannot_run"
 MICROPHONE, SPEECH_LOCAL, SPEECHMATICS_BOX, MODEL_LOCAL, CLAUDE_BOX, CONSULTATION = (
     "microphone", "speech_local", "speechmatics", "model_local", "claude", "consultation")
 CONNECT, TEST, CHOOSE = "connect", "test", "choose"
+DURING = "during"                   # a solid line, of the consultation; a dashed one is AFTER_STOP, as what goes to a service is
 
 
 @dataclass(frozen=True)
@@ -88,9 +89,21 @@ class Box:
 
 @dataclass(frozen=True)
 class Arrow:
+    """A line from the edge of one box to the edge of the next, with a
+    head at its end (the owner's ruling of 20 Nov 2026): solid for what
+    happens during the consultation, dashed for what happens after Stop."""
+    start: str                      # the box it leaves
+    end: str                        # the box its head touches
+    kind: str                       # during or after_stop
     gutter: int                     # 1: after Microphone; 2: after Transcription; 3: after Language model
     from_row: int
     to_row: int
+
+    @property
+    def shape(self) -> str:
+        """How it runs between two columns side by side: straight, or by a
+        corner down to the cloud row or up from it."""
+        return "straight" if self.from_row == self.to_row else "down" if self.from_row < self.to_row else "up"
 
 
 @dataclass(frozen=True)
@@ -106,9 +119,38 @@ class Panel:
     def columns(self) -> list[dict]:
         """The columns in the order of the path, each with its boxes: the
         order a screen reader meets them in."""
-        return [{"name": name, "title": words.PANEL_COLUMNS[name], "n": n, "boxes": [box for box in self.boxes if box.column == name],
-                 "arrow": next((arrow for arrow in self.arrows if arrow.gutter == n), None)}
+        return [{"name": name, "title": words.PANEL_COLUMNS[name], "n": n, "boxes": [box for box in self.boxes if box.column == name]}
                 for n, name in enumerate(words.PANEL_COLUMNS, start=1)]
+
+    @property
+    def after_stop(self) -> bool:
+        """Whether a dashed line is drawn: the recording goes after Stop."""
+        return any(arrow.kind == AFTER_STOP for arrow in self.arrows)
+
+    @property
+    def key(self) -> tuple:
+        """Under the picture: a sample of each kind of line that is drawn,
+        with its words. The dashed part only where a dashed line is."""
+        return tuple((kind, words.PANEL_KEY[kind]) for kind in ((DURING, AFTER_STOP) if self.after_stop else (DURING,)))
+
+
+def arrows_of(path: ChosenPath, boxes: tuple) -> tuple:
+    """The lines of the path chosen (the owner's ruling of 20 Nov 2026).
+    During the consultation: the microphone, the transcription box
+    chosen, the language model box chosen, the consultation. After Stop,
+    where the tick for better accuracy counts: the recording from the
+    microphone to Speechmatics, and its transcript from there to the
+    language model chosen, which drafts the note from it. A box that is
+    not on the path has no line."""
+    by_name = {box.name: box for box in boxes}
+    speech = SPEECHMATICS_BOX if path.speechmatics_live else SPEECH_LOCAL
+    model = CLAUDE_BOX if path.claude else MODEL_LOCAL
+    steps = [(MICROPHONE, speech, DURING), (speech, model, DURING), (model, CONSULTATION, DURING)]
+    if path.recording_after_stop:
+        steps += [(MICROPHONE, SPEECHMATICS_BOX, AFTER_STOP), (SPEECHMATICS_BOX, model, AFTER_STOP)]
+    columns = list(words.PANEL_COLUMNS)
+    return tuple(Arrow(start, end, kind, columns.index(by_name[start].column) + 1, by_name[start].row, by_name[end].row)
+                 for start, end, kind in steps)
 
 
 def _when(stamp) -> tuple[str, str]:
@@ -241,8 +283,6 @@ def build(p, first_run: bool = False) -> Panel:
              model_local_box(p, path, first_run), cloud_box(p, path, CLAUDE, first_run), consultation_box(p, path))
     if first_run:
         boxes = tuple(replace(box, note=words.PANEL_CHOOSE_IN_SETTINGS) if box.state == READY and not box.on_path else box for box in boxes)
-    speech_row, model_row = (1 if path.speechmatics_live else 0), (1 if path.claude else 0)
-    arrows = (Arrow(1, 0, speech_row), Arrow(2, speech_row, model_row), Arrow(3, model_row, 0))
     # Above the picture, in the owner's shape (his word of 18 Nov 2026, 08:03): what runs on this computer and what in
     # the cloud on the path chosen, from the function the notice of a path that sends less reads.
-    return Panel(boxes, arrows, where_lines(path))
+    return Panel(boxes, arrows_of(path, boxes), where_lines(path))
