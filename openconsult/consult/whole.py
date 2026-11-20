@@ -26,6 +26,15 @@ recording the service took whose delete is neither proven nor judged
 not proven, and finishes it beside the start: so a closed app leaves no
 recording at the service.
 
+Delete is never refused (the owner's ruling of 20 Nov 2026). A
+consultation deleted while its recording is at the service, neither
+proven gone nor judged, leaves the job's name and the state of its
+delete apart from it, and nothing else. The thread that is asking goes
+on; where none is, one is started; the next start finds what is kept and
+finishes it by the same rule and limits. When it is proven or judged the
+kept name is dropped, and the log says so in one line that names no
+patient and no consultation.
+
 When the upload fails or passes its limit of time, the live lines stay
 the final transcript, the review page says why, and nothing is sent
 again by itself. A delete that is not proven is said on the review
@@ -127,7 +136,8 @@ class WholeRecording:
     def __init__(self, key: Callable[[], str | None], send: Callable | None = None, sleep: Callable = time.sleep,
                  clock: Callable = time.monotonic):
         self._key, self._send, self._sleep, self._clock = key, send, sleep, clock
-        self._proofs: dict[int, threading.Thread] = {}      # the delete and its proof of a consultation, each on its own thread
+        # The delete and its proof, each on its own thread: by the consultation's number, or by the job's name for one kept apart.
+        self._proofs: dict[int | str, threading.Thread] = {}
         self._lock = threading.Lock()
 
     def http(self) -> upload.Http:
@@ -219,8 +229,27 @@ class WholeRecording:
     def finish_open(self, rows, audit) -> list[int]:
         """At the app's start: every recording the service took whose
         delete is neither proven nor judged not proven is taken up where
-        its record stands, each on its own thread, beside the start."""
-        return [cid for cid in rows.open_proofs() if self.prove(rows, audit, cid)]
+        its record stands, each on its own thread, beside the start; and
+        so is every job kept apart from a consultation that was deleted
+        meanwhile. Returns the consultations taken up."""
+        found = [cid for cid in rows.open_proofs() if self.prove(rows, audit, cid)]
+        for job_id in rows.left_jobs():
+            self.prove_left(rows, audit, job_id)
+        return found
+
+    def prove_left(self, rows, audit, job_id: str, consultation_id: int | None = None) -> bool:
+        """Finish the delete of a job kept apart from a deleted consultation,
+        on a thread of its own. None is started where the thread of that
+        consultation is still asking: it goes on, and drops the kept name
+        itself when it has judged. Never two for one job."""
+        with self._lock:
+            for running in (self._proofs.get(consultation_id), self._proofs.get(job_id)):
+                if running is not None and running.is_alive():
+                    return False
+            thread = threading.Thread(target=self._prove_left, args=(rows, audit, job_id), name="delete-proof-left", daemon=True)
+            self._proofs[job_id] = thread
+            thread.start()
+        return True
 
     def wait(self, timeout_s: float = 30.0) -> bool:
         """Until no delete is in flight, or the time is up: for a test and
@@ -238,9 +267,17 @@ class WholeRecording:
         proven, and the line of the log. Never raises (R30): whatever
         broke, the delete is judged not proven and said."""
         up: dict = {"gone": None, "proof": None}
+        job_id = None
+
+        def note() -> None:
+            # Each step to the consultation's record; and to the row kept apart, where the consultation was deleted meanwhile.
+            rows.note_proof(cid, up["delete"], up["asked_again"])
+            rows.note_left(job_id, up["delete"], up["asked_again"])
+
         try:
             noted = rows.upload(cid)
-            up.update(job={"id": noted["job_id"]}, delete=noted["delete_answer"], asked_again=list(noted["asked_again"] or []))
+            job_id = noted["job_id"]
+            up.update(job={"id": job_id}, delete=noted["delete_answer"], asked_again=list(noted["asked_again"] or []))
             if lines is None:
                 # Taken up after a restart: the words of the result are the transcript's, where one was made from it.
                 lines = [{"text": r["text"]} for r in rows.transcript_lines(cid) if r["n"] is not None] if noted["result_at"] else []
@@ -248,22 +285,57 @@ class WholeRecording:
             if key is None:
                 up["gone"], up["proof"] = False, "no key in use: the service could not be asked"
             else:
-                upload._delete_and_prove(service, self.http(), key, up["job"], lines, up, self._sleep,
-                                         note=lambda: rows.note_proof(cid, up["delete"], up["asked_again"]))
+                upload._delete_and_prove(service, self.http(), key, up["job"], lines, up, self._sleep, note=note)
         except Exception as broke:  # noqa: BLE001
             up["gone"], up["proof"] = False, f"the delete broke: {type(broke).__name__}"
         try:
+            # The judgement first, then the kept name: a Delete of the consultation either finds the judgement and
+            # keeps nothing, or came before it, and then what it kept is dropped here.
             rows.judge_upload(cid, bool(up["gone"]), up["proof"])
-            if up["gone"]:
+            if job_id and rows.drop_left(job_id):
+                self._say_left(audit, up)
+            elif up["gone"]:
                 audit.record("recording.deleted", f"consultation {cid}: {up['proof']}")
             else:
-                # Said on the review page in the owner's words, also when the page is already open, and written to the
-                # log. A consultation deleted while its answer was awaited has no page to say it on: the log alone.
+                # Said on the review page in the owner's words, also when the page is already open, and written to the log.
                 if rows.upload(cid) is not None:
                     rows.add_warning(cid, NOT_PROVEN)
                 audit.record("recording.delete_not_proven", f"consultation {cid}: {up['proof'] or 'no answer'}")
         except Exception:  # noqa: BLE001 - the tables are gone (the app is closing): the next start finds the proof open
             pass
+
+    def _prove_left(self, rows, audit, job_id: str) -> None:
+        """The same delete and the same asks for a job kept apart from a
+        deleted consultation, taken up where the kept state stands. The
+        words of its result went with the consultation, so only an answer
+        that the job is gone proves it. Never raises (R30)."""
+        up: dict = {"gone": None, "proof": None}
+        try:
+            kept = rows.left(job_id)
+            if kept is None:
+                return                                  # proven or judged meanwhile: nothing is owed
+            up.update(job={"id": job_id}, delete=kept["delete"], asked_again=kept["asked_again"])
+            key = self._key()
+            if key is None:
+                up["gone"], up["proof"] = False, "no key in use: the service could not be asked"
+            else:
+                upload._delete_and_prove(service, self.http(), key, up["job"], [], up, self._sleep, words_held=False,
+                                         note=lambda: rows.note_left(job_id, up["delete"], up["asked_again"]))
+        except Exception as broke:  # noqa: BLE001
+            up["gone"], up["proof"] = False, f"the delete broke: {type(broke).__name__}"
+        try:
+            if rows.drop_left(job_id):
+                self._say_left(audit, up)
+        except Exception:  # noqa: BLE001 - the tables are gone (the app is closing): the next start finds the job kept
+            pass
+
+    @staticmethod
+    def _say_left(audit, up: dict) -> None:
+        """The one line of the log for a job whose consultation is deleted:
+        what was found, and that the kept name is dropped. No patient, no
+        consultation's number, no job's name."""
+        event = "recording.left_deleted" if up["gone"] else "recording.left_not_proven"
+        audit.record(event, f"{up['proof'] or 'no answer'}; the job's name is no longer kept")
 
     def _make_final(self, c, lines: list[dict]) -> None:
         """The service's lines as the final transcript, each as the service

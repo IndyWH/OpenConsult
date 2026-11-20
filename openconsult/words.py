@@ -723,6 +723,11 @@ EVENTS = {
     "recording.sent": "Recording sent to Speechmatics after Stop",
     "recording.delete_not_proven": "The delete of a recording sent after Stop could not be confirmed",
     "recording.deleted": "A recording sent after Stop was deleted at Speechmatics, and the service confirmed that it is gone",
+    # Drafts (the owner's ruling of 20 Nov 2026): the one line for a recording whose consultation was deleted while
+    # its delete at the service was awaited. The line names no patient and no consultation.
+    "recording.left_deleted": ("A recording whose consultation was deleted meanwhile was deleted at Speechmatics, and the "
+                               "service confirmed that it is gone"),
+    "recording.left_not_proven": "A recording whose consultation was deleted meanwhile: its delete at Speechmatics could not be confirmed",
     "recording.pressed": "After a lost connection: the doctor's press at Stop",
     "self_test.passed": "Self-test passed from its set-up step",
     "microphone.tested": "Microphone tested: the level moved",

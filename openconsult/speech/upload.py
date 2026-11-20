@@ -269,7 +269,7 @@ def request_made(sent: list[dict]) -> str:
 
 
 def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: list[dict], upload: dict,
-                      sleep: Callable = time.sleep, note: Callable | None = None) -> None:
+                      sleep: Callable = time.sleep, note: Callable | None = None, words_held: bool = True) -> None:
     """The delete, then each ask of the service once; an ask that brought
     no answer at all is made once more, a few seconds later, and never a
     third time (ruling 49). An ask that brought any answer is never made
@@ -283,7 +283,12 @@ def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: li
     and tries of the asks: a delete that was answered is not sent again,
     an ask that was answered is not made again, and an ask whose one try
     brought no answer gets its second try and no more. note is called
-    after the delete and after each try, so that the record holds them."""
+    after the delete and after each try, so that the record holds them.
+
+    words_held: False for a job whose consultation was deleted before the
+    app was closed (the owner's ruling of 20 Nov 2026): nothing of its
+    words is kept, so an answer of 200 cannot be read against them and
+    proves nothing; a 404 or a 410 proves as ever."""
     if not job:
         upload["gone"], upload["proof"] = True, "nothing was taken by the service"
         return
@@ -313,7 +318,9 @@ def _delete_and_prove(service, http: Http, key: str, job: dict | None, lines: li
     def ask(what: str, second: bool) -> int:
         (_, answer), = service.ask_again(http, key, job, only=what, timeout_s=SECOND_ASK_LIMIT_S if second else DELETE_LIMIT_S)
         ok, why = proves_gone(answer, result_words, service.must_not_hold(job), service.lines_of)
-        entry = {"what": what, **answer.kept(), "gone": ok, "why": why, **({"try": 2} if second else {})}
+        if ok and not words_held and answer.status not in GONE_STATUSES:
+            ok, why = False, f"HTTP {answer.status}: the words of the result are no longer held to read the answer against"
+        entry ={"what": what, **answer.kept(), "gone": ok, "why": why, **({"try": 2} if second else {})}
         upload["asked_again"].append(entry)
         said(entry)
         told()

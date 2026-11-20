@@ -13,7 +13,13 @@ its speakers afresh in every session.
 The recording sent after Stop has one row for a consultation: when it
 was sent and by which of the two ways, the job's name at the service,
 when the result came, the delete's answer and each answer when the job
-was asked for again. Never a key."""
+was asked for again. Never a key.
+
+A consultation deleted while its recording is at the service, neither
+proven gone nor judged, leaves one row apart from it (the owner's ruling
+of 20 Nov 2026): the job's name and the state of its delete, and nothing
+else, so that the delete can still be finished. It is dropped when the
+delete is proven or judged."""
 
 from __future__ import annotations
 
@@ -21,6 +27,34 @@ import json
 
 WAYS = ("tick", "press")
 REQUESTS = ("not_made", "never_connected", "made")
+# Of a try of an ask this much is kept apart from a consultation, and never the answer's body, which may hold a word
+# or a time: which ask, its status, whether it proved, why in the app's own words, and whether it was the second try.
+LEFT_TRY = ("what", "status", "gone", "why", "try")
+
+
+def left_state(delete_answer: dict | None, asked_again: list | None) -> tuple[int | None, str]:
+    """The state of a delete as it is kept apart from its consultation: the
+    status of the delete's answer, or None where none came yet, and the
+    tries of the asks, in order, each cut down to LEFT_TRY."""
+    status = None if delete_answer is None else int(delete_answer["status"])
+    tries = [{name: entry[name] for name in LEFT_TRY if name in entry} for entry in asked_again or []]
+    return status, json.dumps(tries, ensure_ascii=False)
+
+
+def keep_left(con, consultation_id: int) -> str | None:
+    """On the connection of the transaction that deletes a consultation,
+    before its rows go: where the service took its recording and the
+    delete there is neither proven nor judged, the job's name and the
+    state of its delete are kept apart. Returns the job's name, or None
+    where nothing is owed."""
+    row = con.execute("SELECT job_id, delete_answer, asked_again FROM recording_upload "
+                      "WHERE consultation_id = ? AND job_id IS NOT NULL AND judged_at IS NULL", (consultation_id,)).fetchone()
+    if row is None:
+        return None
+    status, tries = left_state(json.loads(row["delete_answer"]) if row["delete_answer"] else None,
+                               json.loads(row["asked_again"]) if row["asked_again"] else None)
+    con.execute("INSERT OR REPLACE INTO recording_left (job_id, delete_status, asks) VALUES (?, ?, ?)", (row["job_id"], status, tries))
+    return row["job_id"]
 
 
 class SessionRows:
@@ -121,3 +155,29 @@ class SessionRows:
         for name in ("applied", "delete_answer", "asked_again"):
             found[name] = json.loads(found[name]) if found[name] else None
         return found
+
+    # ------------------- a recording left at the service by a deleted consultation
+
+    def left_jobs(self) -> list[str]:
+        """The jobs kept apart from a deleted consultation: found at start."""
+        return [r["job_id"] for r in self._db.query("SELECT job_id FROM recording_left ORDER BY rowid")]
+
+    def left(self, job_id: str) -> dict | None:
+        """One kept job, in the shape the delete and its proof take up: the
+        delete's answer by its status, or None, and the tries so far."""
+        row = self._db.query_one("SELECT * FROM recording_left WHERE job_id = ?", (job_id,))
+        if row is None:
+            return None
+        return {"job_id": row["job_id"], "delete": None if row["delete_status"] is None else {"status": row["delete_status"]},
+                "asked_again": json.loads(row["asks"])}
+
+    def note_left(self, job_id: str, delete_answer: dict | None, asked_again: list) -> None:
+        """The same steps as note_proof, for a job whose consultation is
+        gone: nothing is written where no such job is kept."""
+        status, tries = left_state(delete_answer, asked_again)
+        self._db.execute("UPDATE recording_left SET delete_status = ?, asks = ? WHERE job_id = ?", (status, tries, job_id))
+
+    def drop_left(self, job_id: str) -> bool:
+        """The kept name dropped, once its delete is proven or judged.
+        True where one was kept."""
+        return self._db.execute("DELETE FROM recording_left WHERE job_id = ?", (job_id,)).rowcount > 0

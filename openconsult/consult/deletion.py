@@ -6,7 +6,11 @@ transcript. No undo, no void state, no purge step. A consultation that
 is not final is refused (Stop first), and so is one that is gone, so a
 second delete is refused and never repeated. A crash between the rows
 and the file leaves a file with no row, which the start-up sweep of
-orphans reports. A patient is deleted only when no consultation is left."""
+orphans reports. A patient is deleted only when no consultation is left.
+
+Delete is never refused because a recording of the consultation is still
+at the cloud service (the owner's ruling of 20 Nov 2026): the delete
+there is finished apart from the consultation (consult/whole.py)."""
 
 from __future__ import annotations
 
@@ -14,6 +18,7 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from openconsult.consult.recording import folder_of
+from openconsult.consult.session_rows import keep_left
 
 
 class NotFinal(Exception):
@@ -101,6 +106,9 @@ def delete_consultation(p, consultation_id: int) -> Deleted:
     if row["state"] != "final":
         raise NotFinal(consultation_id)
     with p.db.transaction() as con:
+        # A recording of it still at the service, its delete there neither proven nor judged: the job's name and the
+        # state of that delete are kept apart, in this same transaction, and nothing else of the consultation.
+        left = keep_left(con, consultation_id)
         counts = delete_rows(con, consultation_id)
     file_name, file_bytes = row["recording_file"], 0
     if file_name:
@@ -116,6 +124,9 @@ def delete_consultation(p, consultation_id: int) -> Deleted:
     date = datetime.fromisoformat(row["started_at"]).date().isoformat()
     deleted = Deleted(consultation_id, row["patient_id"], date, counts, file_name, file_bytes)
     p.audit.record("consultation.deleted", deleted.line())
+    if left:
+        # The thread that is asking goes on and drops the kept name itself; where none is asking, one is started now.
+        p.whole.prove_left(p.consultations, p.audit, left, consultation_id)
     return deleted
 
 
