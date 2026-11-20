@@ -24,7 +24,10 @@ from tests.test_machine_status import box_of
 from tests.test_panel import BOTH_KEYS, made
 
 # THE OWNER'S, letter for letter (his words of 18 Nov 2026, 07:07 to 07:25).
-HEAD = "Saved. No new tick is asked, because less leaves this computer than you agreed to."
+# The head restated on his word A of 20 Nov 2026, 08:06 (mail 5 of run 9c): one line, not two. OLD, his head of 18 Nov,
+# under the control's ordinary line, so that two lines began Saved.: Saved. No new tick is asked, because less leaves
+# this computer than you agreed to. NEW, the one line the page shows in that case, letter for letter:
+HEAD = "Saved. No new tick is asked, because less leaves this computer than you agreed to. It takes effect at the next consultation."
 HERE_MODEL = "On this computer: the language model. Nothing goes to Claude."
 HERE_BOTH = "On this computer: the language model and transcription."
 CLOUD_SPEECH = "In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken."
@@ -116,6 +119,9 @@ def test_ruling_48_the_notice_of_a_path_that_sends_less_in_the_owners_shape_and_
     said = re.findall(r'<p class="(?:less-head|where-line)">([^<]*)</p>', notice)
     assert said == [HEAD, *lines] and words.LESS_HEAD == HEAD
     assert 'role="status"' in notice.split("<details", 1)[0]
+    # One line begins Saved., and it is his: the control's ordinary line is not shown above it (his word of 20 Nov).
+    assert re.findall(r">\s*(Saved\.[^<]*)<", text_of(page)) == [HEAD] and f'id="saved-{at}"' not in page.text
+    assert words.PATH_SAVED not in text_of(page) and words.PATH_SAVED == "Saved. It takes effect at the next consultation."
     # The full statement of the path stays one press away under the notice: closed until pressed, by the browser's own
     # disclosure, so with no script; and it holds no tick.
     full = notice.split("</div>", 1)[1]
@@ -135,6 +141,34 @@ def test_ruling_48_the_notice_of_a_path_that_sends_less_in_the_owners_shape_and_
     assert picture_lines(later) == list(lines)
     apart = later.split('<div class="statement-shown" id="less-apart">', 1)[1].split("</details>", 1)[0]
     assert re.findall(r'<p class="(?:less-head|where-line)">([^<]*)</p>', apart) == list(lines) and HEAD not in later and "<input" not in apart
+
+
+def test_his_word_of_20_nov_the_controls_ordinary_line_stands_alone_wherever_a_change_is_not_saved_under_a_wider_tick(tmp_path, clock):
+    ordinary = "Saved. It takes effect at the next consultation."
+    app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS["CS"])
+    p = app.state.parts
+
+    def saved_lines(answer) -> list[str]:
+        return re.findall(r">\s*(Saved\.[^<]*)<", text_of(client.get(answer.headers["location"])))
+
+    # Under a wider tick: the one line, his.
+    less = client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER})
+    assert saved_lines(less) == [HEAD]
+    # The wider path on the way back, which is ticked itself: the ordinary line, alone.
+    back = client.post("/settings/path/language-model", data={"language_model": CLAUDE})
+    assert back.headers["location"].startswith("/settings?done=path&at=language-model") and saved_lines(back) == [ordinary]
+    # A path with nothing in the cloud: the ordinary line, alone, beside the control that was changed.
+    client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER})
+    plain = client.post("/settings/path/transcription", data={"transcription": THIS_COMPUTER})
+    assert p.stored.path("suitable") == PATHS["L"] and saved_lines(plain) == [ordinary]
+    assert f'id="saved-transcription" role="status">{ordinary}</p>' in text_of(client.get(plain.headers["location"]))
+    # A choice saved by the tick of its own statement, a wider one: the ordinary line, alone.
+    wider = statement_for(PATHS["R"])
+    p.stored.tick_statement("0" * 64, PATHS["L"])                                # no tick stands for any path now
+    ticked = client.post("/settings/better-accuracy", data={"better_accuracy": "yes", "understand": "yes", "sha256": wider.sha256})
+    assert p.stored.path("suitable") == PATHS["R"] and saved_lines(ticked) == [ordinary]
+    # An address that says less on a page whose path is not saved under a wider tick: never his line, never both.
+    assert re.findall(r">\s*(Saved\.[^<]*)<", text_of(client.get("/settings?done=less&at=transcription"))) == [ordinary]
 
 
 def test_ruling_48_the_owners_lines_of_18_nov_letter_for_letter_and_only_the_three_paths_of_the_table_are_ever_shown_so():

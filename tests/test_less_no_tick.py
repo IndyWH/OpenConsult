@@ -33,7 +33,10 @@ CELLS = [(ticked, now, now in NO_TICK[ticked].split()) for ticked in NO_TICK for
 # Restated on the owner's shape of 18 Nov 2026 (mail 4 of run 9c). OLD, my draft, one line: Less leaves this computer
 # than you agreed to, so no new tick is asked. This is what leaves now. NEW, his: the head, then what runs on this
 # computer and what runs in the cloud, a line each; the full statement closed under them.
-LESS = "Saved. No new tick is asked, because less leaves this computer than you agreed to."
+# Restated again on his word of 20 Nov 2026, 08:06 (mail 5): one line, not two. OLD: his head of 18 Nov, Saved. No new
+# tick is asked, because less leaves this computer than you agreed to., with the control's own line (Saved. It takes
+# effect at the next consultation.) above it. NEW: the one line below, and the control's line not shown with it.
+LESS = "Saved. No new tick is asked, because less leaves this computer than you agreed to. It takes effect at the next consultation."
 HERE_S = "On this computer: the language model. Nothing goes to Claude."
 CLOUD_S = "In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken."
 
@@ -131,7 +134,7 @@ def test_15_13_ruling_48_a_path_that_sends_less_is_saved_under_the_wider_tick_wi
     # Right after the save: under the control that was changed, with no tick; Saved beside it; and on the page once.
     after = client.get(saved.headers["location"])
     section = after.text.split('<section class="pane" id="language-model">', 1)[1].split("</section>", 1)[0]
-    assert 'id="less-language-model"' in section and LESS in section and words.PATH_SAVED in section and LESS == words.LESS_HEAD
+    assert 'id="less-language-model"' in section and LESS in section and words.PATH_SAVED not in section and LESS == words.LESS_HEAD
     assert section.index(LESS) < section.index(HERE_S) < section.index(CLOUD_S) and not hasattr(words, "PATH_SENDS_LESS")
     assert sound.heading in section and all(line in text_of(after) for line in sound.sent) and sound.tick not in text_of(after)
     assert text_of(after).count(LESS) == 1 and 'name="sha256"' not in after.text and 'id="cloud-statement"' not in after.text

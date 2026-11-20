@@ -1114,7 +1114,10 @@ PATH_NOT_SAVED_YET = "This choice is not saved yet. Read the statement below and
 # the control is THE OWNER'S, in shape and letter for letter (his words of 18 Nov 2026, 07:07 to 07:25, from the
 # doctor's point of view): the head; a line that begins On this computer and holds what runs here; a line that begins
 # In the cloud and holds what runs there, with what goes to it. The full statement of the path stays one press away.
-LESS_HEAD = "Saved. No new tick is asked, because less leaves this computer than you agreed to."
+# The head is ONE line, his, letter for letter (his word A of 20 Nov 2026, 08:06, by mail 5): it says when the change
+# takes effect itself, and the control's ordinary line (PATH_SAVED) is not shown above it. Two lines began Saved.
+LESS_HEAD = ("Saved. No new tick is asked, because less leaves this computer than you agreed to. "
+             "It takes effect at the next consultation.")
 ON_THIS_COMPUTER = "On this computer:"
 IN_THE_CLOUD = "In the cloud:"
 # What runs here, by the jobs that do. His: both, and the language model alone. Transcription alone is Cowork's draft

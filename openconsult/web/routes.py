@@ -203,19 +203,23 @@ def _settings_page(request: Request, user, refused=None, pending=None, from_pane
     """pending: a change of the path that waits for its tick, drawn in its
     own section with the statement of the path as it would then stand.
     from_panel: the change was pressed in the picture at the top."""
+    done, at = request.query_params.get("done", ""), request.query_params.get("at")
+    covered = None if pending else cloud_web.covered_view(parts(request))
     context = dict(user=user, active="settings", machine=parts(request).machine,
                    # The picture of This machine, with the small table of what its boxes do not say (15.13, ruling 56).
                    panel=panel_web.build(parts(request)), room=room_lines(request), pointer=pointer(request),
                    # A choice pressed in the picture that waits for its statement: the page goes to it by itself.
                    go_to=f"not-saved-{pending['which']}" if pending and from_panel else None,
-                   least=MIN_PASSWORD, notice=NOTICE.get(request.query_params.get("done", "")),
+                   least=MIN_PASSWORD, notice=NOTICE.get(done),
                    # Saved is said beside the control that was changed, and only there (15.13, ruling 47).
-                   done=request.query_params.get("done", ""),
-                   saved_at=request.query_params.get("at") if request.query_params.get("done") in ("path", "less") else None,
+                   done=done,
                    # A path saved under a wider tick shows what leaves now (ruling 48): under its control right after
-                   # the save, and on later views where a statement to tick would stand.
-                   less_at=request.query_params.get("at") if request.query_params.get("done") == "less" else None,
-                   covered=None if pending else cloud_web.covered_view(parts(request)),
+                   # the save, and on later views where a statement to tick would stand. There the page says ONE line
+                   # that begins Saved, the notice's own head, and not the control's ordinary line above it (the
+                   # owner's word of 20 Nov 2026); the ordinary line stands alone in every other case.
+                   less_at=at if done == "less" and covered else None,
+                   saved_at=at if done == "path" or (done == "less" and not covered) else None,
+                   covered=covered,
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
                    thresholds=thresholds_view(parts(request)),
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
