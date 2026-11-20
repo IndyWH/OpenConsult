@@ -1234,6 +1234,13 @@ UPLOAD_MADE_ONLY = "The final transcript was made by Speechmatics from the whole
 # delete is awaited. Stop no longer waits for the delete or its proof (his ruling of 06:55 that day).
 UPLOAD_MADE_AWAITED = ("The final transcript was made by Speechmatics from the whole recording. OpenConsult has asked Speechmatics "
                        "to delete it there and is waiting for the answer.")
+# THE OWNER'S, letter for letter (his word A of 20 Nov 2026, 08:11, by mail 5): above the note where the service took
+# the recording and no transcript from it was made. While the answer to the delete is awaited, and when the delete
+# is proven. When it is not proven no line stands there: his warning of ruling 41 says it, as in every case.
+UPLOAD_NONE_AWAITED = ("The recording went to Speechmatics, and no transcript came back. OpenConsult has asked Speechmatics to "
+                       "delete it there and is waiting for the answer.")
+UPLOAD_NONE = ("The recording went to Speechmatics, and no transcript came back. It was deleted there, and Speechmatics confirmed "
+               "that it is gone.")
 # Drafts: the line for a page whose script did not run while the answer is awaited, and its link.
 SENT_NO_SCRIPT = "The page's script did not run."
 SENT_LOAD_AGAIN = "Load the page again to see whether the answer has come"

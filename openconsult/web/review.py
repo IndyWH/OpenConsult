@@ -213,22 +213,26 @@ def ran_with(p, row: dict) -> dict:
 
 
 SENT_LINES = {whole.AWAITED: words.UPLOAD_MADE_AWAITED, whole.PROVEN: words.UPLOAD_MADE, whole.UNPROVEN: words.UPLOAD_MADE_ONLY}
+# Where the service took the recording and no transcript was made from it (the owner's word of 20 Nov 2026): a line
+# while the answer to the delete is awaited and one when it is proven; none when it is not, where his warning says it.
+SENT_NONE_LINES = {whole.AWAITED: words.UPLOAD_NONE_AWAITED, whole.PROVEN: words.UPLOAD_NONE}
 
 
 def sent_lines(p, row: dict) -> tuple[str | None, str | None, str | None]:
     """For a consultation whose recording was to be sent after Stop: what
     its record can show of the request that carried it, for the mark's
-    third line (ruling 52); the sentence that the final transcript is
-    the service's, one of three by what the record holds of the delete
-    at this moment (the owner's ruling of 18 Nov 2026): the answer
-    awaited, proven, or not proven; and that state itself, which is
-    there also when no transcript came of a recording the service took."""
+    third line (ruling 52); the line above the note, by what the record
+    holds of the delete at this moment (the owner's ruling of 18 Nov
+    2026): the answer awaited, proven, or not proven, in his sentences
+    for a transcript the service made and in his two for a recording it
+    took that gave none; and that state itself. No line and no state
+    where the service took nothing."""
     sent = p.consultations.upload(row["id"])
     if sent is None:
         return None, None, None
     state = whole.proof_state(sent)
     if sent["result_at"] is None:
-        return sent["request"], None, state
+        return sent["request"], SENT_NONE_LINES.get(state), state
     return sent["request"], SENT_LINES.get(state, words.UPLOAD_MADE_ONLY), state
 
 
