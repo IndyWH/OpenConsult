@@ -24,7 +24,7 @@ from datetime import datetime
 
 from openconsult import words
 from openconsult.settings.path import CLAUDE, SPEECHMATICS, THIS_COMPUTER, ChosenPath
-from openconsult.settings.statement import AFTER_STOP, LIVE, NOTHING, goes_sentence, goes_to  # noqa: F401 - goes_to is read from here too
+from openconsult.settings.statement import AFTER_STOP, LIVE, NOTHING, goes_sentence, goes_to, where_lines  # noqa: F401 - goes_to is read from here too
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 
 READY, NOT_SET_UP, CANNOT_RUN = "ready", "not_set_up", "cannot_run"
@@ -97,7 +97,7 @@ class Arrow:
 class Panel:
     boxes: tuple
     arrows: tuple
-    path_line: str
+    path_lines: tuple               # above the picture: what runs here and what in the cloud on the path chosen
 
     def box(self, name: str) -> Box:
         return next(box for box in self.boxes if box.name == name)
@@ -243,8 +243,6 @@ def build(p, first_run: bool = False) -> Panel:
         boxes = tuple(replace(box, note=words.PANEL_CHOOSE_IN_SETTINGS) if box.state == READY and not box.on_path else box for box in boxes)
     speech_row, model_row = (1 if path.speechmatics_live else 0), (1 if path.claude else 0)
     arrows = (Arrow(1, 0, speech_row), Arrow(2, speech_row, model_row), Arrow(3, model_row, 0))
-    line = words.PANEL_PATH_LINE.format(transcription=words.PANEL_PATH_BY[SPEECHMATICS if path.speechmatics_live else THIS_COMPUTER],
-                                        model=words.PANEL_PATH_BY[CLAUDE if path.claude else THIS_COMPUTER])
-    if path.recording_after_stop:
-        line += " " + words.CLOUD_MARK_RECORDING                      # the owner's own line of the mark, where it is true
-    return Panel(boxes, arrows, line)
+    # Above the picture, in the owner's shape (his word of 18 Nov 2026, 08:03): what runs on this computer and what in
+    # the cloud on the path chosen, from the function the notice of a path that sends less reads.
+    return Panel(boxes, arrows, where_lines(path))

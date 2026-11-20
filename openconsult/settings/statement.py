@@ -158,11 +158,18 @@ def goes_sentence(path: ChosenPath, service: str) -> str:
 
 def where_lines(path: ChosenPath) -> tuple[str, ...]:
     """What runs on this computer and what runs in the cloud on a path, as
-    the picture names the two jobs: one line that begins On this
-    computer, where a job runs here, and one that begins In the cloud
-    for each service something goes to (15.13, ruling 48; the owner's
-    shape of 18 Nov 2026, from the doctor's side). Where one job runs
-    here and nothing at all goes to its service, the line says so."""
+    the picture names the two jobs (15.13, ruling 48; the owner's shape
+    of 18 Nov 2026, from the doctor's side). The line above the picture
+    and the notice of a path saved under a wider tick both read it (his
+    word of 18 Nov, 08:03), so the two can never differ.
+
+    At most one line that begins On this computer and one that begins In
+    the cloud. Where one job runs here and nothing at all goes to its
+    service, the first says so; where nothing runs here it is left out.
+    The second holds each thing in the cloud, the transcription or the
+    recording first, then the language model; one thing follows the
+    heading as his lines do, two follow one another, each beginning with
+    a capital; with nothing in the cloud it says so in his word."""
     here = [job for job, runs_here in (("language_model", not path.claude), ("transcription", not path.speechmatics_live)) if runs_here]
     service_of = {"language_model": CLAUDE, "transcription": SPEECHMATICS}
     lines = []
@@ -171,13 +178,20 @@ def where_lines(path: ChosenPath) -> tuple[str, ...]:
         if len(here) == 1 and goes_to(path, service_of[here[0]]) == NOTHING:
             line += " " + goes_sentence(path, service_of[here[0]])
         lines.append(line)
+    cloud = []
     for service in (SPEECHMATICS, CLAUDE):
         goes, sentence = goes_to(path, service), goes_sentence(path, service)
         if goes == LIVE:
-            lines.append(f"{words.IN_THE_CLOUD} {words.JOB_IN_CLOUD[service]} {sentence}")
+            cloud.append(f"{words.JOB_IN_CLOUD[service]} {sentence}")
         elif goes == AFTER_STOP:
-            # His sentence begins the box with a capital; here it follows the heading on its line.
-            lines.append(f"{words.IN_THE_CLOUD} {sentence[0].lower()}{sentence[1:]}")
+            cloud.append(sentence)
+    if not cloud:
+        said = words.IN_THE_CLOUD_NOTHING
+    elif len(cloud) == 1:
+        said = cloud[0][0].lower() + cloud[0][1:]           # one thing follows the heading on its line, as his lines do
+    else:
+        said = " ".join(thing[0].upper() + thing[1:] for thing in cloud)
+    lines.append(f"{words.IN_THE_CLOUD} {said}")
     return tuple(lines)
 
 

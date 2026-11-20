@@ -21,11 +21,11 @@
    style sheet lays them side by side and stacks them in a narrow window. A box is the browser's own disclosure, so it
    opens on a press with no script: its face says name, model, state by a sign and a word, Chosen, and when; opened,
    one sentence, for a cloud service what goes to it on the path chosen, and one action. The arrows are drawn for the
-   eye alone: the line above the picture says the path in words. #}
+   eye alone: the lines above the picture say in words what runs on this computer and what in the cloud. #}
 {% macro control_panel(panel) -%}
 <div class="control-panel" id="control-panel" role="group" aria-label="{{ words.SECTION_MACHINE }}">
   <p class="mark" id="panel-intro">{{ words.PANEL_INTRO }}</p>
-  <p class="sentence" id="panel-path">{{ panel.path_line }}</p>
+  <div class="panel-where" id="panel-path">{% for line in panel.path_lines %}<p class="sentence">{{ line }}</p>{% endfor %}</div>
   <div class="panel-grid">
     {% for column in panel.columns %}
     <h3 class="panel-head col-{{ column.n }}" id="panel-{{ column.name }}">{{ column.title }}</h3>

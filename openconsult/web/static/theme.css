@@ -79,6 +79,9 @@ label.tick { display: flex; align-items: flex-start; color: var(--ink); font-siz
    a line each; the full statement under it is closed until its line is pressed. */
 .where-lines p { margin: .2rem 0; }
 .where-lines .where-line { font-weight: 400; }
+/* The same two lines above the picture of This machine, for the path chosen: one under the other, close together. */
+.panel-where { margin: .8rem 0 1rem; }
+.panel-where p.sentence { margin: .2rem 0; }
 .statement-full > summary { cursor: pointer; margin: .4rem 0; }
 /* A line or a section the page goes to by itself stands clear of the app's bar, which stays at the top of the window. */
 .waiting, section.pane { scroll-margin-top: 4.2rem; }

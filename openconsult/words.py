@@ -1122,6 +1122,11 @@ IN_THE_CLOUD = "In the cloud:"
 JOBS_HERE = {("language_model", "transcription"): "the language model and transcription.", ("language_model",): "the language model.",
              ("transcription",): "transcription."}
 JOB_IN_CLOUD = {"speechmatics": "transcription, by Speechmatics.", "claude": "the language model, by Claude."}
+# His too, letter for letter (his word A of 18 Nov 2026, 08:03, by mail 5): the line In the cloud: nothing. where
+# nothing of the path is in the cloud. The same lines stand above the picture of This machine for the path chosen.
+# Cowork's details, drafts until he has seen them: one line for each heading; two things in the cloud follow one
+# another on its line, each beginning with a capital; no line On this computer where nothing runs here.
+IN_THE_CLOUD_NOTHING = "nothing."
 # What goes to a cloud service on a path: his sentences, one wording for the notice and for the boxes of the picture
 # (settings/statement.py gives them to both). Nothing goes to Speechmatics. is Cowork's draft after his pattern.
 GOES = {
@@ -1175,8 +1180,6 @@ PANEL_REASONS = {
     "consultation_ready": "Ready to start.",
     "consultation_not_tested": "{service} has not been tested since OpenConsult started. The Start screen tests it.",
 }
-PANEL_PATH_LINE = "The path you chose: the microphone, then transcription {transcription}, then the language model {model}."
-PANEL_PATH_BY = {"this_computer": "on this computer", "speechmatics": "by Speechmatics", "claude": "by Claude"}
 PANEL_CHOOSE_IN_SETTINGS = "You can choose it in Settings once OpenConsult is set up."
 # Run 9c: the section Local models (7.3; 15.13, ruling 57): a list that is read. Drafts.
 SECTION_LOCAL_MODELS = "Local models"

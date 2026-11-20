@@ -167,11 +167,19 @@ def test_15_13_ruling_56_a_cloud_box_for_each_state_and_a_key_not_tested_since_t
 
 # ------------------------------------------ the chosen path, and what goes
 
+# Restated on the owner's word of 18 Nov 2026, 08:03 (mail 5 of run 9c): the line above the picture is in his shape.
+# OLD, my draft, one sentence: The path you chose: the microphone, then transcription on this computer (or: by
+# Speechmatics), then the language model on this computer (or: by Claude). NEW: what runs on this computer and what
+# in the cloud, from the function the notice of a path that sends less reads; tests/test_where_it_runs.py pins the
+# words for each of the six paths.
 @pytest.mark.parametrize("name, speech_row, model_row, by", [
-    ("L", 0, 0, "transcription on this computer, then the language model on this computer."),
-    ("S", 1, 0, "transcription by Speechmatics, then the language model on this computer."),
-    ("C", 0, 1, "transcription on this computer, then the language model by Claude."),
-    ("CS", 1, 1, "transcription by Speechmatics, then the language model by Claude."),
+    ("L", 0, 0, ("On this computer: the language model and transcription.", "In the cloud: nothing.")),
+    ("S", 1, 0, ("On this computer: the language model. Nothing goes to Claude.",
+                 "In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken.")),
+    ("C", 0, 1, ("On this computer: transcription. Nothing goes to Speechmatics.",
+                 "In the cloud: the language model, by Claude. The words of the consultation go to it.")),
+    ("CS", 1, 1, ("In the cloud: Transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken. "
+                  "The language model, by Claude. The words of the consultation go to it.",)),
 ])
 def test_15_13_ruling_56_the_chosen_path_is_marked_for_each_path_by_the_border_the_word_and_the_arrows(tmp_path, clock, name, speech_row, model_row, by):
     app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS[name])
@@ -180,7 +188,7 @@ def test_15_13_ruling_56_the_chosen_path_is_marked_for_each_path_by_the_border_t
     assert chosen == {("speechmatics" if speech_row else "speech_local"), ("claude" if model_row else "model_local")}
     assert {box.name for box in made_panel.boxes if box.on_path} == chosen | {"microphone", "consultation"}
     assert [(a.gutter, a.from_row, a.to_row) for a in made_panel.arrows] == [(1, 0, speech_row), (2, speech_row, model_row), (3, model_row, 0)]
-    assert made_panel.path_line == "The path you chose: the microphone, then " + by
+    assert made_panel.path_lines == by
     # On the page: the word Chosen in the two chosen boxes and in no other, the heavier border by its class, the arrows hidden from a reader.
     page = text_of(client.get("/settings"))
     for box in made_panel.boxes:
@@ -188,7 +196,7 @@ def test_15_13_ruling_56_the_chosen_path_is_marked_for_each_path_by_the_border_t
         assert ("data-chosen" in in_page.split(">", 1)[0]) is box.chosen and (f'<b class="box-chosen">{words.PANEL_CHOSEN}</b>' in in_page) is box.chosen
         assert (" on-path" in page.split(f'id="box-{box.name}"', 1)[0].rsplit("<details", 1)[1]) is box.on_path
     assert page.count('class="panel-arrow ') == 3 and page.count('class="panel-arrow ') == page.count('aria-hidden="true"><svg viewBox="0 0 24 12"')
-    assert f'<p class="sentence" id="panel-path">{made_panel.path_line}</p>' in page
+    assert '<div class="panel-where" id="panel-path">' + "".join(f'<p class="sentence">{line}</p>' for line in by) + "</div>" in page
 
 
 @pytest.mark.parametrize("name, speechmatics, claude", [
@@ -212,9 +220,13 @@ def test_review_point_1_a_cloud_box_says_what_goes_to_it_on_the_path_as_chosen_a
     page = text_of(client.get("/settings"))
     assert ("goes to it as it is spoken" in box_of(page, "speechmatics")) is (speechmatics == "live")          # restated with the sentences above
     assert ("The words of the consultation go to it." in box_of(page, "claude")) is (claude == "live")
-    # With the tick for better accuracy the Speechmatics box says Used after Stop, and the line of the path adds the owner's own.
+    # With the tick for better accuracy the Speechmatics box says Used after Stop, and the line above the picture says
+    # what goes after Stop. Restated on mail 5 of run 9c. OLD: the line of the path added the mark's own line, After
+    # Stop the recording goes to Speechmatics. NEW: his sentence of 18 Nov, in the line In the cloud.
     assert (made_panel.box("speechmatics").also == "Used after Stop") is (speechmatics == "after_stop")
-    assert (words.CLOUD_MARK_RECORDING in made_panel.path_line) is (speechmatics == "after_stop")
+    after_stop = "fter Stop, the recording goes to Speechmatics once. No sound goes to it during the consultation."
+    assert any(after_stop in line for line in made_panel.path_lines) is (speechmatics == "after_stop")
+    assert words.CLOUD_MARK_RECORDING not in " ".join(made_panel.path_lines)
     assert panel.goes_to(PATHS[name], SPEECHMATICS) == speechmatics and panel.goes_to(PATHS[name], CLAUDE) == claude
 
 

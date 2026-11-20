@@ -53,6 +53,54 @@ def notice_of(page: str, at: str) -> str:
     return page.split(f'<div class="statement-shown" id="less-{at}">', 1)[1].split("</details>", 1)[0]
 
 
+def picture_lines(page: str) -> list[str]:
+    """The lines above the picture of This machine, as the page holds them."""
+    above = page.split('<div class="panel-where" id="panel-path">', 1)[1].split("</div>", 1)[0]
+    return re.findall(r'<p class="sentence">([^<]*)</p>', above)
+
+
+# The line above the picture for each of the six paths (mail 5 of run 9c). THE OWNER'S, letter for letter: the lines
+# named above, and for the path with nothing in the cloud his two of 18 Nov 2026, 08:03.
+CLOUD_NOTHING = "In the cloud: nothing."
+# COWORK'S DETAILS, drafts until he has seen them: at most one line for each heading; two things in the cloud follow
+# one another on that one line, the transcription or the recording first, then the language model, each sentence
+# beginning with a capital; where nothing runs on this computer the line On this computer: is left out.
+HERE_SPEECH_ALONE_DRAFT = "On this computer: transcription."
+CLOUD_BOTH_DRAFT = ("In the cloud: Transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken. "
+                    "The language model, by Claude. The words of the consultation go to it.")
+CLOUD_AFTER_STOP_AND_MODEL_DRAFT = ("In the cloud: After Stop, the recording goes to Speechmatics once. No sound goes to it during the "
+                                    "consultation. The language model, by Claude. The words of the consultation go to it.")
+ABOVE_THE_PICTURE = {"L": (HERE_BOTH, CLOUD_NOTHING), "R": (HERE_BOTH, CLOUD_AFTER_STOP), "S": (HERE_MODEL, CLOUD_SPEECH),
+                     "C": (HERE_SPEECH_DRAFT, CLOUD_MODEL), "CR": (HERE_SPEECH_ALONE_DRAFT, CLOUD_AFTER_STOP_AND_MODEL_DRAFT),
+                     "CS": (CLOUD_BOTH_DRAFT,)}
+
+
+@pytest.mark.parametrize("name", list(ABOVE_THE_PICTURE))
+def test_his_word_of_18_nov_the_line_above_the_picture_says_what_runs_here_and_what_in_the_cloud_for_each_of_the_six_paths(tmp_path, clock, name):
+    lines = ABOVE_THE_PICTURE[name]
+    assert where_lines(PATHS[name]) == lines
+    # At most one line for each heading, On this computer first; never a line with neither.
+    assert [line.split(":")[0] for line in lines] in (["On this computer", "In the cloud"], ["In the cloud"])
+    assert sum(line.count("On this computer:") for line in lines) <= 1 and sum(line.count("In the cloud:") for line in lines) == 1
+    app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS[name])
+    page = text_of(client.get("/settings"))
+    assert picture_lines(page) == list(lines) and panel.build(app.state.parts).path_lines == lines
+    # The draft sentence is gone from the page and from the file of words.
+    assert "The path you chose" not in page and not hasattr(words, "PANEL_PATH_LINE") and not hasattr(words, "PANEL_PATH_BY")
+    # A path whose own statement is ticked shows the lines above the picture alone: no notice of a path that sends less.
+    assert 'id="less-' not in page and page.count("In the cloud:") == 1
+
+
+def test_his_word_of_18_nov_the_path_with_nothing_in_the_cloud_letter_for_letter_and_the_same_at_step_2_of_the_first_run(tmp_path, clock):
+    assert where_lines(PATHS["L"]) == ("On this computer: the language model and transcription.", "In the cloud: nothing.")
+    assert words.IN_THE_CLOUD_NOTHING == "nothing."
+    # Step 2 of the first run draws the same picture: a machine with a suitable card begins on this computer for both.
+    app, client, *_ = made(tmp_path, clock, user=False)
+    client.post("/first-run/statement", data={"agree": "yes"})
+    step = text_of(client.get("/first-run"))
+    assert picture_lines(step) == ["On this computer: the language model and transcription.", "In the cloud: nothing."]
+
+
 @pytest.mark.parametrize("name, wider, at, address, sent, lines", COVERED)
 def test_ruling_48_the_notice_of_a_path_that_sends_less_in_the_owners_shape_and_words_of_18_nov(tmp_path, clock, name, wider, at, address, sent, lines):
     app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS[wider])
@@ -75,12 +123,16 @@ def test_ruling_48_the_notice_of_a_path_that_sends_less_in_the_owners_shape_and_
     own = statement_for(PATHS[name])
     assert own.heading in full and all(line in full for line in own.sent) and own.tick not in text_of(page)
     assert "<input" not in notice and "<button" not in notice and 'id="cloud-statement"' not in page.text
-    # The same two lines and no other stand on the page once, and the old draft nowhere.
-    assert all(text_of(page).count(line) == 1 for line in lines) and text_of(page).count("On this computer:") == 1
-    assert text_of(page).count("In the cloud:") == 1 and not any(old in text_of(page) for old in OLD_DRAFTS)
+    # The same two lines and no other stand on the page, and the old draft nowhere. Restated on mail 5 of run 9c
+    # (his word of 18 Nov, 08:03). OLD: each line once on the page. NEW: twice, in the notice and above the picture,
+    # which now says the same two lines for the path chosen, from the same function.
+    assert all(text_of(page).count(line) == 2 for line in lines) and text_of(page).count("On this computer:") == 2
+    assert text_of(page).count("In the cloud:") == 2 and not any(old in text_of(page) for old in OLD_DRAFTS)
+    assert picture_lines(text_of(page)) == list(lines)
     # On a later view the two lines stand where a statement to tick would stand, with the statement closed under
     # them; the head does not, since that view saved nothing.
     later = text_of(client.get("/settings"))
+    assert picture_lines(later) == list(lines)
     apart = later.split('<div class="statement-shown" id="less-apart">', 1)[1].split("</details>", 1)[0]
     assert re.findall(r'<p class="(?:less-head|where-line)">([^<]*)</p>', apart) == list(lines) and HEAD not in later and "<input" not in apart
 
@@ -130,7 +182,10 @@ def test_ruling_48_each_cloud_box_says_what_goes_to_it_in_the_owners_sentence_fo
         if goes == "live":
             assert sentence in lines
         elif goes == "after_stop":
-            assert sentence[0].lower() + sentence[1:] in lines
+            # Restated on mail 5 of run 9c. OLD: the sentence follows the heading with a small letter, always. NEW: so
+            # where it is the one thing in the cloud; where Claude is there too, each sentence begins with a capital.
+            first = sentence[0] if claude == "live" else sentence[0].lower()
+            assert f"In the cloud: {first}{sentence[1:]}" in lines
 
 
 def test_ruling_48_the_notice_and_the_boxes_read_one_function_so_the_two_can_never_differ(tmp_path, clock, monkeypatch):

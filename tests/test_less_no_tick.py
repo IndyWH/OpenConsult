@@ -137,8 +137,12 @@ def test_15_13_ruling_48_a_path_that_sends_less_is_saved_under_the_wider_tick_wi
     assert text_of(after).count(LESS) == 1 and 'name="sha256"' not in after.text and 'id="cloud-statement"' not in after.text
     # On a later view: where a statement to tick would stand, read only: what runs where, once, and no head, since
     # nothing was saved by this view.
+    # Restated on mail 5 of run 9c (the owner's word of 18 Nov 2026, 08:03). OLD: each of the two lines once on the
+    # page. NEW: twice, here and above the picture of This machine, which says the same two lines for the path chosen.
     later = client.get("/settings")
-    assert 'id="statement-covered"' in later.text and text_of(later).count(HERE_S) == 1 and text_of(later).count(CLOUD_S) == 1
+    assert 'id="statement-covered"' in later.text and text_of(later).count(HERE_S) == 2 and text_of(later).count(CLOUD_S) == 2
+    covered = text_of(later).split('id="statement-covered"', 1)[1].split("</section>", 1)[0]
+    assert covered.count(HERE_S) == 1 and covered.count(CLOUD_S) == 1
     assert LESS not in text_of(later) and 'name="understand"' not in later.text
     # The wider path asks nothing on the way back, while its words are unchanged; and then nothing more is shown.
     back = client.post("/settings/path/language-model", data={"language_model": CLAUDE})
