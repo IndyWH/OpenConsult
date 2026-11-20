@@ -1248,7 +1248,9 @@ SEND_WHOLE = "Send the recording once for the whole transcript."
 GO_ON_WITHOUT = "Go on without it."
 CLOUD_MARK_RECORDING_SENT = "After Stop the recording went to Speechmatics."
 # The model line of the review page where the service made the final transcript from the whole recording (run 9c;
-# the plan review, point b): it must not name this computer's speech choice alone for lines another made. A draft.
+# the plan review, point b): it must not name this computer's speech choice alone for lines another made. Its first
+# sentence is THE OWNER'S, letter for letter (his word A of 20 Nov 2026, 08:05, by mail 5): Speech: Nemotron during
+# the consultation, Speechmatics for the final transcript. With the WhisperX choice live the name is that choice's.
 MODEL_LINE_WHOLE = ("Speech: {speech} during the consultation, Speechmatics for the final transcript. "
                     "Language model: {model} on {engine} {version}.")
 START_BETTER_MAY_FAIL = ("Speechmatics cannot be reached now: {reason} The consultation can start. The better transcript may not be "

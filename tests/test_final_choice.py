@@ -60,6 +60,23 @@ def test_details_of_9c_where_the_upload_failed_the_live_lines_stay_and_the_line_
     assert NOT_MEASURED in page and WHOLE_LINE not in page and "Speech: Nemotron. Language model: " in page   # as before this run
 
 
+def test_his_word_of_20_nov_the_model_line_where_the_service_made_the_final_transcript_is_the_owners_letter_for_letter():
+    # THE OWNER'S since his word A of 20 Nov 2026, 08:05 (mail 5 of run 9c); until then my draft, in the same words.
+    from openconsult.web.review import model_line_of
+    his = "Speech: Nemotron during the consultation, Speechmatics for the final transcript."
+    row = {"speech_choice": "nemotron", "model_tag": "made-up-tag", "engine": "vllm", "engine_version": "9.9"}
+    made, plain = model_line_of(row, whole_made=True), model_line_of(row)
+    assert made.startswith(his + " Language model: ") and made.count(his) == 1
+    assert words.MODEL_LINE_WHOLE.split(" Language model: ")[0] == his.replace("Nemotron", "{speech}")
+    # The rest of the line is the ordinary line's: the language model, its engine and version, from the row's stamps.
+    assert plain.startswith("Speech: Nemotron. Language model: ") and made.removeprefix(his) == plain.removeprefix("Speech: Nemotron.")
+    # With the WhisperX choice live the name is that choice's, and nothing else of his sentence changes.
+    whisperx = model_line_of({**row, "speech_choice": "whisperx_pyannote"}, whole_made=True)
+    assert whisperx.startswith("Speech: WhisperX with pyannote during the consultation, Speechmatics for the final transcript. Language model: ")
+    # In cloud transcription the service made the live lines too: it is named once, as before.
+    assert model_line_of({**row, "speech_choice": "speechmatics"}, whole_made=True).startswith("Speech: Speechmatics. Language model: ")
+
+
 def test_details_of_9c_after_the_one_press_in_cloud_transcription_the_model_line_is_as_it_was(tmp_path, clock, server, monkeypatch):
     app, client, c, worker, now = lost_and_found(tmp_path, clock, server, monkeypatch)
     p = app.state.parts
