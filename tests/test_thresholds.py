@@ -228,3 +228,28 @@ def test_7_3_an_older_row_is_judged_by_the_defaults_whatever_settings_holds(tmp_
     finish_it(app, client, p.running[1])
     kinds = [w["kind"] for w in p.consultations.warnings(1)]
     assert "too_short" not in kinds and "low_confidence" not in kinds        # 80 words are 60 or more; 0.70 is not under 0.60
+
+
+def gate_line(page: str) -> str:
+    return page.split('<p class="mark no-print" id="gate-values">', 1)[1].split("</p>", 1)[0]
+
+
+def test_mail_5_of_9c_the_review_page_says_the_two_values_the_consultations_gate_used_among_the_details_it_ran_with(tmp_path, clock, server):
+    # Cowork's detail of 20 Nov 2026, a draft, to the flag of mail 2: a line at 0.70 with no mark, or a note not
+    # drafted, could not be read against anything on the page when Settings held other values than the consultation.
+    app, client, local = ticked_app(tmp_path, clock, server, SecondSpeakerAt(0.70))
+    p = app.state.parts
+    client.post("/settings/fewest-words", data={"words": "45"})
+    client.post("/settings/low-score", data={"score": "0.8"})
+    client.post("/consultations/start/1", data=TICKS)
+    client.post("/settings/fewest-words", data={"words": "300"})   # after Start: the page still says what this consultation was judged with
+    client.post("/settings/low-score", data={"score": "0.40"})
+    finish_it(app, client, p.running[1])
+    page = text_of(client.get("/consultations/1"))
+    said = "The gate of this consultation: a note is drafted from 45 words or more; a line with a score under 0.80 is marked as low confidence."
+    assert gate_line(page) == said and words.GATE_RAN_WITH.format(words=45, score="0.80") == said and page.count("The gate of this consultation") == 1
+    # Among the details it ran with: after the line of the patient's details, before the note.
+    assert page.index('id="ran-with"') < page.index('id="gate-values"') < page.index('id="note"')
+    # A row from before the thresholds could be set was judged by the defaults, and the page says those.
+    p.db.execute("UPDATE consultation SET fewest_words = NULL, low_score = NULL WHERE id = 1")
+    assert gate_line(text_of(client.get("/consultations/1"))) == words.GATE_RAN_WITH.format(words=60, score="0.60")

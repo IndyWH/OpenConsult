@@ -204,11 +204,16 @@ def note_state(p, row: dict, gate_refused: bool) -> dict:
 def ran_with(p, row: dict) -> dict:
     """The three details the consultation ran with, from its own row, never
     a join back to the patient (ruling 2); and the one line, with the date,
-    when the patient's details were corrected after it started."""
+    when the patient's details were corrected after it started. And the
+    two values its gate used, from its own row too (7.3): what Settings
+    holds now may differ, and a row from before they could be set was
+    judged by the defaults."""
     born = datetime.fromisoformat(row["patient_date_of_birth"]).date() if row["patient_date_of_birth"] else None
     changed = p.patients.changed_after(row["patient_id"], row["started_at"])
+    fewest_words, low_score = thresholds.of_row(row)
     return {"name": row["patient_name"], "born": words.plain_date(born) if born else "",
             "sex": words.SEX_WORDS.get(row["patient_sex"], ""),
+            "gate": words.GATE_RAN_WITH.format(words=fewest_words, score=f"{low_score:.2f}"),
             "corrected": words.DETAILS_CORRECTED.format(date=words.plain_date(datetime.fromisoformat(changed))) if changed else None}
 
 

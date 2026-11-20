@@ -595,6 +595,10 @@ FIELD_LOW_SCORE = "The score under which a line is marked as low confidence. Fro
 FEWEST_WORDS_BAD = "Enter a whole number from {low} to {high}."
 LOW_SCORE_BAD = "Enter a number from {low} to {high}, such as {default}."
 THRESHOLD_SAVED = "Saved. A consultation started from now on uses it. One already started keeps the value it started with."
+# A draft (Cowork's detail of 20 Nov 2026, by mail 5): among the details a consultation ran with, the review page says
+# the two values its gate used, so that a line with no mark, or a note not drafted, can be read against them.
+GATE_RAN_WITH = ("The gate of this consultation: a note is drafted from {words} words or more; a line with a score under {score} "
+                 "is marked as low confidence.")
 SECTION_YOU = "You"
 SECTION_PASSWORD = "Change password"
 FIELD_CURRENT_PASSWORD = "Current password"
