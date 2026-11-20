@@ -5,7 +5,8 @@ This branch is where OpenConsult v2.0 is being built.
 - The working app, v1, is on the main branch.
 - The plan for v2 is in V2_SPEC.md.
 - So far this version runs acted consultations from a patient list to an
-  approved note and its referral letters. The Patients page lists every
+  approved note and its referral letters. The Patients page has New
+  patient at its top and lists every
   acted patient, last seen first, with a number, and one search box finds one by part of a name, a
   date of birth or the number; the patient's page corrects a name, a date
   of birth or a sex with every change audited, and an earlier consultation
@@ -161,7 +162,9 @@ This branch is where OpenConsult v2.0 is being built.
   machine is one picture of the path, from the microphone to the
   consultation, shown at the first run and at the top of Settings: two
   lines above it say what runs on this computer and what in the cloud,
-  each box says whether it is ready, the path chosen is marked, and a
+  each box says whether it is ready, the path chosen is marked and
+  drawn as lines from box to box, solid for what happens during the
+  consultation and dashed for what happens after Stop, and a
   press on a box opens one sentence and one action. In Settings the doctor
   also chooses the speech model of this computer, Nemotron or WhisperX
   with pyannote, and a section Local models lists what is installed.

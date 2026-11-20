@@ -11,12 +11,50 @@ Run on 17, 18 and 20 Nov 2026 by the mailbox, as one run in two halves
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Thirty-five commits, none pushed. The
-suite: 1324 passed in about 145 s, none skipped (1114 at the start). No
+plan and its review beside it. Forty-one commits, none pushed. The
+suite: 1357 passed in about 147 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
 half two.
+
+FOUR THINGS BY MAIL 6 (20 Nov 2026; 7b1164e to 73ffdf3), from the
+owner's room check of that morning on 262f018, which passed every step
+(his own folder came forward to version 13).
+- The arrows of the picture show the path chosen (his words at 10:06,
+  his word A at 10:14; a change to the picture of ruling 56). An arrow
+  was a small sign in each gap between two columns. Now every arrow is
+  a line from the edge of one box to the edge of the next, with a head
+  (panel.arrows_of): solid during the consultation, Microphone, the
+  transcription box chosen, the language model box chosen,
+  Consultation; dashed after Stop where the tick for better accuracy
+  counts, Microphone to Speechmatics and Speechmatics to the language
+  model chosen. A box off the path has no line. Under the picture a
+  key (PANEL_KEY, Cowork's draft), its dashed part only with a dashed
+  line. No script and no colour tells them apart: the template draws
+  each line twice in SVG and the style sheet shows one. Side by side a
+  line runs in the gutter between its columns, the solid 18 px under a
+  box's top and the dashed 40 px. Under 760 px each box has a row of
+  its own and the lines run down a rail beside the boxes, the solid on
+  the left and the dashed pair on the right (my proposal, built as the
+  mail asked). Lines and key are hidden from a screen reader.
+- New patient stands at the top of the Patients page (10:31), above
+  the rows waiting and the list. The link in the top bar stays.
+- A transcript that came back and could not be used (10:57) has his
+  two lines above the note, awaited and proven (UPLOAD_UNUSED_AWAITED,
+  UPLOAD_UNUSED); his sentence that none came back stays where none
+  did. No new column: the record holds what the service says it
+  applied only where its reply was read (whole.came_back).
+- After the tick of a long statement the line Saved. is in the window
+  (Cowork's detail): place.js moves the window only when that line is
+  not whole in it, clear of the app's bar as measured (190 px tall at
+  420 px wide).
+Seen in the browser (looks mail6-1 and mail6-2): every line measured
+on the screen for the six paths at 1280 and 420 px, each from its box's
+edge to its box's edge, none through a box, over a word or across
+another; Saved. in the window at both widths; the unused transcript's
+line changing with no load; New patient in the first window with 1001
+patients at 1280 px. Restated, old words kept: one line of test_panel.
 
 SIX SMALL THINGS BY MAIL 5 (20 Nov 2026; c67b906 to 31973db), each the
 owner's word with its time, the first five to flags of mails 2 to 4.
@@ -224,13 +262,18 @@ test_speech_machine, test_connect_screens); and two the plan did not
 foresee: test_db_v11 (it ended at today's version) and test_pages
 (the count of the audit lines written at start).
 
-Flags for the owner, each in the report: mail 5 said the new table
+Version 13 stands (Cowork's word by mail 6): mail 5 said the new table
 joins version 12, but the app was started from this tree on 19 Nov
-(bytecode of 19:16 in the repo), so it is version 13; the line of a
-recording that gave no transcript also stands where one came back and
-was not used; after the tick of a long statement the line Saved. is
-above the window; a refused value leaves the field
-showing the saved one; the details
+(bytecode of 19:16 in the repo). At a later start a kept job is proven
+only by a 404 or a 410: stands as built, Cowork's word.
+
+Flags for the owner, each in the report: on the Patients page the
+search box takes the keyboard at load, and where it stands under the
+first window the browser moves the page to it, so New patient is then
+above the window (seen at 420 by 700 px; at 1280 by 800 with three
+rows waiting it is in the first window); the key under the picture is
+hidden from a screen reader with the lines (my reading); a refused
+value leaves the field showing the saved one; the details
 say a speech choice's models are in the data folder, and they are in
 the hub's own cache, so Local models counts the environment and says
 so; the self-test of Speechmatics as a speech choice is no longer on
@@ -239,15 +282,16 @@ secure store for both keys at every start, where before it read only
 the keys of the chosen path. words.py and schema.py are over their
 targets.
 
-Made untrue, and put right: the README (the picture and its two
-lines, the speech model, Local models, the Start screen, the two
-thresholds, a consultation deleted while a delete is awaited),
-CLAUDE.md's run line. Not mine to write: the spec's details of run 9c
-say that half one changes no table, and the spec does not yet hold the
-owner's words of 20 Nov. No help page exists.
+Made untrue, and put right: the README (the picture, its two lines,
+its arrows and key, the speech model, Local models, the Start screen,
+New patient at the top, the two thresholds, a consultation deleted
+while a delete is awaited), CLAUDE.md's run line. Not mine to write:
+the spec's details of run 9c say that half one changes no table, and
+the spec does not yet hold the owner's words of 20 Nov, the lines of
+the picture among them. No help page exists.
 
-Next: the owner's room check of 9c, one sitting, the first step to
-stop the app and start it again.
+Next: the owner's look after mail 6, a few steps with no consultation
+(THE LOOK AFTER MAIL 6 in the report).
 
 ## 2026-11-16. Run 9b: cloud mode. A consultation can run on Claude and Speechmatics, said before anything leaves, marked while it runs; a recording can be sent once after Stop and is deleted there
 
@@ -371,127 +415,3 @@ owner's words of 16 Nov that came with the review and the mails.
 Cowork writes them in. No help page exists.
 
 The room check was met on 17 Nov 2026 (above). Next: 9c.
-
-## 2026-11-15. Step 6e, the collating step: the transcript of the review page reads as turns of speech; a leftover piece of a drug name is taken out at its row; what counts as use is said exactly
-
-Run on 15 Nov 2026 by the mailbox, under the owner's okay of the plan
-(18:47, his word: Go!) and Cowork's review of it (twelve points; all are
-in). The spec is 211041a (sha256 49e411f2...), committed again with Met
-for the step as 0631413; the stage prompt fa8fa2a
-(stage-prompts/STAGE_06E.md). The private report is STAGE6E_REPORT.md in
-the log folder, with the plan and its review beside it. Thirteen
-commits, all pushed. No model was called, no engine started or stopped,
-nothing left the machine. No new table and no new package.
-
-For the patient. In the room run of 15 Nov one greeting and one question
-stood as ten lines of one to six words, each a row with its own boxes. A
-doctor who reads the transcript to check a note now reads a conversation:
-doctor, patient, doctor, patient. Every mark that protects the patient
-stays in sight inside the turn: a doubted drug name, a word with no
-speaker, and above all a line that the check of who spoke moved, because
-on six recordings with two people that check moved 23 lines, 18 of them
-wrongly. A leftover piece of a medicine name no longer goes to the
-note's model as if it had been said. And a consultation left on a screen
-no longer stays on the screen.
-
-The reading view (15.10 rulings 35 and 42 to 44; the details of 6e).
-- One rule, consult/reading.py, pure: neighbouring lines shown under one
-  speaker are one turn; an unsure run of three words or fewer between two
-  lines of one speaker sits inside that turn; every other unsure run is
-  an entry of its own. A line counts by the speaker it is shown with
-  (ruling 14). Nothing is stored and no model reads a turn.
-- THE RULE ON THE NINE STORED PAGES, by the app's own function: Nemotron
-  s19, s15, s14, s11, s13, sT2 give 49, 32, 39, 44, 47 and 29 entries
-  with 7, 9, 7, 4, 6 and 0 unsure lines folded in; Speechmatics live s19,
-  s15, s14 give 43, 27 and 31. All nine equal the figures of the details.
-- A turn is the browser's own disclosure element, sent closed: its
-  summary holds the speaker, the first and last line number, one press
-  that plays the turn (from one second before its first line to the
-  latest end among its lines), and the words, a piece for each line with
-  that line's marks. A press opens the turn's lines in place, with no
-  script. The lines are not changed by a byte: a test pins the sha256 of
-  every line's piece on three made-up pages as 9aa9aab gave them.
-- Each piece is a marked part beside its line, so a kept name shows
-  inside a closed turn with no load. A keep that changes the entries (an
-  unsure run crossing three words) leaves the turns as they stand until
-  the next load.
-- With a script, what stood open is open after every press that loads
-  the page: review.js notes the numbers of the open lines when the page
-  is left, never a word, and opens the turns that hold them before
-  place.js puts the place back. One control, Open all the lines, beside
-  Swap; with no script a link (?lines=open). A turn that holds unsaved
-  words is not closed by that control nor by the doctor's own press, and
-  says so. With no script every turn is closed again after a load, and
-  his own press does close such a turn.
-- The app sends a turn open in one case more: a Save or Undo on a line
-  that it refuses, so that the sentence in its slot is seen (R15).
-- A line number pressed marks the line's words inside its closed turn
-  and opens nothing. A line the check moved stands inside its turn in a
-  box with a heavy edge, after the words changed by the check and its
-  own Undo, a button tied to a form with the line's undo address.
-
-Ruling 40. An empty box with the tick or Enter takes the doubted words
-out of the line by the function a correction uses and settles the mark,
-which keeps the point the words left. A second press opens it with an
-empty box; words typed back go in at the point, never inside a word; the
-point moves with the letters around it when the line is edited
-elsewhere. Leaving an empty box sends nothing. A keep with an empty
-field, which only a stale page sends, is refused as built.
-
-Ruling 41. The recording and the question for its file are never use
-(guards.logged_in_not_use). Every press on the review page is use, as
-typing is, told at most once in 30 s; sound tells while it plays and
-once more when it stops; each answer sets the page's count; the copy of
-the note tells too. The timed move never comes while sound plays or a
-field is unsaved. NOT MENDED, AS THE DETAILS SAY: with no script the
-review page has no timed move (as built since 6b) and the browser's
-player is not heard by the app, so the lock falls 30 minutes after the
-last press that loaded a page, also while sound plays.
-
-Tests. 985 in 94 s, none skipped; 21 are new. One test of 6d is
-restated, as the plan and its review name it: its first three
-assertions pinned that a tick with an empty field is refused, which
-ruling 40 reverses; they now pin the ruling, the name says so, and its
-second half is as written. No other test of 6c, 6d or 6d2 is touched.
-
-Seen in a browser by the build model: this machine's Chrome 157,
-headless, cut off from outside, real mouse and key events, a made-up
-consultation with a sound that tells the time, and one profile that had
-first loaded the page of 9aa9aab: after the update every script that ran
-was the file as built, by its bytes. By the sound: a turn of six lines,
-two of them 0.08 s long, played from 18.99 to 28.00 of an asked 19.0 to
-28.0. Each line of Done when you see, for 6e, held. The lock, at a lock
-time of 20 s: nothing pressed, the login page at 20.8 s; one turn
-played, 20.3 s after the sound ended; an unsaved box held the page. At
-40 s: a sound of 100 s held the page, the login page 40.3 s after it
-stopped; presses every 5 s held it, and the lock fell 40 s after the
-last tell. Not seen: a hand's timing, real speech, Firefox or Safari, a
-screen reader. The owner's room check is the check that counts.
-
-New words, all drafts: Open all the lines; Close all the lines; Press
-to open or close the lines of this turn. (a screen reader's description
-of a turn); Play this turn; Taken out of the line.; This turn holds
-words that are not saved. Save them first.
-
-Flags. The tells come at most once in 30 s, so the lock can fall up to
-30 s short of 30 minutes after the last press, as for typing since 6b.
-The turns' script stands in review.js, not in a file of its own as the
-plan had it: a test of 6d2 pins the review page's scripts by name. In a
-closed turn two things a line shows are out of sight until it is
-opened: the sentence of a line with no words, and the label the check
-gave a word that had no first speaker. The letter's own page has a copy
-its count does not hear; outside ruling 41, left. words.py is 958
-lines, over its target as before.
-
-Made untrue, and put right in this commit: CLAUDE.md's run line, the
-README's account of the transcript, and this file's entry for 6d2.
-The spec is in step: where the review of the plan changed the details
-of 6e (a turn's play ends at the latest end among its lines; no taking
-of the whole transcript after a keep; his own press does not close a
-turn with unsaved words; every press is use), Cowork wrote them in with
-0631413. No help page exists. The three oldest entries here,
-step 6c2, stage 6c and stage 5e2, moved to the archive.
-
-The room check was met: the owner's room check of the evening of 15 Nov
-2026, on the build of 9d8be35, is the spec's Met line for the step
-(0631413). Next: 9b.
