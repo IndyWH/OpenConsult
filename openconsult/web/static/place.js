@@ -34,7 +34,19 @@
       if (k > 0) found.setAttribute('tabindex', '-1');      // not the control itself: its place takes the keyboard, so Tab goes on from there
       found.focus({preventScroll: true});
     }
+    // The line that says the save was made stands in the window (15.13, ruling 47; mail 6 of run 9c). After the tick
+    // of a long statement the form is short again, and with its top where it was the line stood above the window:
+    // the choice was saved and the doctor did not see it said. Only then the window moves, and the least that shows
+    // the form that was used and the line.
+    const said = page.querySelector('.notice[role=status], .where-lines[role=status]');
+    if (said && !inWindow(said.getBoundingClientRect(), barBottom(), window.innerHeight)) {
+      if (k === 0) document.getElementById(noted.names[0]).scrollIntoView({block: 'nearest'});
+      said.scrollIntoView({block: 'nearest'});
+    }
   }
+  // Pure: whether a box stands whole in the window, under the app's bar.
+  function inWindow(box, under, height) { return box.top >= under && box.bottom <= height; }
+  function barBottom() { const bar = document.querySelector('header.app'); return bar ? bar.getBoundingClientRect().bottom : 0; }
   page.addEventListener('submit', function (event) {
     const form = event.target;
     if (!form.hasAttribute('data-stay')) return;

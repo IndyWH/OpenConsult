@@ -85,6 +85,8 @@ label.tick { display: flex; align-items: flex-start; color: var(--ink); font-siz
 .statement-full > summary { cursor: pointer; margin: .4rem 0; }
 /* A line or a section the page goes to by itself stands clear of the app's bar, which stays at the top of the window. */
 .waiting, section.pane { scroll-margin-top: 4.2rem; }
+/* A line that says a save was made, and the form it belongs to, are moved into the window clear of the app's bar (place.js). */
+.notice[role=status], .where-lines[role=status], #settings form[data-stay] { scroll-margin: 4.2rem 0 1rem; }
 
 /* Panes */
 .pane { background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); margin-top: 1rem; }

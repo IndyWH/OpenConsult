@@ -85,6 +85,35 @@ def test_15_13_ruling_47_nothing_is_saved_while_a_statement_waits_and_the_page_l
     assert [l.event for l in p.audit.lines()][:2] == ["statement.ticked", "setting.changed"]
 
 
+def test_15_13_ruling_47_mail_6_after_the_tick_of_a_long_statement_the_line_saved_is_one_the_places_script_moves_into_the_window(tmp_path, clock):
+    # Seen in the browser at mail 5 of run 9c and mended at mail 6 (Cowork's detail, in the sense of ruling 47): after
+    # the tick of a long statement the form is short again and its line Saved. stood above the window. The suite has no
+    # browser: this pins what the script rests on; the window itself is measured in the look of mail 6.
+    app, client, store, testers = made_app(tmp_path, clock, machine=SUITABLE, store=MadeStore(BOTH_KEYS))
+    made = statement_for(ChosenPath(CLAUDE, THIS_COMPUTER))
+    shown = client.post("/settings/path/language-model", data={"language_model": CLAUDE, "place": "keep"}).text
+    long_form = shown.split('id="form-language-model"', 1)[1].split("</form>", 1)[0]
+    assert long_form.count("<li>") >= 8                                                 # a long statement: the tick stands far under the control
+    saved = client.post("/settings/path/language-model", data={"language_model": CLAUDE, "understand": "yes", "sha256": made.sha256, "place": "keep"})
+    after = client.get(saved.headers["location"]).text
+    form = after.split('id="form-language-model"', 1)[1].split("</form>", 1)[0]
+    # The line is in the form that was used, which is short again, a status line of the class the script looks for.
+    assert f'<p class="notice" id="saved-language-model" role="status">{words.PATH_SAVED}</p>' in form and "<li>" not in form
+    assert after.count('class="notice"') == 1 and '<div id="settings" data-keeps-place data-path="/settings">' in after
+    script = client.get("/static/place.js").text
+    assert "page.querySelector('.notice[role=status], .where-lines[role=status]')" in script     # the line of a save, and his line of a path that sends less
+    assert script.count("scrollIntoView({block: 'nearest'})") == 2                               # the form that was used, then the line: the least move
+    assert "function inWindow(box, under, height) { return box.top >= under && box.bottom <= height; }" in script   # only when the line is not whole in the window
+    style = client.get("/static/theme.css").text
+    assert ".notice[role=status], .where-lines[role=status], #settings form[data-stay] { scroll-margin: 4.2rem 0 1rem; }" in style   # clear of the app's bar
+    # The line of a path that sends less is of the second class, when it says a save.
+    wide = statement_for(ChosenPath(CLAUDE, SPEECHMATICS))
+    client.post("/settings/path/transcription", data={"transcription": SPEECHMATICS, "understand": "yes", "sha256": wide.sha256})
+    less = client.post("/settings/path/language-model", data={"language_model": THIS_COMPUTER, "place": "keep"})
+    assert less.headers["location"] == "/settings?done=less&at=language-model"
+    assert '<div class="waiting where-lines" role="status">' in client.get(less.headers["location"]).text
+
+
 def test_15_13_ruling_47_a_changed_choice_is_never_saved_by_the_tick_of_another_choices_statement(tmp_path, clock):
     app, client, store, testers = made_app(tmp_path, clock, machine=SUITABLE, store=MadeStore(BOTH_KEYS))
     p = app.state.parts
