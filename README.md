@@ -2,6 +2,8 @@
 
 [![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.22689260-blue)](https://doi.org/10.5281/zenodo.22689260)
 
+**Paper (preprint, 18 Nov 2026):** [OpenConsult, an Open-Source Fully Local AI Scribe With Live Decision Support: Development and Formative Evaluation](https://doi.org/10.21203/rs.3.rs-11771422/v1), Research Square.
+
 **A research/educational prototype for AI-assisted medical consultations — fully local, human-in-the-loop, English-only in v1.**
 
 Transcribes a doctor–patient consultation live, offers real-time clinical decision support (differentials, questions to ask, signs to elicit), then produces a diarised transcript, a concise doctor-style note with every claim cited to the transcript, referral letters, and evidence-grounded guideline summaries — all running locally on consumer hardware.

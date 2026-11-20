@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite the paper below. The software itself is archived at the DOI given here."
 title: "OpenConsult"
 abstract: >-
   A fully local, GDPR-conscious AI consultation assistant, developed by a
@@ -28,3 +28,18 @@ keywords:
   - clinical decision support
   - retrieval-augmented generation
   - local-first
+preferred-citation:
+  type: article
+  status: preprint
+  title: "OpenConsult, an Open-Source Fully Local AI Scribe With Live Decision Support: Development and Formative Evaluation"
+  authors:
+    - family-names: "Herath"
+      given-names: "H M W I"
+      orcid: "https://orcid.org/0009-0008-6367-1588"
+    - family-names: "Potts"
+      given-names: "Henry W W"
+  journal: "Research Square"
+  year: 2026
+  month: 11
+  doi: "10.21203/rs.3.rs-11771422/v1"
+  url: "https://www.researchsquare.com/article/rs-11771422/v1"
