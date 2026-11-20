@@ -1245,6 +1245,12 @@ UPLOAD_NONE_AWAITED = ("The recording went to Speechmatics, and no transcript ca
                        "delete it there and is waiting for the answer.")
 UPLOAD_NONE = ("The recording went to Speechmatics, and no transcript came back. It was deleted there, and Speechmatics confirmed "
                "that it is gone.")
+# THE OWNER'S, letter for letter (his word A of 20 Nov 2026, 10:57, by mail 6): where a transcript came back and the app
+# did not use it, because the settings asked for were not used or it held no words. Awaited, and proven.
+UPLOAD_UNUSED_AWAITED = ("The recording went to Speechmatics, and the transcript that came back could not be used. OpenConsult has "
+                         "asked Speechmatics to delete it there and is waiting for the answer.")
+UPLOAD_UNUSED = ("The recording went to Speechmatics, and the transcript that came back could not be used. It was deleted there, "
+                 "and Speechmatics confirmed that it is gone.")
 # Drafts: the line for a page whose script did not run while the answer is awaited, and its link.
 SENT_NO_SCRIPT = "The page's script did not run."
 SENT_LOAD_AGAIN = "Load the page again to see whether the answer has come"

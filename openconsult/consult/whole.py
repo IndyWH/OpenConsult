@@ -76,6 +76,14 @@ def proof_state(sent: dict | None) -> str | None:
     return AWAITED if sent["judged_at"] is None else UNPROVEN
 
 
+def came_back(sent: dict) -> bool:
+    """Whether a transcript came back from the service, used or not. The
+    record holds what the service says it applied only where its reply
+    was read: so a reply that was read and not used, for its settings or
+    for holding no words, is told from none at all."""
+    return sent["applied"] is not None
+
+
 def limit_s(recording_s: float) -> float:
     return LIMIT_BASE_S + LIMIT_SHARE * max(0.0, recording_s)
 
