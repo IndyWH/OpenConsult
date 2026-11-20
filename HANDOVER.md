@@ -11,12 +11,27 @@ Run on 17, 18 and 20 Nov 2026 by the mailbox, as one run in two halves
 23:31) and Cowork's review of the plan. The spec is e9a7ac8 (sha256
 78c7d692...), the stage prompt 59521c1 (stage-prompts/STAGE_09C.md).
 The private report is STAGE9C_REPORT.md in the log folder, with the
-plan and its review beside it. Forty-one commits, none pushed. The
-suite: 1357 passed in about 147 s, none skipped (1114 at the start). No
+plan and its review beside it. Forty-three commits, none pushed. The
+suite: 1358 passed in about 147 s, none skipped (1114 at the start). No
 prompt file, frame or form changed: the two prompt folders are as at
 18cc922. No engine was started; the Ollama service was not touched.
 Half one stood by itself at 85e3f2e, suite 1228, and needed nothing of
 half two.
+
+ONE THING BY MAIL 7 (20 Nov 2026), from the owner's look after mail 6
+(11:58: the diagram stands, wide and narrow; New patient was at the top
+but the page scrolled down to the search). The Patients page opens at
+its top with New patient in the window: the search box is given the
+keyboard by the page's first script (static/keyboard.js, the field
+marked data-keyboard), which does not move the page, and no longer by
+the browser's own attribute, which moved the page down to the box when
+it stood under the window. Made first on 7a7abae: with twelve rows
+waiting the page loaded 711 px down at 1280 by 800 and 1,245 px down at
+420 by 700. As built: 0 px in every case, the button in the window,
+the keyboard in the box, a typed letter in it. A search that was sent
+keeps the browser's attribute and stands as before: the page comes up
+at the box, above its results. With no script the page stays at its
+top and the box takes the keyboard at a press.
 
 FOUR THINGS BY MAIL 6 (20 Nov 2026; 7b1164e to 73ffdf3), from the
 owner's room check of that morning on 262f018, which passed every step
@@ -267,11 +282,10 @@ joins version 12, but the app was started from this tree on 19 Nov
 (bytecode of 19:16 in the repo). At a later start a kept job is proven
 only by a 404 or a 410: stands as built, Cowork's word.
 
-Flags for the owner, each in the report: on the Patients page the
-search box takes the keyboard at load, and where it stands under the
-first window the browser moves the page to it, so New patient is then
-above the window (seen at 420 by 700 px; at 1280 by 800 with three
-rows waiting it is in the first window); the key under the picture is
+Flags for the owner, each in the report: on the Patients page a typed
+letter makes the browser bring the search box into the window, and a
+reload made from further down comes back to that place, both the
+browser's own; the key under the picture is
 hidden from a screen reader with the lines (my reading); a refused
 value leaves the field showing the saved one; the details
 say a speech choice's models are in the data folder, and they are in
@@ -290,8 +304,7 @@ the spec's details of run 9c say that half one changes no table, and
 the spec does not yet hold the owner's words of 20 Nov, the lines of
 the picture among them. No help page exists.
 
-Next: the owner's look after mail 6, a few steps with no consultation
-(THE LOOK AFTER MAIL 6 in the report).
+Next: the owner opens the Patients page once on the build of mail 7.
 
 ## 2026-11-16. Run 9b: cloud mode. A consultation can run on Claude and Speechmatics, said before anything leaves, marked while it runs; a recording can be sent once after Stop and is deleted there
 
