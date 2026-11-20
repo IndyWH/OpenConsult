@@ -4,6 +4,9 @@
 <h1 class="page">{{ words.PATIENTS_TITLE }}</h1>
 <p class="statement">{{ statement }}</p>
 {% if notice %}<p class="notice">{{ notice }}</p>{% endif %}
+{# New patient stands at the very top (the owner's word of 20 Nov 2026, 10:31): above the rows waiting and above the
+   list, so that a doctor with a thousand patients starts a new consultation without moving the page. #}
+<p><a class="button" id="new-patient" href="/patients/new">{{ words.NAV_NEW_PATIENT }}</a></p>
 {% if waiting %}
 <section class="pane">
   <div class="pane-head"><h2>{{ words.HOME_WAITING }}</h2></div>
@@ -40,6 +43,5 @@
   </table>
   {% else %}<div class="pane-body"><p class="mark" id="none-found">{{ none_found or words.NO_PATIENTS }}</p></div>{% endif %}
 </section>
-<p><a class="button" href="/patients/new">{{ words.NAV_NEW_PATIENT }}</a></p>
 <p class="mark">{{ words.HOME_SO_FAR }}</p>
 {% endblock %}

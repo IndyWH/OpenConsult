@@ -73,3 +73,31 @@ def test_ruling_1_R1_R15_the_patients_page_is_the_home_page_with_the_waiting_row
     found = [raw.find(words.HOME_WAITING), raw.find('id="search-form"'), raw.find('id="patients"')]
     assert all(f >= 0 for f in found) and found == sorted(found)                       # the waiting rows above the box, the box above the list
     assert words.CONTINUE_CONSULTATION in text_of(client.get("/"))
+
+
+def test_his_word_of_20_nov_1031_the_new_patient_button_stands_at_the_very_top_above_the_rows_waiting_and_the_list(tmp_path, clock, machine):
+    # The owner, at his room check of 20 Nov 2026 (mail 6 of run 9c): The new patient button is at the very bottom of
+    # for review patients and the patient list. ... What if there was 1000 patients in the database! New patient
+    # button should be at the very top. OLD: the button under the list. NEW: above the rows waiting and the list.
+    from tests.test_review_page import reviewed
+    app, client, c = reviewed(tmp_path, clock, machine)                                # consultation 1 waits for review
+    for n in range(30):
+        client.post("/patients", data={**PATIENT, "name": f"Made-up Patient {n}"})
+    client.post("/consultations/start/2", data=TICKS)
+    app.state.parts.running[2].on_stop = None                                         # hold the finaliser: the row waits at Stop
+    client.post("/consultations/2/stop")
+    raw = client.get("/").text
+    main = raw.split("<main", 1)[1].split("</main>", 1)[0]
+    button = '<a class="button" id="new-patient" href="/patients/new">' + words.NAV_NEW_PATIENT + "</a>"
+    found = [main.find(button), main.find(words.HOME_WAITING), main.find(words.HOME_REVIEW), main.find('id="search-form"'),
+             main.find('id="patients"'), main.find('<tr class="patient" ')]
+    assert all(f >= 0 for f in found) and found == sorted(found)                       # the button first, then all that was above it
+    assert main.count('href="/patients/new"') == 1 and len(rows_on(raw)) == 31         # once, and not again under the list
+    assert main.find(words.PATIENTS_TITLE) < main.find(button)                         # under the page's heading
+    # The link in the top bar stays.
+    bar = raw.split('<nav class="tabs">', 1)[1].split("</nav>", 1)[0]
+    assert 'href="/patients/new"' in bar and words.NAV_NEW_PATIENT in bar
+    # A folder with no patient: the button is there too, above the line that says none is there.
+    empty, first = app_with(tmp_path / "empty", clock, machine)
+    page = first.get("/").text
+    assert 0 <= page.find(button) < page.find('id="none-found"')
