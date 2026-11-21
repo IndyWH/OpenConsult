@@ -1146,25 +1146,26 @@ LESS_HEAD = ("Saved. No new tick is asked, because less leaves this computer tha
              "It takes effect at the next consultation.")
 ON_THIS_COMPUTER = "On this computer:"
 IN_THE_CLOUD = "In the cloud:"
-# What runs here, by the jobs that do. His: both, and the language model alone. Transcription alone is Cowork's draft
-# after his pattern, which he has not seen.
+# What runs here, by the jobs that do. His: both, the language model alone, and since 21 Nov 2026 (15.13, ruling 76)
+# the line On this computer: transcription. Nothing goes to Speechmatics. The line On this computer: transcription.
+# alone, where the recording goes after Stop, is still Cowork's draft.
 JOBS_HERE = {("language_model", "transcription"): "the language model and transcription.", ("language_model",): "the language model.",
              ("transcription",): "transcription."}
 JOB_IN_CLOUD = {"speechmatics": "transcription, by Speechmatics.", "claude": "the language model, by Claude."}
 # His too, letter for letter (his word A of 18 Nov 2026, 08:03, by mail 5): the line In the cloud: nothing. where
 # nothing of the path is in the cloud. The same lines stand above the picture of This machine for the path chosen.
-# Cowork's details, drafts until he has seen them: one line for each heading; two things in the cloud follow one
-# another on its line, each beginning with a capital; no line On this computer where nothing runs here.
+# Two things in the cloud each have a line of their own that begins In the cloud:, his word B of 21 Nov 2026 (ruling
+# 76): the one long line that run 9c built for both fell away. No line On this computer where nothing runs here.
 IN_THE_CLOUD_NOTHING = "nothing."
 # What goes to a cloud service on a path: his sentences, one wording for the notice and for the boxes of the picture
-# (settings/statement.py gives them to both). Nothing goes to Speechmatics. is Cowork's draft after his pattern.
+# (settings/statement.py gives them to both).
 GOES = {
     "speechmatics": {"live": "The sound of the consultation goes to it as it is spoken.",
                      "after_stop": "After Stop, the recording goes to Speechmatics once. No sound goes to it during the consultation.",
                      "nothing": "Nothing goes to Speechmatics."},
     "claude": {"live": "The words of the consultation go to it.", "nothing": "Nothing goes to Claude."},
 }
-# A draft: the press that opens the full statement under the notice.
+# The press that opens the full statement under the notice: his since 21 Nov 2026 (ruling 76, three).
 LESS_FULL_STATEMENT = "Read the full statement for these choices"
 CONNECT_FIRST = "Connect {service} first."
 # The Start screen in cloud mode (7.2; 7.3; R15; run 9b). Drafts.

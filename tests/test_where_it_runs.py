@@ -65,33 +65,40 @@ def picture_lines(page: str) -> list[str]:
 # The line above the picture for each of the six paths (mail 5 of run 9c). THE OWNER'S, letter for letter: the lines
 # named above, and for the path with nothing in the cloud his two of 18 Nov 2026, 08:03.
 CLOUD_NOTHING = "In the cloud: nothing."
-# COWORK'S DETAILS, drafts until he has seen them: at most one line for each heading; two things in the cloud follow
-# one another on that one line, the transcription or the recording first, then the language model, each sentence
-# beginning with a capital; where nothing runs on this computer the line On this computer: is left out.
+# Restated on the owner's word B of 21 Nov 2026 (15.13, ruling 76; step 9f): each thing in the cloud has a line of its
+# own that begins In the cloud:, in his words of 18 Nov. OLD, Cowork's details of run 9c, drafts he had not seen: at
+# most one line for each heading; two things in the cloud followed one another on that one line, the transcription or
+# the recording first, then the language model, each sentence beginning with a capital:
+#   CS, one line: In the cloud: Transcription, by Speechmatics. The sound of the consultation goes to it as it is
+#       spoken. The language model, by Claude. The words of the consultation go to it.
+#   CR, its second line: In the cloud: After Stop, the recording goes to Speechmatics once. No sound goes to it during
+#       the consultation. The language model, by Claude. The words of the consultation go to it.
+# NEW: one line for each thing, each the heading and then his sentence with a small letter. Unchanged: where nothing
+# runs on this computer the line On this computer: is left out; and that line alone for CR is still Cowork's draft.
 HERE_SPEECH_ALONE_DRAFT = "On this computer: transcription."
-CLOUD_BOTH_DRAFT = ("In the cloud: Transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken. "
-                    "The language model, by Claude. The words of the consultation go to it.")
-CLOUD_AFTER_STOP_AND_MODEL_DRAFT = ("In the cloud: After Stop, the recording goes to Speechmatics once. No sound goes to it during the "
-                                    "consultation. The language model, by Claude. The words of the consultation go to it.")
 ABOVE_THE_PICTURE = {"L": (HERE_BOTH, CLOUD_NOTHING), "R": (HERE_BOTH, CLOUD_AFTER_STOP), "S": (HERE_MODEL, CLOUD_SPEECH),
-                     "C": (HERE_SPEECH_DRAFT, CLOUD_MODEL), "CR": (HERE_SPEECH_ALONE_DRAFT, CLOUD_AFTER_STOP_AND_MODEL_DRAFT),
-                     "CS": (CLOUD_BOTH_DRAFT,)}
+                     "C": (HERE_SPEECH_DRAFT, CLOUD_MODEL), "CR": (HERE_SPEECH_ALONE_DRAFT, CLOUD_AFTER_STOP, CLOUD_MODEL),
+                     "CS": (CLOUD_SPEECH, CLOUD_MODEL)}
 
 
 @pytest.mark.parametrize("name", list(ABOVE_THE_PICTURE))
 def test_his_word_of_18_nov_the_line_above_the_picture_says_what_runs_here_and_what_in_the_cloud_for_each_of_the_six_paths(tmp_path, clock, name):
     lines = ABOVE_THE_PICTURE[name]
     assert where_lines(PATHS[name]) == lines
-    # At most one line for each heading, On this computer first; never a line with neither.
-    assert [line.split(":")[0] for line in lines] in (["On this computer", "In the cloud"], ["In the cloud"])
-    assert sum(line.count("On this computer:") for line in lines) <= 1 and sum(line.count("In the cloud:") for line in lines) == 1
+    # OLD: at most one line for each heading, On this computer first; never a line with neither; In the cloud: once.
+    # NEW: at most one line On this computer, first; then one line In the cloud for each thing that is there, and one
+    # where nothing is; never a line with neither.
+    in_cloud = max(1, sum(goes_to(PATHS[name], service) != "nothing" for service in (SPEECHMATICS, CLAUDE)))
+    assert [line.split(":")[0] for line in lines] in (["On this computer"] + ["In the cloud"] * in_cloud, ["In the cloud"] * in_cloud)
+    assert all(line.count("On this computer:") + line.count("In the cloud:") == 1 for line in lines)
     app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS[name])
     page = text_of(client.get("/settings"))
     assert picture_lines(page) == list(lines) and panel.build(app.state.parts).path_lines == lines
     # The draft sentence is gone from the page and from the file of words.
     assert "The path you chose" not in page and not hasattr(words, "PANEL_PATH_LINE") and not hasattr(words, "PANEL_PATH_BY")
     # A path whose own statement is ticked shows the lines above the picture alone: no notice of a path that sends less.
-    assert 'id="less-' not in page and page.count("In the cloud:") == 1
+    # OLD: In the cloud: once on the page. NEW: once for each line of the cloud.
+    assert 'id="less-' not in page and page.count("In the cloud:") == in_cloud
 
 
 def test_his_word_of_18_nov_the_path_with_nothing_in_the_cloud_letter_for_letter_and_the_same_at_step_2_of_the_first_run(tmp_path, clock):
@@ -218,8 +225,10 @@ def test_ruling_48_each_cloud_box_says_what_goes_to_it_in_the_owners_sentence_fo
         elif goes == "after_stop":
             # Restated on mail 5 of run 9c. OLD: the sentence follows the heading with a small letter, always. NEW: so
             # where it is the one thing in the cloud; where Claude is there too, each sentence begins with a capital.
-            first = sentence[0] if claude == "live" else sentence[0].lower()
-            assert f"In the cloud: {first}{sentence[1:]}" in lines
+            # Restated again on the owner's word B of 21 Nov 2026 (15.13, ruling 76; step 9f). OLD, of mail 5:
+            #   first = sentence[0] if claude == "live" else sentence[0].lower()
+            # NEW: with a small letter always, for the sentence stands after the heading of a line of its own.
+            assert f"In the cloud: {sentence[0].lower()}{sentence[1:]}" in lines
 
 
 def test_ruling_48_the_notice_and_the_boxes_read_one_function_so_the_two_can_never_differ(tmp_path, clock, monkeypatch):

@@ -178,8 +178,11 @@ def test_15_13_ruling_56_a_cloud_box_for_each_state_and_a_key_not_tested_since_t
                  "In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken.")),
     ("C", 0, 1, ("On this computer: transcription. Nothing goes to Speechmatics.",
                  "In the cloud: the language model, by Claude. The words of the consultation go to it.")),
-    ("CS", 1, 1, ("In the cloud: Transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken. "
-                  "The language model, by Claude. The words of the consultation go to it.",)),
+    # Restated on the owner's word B of 21 Nov 2026 (15.13, ruling 76; step 9f). OLD, one long line for both: In the
+    # cloud: Transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken. The language
+    # model, by Claude. The words of the consultation go to it. NEW: a line of its own for each thing in the cloud.
+    ("CS", 1, 1, ("In the cloud: transcription, by Speechmatics. The sound of the consultation goes to it as it is spoken.",
+                  "In the cloud: the language model, by Claude. The words of the consultation go to it.")),
 ])
 def test_15_13_ruling_56_the_chosen_path_is_marked_for_each_path_by_the_border_the_word_and_the_arrows(tmp_path, clock, name, speech_row, model_row, by):
     app, client, *_ = made(tmp_path, clock, held=BOTH_KEYS, path=PATHS[name])

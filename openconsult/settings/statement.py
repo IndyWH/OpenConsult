@@ -163,13 +163,15 @@ def where_lines(path: ChosenPath) -> tuple[str, ...]:
     and the notice of a path saved under a wider tick both read it (his
     word of 18 Nov, 08:03), so the two can never differ.
 
-    At most one line that begins On this computer and one that begins In
-    the cloud. Where one job runs here and nothing at all goes to its
-    service, the first says so; where nothing runs here it is left out.
-    The second holds each thing in the cloud, the transcription or the
-    recording first, then the language model; one thing follows the
-    heading as his lines do, two follow one another, each beginning with
-    a capital; with nothing in the cloud it says so in his word."""
+    At most one line that begins On this computer. Where one job runs
+    here and nothing at all goes to its service, it says so; where
+    nothing runs here it is left out. Then one line for each thing in
+    the cloud, each beginning In the cloud (15.13, ruling 76; his word B
+    of 21 Nov 2026: the one long line that run 9c built for two things
+    falls away): the transcription or the recording first, then the
+    language model, each the heading and then his sentence beginning
+    with a small letter. With nothing in the cloud one line says so in
+    his word."""
     here = [job for job, runs_here in (("language_model", not path.claude), ("transcription", not path.speechmatics_live)) if runs_here]
     service_of = {"language_model": CLAUDE, "transcription": SPEECHMATICS}
     lines = []
@@ -185,13 +187,8 @@ def where_lines(path: ChosenPath) -> tuple[str, ...]:
             cloud.append(f"{words.JOB_IN_CLOUD[service]} {sentence}")
         elif goes == AFTER_STOP:
             cloud.append(sentence)
-    if not cloud:
-        said = words.IN_THE_CLOUD_NOTHING
-    elif len(cloud) == 1:
-        said = cloud[0][0].lower() + cloud[0][1:]           # one thing follows the heading on its line, as his lines do
-    else:
-        said = " ".join(thing[0].upper() + thing[1:] for thing in cloud)
-    lines.append(f"{words.IN_THE_CLOUD} {said}")
+    for thing in cloud or [words.IN_THE_CLOUD_NOTHING]:
+        lines.append(f"{words.IN_THE_CLOUD} {thing[0].lower()}{thing[1:]}")      # a thing follows the heading on its own line, as his lines do
     return tuple(lines)
 
 

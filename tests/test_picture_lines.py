@@ -135,7 +135,10 @@ def test_his_ruling_of_20_nov_solid_and_dashed_are_told_by_the_line_itself_and_t
     # Drawn for the eye alone: every line and the key hidden from a reader; the lines above the picture say it in words.
     drawn = ARROW.findall(picture)
     assert len(drawn) == 5 and picture.count('aria-hidden="true"><span class="key-part') == 1
-    assert "In the cloud: After Stop, the recording goes to Speechmatics once." in picture.split('id="panel-path"', 1)[1].split("</div>", 1)[0]
+    # Restated on the owner's word B of 21 Nov 2026 (15.13, ruling 76; step 9f): on this path the recording and the
+    # language model are two things in the cloud, each now with a line of its own. OLD: "In the cloud: After Stop, the
+    # recording goes to Speechmatics once." in the lines above the picture, with a capital. NEW: with a small letter.
+    assert "In the cloud: after Stop, the recording goes to Speechmatics once." in picture.split('id="panel-path"', 1)[1].split("</div>", 1)[0]
     assert "<script" not in picture                                                     # the page draws them with no script
 
 
