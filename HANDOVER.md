@@ -10,10 +10,31 @@ Run on 21 Nov 2026 by the mailbox, one plan gate (the owner's okay at
 08:35, his words: Noted. Choice A.), under Cowork's review of the plan
 with changes A to E. The spec is 6d9e048 (sha256 cce162a5...), the
 stage prompt 696daae (stage-prompts/STAGE_09F.md). The private report
-is STAGE9F_REPORT.md in the log folder. Fifteen commits, none pushed.
-The suite: 1420 passed in about 152 s, none skipped (1358 at the
-start). No model was called, no key read, nothing left the machine. No
-prompt file, frame or form changed; the tables stay at version 13.
+is STAGE9F_REPORT.md in the log folder. Eighteen commits, none pushed:
+fifteen to the first report (78aabbe), one by mail 2, two by mail 3,
+this entry's last line among them. The suite: 1420 passed in about
+152 s, none skipped (1358 at the start). No model was called, no key
+read, nothing left the machine. No prompt file, frame or form changed;
+the tables stay at version 13.
+
+THREE THINGS BY MAIL 3 (21 Nov 2026, the owner's word A at 10:41).
+- The passage of a guideline in the live page's pop-up, measured in
+  the browser on 385ad5e and on this head: the same in every figure
+  (margins 14.4 px above and below, ink black, 14.4 px on 21.6 px, the
+  window not moved by the press). Nothing changed. On the build of
+  before mail 2 it had no margin above, 11.2 px below and the page's
+  ink: the fault that f0aa28a closed.
+- A page of 130 turns in the simple transcript, at 1280 and 420 px:
+  all clear and nothing cut, but a number of three figures was 6 px
+  wider, so the speaker's word began 6 px further right from passage
+  100. The number has one width for one to three figures (3248873).
+- This entry's count of commits.
+Noticed there, older than this step and not touched: on the live page
+a press on a mark of the Guidelines pane took three to five presses to
+open the pop-up, on 385ad5e and on this head alike, in a made
+consultation whose page is sent sound by the browser's made
+microphone. Likely the pane being drawn afresh under the press; not
+measured.
 
 ONE MEND BY MAIL 2 (21 Nov 2026, the owner's word A at 10:10): a
 passage of the simple transcript is laid out as v1 showed its
