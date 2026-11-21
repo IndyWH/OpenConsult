@@ -98,6 +98,20 @@ def test_review_change_b_a_save_the_app_refuses_for_another_reason_answers_with_
     c.close()
 
 
+def test_9f_a_save_after_the_login_has_ended_is_answered_with_another_page_and_the_script_has_a_sentence_for_it(tmp_path, clock, machine):
+    # Found at the look in the browser: the script took every answer that is not the review page for an ended login and
+    # loaded the page, which lost what was typed without a word. It now leaves the field open and says why. What the
+    # app gives it: after the lock has fallen the save is answered with the login page, and nothing is written.
+    app, client, c = made(tmp_path, clock, machine)
+    entry = entry_of(app, MODELS)
+    clock.advance(minutes=31)
+    answer = save(client, entry["id"], DOCTORS)
+    assert answer.status_code == 200 and 'id="review"' not in answer.text and 'name="password"' in answer.text
+    assert app.state.parts.notes.entry(entry["id"])["text"] == MODELS and app.state.parts.notes.edits(entry["id"]) == []
+    assert "NOT_SAVED_LOGIN" in SCRIPT_WORDS and words.NOT_SAVED_LOGIN == "the login has ended"
+    c.close()
+
+
 def editable(raw: str) -> tuple[int, int, int]:
     """What the page gives the script to act on in the note: the forms, the places for Saved, the reader's sentence."""
     note = note_of(raw)

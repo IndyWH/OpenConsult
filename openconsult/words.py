@@ -305,6 +305,9 @@ ENTRY_PRESS = "Press Enter to edit the words of this entry."
 ENTRY_SAVED = "Saved."
 ENTRY_NOT_SAVED = "These words were not saved: {reason}. They are still in the box."
 NOT_SAVED_NEW_DRAFT = "the note has been drafted again since this page was shown"
+# And one more reason, added at the look in the browser: the app answered the save with another page, because the
+# login has ended. The page is not sent to the login page for it, which would lose what was typed without a word.
+NOT_SAVED_LOGIN = "the login has ended"
 # A press on Simple at an area whose advanced view holds a box or a choice that is not saved changes nothing and says
 # this (15.10, ruling 12; the plan review of 9f, change A), in the pattern of a turn's sentence below.
 VIEW_NOT_SAVED = "This view holds words that are not saved. Save them first."

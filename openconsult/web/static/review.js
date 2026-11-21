@@ -167,6 +167,8 @@
   // entries can be edited: read only, the words are not a press and do not look like one (R15).
   const note = document.getElementById('note');
   const onWay = new Map();      // the fields whose save is on its way, each with its promise
+  const STOPS = 'a[href], button, input:not([type=hidden]), select, textarea, [tabindex]';
+  const SAVE_LIMIT_MS = 30000;  // the app answers a save in well under a second; the limit the app gives its own asks of a service
   let saidSaved = null;         // the place that says Saved, until the next press or keystroke
 
   // Pure: an entry is one line in the note, so a line break that was typed or pasted is sent as a space; and the
@@ -177,7 +179,7 @@
   function formOf(block) { return block.querySelector('form.entry-form'); }
   function shownOf(block) { return block.querySelector('span.entry-text'); }
   function fieldOf(block) { return block.querySelector('textarea.entry-field'); }
-  function says(block, sentence, trouble) {
+  function entrySays(block, sentence, trouble) {
     const slot = block.querySelector('.entry-said');
     if (!slot) return;
     slot.textContent = sentence;
@@ -214,19 +216,32 @@
   }
   // The app's answer to a save, as the text of a page: true when the words were saved, else the entry's own name.
   function answered(block, field, typed, status, html, keyboardBack) {
+    // An answer that is neither the page nor a refusal on the page is an error: the field stays, with what was typed.
+    if (status !== 200 && status !== 400) {
+      field.readOnly = false;
+      entrySays(block, notSaved(WORDS.NOT_SAVED_ERROR.replace('{status}', status)), true);
+      return block.id;
+    }
     const got = new DOMParser().parseFromString(html, 'text/html');
-    if (!got.getElementById('review')) { window.location.href = page.dataset.path; return block.id; }      // not the review page: the login ended
+    if (!got.getElementById('review')) {      // a page, and not the review page: the login has ended. The words stay in the box.
+      field.readOnly = false;
+      entrySays(block, notSaved(WORDS.NOT_SAVED_LOGIN), true);
+      return block.id;
+    }
     if (window.pageFields) window.pageFields.left(got.getElementById('review').dataset.secondsLeft);      // the request was use
     const theirs = got.getElementById(block.id);
     if (status === 200 && theirs) {
       const place = function () {
         const node = document.importNode(theirs, true);
         close(block, false);
+        // The keyboard stays where it was: on the same control of the new piece, as fresh.js keeps it for a part.
+        const stop = block.contains(document.activeElement) ? Array.from(block.querySelectorAll(STOPS)).indexOf(document.activeElement) : -1;
         block.replaceWith(node);
         ready(node);
-        says(node, WORDS.ENTRY_SAVED, false);
+        entrySays(node, WORDS.ENTRY_SAVED, false);
         saidSaved = node.querySelector('.entry-said');
-        if (keyboardBack && shownOf(node)) shownOf(node).focus({preventScroll: true});
+        const again = keyboardBack ? shownOf(node) : (stop >= 0 ? node.querySelectorAll(STOPS)[stop] : null);
+        if (again) again.focus({preventScroll: true});
       };
       if (window.freshPage && window.freshPage.whenUp) window.freshPage.whenUp(place); else place();
       return true;
@@ -235,13 +250,13 @@
     const sentence = slot ? slot.textContent.trim() : '';
     if (sentence && !typed) {      // an empty field: the app's sentence, and the words as they stood
       close(block, keyboardBack);
-      says(block, sentence, true);
+      entrySays(block, sentence, true);
       return block.id;
     }
     field.readOnly = false;
-    if (sentence) says(block, sentence, true);
-    else if (status === 200) says(block, notSaved(WORDS.NOT_SAVED_NEW_DRAFT), true);      // the entry is no longer on the app's page
-    else says(block, notSaved(WORDS.NOT_SAVED_ERROR.replace('{status}', status)), true);
+    if (sentence) entrySays(block, sentence, true);
+    else if (status === 200) entrySays(block, notSaved(WORDS.NOT_SAVED_NEW_DRAFT), true);      // the entry is no longer on the app's page
+    else entrySays(block, notSaved(WORDS.NOT_SAVED_ERROR.replace('{status}', status)), true);  // a refusal with no sentence for this entry
     return block.id;
   }
   function save(block, keyboardBack) {
@@ -249,13 +264,17 @@
     if (!field) return Promise.resolve(true);
     if (onWay.has(field)) return onWay.get(field);
     const typed = oneLine(field.value);
-    if (typed === oneLine(field.defaultValue)) { close(block, keyboardBack); says(block, '', false); return Promise.resolve(true); }
+    if (typed === oneLine(field.defaultValue)) { close(block, keyboardBack); entrySays(block, '', false); return Promise.resolve(true); }
     field.readOnly = true;
+    // An app that takes the request and never answers is an app that does not answer: after this long the save is
+    // given up and said as not saved, so that the field and a held press are never left waiting without a word.
+    const limit = new AbortController();
+    const timer = window.setTimeout(function () { limit.abort(); }, SAVE_LIMIT_MS);
     const sent = fetch(formOf(block).action, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                                              body: new URLSearchParams({text: typed}), keepalive: true})
+                                              body: new URLSearchParams({text: typed}), keepalive: true, signal: limit.signal})
       .then(function (answer) { return answer.text().then(function (html) { return answered(block, field, typed, answer.status, html, keyboardBack); }); })
-      .catch(function () { field.readOnly = false; says(block, notSaved(WORDS.NOT_SAVED_NO_ANSWER), true); return block.id; })
-      .then(function (outcome) { onWay.delete(field); return outcome; });
+      .catch(function () { field.readOnly = false; entrySays(block, notSaved(WORDS.NOT_SAVED_NO_ANSWER), true); return block.id; })
+      .then(function (outcome) { window.clearTimeout(timer); onWay.delete(field); return outcome; });
     // The save joins the line of keeps: a press that loads the page waits for it, and is dropped if it failed.
     const done = window.reviewSaves ? window.reviewSaves.join(sent) : sent;
     onWay.set(field, done);
@@ -282,7 +301,7 @@
       if (target.matches('span.entry-text.can-edit') && event.key === 'Enter') { event.preventDefault(); open(target.closest('.entry')); return; }
       if (!target.matches('textarea.entry-field') || onWay.has(target)) return;      // while a save is on its way the field waits
       if (event.key === 'Enter') { event.preventDefault(); save(target.closest('.entry'), true); }
-      if (event.key === 'Escape') { const block = target.closest('.entry'); close(block, true); says(block, '', false); }
+      if (event.key === 'Escape') { const block = target.closest('.entry'); close(block, true); entrySays(block, '', false); }
     });
     note.addEventListener('input', function (event) { if (event.target.matches('textarea.entry-field')) fit(event.target); });
     note.addEventListener('focusout', function (event) {
