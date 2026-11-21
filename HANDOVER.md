@@ -15,6 +15,16 @@ The suite: 1420 passed in about 152 s, none skipped (1358 at the
 start). No model was called, no key read, nothing left the machine. No
 prompt file, frame or form changed; the tables stay at version 13.
 
+ONE MEND BY MAIL 2 (21 Nov 2026, the owner's word A at 10:10): a
+passage of the simple transcript is laid out as v1 showed its
+transcript. Its number, the speaker's word and the play stand in a
+column of one width at the left; its words in a column of their own,
+every wrapped line under the first word; the speaker's word in the
+page's ink and heavier. Under 600 px the words stand under the head.
+Seen in the browser at 1280 and 420 px for both made pages. The rules
+are scoped to #passages, for the passage of a guideline on the live
+page has the same class name and had taken three of them.
+
 For the patient. After Stop the doctor reads the note as plain words
 under its four headings, whole and wrapped, so that a wrong dose is
 seen and not lost among boxes and 20 to 55 line numbers. Each entry

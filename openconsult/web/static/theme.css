@@ -209,17 +209,29 @@ button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
    opens all the lines. */
 #transcript[data-view="simple"] #final-transcript, #transcript[data-view="simple"] #who-check, #transcript[data-view="simple"] #check-who-form, #transcript[data-view="simple"] #check-who, #transcript[data-view="simple"] #open-all { display: none; }
 #transcript[data-view="advanced"] #passages { display: none; }
-/* A passage: its number, as a chip of the note shows it, the speaker's word, the play, then its words as running text. */
-.passage { margin: 0 0 .7rem; line-height: 1.7; font-size: 1rem; color: var(--ink); scroll-margin-top: 4.2rem; }
-.passage-head { display: inline-block; min-width: 5.9rem; color: var(--ink-soft); font-size: .8rem; margin-right: .5rem; }
-.passage-number { display: inline-block; min-width: 1.9rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); font-size: .72rem; line-height: 1.5; }
-button.passage-play { margin: 0 .5rem 0 0; }
+/* A passage, as v1 showed its transcript: at the left, in a column of one width for every passage, its number as a
+   chip of the note shows it, the speaker's word and the play; then its words in a column of their own, so that every
+   wrapped line begins under the first word and the eye runs down the left edge, doctor, patient, doctor, patient.
+   The speaker's word is in the ink of the page's words and heavier: told by the word, with no meaning in a colour.
+   The rules are the review page's own: the passage of a guideline on the live page is another piece of that name. */
+#passages .passage { display: grid; grid-template-columns: 7.2rem 2.7rem minmax(0, 1fr); column-gap: .5rem; align-items: baseline; margin: 0 0 .7rem; line-height: 1.7; font-size: 1rem; color: var(--ink); scroll-margin-top: 4.2rem; }
+#passages .passage-head { grid-column: 1; color: var(--ink); font-size: .9rem; font-weight: 600; }
+#passages .passage-number { display: inline-block; min-width: 1.9rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); color: var(--ink-soft); font-size: .72rem; font-weight: 400; line-height: 1.5; }
+#passages button.passage-play { grid-column: 2; margin: 0; justify-self: start; }
+#passages .passage-text { grid-column: 3; }
+/* In a narrow window the words stand under the head of their passage, at the window's full width. */
+@media (max-width: 600px) {
+  #passages .passage { display: block; }
+  #passages .passage-head { margin-right: .5rem; }
+  #passages button.passage-play { margin-right: .5rem; }
+  #passages .passage-text { display: block; }
+}
 a.passage-doubt { text-decoration: underline dotted; color: inherit; }
 /* Inside a passage the words of the line a number named, and of the line that is sounding, as inside a closed turn. And
    the turn a chip named, marked whole in either view: a ground and an outline, so it is not told by colour alone. */
 .passage-line.marked { background: #F3EDE6; outline: 2px solid var(--ink-soft); outline-offset: 0; border-radius: 3px; margin: 0 .2rem; padding: 0 .15rem; }
 .passage-line.playing { background: #EFE7DE; }
-.passage.marked, details.turn.marked > summary { background: #F3EDE6; outline: 2px solid var(--ink-soft); outline-offset: 3px; border-radius: 6px; }
+#passages .passage.marked, details.turn.marked > summary { background: #F3EDE6; outline: 2px solid var(--ink-soft); outline-offset: 3px; border-radius: 6px; }
 /* The number of a turn in the advanced view: for a screen reader and a chip's press, not for the eye. */
 .turn-number { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* An entry the doctor has changed (ruling 75), in both views: its words on a soft green ground, the box of the advanced
