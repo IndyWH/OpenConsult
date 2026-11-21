@@ -21,6 +21,9 @@
   const page = document.getElementById('review');
   if (!page) return;
   const WORDS = JSON.parse(document.getElementById('words').textContent);
+  const FRESH_MS = 15000;      // a note older than this belongs to a load that never came
+  let store = null;
+  try { store = window.sessionStorage; store.getItem('x'); } catch (error) { store = null; }     // no store: as with no script
   // A line number pressed: the turn that holds the line is shown, with that line's words marked inside it, in the middle
   // of the window; the turn is not opened. On an opened turn the line itself is marked, as before the reading view.
   function show(n) {
@@ -62,12 +65,74 @@
       .catch(function (error) { result.textContent = WORDS.COPY_FAILED.replace('{reason}', error && error.message ? error.message : String(error)); });
   });
 
+  // ------------------------------------------------------------------ the two views
+  // An area of the page, the note or the transcript, says its view in data-view, and the style sheet shows that one
+  // (spec 15.13, ruling 46). A press on Simple or Advanced changes it in place: nothing loads, and the press stays
+  // where it stood in the window. The choice holds while the page is in use, as the opened lines do: when the page
+  // is left the two names and the time are noted in the session store, never a word of the consultation; the next
+  // load reads the note once and, if it is fresh, sets the views, before place.js puts the page's place back. An
+  // area the app holds in its view (data-view-held, while the check of who spoke runs) is left as the app sent it.
+  // A press on Simple changes nothing where the advanced view holds a box or a choice that is not saved: hidden,
+  // those words would be lost without a word, and a note approved without them (15.10, ruling 12). The area says why.
+  const AREAS = ['note', 'transcript'];
+  const VIEWS_KEY = 'openconsult.views:' + page.dataset.path;
+  const ADVANCED_FIELDS = '.entry-form input, #final-transcript input, #final-transcript select';
+  // Pure: the view a name stands for, and whether a noted choice is one to act on.
+  function viewOf(name) { return name === 'advanced' ? 'advanced' : 'simple'; }
+  function freshChoice(noted, now) { return Boolean(noted) && now - noted.at < FRESH_MS; }
+  function setView(name, view) {
+    const node = document.getElementById(name);
+    if (!node || node.hasAttribute('data-view-held')) return;
+    node.dataset.view = viewOf(view);
+    node.querySelectorAll('a.view').forEach(function (press) {
+      if (press.dataset.view === node.dataset.view) press.setAttribute('aria-current', 'true'); else press.removeAttribute('aria-current');
+    });
+  }
+  function advancedHolds(node) {
+    return Boolean(window.pageFields) && Array.from(node.querySelectorAll(ADVANCED_FIELDS)).some(window.pageFields.unsaved);
+  }
+  function viewSays(name, sentence) {
+    const slot = document.getElementById(name + '-view-says');
+    if (slot) slot.textContent = sentence;
+  }
+  if (store) {
+    let chosen = null;
+    try { chosen = JSON.parse(store.getItem(VIEWS_KEY)); } catch (error) { chosen = null; }
+    store.removeItem(VIEWS_KEY);
+    if (freshChoice(chosen, Date.now())) AREAS.forEach(function (name) { setView(name, chosen[name]); });
+    window.addEventListener('pagehide', function () {
+      const noted = {at: Date.now()};
+      AREAS.forEach(function (name) { const node = document.getElementById(name); if (node) noted[name] = node.dataset.view; });
+      try { store.setItem(VIEWS_KEY, JSON.stringify(noted)); } catch (error) { /* a full store: the page comes back simple */ }
+    });
+  }
+  document.addEventListener('click', function (event) {
+    const press = event.target.closest ? event.target.closest('a.view') : null;
+    if (!press) return;
+    event.preventDefault();      // with no script the press is a link that loads the page with that view, at that area
+    const name = press.dataset.area, node = document.getElementById(name);
+    if (!node || node.dataset.view === press.dataset.view) return;
+    if (press.dataset.view === 'simple' && advancedHolds(node)) { viewSays(name, WORDS.VIEW_NOT_SAVED); return; }
+    viewSays(name, '');
+    const before = press.getBoundingClientRect().top;
+    setView(name, press.dataset.view);
+    window.scrollBy(0, press.getBoundingClientRect().top - before);
+  });
+  // The sentence goes when the area holds nothing unsaved any more.
+  ['input', 'change'].forEach(function (kind) {
+    document.addEventListener(kind, function (event) {
+      AREAS.forEach(function (name) {
+        const node = document.getElementById(name);
+        if (node && node.contains(event.target) && !advancedHolds(node)) viewSays(name, '');
+      });
+    });
+  });
+
   // ------------------------------------------------------------------ the turns
   const pane = document.getElementById('final-transcript');
   if (!pane) return;
   const all = document.getElementById('open-all');
   const KEY = 'openconsult.open:' + page.dataset.path;
-  const FRESH_MS = 15000;      // a note older than this belongs to a load that never came
 
   // Pure: whether a turn of these lines holds one that stood open, and whether a note is one to act on.
   function holdsOne(numbers, stoodOpen) { return numbers.some(function (n) { return stoodOpen.indexOf(n) >= 0; }); }
@@ -94,9 +159,7 @@
     slot.textContent = WORDS.TURN_NOT_SAVED;
   }
 
-  let store = null;
-  try { store = window.sessionStorage; store.getItem('x'); } catch (error) { store = null; }     // no store: turns open by a press, as with no script
-  if (store) {
+  if (store) {      // no store: turns open by a press, as with no script
     let noted = null;
     try { noted = JSON.parse(store.getItem(KEY)); } catch (error) { noted = null; }
     store.removeItem(KEY);

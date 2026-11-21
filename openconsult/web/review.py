@@ -37,7 +37,7 @@ GATE_REFUSALS = gate.REFUSALS
 CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
 SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE", "NAME_NOT_SAVED", "NOT_SAVED_NO_ANSWER",
-                "NOT_SAVED_ERROR", "OPEN_ALL_LINES", "CLOSE_ALL_LINES", "TURN_NOT_SAVED")
+                "NOT_SAVED_ERROR", "OPEN_ALL_LINES", "CLOSE_ALL_LINES", "TURN_NOT_SAVED", "VIEW_NOT_SAVED")
 # A press that plays a line or a row starts this long before the line, and ends where it ended (15.10 ruling 38: in
 # the room check of 15 Nov 2026 the sound of a row began late, and at one row the drug's name was gone).
 PLAY_LEAD_S = 1.0
@@ -95,11 +95,49 @@ def turns_of(lines: list[dict]) -> list[dict]:
     turn must not be cut short by them. It is how the page is shown:
     nothing of it is stored."""
     found = []
-    for entry in reading.entries_of(lines):
+    entries = reading.entries_of(lines)
+    numbers = reading.numbers_of(entries)
+    for entry in entries:
         held = entry["lines"]
         ends = [line["end_s"] for line in held if line["end_s"] is not None]
-        found.append({"first": held[0]["n"], "last": held[-1]["n"], "speaker": entry["speaker"], "lines": held,
-                      "play_s": press_start(held[0]["start_s"]), "end_s": max(ends) if ends else None})
+        found.append({"number": numbers[held[0]["n"]], "first": held[0]["n"], "last": held[-1]["n"], "speaker": entry["speaker"],
+                      "lines": held, "play_s": press_start(held[0]["start_s"]), "end_s": max(ends) if ends else None})
+    return found
+
+
+# The two areas of the page that have a simple and an advanced view (15.13, ruling 46), and the two views.
+AREAS = ("note", "transcript")
+SIMPLE, ADVANCED = "simple", "advanced"
+
+
+def views_of(request: Request, refused: tuple | None, check_running: bool) -> dict:
+    """The view of each area as the app sends the page (15.13, ruling 46
+    and the details of step 9f): simple at every fresh visit; advanced
+    where the address names it, which is how a view is chosen with no
+    script; and advanced where the page comes back to something that
+    stands in the advanced view alone, so that it is seen with no script
+    too (R15): a Save of an entry that was refused; a Save or an Undo of
+    a line that was refused, every line opened, the check of who spoke
+    while it runs and each of its waits, with the load that shows its
+    outcome. With a script the browser remembers the doctor's choice
+    and sets it after the load; the app holds nothing of it."""
+    asked = request.query_params
+    control = refused[0] if refused else ""
+    note = asked.get("note") == ADVANCED or control.startswith("entry-")
+    transcript = (asked.get("transcript") == ADVANCED or asked.get("lines") == "open" or check_running
+                  or asked.get("quiet", "").isdigit() or control.startswith(("save-line-", "undo-", "check-who")))
+    return {"note": ADVANCED if note else SIMPLE, "transcript": ADVANCED if transcript else SIMPLE}
+
+
+def view_addresses(consultation_id: int, views: dict) -> dict:
+    """With no script each press of a view is a link that loads the page
+    with that view, at that area; the other area keeps the view it has."""
+    found = {}
+    for area in AREAS:
+        for view in (SIMPLE, ADVANCED):
+            chosen = {**views, area: view}
+            asked = "&".join(f"{name}={ADVANCED}" for name in AREAS if chosen[name] == ADVANCED)
+            found[area, view] = f"/consultations/{consultation_id}" + (f"?{asked}" if asked else "") + f"#{area}"
     return found
 
 
@@ -257,6 +295,12 @@ def page_data(p, row: dict) -> dict:
     gate_reason = " ".join(w["detail"] or words.WARNING_SENTENCES.get(w["kind"], "") for w in warning_rows if w["kind"] in GATE_REFUSALS)
     choice = CHOICES.get(row["speech_choice"])
     state = note_state(p, row, gate_refused)
+    turns = turns_of(lines)
+    # The chips of each entry (15.13, ruling 71): made now, from its lines as the record holds them and the turns as
+    # the page shows them.
+    numbers = {line["n"]: turn["number"] for turn in turns for line in turn["lines"]}
+    for entry in state["entries"]:
+        entry["chips"] = reading.chips_of(entry["lines"], numbers)
     # The doubted drug names (rulings 20, 26 and 28): their rows head the warnings; one that is not settled counts on
     # Approve; the sentences above them are not counted.
     drug = drug_marks.review_data(p.consultations, cid, lines)
@@ -301,7 +345,7 @@ def page_data(p, row: dict) -> dict:
             "background_read": background_read(row), "letters": letters_web.section_data(p, row),
             "marks": marks, "marks_json": json.dumps(marks), "alarms": alarm_rows,
             "alarm_count": words.ALARM_ONE if len(alarm_rows) == 1 else words.ALARMS_COUNT.format(count=len(alarm_rows)),
-            "lines": lines, "turns": turns_of(lines), "warnings": warnings, "who_check": who, "drug_head": drug["head"],
+            "lines": lines, "turns": turns, "warnings": warnings, "who_check": who, "drug_head": drug["head"],
             "drug_marks": drug["marks"],
             "player": player, "player_json": json.dumps(player),
             "audio_gone": None if player["available"] else words.AUDIO_GONE.format(
@@ -331,6 +375,8 @@ def review_page(request: Request, user, consultation_id: int, refused: tuple | N
     at_line = refused[0].rpartition("-")[2] if refused and refused[0].startswith(("save-line-", "undo-")) else ""
     for turn in data["turns"]:
         turn["open"] = data["lines_open"] or (at_line.isdigit() and turn["first"] <= int(at_line) <= turn["last"])
+    data["views"] = views_of(request, refused, data["who_check"]["running"])
+    data["view_addresses"] = view_addresses(consultation_id, data["views"])
     data["asking_delete"] = asking_delete
     data["delete_question"] = words.DELETE_CONSULTATION_QUESTION.format(name=data["ran_with"]["name"], date=data["date"])
     draft = data["draft"]
