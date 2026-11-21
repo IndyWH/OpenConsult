@@ -213,10 +213,12 @@ button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
    chip of the note shows it, the speaker's word and the play; then its words in a column of their own, so that every
    wrapped line begins under the first word and the eye runs down the left edge, doctor, patient, doctor, patient.
    The speaker's word is in the ink of the page's words and heavier: told by the word, with no meaning in a colour.
+   The number has one width for one to three figures: a consultation of an hour passes 100 turns, and the speaker's
+   words must still begin on one edge down the page.
    The rules are the review page's own: the passage of a guideline on the live page is another piece of that name. */
 #passages .passage { display: grid; grid-template-columns: 7.2rem 2.7rem minmax(0, 1fr); column-gap: .5rem; align-items: baseline; margin: 0 0 .7rem; line-height: 1.7; font-size: 1rem; color: var(--ink); scroll-margin-top: 4.2rem; }
 #passages .passage-head { grid-column: 1; color: var(--ink); font-size: .9rem; font-weight: 600; }
-#passages .passage-number { display: inline-block; min-width: 1.9rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); color: var(--ink-soft); font-size: .72rem; font-weight: 400; line-height: 1.5; }
+#passages .passage-number { display: inline-block; min-width: 2.4rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); color: var(--ink-soft); font-size: .72rem; font-weight: 400; line-height: 1.5; }
 #passages button.passage-play { grid-column: 2; margin: 0; justify-self: start; }
 #passages .passage-text { grid-column: 3; }
 /* In a narrow window the words stand under the head of their passage, at the window's full width. */
