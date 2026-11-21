@@ -64,13 +64,23 @@
     if (down) waiting = [answer, anchorId]; else place(answer, anchorId);
     return true;
   };
+  // Another piece of the page put in place by a script (an entry of the note saved where it stands, review.js) waits
+  // in the same way: not while a mouse button is down.
+  let later = [];
+  fresh.whenUp = function (act) { if (down) later.push(act); else act(); };
   document.querySelectorAll('[data-part]').forEach(function (part) { served[part.id] = part.outerHTML; });
   document.addEventListener('pointerdown', function () { down = true; }, true);
   ['pointerup', 'pointercancel'].forEach(function (name) {
     document.addEventListener(name, function () {
       down = false;
       // After the click that this release makes has been dealt with.
-      window.setTimeout(function () { if (!down && waiting) { const held = waiting; waiting = null; place(held[0], held[1]); } }, 0);
+      window.setTimeout(function () {
+        if (down) return;
+        if (waiting) { const held = waiting; waiting = null; place(held[0], held[1]); }
+        const acts = later;
+        later = [];
+        acts.forEach(function (act) { act(); });
+      }, 0);
     }, true);
   });
   window.freshPage = fresh;

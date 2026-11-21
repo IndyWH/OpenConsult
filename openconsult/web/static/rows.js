@@ -73,6 +73,19 @@
     unanswered.push(done);
     chain = done;
   }
+  // A save of another kind joins the line of keeps: an entry of the note corrected where it stands (spec 15.13, ruling
+  // 72; review.js). It answers true when the app saved it, else the name of the piece of the page that says why. A press
+  // that loads the page is then held until it has answered too, and dropped when it failed: a note is never approved
+  // without the words the doctor has just typed.
+  window.reviewSaves = {join: function (saving) {
+    const done = saving.then(function (outcome) {
+      unanswered = unanswered.filter(function (one) { return one !== done; });
+      settle();
+      return outcome;
+    });
+    unanswered.push(done);
+    return done;
+  }};
   function tickOf(box) { return box && box.form ? box.form.querySelector('button.tick') : null; }
   function leave(box, to) {
     if (box.readOnly || !box.form || !changed(box) || onWay.has(box) || box.form === sending) return;

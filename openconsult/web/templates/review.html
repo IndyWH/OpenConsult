@@ -57,6 +57,8 @@
   </div>
   <div class="pane-body">
     {{ view_says("note") }}
+    {# What a screen reader is told at an entry that can be corrected where it stands (ruling 72), as its description. #}
+    {% if has_note and not entries_read_only %}<p id="entry-says" hidden>{{ words.ENTRY_PRESS }}</p>{% endif %}
     {% if speakers_changed %}<p class="statement no-print" id="speakers-changed">{{ words.NOTE_SPEAKERS_CHANGED }}</p>{% endif %}
     {% if gate_refused %}<p class="failed" id="note-state">{{ words.NOTE_GATE_REFUSED.format(reason=gate_reason) }}</p>
     {% elif not draft %}<p class="mark" id="note-state">{{ words.NO_NOTE_YET }}</p>
@@ -82,6 +84,8 @@
         {% for k in entry.chips %}<button type="button" class="chip no-print" data-turn="{{ k }}" aria-label="{{ words.SHOW_TURN.format(n=k) }}" title="{{ words.SHOW_TURN.format(n=k) }}">{{ k }}</button>{% endfor %}
         {% if entry.uncited %}<span class="mark uncited no-print">({{ words.ENTRY_UNCITED }})</span>{% endif %}
         {% if entry.edited %}<span class="mark edited-word no-print">{{ words.ENTRY_EDITED }}</span>{% endif %}
+        {# Where the entry says that it was saved from the simple view, or why it was not (ruling 72): the page's script writes it. #}
+        {% if not entries_read_only %}<span class="entry-said no-print" id="entry-{{ entry.id }}-said" role="status"></span>{% endif %}
       </div>
       {% endfor %}
       {% if section == "assessment" %}{{ differentials_aside() }}{% endif %}

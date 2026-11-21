@@ -37,7 +37,8 @@ GATE_REFUSALS = gate.REFUSALS
 CHECK_KINDS = ("label_check_refused", "label_check_failed")
 # The sentences the page scripts render, handed as data (15.6).
 SCRIPT_WORDS = ("COPIED", "COPY_FAILED", "AUDIO_NOT_SUPPORTED", "ALARM_FIRED", "CLOSE", "NAME_NOT_SAVED", "NOT_SAVED_NO_ANSWER",
-                "NOT_SAVED_ERROR", "OPEN_ALL_LINES", "CLOSE_ALL_LINES", "TURN_NOT_SAVED", "VIEW_NOT_SAVED")
+                "NOT_SAVED_ERROR", "OPEN_ALL_LINES", "CLOSE_ALL_LINES", "TURN_NOT_SAVED", "VIEW_NOT_SAVED", "ENTRY_SAVED", "ENTRY_NOT_SAVED",
+                "NOT_SAVED_NEW_DRAFT")
 # A press that plays a line or a row starts this long before the line, and ends where it ended (15.10 ruling 38: in
 # the room check of 15 Nov 2026 the sound of a row began late, and at one row the drug's name was gone).
 PLAY_LEAD_S = 1.0

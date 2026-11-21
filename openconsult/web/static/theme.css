@@ -209,6 +209,15 @@ button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
 .entry.edited .entry-text { background: #D3ECD9; }
 .entry.edited span.entry-text { padding: 0 .15rem; border-radius: 2px; }
 .mark.edited-word { color: #1F5C38; font-weight: 600; margin-left: .35rem; }
+/* An entry corrected where it stands (ruling 72): where it can be edited its words are a press, shown by the cursor and,
+   under the pointer or the keyboard, an outline; pressed, they become a field in place that holds them whole. Then the
+   entry says that it was saved, or in red why it was not. */
+#note .entry-text.can-edit { cursor: text; }
+#note .entry-text.can-edit:hover, #note .entry-text.can-edit:focus-visible { outline: 1px dashed var(--ink-soft); outline-offset: 2px; }
+#note .entry.editing span.entry-text { display: none; }
+textarea.entry-field { display: block; width: 100%; margin: .15rem 0; font-family: var(--sans); font-size: .95rem; line-height: 1.5; color: var(--ink); background: var(--panel); border: 1px solid var(--ink-soft); border-radius: 8px; padding: .3rem .5rem; resize: none; overflow: hidden; }
+.entry-said { font-size: .8rem; margin-left: .4rem; color: var(--green); }
+.entry-said.not-saved { color: var(--red); }
 .differentials { margin: .4rem 0 .6rem; padding: .5rem .8rem; border-left: 3px solid var(--line); background: var(--paper); font-size: .9rem; }
 .differentials h4 { margin: 0 0 .2rem; font-weight: 600; }
 .control-row { display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }

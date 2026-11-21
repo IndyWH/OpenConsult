@@ -295,6 +295,14 @@ VIEW_GROUP = {"note": "View of the note", "transcript": "View of the transcript"
 SHOW_TURN = "Show turn {n} in the transcript"
 # The small word after an entry the doctor has changed (ruling 75), beside the green ground of its words. A draft.
 ENTRY_EDITED = "Edited"
+# An entry corrected where it stands, in the simple view (ruling 72). Drafts. What a screen reader is told at an entry
+# that can be edited, as its description; what the entry says after a save; and what it says when the words were not
+# saved, in the pattern of a drug name that was not saved (NAME_NOT_SAVED below), with its two reasons and one more,
+# added after the plan for the plan review's change B: the app answered, and the entry is no longer on its page.
+ENTRY_PRESS = "Press Enter to edit the words of this entry."
+ENTRY_SAVED = "Saved."
+ENTRY_NOT_SAVED = "These words were not saved: {reason}. They are still in the box."
+NOT_SAVED_NEW_DRAFT = "the note has been drafted again since this page was shown"
 # A press on Simple at an area whose advanced view holds a box or a choice that is not saved changes nothing and says
 # this (15.10, ruling 12; the plan review of 9f, change A), in the pattern of a turn's sentence below.
 VIEW_NOT_SAVED = "This view holds words that are not saved. Save them first."

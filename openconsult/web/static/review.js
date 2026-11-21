@@ -114,9 +114,16 @@
     if (!node || node.dataset.view === press.dataset.view) return;
     if (press.dataset.view === 'simple' && advancedHolds(node)) { viewSays(name, WORDS.VIEW_NOT_SAVED); return; }
     viewSays(name, '');
-    const before = press.getBoundingClientRect().top;
-    setView(name, press.dataset.view);
-    window.scrollBy(0, press.getBoundingClientRect().top - before);
+    function change() {
+      const before = press.getBoundingClientRect().top;
+      setView(name, press.dataset.view);
+      window.scrollBy(0, press.getBoundingClientRect().top - before);
+    }
+    // The other way round: an entry's field of the simple note that is open is saved first, and the view changes only
+    // when the app has answered. Where the save failed the view stays, and the field stays open with its sentence.
+    const saves = name === 'note' ? leaveFields() : [];
+    if (!saves.length) { change(); return; }
+    Promise.all(saves).then(function (all) { if (all.every(function (one) { return one === true; })) change(); });
   });
   // The sentence goes when the area holds nothing unsaved any more.
   ['input', 'change'].forEach(function (kind) {
@@ -127,6 +134,151 @@
       });
     });
   });
+
+  // ------------------------------------------------------------------ an entry corrected where it stands
+  // In the simple view a click on an entry's words, or Enter on an entry that has the keyboard, turns the words into a
+  // field in place that holds them whole (spec 15.13, ruling 72). Enter, or leaving the field, saves through the
+  // address and the function an edit has always used: the script posts the entry's own form. The app answers with the
+  // page, and its own piece of that entry is put in place of the old one: nothing loads, the window is not moved, and
+  // the entry says that it was saved until the next press or keystroke. Words left as they stood send nothing and say
+  // nothing; Escape puts them back. An empty field is refused by the app with its own sentence and the words come
+  // back. Any other refusal, an error or no answer leaves the field open with what was typed, and the entry says so:
+  // nothing typed is lost without a word. The field carries the words as they stood as what the app gave it, so the
+  // page's timed move does not come while it holds others (use.js; 15.10 ruling 12). A press that loads the page
+  // while a save is on its way is held until the app has answered and dropped if the save failed (rows.js), so that
+  // a note is never approved without the words just typed. Only where the app sends an entry's form, that is where
+  // entries can be edited: read only, the words are not a press and do not look like one (R15).
+  const note = document.getElementById('note');
+  const onWay = new Map();      // the fields whose save is on its way, each with its promise
+  let saidSaved = null;         // the place that says Saved, until the next press or keystroke
+
+  // Pure: an entry is one line in the note, so a line break that was typed or pasted is sent as a space; and the
+  // sentence for words that were not saved, from the app's own words.
+  function oneLine(text) { return String(text).replace(/\s*[\r\n]+\s*/g, ' ').trim(); }
+  function notSaved(reason) { return WORDS.ENTRY_NOT_SAVED.replace('{reason}', reason); }
+
+  function formOf(block) { return block.querySelector('form.entry-form'); }
+  function shownOf(block) { return block.querySelector('span.entry-text'); }
+  function fieldOf(block) { return block.querySelector('textarea.entry-field'); }
+  function says(block, sentence, trouble) {
+    const slot = block.querySelector('.entry-said');
+    if (!slot) return;
+    slot.textContent = sentence;
+    slot.classList.toggle('not-saved', Boolean(trouble));
+    slot.setAttribute('role', trouble ? 'alert' : 'status');
+    if (saidSaved === slot) saidSaved = null;
+  }
+  function ready(block) {
+    const shown = shownOf(block);
+    if (!shown || !formOf(block)) return;
+    shown.classList.add('can-edit');
+    shown.setAttribute('tabindex', '0');
+    shown.setAttribute('aria-describedby', 'entry-says');
+  }
+  function fit(field) { field.style.height = 'auto'; field.style.height = field.scrollHeight + 'px'; }
+  function open(block) {
+    const shown = shownOf(block), form = formOf(block);
+    if (!shown || !form || fieldOf(block) || !note || note.dataset.view !== 'simple') return;
+    const field = document.createElement('textarea');
+    field.className = 'entry-field';
+    field.rows = 1;
+    field.defaultValue = shown.textContent;      // the words as they stood: what the app gave this field
+    field.setAttribute('aria-label', form.querySelector('input[name=text]').getAttribute('aria-label'));
+    block.classList.add('editing');
+    shown.after(field);
+    fit(field);
+    field.focus();
+  }
+  function close(block, keyboardBack) {
+    const field = fieldOf(block);
+    if (field) { field.dataset.closed = 'yes'; field.remove(); }
+    block.classList.remove('editing');
+    if (keyboardBack && shownOf(block)) shownOf(block).focus({preventScroll: true});
+  }
+  // The app's answer to a save, as the text of a page: true when the words were saved, else the entry's own name.
+  function answered(block, field, typed, status, html, keyboardBack) {
+    const got = new DOMParser().parseFromString(html, 'text/html');
+    if (!got.getElementById('review')) { window.location.href = page.dataset.path; return block.id; }      // not the review page: the login ended
+    if (window.pageFields) window.pageFields.left(got.getElementById('review').dataset.secondsLeft);      // the request was use
+    const theirs = got.getElementById(block.id);
+    if (status === 200 && theirs) {
+      const place = function () {
+        const node = document.importNode(theirs, true);
+        close(block, false);
+        block.replaceWith(node);
+        ready(node);
+        says(node, WORDS.ENTRY_SAVED, false);
+        saidSaved = node.querySelector('.entry-said');
+        if (keyboardBack && shownOf(node)) shownOf(node).focus({preventScroll: true});
+      };
+      if (window.freshPage && window.freshPage.whenUp) window.freshPage.whenUp(place); else place();
+      return true;
+    }
+    const slot = status === 400 ? got.getElementById(formOf(block).querySelector('button').id + '-refusal') : null;
+    const sentence = slot ? slot.textContent.trim() : '';
+    if (sentence && !typed) {      // an empty field: the app's sentence, and the words as they stood
+      close(block, keyboardBack);
+      says(block, sentence, true);
+      return block.id;
+    }
+    field.readOnly = false;
+    if (sentence) says(block, sentence, true);
+    else if (status === 200) says(block, notSaved(WORDS.NOT_SAVED_NEW_DRAFT), true);      // the entry is no longer on the app's page
+    else says(block, notSaved(WORDS.NOT_SAVED_ERROR.replace('{status}', status)), true);
+    return block.id;
+  }
+  function save(block, keyboardBack) {
+    const field = fieldOf(block);
+    if (!field) return Promise.resolve(true);
+    if (onWay.has(field)) return onWay.get(field);
+    const typed = oneLine(field.value);
+    if (typed === oneLine(field.defaultValue)) { close(block, keyboardBack); says(block, '', false); return Promise.resolve(true); }
+    field.readOnly = true;
+    const sent = fetch(formOf(block).action, {method: 'POST', headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+                                              body: new URLSearchParams({text: typed}), keepalive: true})
+      .then(function (answer) { return answer.text().then(function (html) { return answered(block, field, typed, answer.status, html, keyboardBack); }); })
+      .catch(function () { field.readOnly = false; says(block, notSaved(WORDS.NOT_SAVED_NO_ANSWER), true); return block.id; })
+      .then(function (outcome) { onWay.delete(field); return outcome; });
+    // The save joins the line of keeps: a press that loads the page waits for it, and is dropped if it failed.
+    const done = window.reviewSaves ? window.reviewSaves.join(sent) : sent;
+    onWay.set(field, done);
+    return done;
+  }
+  // Every open field is left: saved where its words changed, closed where they did not. The saves on their way.
+  function leaveFields() {
+    const saves = [];
+    if (note) note.querySelectorAll('textarea.entry-field').forEach(function (field) {
+      const done = save(field.closest('.entry'), false);
+      if (onWay.has(field)) saves.push(done);
+    });
+    return saves;
+  }
+  if (note) {
+    note.querySelectorAll('.entry').forEach(ready);
+    note.addEventListener('click', function (event) {
+      const shown = event.target.closest ? event.target.closest('span.entry-text.can-edit') : null;
+      const chosen = window.getSelection ? window.getSelection() : null;
+      if (shown && !(chosen && !chosen.isCollapsed && shown.contains(chosen.anchorNode))) open(shown.closest('.entry'));
+    });
+    note.addEventListener('keydown', function (event) {
+      const target = event.target;
+      if (target.matches('span.entry-text.can-edit') && event.key === 'Enter') { event.preventDefault(); open(target.closest('.entry')); return; }
+      if (!target.matches('textarea.entry-field') || onWay.has(target)) return;      // while a save is on its way the field waits
+      if (event.key === 'Enter') { event.preventDefault(); save(target.closest('.entry'), true); }
+      if (event.key === 'Escape') { const block = target.closest('.entry'); close(block, true); says(block, '', false); }
+    });
+    note.addEventListener('input', function (event) { if (event.target.matches('textarea.entry-field')) fit(event.target); });
+    note.addEventListener('focusout', function (event) {
+      const field = event.target;
+      if (!field.matches || !field.matches('textarea.entry-field') || field.dataset.closed || (window.freshPage && window.freshPage.busy)) return;
+      save(field.closest('.entry'), false);
+    });
+    // A press that loads the page while a field is open: the field is left first, so its save is in the line that holds the press.
+    document.addEventListener('submit', function () { leaveFields(); }, true);
+    ['click', 'keydown'].forEach(function (kind) {
+      document.addEventListener(kind, function () { if (saidSaved) { saidSaved.textContent = ''; saidSaved = null; } }, true);
+    });
+  }
 
   // ------------------------------------------------------------------ the turns
   const pane = document.getElementById('final-transcript');
