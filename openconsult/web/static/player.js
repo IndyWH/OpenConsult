@@ -108,8 +108,9 @@
     stopIfReached();
     document.querySelectorAll('.playing').forEach(function (line) { line.classList.remove('playing'); });
     const line = player.lines.find(function (l) { return t >= l.start_s && t < l.end_s; });
-    // The sounding line is marked on the line, and on its words inside its turn: the one in sight shows it (step 6e).
-    if (line) ['line-', 'turn-line-'].forEach(function (name) {
+    // The sounding line is marked on the line, on its words inside its turn, and on its words inside its passage of the
+    // simple view: the one in sight shows it (steps 6e and 9f).
+    if (line) ['line-', 'turn-line-', 'passage-line-'].forEach(function (name) {
       const node = document.getElementById(name + line.n);
       if (node) node.classList.add('playing');
     });

@@ -213,6 +213,11 @@ button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
 .passage-number { display: inline-block; min-width: 1.5rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); font-size: .72rem; line-height: 1.5; }
 button.passage-play { margin: 0 .5rem 0 0; }
 a.passage-doubt { text-decoration: underline dotted; color: inherit; }
+/* Inside a passage the words of the line a number named, and of the line that is sounding, as inside a closed turn. And
+   the turn a chip named, marked whole in either view: a ground and an outline, so it is not told by colour alone. */
+.passage-line.marked { background: #F3EDE6; outline: 2px solid var(--ink-soft); outline-offset: 0; border-radius: 3px; margin: 0 .2rem; padding: 0 .15rem; }
+.passage-line.playing { background: #EFE7DE; }
+.passage.marked, details.turn.marked > summary { background: #F3EDE6; outline: 2px solid var(--ink-soft); outline-offset: 3px; border-radius: 6px; }
 /* The number of a turn in the advanced view: for a screen reader and a chip's press, not for the eye. */
 .turn-number { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* An entry the doctor has changed (ruling 75), in both views: its words on a soft green ground, the box of the advanced

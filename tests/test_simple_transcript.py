@@ -211,6 +211,12 @@ def test_9f_an_advanced_turn_carries_the_number_its_passage_shows_and_every_name
     # The page gives its script what a chip's press needs in each view: every chip names a passage that is on the page.
     chips = {int(k) for k in re.findall(r'class="chip no-print" data-turn="(\d+)"', raw)}
     assert chips and chips <= {p["number"] for p in passages(raw)}
+    # The turn a chip names is marked whole in either view by a ground and an outline, never by colour alone (ruling 71; R15);
+    # and inside a passage the words of the line a number named, as inside a closed turn.
+    css = client.get("/static/theme.css").text
+    whole = css.split(".passage.marked, details.turn.marked > summary {")[1].split("}")[0]
+    line = css.split(".passage-line.marked {")[1].split("}")[0]
+    assert all("background:" in rule and "outline: 2px solid" in rule for rule in (whole, line))
     c.close()
 
 

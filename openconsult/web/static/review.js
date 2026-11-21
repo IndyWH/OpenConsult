@@ -26,20 +26,37 @@
   try { store = window.sessionStorage; store.getItem('x'); } catch (error) { store = null; }     // no store: as with no script
   // A line number pressed: the turn that holds the line is shown, with that line's words marked inside it, in the middle
   // of the window; the turn is not opened. On an opened turn the line itself is marked, as before the reading view.
-  function show(n) {
+  // Since step 9f the transcript has two views, and every such press works in both (spec 15.13, the details of step
+  // 9f): in the simple view the passage that holds the line is shown, with that line's words marked inside it.
+  function simpleTranscript() {
+    const transcript = document.getElementById('transcript');
+    return Boolean(transcript) && transcript.dataset.view === 'simple';
+  }
+  function mark(shown) {
     document.querySelectorAll('.marked').forEach(function (node) { node.classList.remove('marked'); });
-    const line = document.getElementById('line-' + n);
-    if (!line) return;
-    const turn = line.closest('details.turn');
-    const shown = turn && !turn.open ? document.getElementById('turn-line-' + n) : line;
     if (!shown) return;
     shown.classList.add('marked');
     shown.scrollIntoView({block: 'center'});
+  }
+  function show(n) {
+    if (simpleTranscript()) { mark(document.getElementById('passage-line-' + n)); return; }
+    const line = document.getElementById('line-' + n);
+    const turn = line ? line.closest('details.turn') : null;
+    mark(turn && !turn.open ? document.getElementById('turn-line-' + n) : line);
+  }
+  // A chip pressed (ruling 71): the turn of that number is shown in the transcript, in the middle of the window, marked
+  // whole, in whichever view the transcript stands: its passage, or the turn that carries the number. It opens
+  // nothing and plays nothing.
+  function showTurn(k) {
+    const number = document.getElementById('turn-number-' + k);
+    mark(simpleTranscript() ? document.getElementById('passage-' + k) : (number ? number.closest('details.turn') : null));
   }
   // One listener for the page: a row or a line that fresh.js put in place is a new node, and its line number must work as after a load.
   document.addEventListener('click', function (event) {
     const button = event.target.closest ? event.target.closest('button.cite') : null;
     if (button) show(button.dataset.line);
+    const chip = event.target.closest ? event.target.closest('button.chip') : null;
+    if (chip) showTurn(chip.dataset.turn);
   });
   // The red mark beside the assessment (15.11 ruling 9): a press shows the alarm the app matched.
   const marksNode = document.getElementById('marks');
