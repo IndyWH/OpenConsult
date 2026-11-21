@@ -189,6 +189,8 @@ button.cite:hover { text-decoration: underline; }
    An area says its view in data-view, and the rules below show that one. The two presses stand at the right of the
    area's head; the one in use is told by its weight, its edge and the line under it, never by colour alone (R15). */
 .views { margin-left: auto; display: inline-flex; gap: .3rem; flex: none; }
+/* In a narrow window the head of the note and of the transcript wraps, so that the two presses stay inside it. */
+#note > .pane-head, #transcript > .pane-head { flex-wrap: wrap; row-gap: .4rem; }
 .views .view { font-size: .8rem; text-decoration: none; padding: .25rem .8rem; border: 1px solid var(--line); border-radius: 999px; color: var(--ink-soft); background: var(--panel); }
 .views .view[aria-current="true"] { font-weight: 700; color: var(--ink); border: 2px solid var(--ink); text-decoration: underline; }
 .views .view[aria-disabled="true"] { opacity: .5; cursor: not-allowed; }
@@ -209,8 +211,8 @@ button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
 #transcript[data-view="advanced"] #passages { display: none; }
 /* A passage: its number, as a chip of the note shows it, the speaker's word, the play, then its words as running text. */
 .passage { margin: 0 0 .7rem; line-height: 1.7; font-size: 1rem; color: var(--ink); scroll-margin-top: 4.2rem; }
-.passage-head { color: var(--ink-soft); font-size: .8rem; margin-right: .5rem; }
-.passage-number { display: inline-block; min-width: 1.5rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); font-size: .72rem; line-height: 1.5; }
+.passage-head { display: inline-block; min-width: 5.9rem; color: var(--ink-soft); font-size: .8rem; margin-right: .5rem; }
+.passage-number { display: inline-block; min-width: 1.9rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); font-size: .72rem; line-height: 1.5; }
 button.passage-play { margin: 0 .5rem 0 0; }
 a.passage-doubt { text-decoration: underline dotted; color: inherit; }
 /* Inside a passage the words of the line a number named, and of the line that is sounding, as inside a closed turn. And
