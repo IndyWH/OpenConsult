@@ -202,6 +202,13 @@ button.cite:hover { text-decoration: underline; }
 /* A chip: the number of a turn of speech an entry rests on, a small press. */
 button.chip { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0 .45rem; min-width: 1.5rem; margin: 0 .1rem 0 .25rem; font-size: .72rem; line-height: 1.5; color: var(--ink-soft); cursor: pointer; }
 button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
+/* An entry the doctor has changed (ruling 75), in both views: its words on a soft green ground, the box of the advanced
+   view too, and the small word Edited after it. Ink on this green measures 12.38 to 1, as on the yellow of a doubted
+   drug name (12.67 to 1). The two grounds are almost equally light, so an eye that cannot tell green from yellow
+   tells an edited entry by the word, never by the ground (R15). The word, on the panel: 7.94 to 1. */
+.entry.edited .entry-text { background: #D3ECD9; }
+.entry.edited span.entry-text { padding: 0 .15rem; border-radius: 2px; }
+.mark.edited-word { color: #1F5C38; font-weight: 600; margin-left: .35rem; }
 .differentials { margin: .4rem 0 .6rem; padding: .5rem .8rem; border-left: 3px solid var(--line); background: var(--paper); font-size: .9rem; }
 .differentials h4 { margin: 0 0 .2rem; font-weight: 600; }
 .control-row { display: flex; gap: 1.2rem; align-items: flex-start; flex-wrap: wrap; }

@@ -5,5 +5,7 @@
 header.app, footer.disclaimer, .no-print, .entry-form, button.cite, .uncited, .differentials, #controls, #warnings,
 #transcript, #model-line, #letters, .refusal, .reason { display: none !important; }
 .print-only { display: inline !important; }
+/* The mark of an edited entry is the page's alone (15.13, ruling 75): the sheet is the note, with no ground and no word. */
+.entry.edited .entry-text { background: none !important; padding: 0 !important; }
 .print-keep { display: block; }
 .pane { border: none; }

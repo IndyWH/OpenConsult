@@ -301,6 +301,9 @@ def page_data(p, row: dict) -> dict:
     numbers = {line["n"]: turn["number"] for turn in turns for line in turn["lines"]}
     for entry in state["entries"]:
         entry["chips"] = reading.chips_of(entry["lines"], numbers)
+        # Ruling 75: an entry is edited when its words as they stand differ from the model's own, which the record keeps
+        # beside them. One typed back to the model's words is not.
+        entry["edited"] = entry["text"].strip() != entry["model_text"].strip()
     # The doubted drug names (rulings 20, 26 and 28): their rows head the warnings; one that is not settled counts on
     # Approve; the sentences above them are not counted.
     drug = drug_marks.review_data(p.consultations, cid, lines)

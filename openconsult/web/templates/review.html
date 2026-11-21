@@ -68,7 +68,9 @@
     <div class="section" id="section-{{ section }}">
       <h3 class="section-head">{{ words.SECTION_WORDS[section] }}</h3>
       {% for entry in sections[section] %}
-      <div class="entry" id="entry-{{ entry.id }}-block">
+      {# An entry the doctor has changed is marked in both views (ruling 75): its words on a green ground, and the word
+         Edited after its chips or its line numbers, so that it is never told by colour alone. #}
+      <div class="entry{% if entry.edited %} edited{% endif %}" id="entry-{{ entry.id }}-block">
         {% if entries_read_only %}<span class="entry-text">{{ entry.text }}</span>{{ refusal("entry-" ~ entry.id) }}
         {% else %}<form method="post" action="/consultations/{{ cid }}/entries/{{ entry.id }}" class="entry-form no-print" data-stay>
           <input name="text" value="{{ entry.text }}" class="entry-text" aria-label="{{ words.SECTION_WORDS[entry.section] }}">
@@ -79,6 +81,7 @@
         {# The chips (ruling 71): one for each turn of the reading view that holds a line the entry cites. A press shows that turn. #}
         {% for k in entry.chips %}<button type="button" class="chip no-print" data-turn="{{ k }}" aria-label="{{ words.SHOW_TURN.format(n=k) }}" title="{{ words.SHOW_TURN.format(n=k) }}">{{ k }}</button>{% endfor %}
         {% if entry.uncited %}<span class="mark uncited no-print">({{ words.ENTRY_UNCITED }})</span>{% endif %}
+        {% if entry.edited %}<span class="mark edited-word no-print">{{ words.ENTRY_EDITED }}</span>{% endif %}
       </div>
       {% endfor %}
       {% if section == "assessment" %}{{ differentials_aside() }}{% endif %}

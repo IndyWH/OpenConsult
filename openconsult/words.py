@@ -293,6 +293,8 @@ VIEW_WORDS = {"simple": "Simple", "advanced": "Advanced"}
 # (the one in use is told by the reader's own word for current), and what a chip's press does (also its tip).
 VIEW_GROUP = {"note": "View of the note", "transcript": "View of the transcript"}
 SHOW_TURN = "Show turn {n} in the transcript"
+# The small word after an entry the doctor has changed (ruling 75), beside the green ground of its words. A draft.
+ENTRY_EDITED = "Edited"
 # A press on Simple at an area whose advanced view holds a box or a choice that is not saved changes nothing and says
 # this (15.10, ruling 12; the plan review of 9f, change A), in the pattern of a turn's sentence below.
 VIEW_NOT_SAVED = "This view holds words that are not saved. Save them first."
