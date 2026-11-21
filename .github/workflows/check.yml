@@ -16,6 +16,8 @@ jobs:
   suite:
     name: ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
+    # A ceiling, well above the slowest check seen (53 minutes on Windows on 20 Nov 2026): a job that stands still ends.
+    timeout-minutes: 90
     strategy:
       fail-fast: false
       matrix:
@@ -33,8 +35,9 @@ jobs:
       - name: Install from the lock file
         run: uv sync --locked
 
+      # pytest's own list of the slowest tests, on every system, so that a slow check can be read and not guessed at.
       - name: Run the suite (a skipped test fails it)
-        run: uv run pytest -rs
+        run: uv run pytest -rs --durations=40 --durations-min=1.0
 
       - name: Start the app with a temporary data folder, check that it answers, stop it
         run: uv run python .github/scripts/start_check.py
