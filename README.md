@@ -4,6 +4,10 @@ This branch is where OpenConsult v2.0 is being built.
 
 - The working app, v1, is on the main branch.
 - The plan for v2 is in V2_SPEC.md.
+- The paper on v1 is a preprint (18 Nov 2026): [OpenConsult, an
+  Open-Source Fully Local AI Scribe With Live Decision Support:
+  Development and Formative Evaluation](https://doi.org/10.21203/rs.3.rs-11771422/v1),
+  Research Square.
 - So far this version runs acted consultations from a patient list to an
   approved note and its referral letters. The Patients page has New
   patient at its top and lists every
@@ -29,7 +33,16 @@ This branch is where OpenConsult v2.0 is being built.
   beside the assessment and marked as not part of the note, Approve with
   the counts of warnings and alarms, Refuse, the warnings and the alarms
   each a press from the sound, and the transcript with a player for the
-  recording. The transcript reads as turns of speech, doctor, patient,
+  recording. On the review page the draft note and the transcript each
+  open in a simple view. The note is plain words under its four
+  headings, each entry with one small chip for each turn of speech it
+  rests on, and a click on an entry's words corrects it where it
+  stands. The transcript is numbered passages, each with a play, and of
+  all the marks only a doubted drug name stays in sight. One press at
+  the top right of each area shows the advanced view: the boxes, the
+  line numbers, every mark and Check who spoke. An entry the doctor has
+  changed stands on green with the word Edited, in both views. In its
+  advanced view the transcript reads as turns of speech, doctor, patient,
   doctor, patient: neighbouring lines of one speaker are one entry,
   however the speech choice cut them, with the numbers of its first and
   last line and one press that plays the whole turn; up to three words

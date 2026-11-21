@@ -4,6 +4,92 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-21. Step 9f: the review page opens in a simple view of the note and of the transcript, an edited entry is marked, two lines for two things in the cloud
+
+Run on 21 Nov 2026 by the mailbox, one plan gate (the owner's okay at
+08:35, his words: Noted. Choice A.), under Cowork's review of the plan
+with changes A to E. The spec is 6d9e048 (sha256 cce162a5...), the
+stage prompt 696daae (stage-prompts/STAGE_09F.md). The private report
+is STAGE9F_REPORT.md in the log folder. Fifteen commits, none pushed.
+The suite: 1420 passed in about 152 s, none skipped (1358 at the
+start). No model was called, no key read, nothing left the machine. No
+prompt file, frame or form changed; the tables stay at version 13.
+
+For the patient. After Stop the doctor reads the note as plain words
+under its four headings, whole and wrapped, so that a wrong dose is
+seen and not lost among boxes and 20 to 55 line numbers. Each entry
+carries one small chip for each turn of speech it rests on; a press
+shows that turn in the transcript, marked. An entry that rests on
+nothing that was said still says so. An entry the doctor changed
+stands on green with the word Edited, in both views.
+
+- Two views of one page (15.13, rulings 46 and 71 to 75; Cowork's
+  ruling on the plan's item 2). Each area carries data-view and the
+  style sheet shows that view. The note is one piece for both: the
+  simple view shows the words the print sheet already had, so no word
+  of it is sent twice. The transcript gains a block of passages
+  (#passages) before the turns, so its words are sent once more:
+  measured on a made page of 240 one-word lines, 297,121 bytes before
+  and 327,933 after, 101 bytes a line where a line costs 1,043. The
+  advanced view is each area as it stood at 385ad5e, proven piece for
+  piece, plus one hidden number in each turn.
+- The choice of view is the browser's: noted in the session store when
+  the page is left (two names and a time), read once at the next load
+  if not older than 15 s, before place.js. With no script each press is
+  a link (?note=advanced&transcript=advanced#area), and the app sends
+  an area advanced where the page comes back to something that stands
+  there alone (a refused Save, lines=open, the check's waits and
+  outcome). With no script a Save that was taken comes back simple.
+- The number of a turn and the chips: two pure rules in
+  consult/reading.py (numbers_of, chips_of); nothing stored, no model
+  reads them.
+- An entry corrected where it stands (ruling 72), in review.js: a
+  click or Enter, a field in place, saved on leaving or Enter through
+  the address of today. Nothing typed is lost without a word: after a
+  refusal, an error, no answer (30 s) or an ended login the field
+  stays open and the entry says why. A press that loads the page waits
+  for a save on its way (rows.js) and is dropped if it failed; a
+  change of view never hides words not saved, either way (change A).
+- The mark of an edited entry (ruling 75): text differs from
+  model_text. Green #D3ECD9, ink on it 12.38 to 1; the yellow of a
+  doubted name 12.67 to 1; the two are equally light, so the word
+  carries the mark. Not in the copy text, the approved text or print.
+- Two lines for two things in the cloud (ruling 76): where_lines gives
+  each thing a line that begins In the cloud:. Eleven sentences of the
+  owner's are proven letter for letter (tests/test_two_cloud_lines.py).
+- Two flags of 9c: a transcript that came back with no words has the
+  owner's reason (UPLOAD_NO_WORDS); the picture of This machine is
+  described to a screen reader by the lines above it.
+- web/review.py: its five edits moved to web/review_edits.py; 544
+  lines (636 before). GitHub's check lists its 40 slowest tests and
+  has a limit of 90 minutes; nothing mended on a guess.
+
+Seen in a real browser (this machine's Chrome, cut off, a profile that
+had seen 385ad5e; it ran the built scripts): each line of Done when you
+see; every way a save ends; the keyboard alone; the lock held by an
+unsaved field; scripts off; a passage's play by the sound that comes
+out (within 0.01 s); 420 px. Five faults found there and mended in two
+commits (8c965d6, e26e282): the worst, two functions of review.js with
+one name, which no test can reach.
+
+Older tests restated, old words kept: five of run 9c (four for the one
+long line, one for the old reason). None for the two views.
+
+Flags for the owner, each in the report: the drafts he meets on screen
+(Edited; Saved.) and those he does not (the sentences for words not
+saved, the reader's sentences); a return to the page within 15 s finds
+the view chosen; the 30 s limit and two reasons were added after the
+plan; words.py (1,329 lines) and schema.py are over their targets.
+
+Made untrue, and put right: the README (the two views; one line for the
+paper), CLAUDE.md's run line. The entry of run 9b moved to the archive.
+Not mine to write: the spec's details of 9f still give the reason of a
+transcript with no words as a draft, and it is the owner's since his
+word of 08:35; and they do not yet hold changes A and B of the plan
+review. No help page exists.
+
+Next: the owner's room check of step 9f, one sitting.
+
 ## 2026-11-18. Run 9c: one picture of This machine, a tick or a choice that saves by itself, the mends from the room check of run 9b, and the two thresholds of the gate within the owner's bounds
 
 Run on 17, 18 and 20 Nov 2026 by the mailbox, as one run in two halves
@@ -305,126 +391,3 @@ the spec does not yet hold the owner's words of 20 Nov, the lines of
 the picture among them. No help page exists.
 
 Next: the owner opens the Patients page once on the build of mail 7.
-
-## 2026-11-16. Run 9b: cloud mode. A consultation can run on Claude and Speechmatics, said before anything leaves, marked while it runs; a recording can be sent once after Stop and is deleted there
-
-Run on 16 Nov 2026 by the mailbox, as one run in two halves (15.13,
-ruling 35), under the owner's okay of the plan (00:52) and Cowork's
-review of it; three questions went by mail and were answered. The spec
-is a17ed6c (sha256 8c5a7e85...), the stage prompt c7419b0
-(stage-prompts/STAGE_09B.md). The private report is STAGE9B_REPORT.md in
-the log folder, with the plan, its review and the first act beside it.
-Twenty-four commits since 0631413: the twenty-two of the run (the last
-11275de), the spec with Met (8438975) and the line for Windows
-(18cc922). The suite: 1114 passed in about 111 s, none skipped (985 at
-the start). No prompt file, frame or form changed: the two prompt
-folders are as at 0631413. vLLM was left as found; the Ollama service
-was not touched.
-Pushed by the owner on 17 Nov 2026. Met on 17 Nov 2026 by his room
-check in two sittings (15.13, Met for run 9b). GitHub's check is green
-on the three systems at 18cc922: the Windows check had failed on one
-test, the hash of why_this_model.md, for the line ends, and its line in
-.gitattributes mended it.
-
-For the patient. Until this run nothing a patient said could leave the
-computer, and a computer with no suitable card could not run a
-consultation at all. Now it can, on two cloud services, and the app
-says so three times over: in a statement, built for the doctor's own
-choices and ticked before Start is offered, of what is sent, what stays
-and what each service keeps; in a Cloud mark on the Start screen, the
-live page and the review page for the whole of a consultation; and in
-the record. When the connection is lost the page says at once that the
-emergency alarm has stopped listening. A recording that is sent after
-Stop is deleted at the service as soon as the transcript is back, the
-service is asked again, and the doctor is told whether it is gone.
-
-What was built (15.13, rulings 25 to 35 and the details of 9b).
-- Keys (7.2). The connect screens for Claude and Speechmatics test a
-  pasted key before it is kept, and keep it in the system's secure
-  store alone (the keyring package, MIT, with eight behind it; cffi
-  under MIT-0 by the owner's reading). Read order: store, environment,
-  the file .env. No store that answers in 5 s: nothing saved. Each
-  reason of a failed test stands on its screen. Connections in
-  Settings: Test, Remove. The test is six words to each of Claude's
-  two models, or a session opened and ended with no sound; 10 s.
-- The path (7.3; 10.3). Two settings and one tick: the language model
-  and the transcription, each on this computer or at its one service,
-  and Better accuracy. With no suitable card both begin in the cloud.
-  A cloud choice is refused without its connection and without the
-  statement for the path as it would stand ticked; a changed word
-  asks for the tick again (a checksum). A consultation holds the path
-  it started with and no call falls back to another (10.4).
-- Claude behind the app's door: Claude Haiku 5.5 for every job, Claude
-  Sonnet 5.5 for the drug-name call alone (ruling of 15 Nov). The
-  engine moved from the bench to llm; the bench keeps its effort, its
-  waiting and its stops. What the model saw says what Claude adds.
-- Speechmatics live, at its EU address. AssemblyAI is no choice of the
-  app; its worker and its choice are the bench's alone (ruling 28).
-- A lost connection (ruling 29): said at once, the recording goes on,
-  tried again every 10 s, each session's speakers asked about apart,
-  the stretch with no transcript a warning, and at Stop two presses:
-  send the recording once, or go on without it.
-- The recording after Stop (15.9, rulings 36 and 42; consult/whole.py):
-  by the tick or by the one press, once, as recording.wav to the EU
-  host alone; the stage with its seconds; delete, asked again, both
-  answers kept; three lines for the review page: made and gone, made
-  and not proven gone (the owner's sentence), not made. A failure is
-  never followed by a second sending.
-- The first run (7.1): connect the language model, connect
-  transcription, the self-test from its page, the microphone test (not
-  stored, not sent), each with Not now. A folder set up before them meets them
-  once, at its first login (the owner's choice, by mail).
-- The page Why this model, Cowork's draft byte for byte (ruling 30).
-- The tables are version 11: the path and the statement's checksum on a
-  consultation; speech_session; recording_upload; first_run_left. A
-  folder of version 10 comes forward with every row.
-
-Measurements, as counts.
-- The first act, before any commit: Speechmatics on three recordings,
-  live and whole, as on 10 Nov. Six results, no failure. 904.8 s live
-  and 903.0 s whole, about 0.39 US dollars by the list prices. Results
-  6.3, 5.3 and 11.2 s after the upload. Deletes 4 of 4, each proven.
-  Settings as on 10 Nov; the service's build line had moved. Both hard
-  marks held on all six pages: 0 and 0.
-- Five real calls, each once. The alarm call to Claude Haiku: 1,511
-  tokens read, 361 written, 4.0 s. The drug-name call to Claude Sonnet
-  on one stored page: 3,258 read, 120 written, 6.2 s, 4 entries kept.
-  The app's test of Claude: two requests of 18 and 4 tokens, 0.9 and
-  1.3 s. Its test of Speechmatics: a session in 0.17 s, no sound. The
-  gate clip through the app's upload: result in 2.66 s, 22 of 22
-  words, deleted. Language model cost 0.0081 US dollars.
-- What left the machine: api.anthropic.com (8 connections),
-  eu.rt.speechmatics.com (5 sessions), eu1.asr.api.speechmatics.com
-  (43 connections). No other name in any step.
-- Seen in a real browser against made services: a profile that had
-  seen 0631413 ran only the scripts as built; each connect screen
-  through failed and passed tests; the statement and its tick; the
-  mark; a session lost and found again in 10.2 to 10.3 s; the question
-  at Stop; the first run on a fresh folder; the tick, with a good
-  upload, a failed one and a delete not proven. The Start screen shows
-  in 0.3 s when the services answer and in 10.3 s when one does not.
-
-A fault of this run, found by its own record of connections and closed
-in a commit of its own: four older tests build the app in a fresh
-Python, outside the suite's guards, and from the store's commit on that
-child asked the machine's real secure store for the app's names (211
-children in 22 steps; no value printed, written or sent). conftest now
-hands every child the package's switch for no store, and a test pins it.
-
-Flags for the owner, each in the report: the proof of a delete (the job
-answered 200 with no words right after its delete, 404 a minute later;
-the app calls that gone; a stricter rule is his); the Start screen
-tests the connections at each showing (a page-first screen is proposed,
-not built); a folder set up before this run cannot Start until the
-self-test passes from its page; the file .env of the data folder gives
-the app a key before anything is connected. words.py and schema.py are
-over their targets.
-
-Made untrue, and put right in this commit: the README (what this
-version does; three speech choices; Cowork's two changes to the dated
-section, byte for byte), CLAUDE.md's run lines, .env.example, and this
-file's entry for 6e in four places. Not mine to write, in the spec: the
-owner's words of 16 Nov that came with the review and the mails.
-Cowork writes them in. No help page exists.
-
-The room check was met on 17 Nov 2026 (above). Next: 9c.
