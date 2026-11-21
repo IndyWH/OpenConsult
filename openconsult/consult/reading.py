@@ -50,3 +50,23 @@ def entries_of(lines: list[dict]) -> list[dict]:
         else:
             entries.append({"speaker": speaker, "lines": [line]})
     return entries
+
+
+def numbers_of(entries: list[dict]) -> dict[int, int]:
+    """The number of the turn that holds each line (15.13, the details of
+    step 9f, The number of a turn): the entries of the reading view are
+    numbered from 1, in order, as the page shows them, and an entry of
+    its own with no sure speaker is numbered like any turn. It is how
+    the page is shown: the number is not stored and no model reads it
+    (the turns a model cites are note.py's, numbered from 0 by another
+    rule)."""
+    return {line["n"]: number for number, entry in enumerate(entries, start=1) for line in entry["lines"]}
+
+
+def chips_of(cited: list[int], numbers: dict[int, int]) -> list[int]:
+    """The chips of a note entry (15.13, ruling 71): the number of each
+    turn that holds at least one of the lines the entry cites, in order,
+    each number once; none is dropped or gathered into a range. An entry
+    that cites no line has none, and a cited line that is not on the
+    page gives none."""
+    return sorted({numbers[n] for n in cited if n in numbers})
