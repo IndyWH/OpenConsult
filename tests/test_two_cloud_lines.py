@@ -79,6 +79,10 @@ OWNERS = [
     ("ruling 76, four: the box of Claude, opened, when it is ready",
      lambda: words.PANEL_REASONS["cloud_ready"].format(service=words.SERVICE_TITLES["claude"], kind=words.PANEL_KINDS["claude"]),
      "Claude is connected. It is the cloud language model."),
+    # His by mail 1 of the step (his word A of 21 Nov 2026, 08:35): the reason where the recording was sent after Stop
+    # and the transcript that came back held no words.
+    ("the reason of a transcript that came back with no words", lambda: words.UPLOAD_NO_WORDS.format(service=words.SERVICE_TITLES["speechmatics"]),
+     "Speechmatics sent back a transcript with no words in it."),
 ]
 
 

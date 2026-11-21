@@ -44,7 +44,10 @@ def test_his_word_of_20_nov_1057_the_two_lines_for_a_transcript_that_came_back_a
 
 @pytest.mark.parametrize("case, made, reason", [
     ("the settings asked for were not used", lambda: Held(model="standard"), "Speechmatics did not use the settings that were asked for."),
-    ("it held no words", lambda: NoWords(), "Speechmatics is not answering. Try again later."),
+    # Restated on the owner's word A of 21 Nov 2026, 08:35 (step 9f; a flag of run 9c): the service answered, and its
+    # transcript was empty, so the reason is one of its own. OLD: "Speechmatics is not answering. Try again later.",
+    # which is not true there. NEW, his sentence, letter for letter:
+    ("it held no words", lambda: NoWords(), "Speechmatics sent back a transcript with no words in it."),
 ])
 def test_his_word_of_20_nov_1057_a_transcript_that_came_back_and_was_not_used_has_his_line_awaited_and_then_proven(tmp_path, clock, server, case, made, reason):
     made = made()

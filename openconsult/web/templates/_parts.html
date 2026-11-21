@@ -47,8 +47,10 @@
 </span>
 {%- endmacro %}
 
+{# The lines and the key of the picture are hidden from a screen reader, which cannot meet a drawing. So the picture is
+   tied to the lines above it as its description (step 9f): a reader is given in words what the lines draw. #}
 {% macro control_panel(panel) -%}
-<div class="control-panel" id="control-panel" role="group" aria-label="{{ words.SECTION_MACHINE }}">
+<div class="control-panel" id="control-panel" role="group" aria-label="{{ words.SECTION_MACHINE }}" aria-describedby="panel-path">
   <p class="mark" id="panel-intro">{{ words.PANEL_INTRO }}</p>
   <div class="panel-where" id="panel-path">{% for line in panel.path_lines %}<p class="sentence">{{ line }}</p>{% endfor %}</div>
   <div class="panel-grid{% if panel.after_stop %} has-after-stop{% endif %}">

@@ -62,6 +62,8 @@ FILE_NAME = "recording.wav"          # a plain name with no date, no number and 
 LIMIT_BASE_S, LIMIT_SHARE = 120.0, 0.25
 MADE, FAILED, NOT_PROVEN = "better_transcript", "better_transcript_failed", "delete_not_proven"
 KINDS = (MADE, FAILED, NOT_PROVEN)
+# What the record's line of the sending says of a transcript that came back and held no words; its reason is its own.
+NO_WORDS = "the result held no words"
 # What the record holds of the delete of a recording the service took: the answer awaited, proven gone, or not proven.
 AWAITED, PROVEN, UNPROVEN = "awaited", "proven", "not_proven"
 
@@ -113,6 +115,9 @@ def reason_of(failure: dict | None, limit: float) -> str:
         return words.SERVICE_DOWN.format(service=title)
     if at == "result" and "no result within" in detail:
         return words.UPLOAD_TOO_SLOW.format(service=title, seconds=f"{limit:.0f}")
+    if at == "result" and detail == NO_WORDS:
+        # The service answered, and its transcript was empty: it is not true there that the service is not answering.
+        return words.UPLOAD_NO_WORDS.format(service=title)
     if at == "model":
         return words.UPLOAD_WRONG_SETTINGS.format(service=title)
     if at == "restart":
@@ -193,7 +198,7 @@ class WholeRecording:
         job = up.get("job") or {}
         made = failure is None and bool(lines)
         if failure is None and not lines:
-            failure = {"at": "result", "detail": "the result held no words"}
+            failure = {"at": "result", "detail": NO_WORDS}
         if made:
             self._make_final(c, lines)
         reason = None if made else reason_of(failure, limit)

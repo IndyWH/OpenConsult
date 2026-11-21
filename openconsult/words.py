@@ -1256,6 +1256,10 @@ BETTER_ACCURACY = "Better accuracy: after Stop, send the whole recording to Spee
 NOT_CONNECTED_SERVICE = "{service} is not connected."
 UPLOAD_TOO_SLOW = "{service} did not answer in {seconds} seconds."
 UPLOAD_WRONG_SETTINGS = "{service} did not use the settings that were asked for."
+# THE OWNER'S, letter for letter (his word A of 21 Nov 2026, 08:35, by mail 1 of step 9f): the reason where the
+# recording was sent after Stop and the transcript that came back held no words. Until then the warning said that
+# the service is not answering, which is not true there.
+UPLOAD_NO_WORDS = "{service} sent back a transcript with no words in it."
 UPLOAD_APP_CLOSED = "OpenConsult was closed while the recording was being sent."
 UPLOAD_MADE = ("The final transcript was made by Speechmatics from the whole recording. It was deleted there, and Speechmatics "
                "confirmed that it is gone.")
