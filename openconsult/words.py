@@ -293,6 +293,8 @@ VIEW_WORDS = {"simple": "Simple", "advanced": "Advanced"}
 # (the one in use is told by the reader's own word for current), and what a chip's press does (also its tip).
 VIEW_GROUP = {"note": "View of the note", "transcript": "View of the transcript"}
 SHOW_TURN = "Show turn {n} in the transcript"
+# In the advanced view a turn carries its number where a screen reader meets it, before its first and last line number.
+TURN_NUMBER = "Turn {n}"
 # The small word after an entry the doctor has changed (ruling 75), beside the green ground of its words. A draft.
 ENTRY_EDITED = "Edited"
 # An entry corrected where it stands, in the simple view (ruling 72). Drafts. What a screen reader is told at an entry

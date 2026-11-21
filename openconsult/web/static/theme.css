@@ -202,6 +202,19 @@ button.cite:hover { text-decoration: underline; }
 /* A chip: the number of a turn of speech an entry rests on, a small press. */
 button.chip { border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 0 .45rem; min-width: 1.5rem; margin: 0 .1rem 0 .25rem; font-size: .72rem; line-height: 1.5; color: var(--ink-soft); cursor: pointer; }
 button.chip:hover { border-color: var(--ink-soft); color: var(--ink); }
+/* The transcript's two views (rulings 73 and 74). Simple: the passages, for reading and listening, with Swap and the
+   player. Advanced: the turns with their lines and every mark, Check who spoke with its pane, and the control that
+   opens all the lines. */
+#transcript[data-view="simple"] #final-transcript, #transcript[data-view="simple"] #who-check, #transcript[data-view="simple"] #check-who-form, #transcript[data-view="simple"] #check-who, #transcript[data-view="simple"] #open-all { display: none; }
+#transcript[data-view="advanced"] #passages { display: none; }
+/* A passage: its number, as a chip of the note shows it, the speaker's word, the play, then its words as running text. */
+.passage { margin: 0 0 .7rem; line-height: 1.7; font-size: 1rem; color: var(--ink); scroll-margin-top: 4.2rem; }
+.passage-head { color: var(--ink-soft); font-size: .8rem; margin-right: .5rem; }
+.passage-number { display: inline-block; min-width: 1.5rem; text-align: center; border: 1px solid var(--line); border-radius: 999px; padding: 0 .45rem; margin-right: .3rem; background: var(--paper); font-size: .72rem; line-height: 1.5; }
+button.passage-play { margin: 0 .5rem 0 0; }
+a.passage-doubt { text-decoration: underline dotted; color: inherit; }
+/* The number of a turn in the advanced view: for a screen reader and a chip's press, not for the eye. */
+.turn-number { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* An entry the doctor has changed (ruling 75), in both views: its words on a soft green ground, the box of the advanced
    view too, and the small word Edited after it. Ink on this green measures 12.38 to 1, as on the yellow of a doubted
    drug name (12.67 to 1). The two grounds are almost equally light, so an eye that cannot tell green from yellow

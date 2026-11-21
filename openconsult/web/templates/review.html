@@ -165,8 +165,11 @@
   </div>
 </section>
 
-{# Four: the transcript with the player. #}
-<section class="pane transcript no-print" id="transcript">
+{# Four: the transcript with the player. Two views (15.13, rulings 46, 73 and 74), as the note has: simple, the passages,
+   for reading and listening; advanced, the turns with their lines and every mark, Check who spoke and the control that
+   opens all the lines, as the transcript stood before step 9f. Swap and the player stand in both. While the check of
+   who spoke runs the transcript is held in the advanced view, where it was asked for. #}
+<section class="pane transcript no-print" id="transcript" data-view="{{ views.transcript }}"{% if who_check.running %} data-view-held{% endif %}>
   <div class="pane-head"><h2>{{ words.PANEL_TRANSCRIPT }}</h2>
     {% if not transcript_read_only %}<form method="post" action="/consultations/{{ cid }}/lines/swap" id="swap-form" class="swap" data-stay>
       <button id="swap" aria-describedby="swap-refusal">{{ words.SWAP }}</button>{{ refusal("swap") }}</form>
@@ -179,8 +182,10 @@
     {# The control that opens every turn and closes them again (ruling 43). With a script it does so in place; with no
        script it is a link that loads the page at the transcript with every turn open, and then one that loads it closed. #}
     {% if turns %}<a class="open-all" id="open-all" href="/consultations/{{ cid }}{{ '' if lines_open else '?lines=open' }}#transcript">{{ words.CLOSE_ALL_LINES if lines_open else words.OPEN_ALL_LINES }}</a>{% endif %}
+    {{ view_presses("transcript", "check-who-running" if who_check.running else None) }}
   </div>
   <div class="pane-body who-check" id="who-check">
+    {{ view_says("transcript") }}
     {% if who_check.offered %}<p class="mark" id="check-who-line">{{ words.CHECK_WHO_SPOKE_LINE }}</p>{% endif %}
     {# The running sentence and the outcome are statements in the page's ordinary type, not marks, with Undo all beside the
        outcome: in the room run of 15 Nov 2026 the check changed 29 lines and the doctor saw a faded button and nothing else. #}
@@ -200,6 +205,21 @@
     {% else %}<p class="mark" id="audio-gone">{{ audio_gone }}</p>{% endif %}
     {% if conversion_failed %}<p class="mark" id="conversion-failed">{{ conversion_failed }}</p>{% endif %}
   </div>
+  {# The simple view (rulings 73 and 74): each turn of the reading view one passage. Its number, the one the chips of the
+     note point to; the speaker's word; one press that plays the turn, with the turn's own stretch; and the words of its
+     lines as running text, the words of each line a piece of their own, so that a cited line and the line that is
+     sounding can be marked inside the passage and a kept name shows there with no load. Of all the marks only a doubted
+     drug name stays in sight, with its press to its row: a misheard name is the one mark that can reach the patient
+     through the note. A line with no words has an empty piece. A passage is plain text and no control: a press on it
+     opens nothing, and a drag over its words selects them. #}
+  <div class="pane-body passages" id="passages">
+    {% for turn in turns %}
+    <p class="passage" id="passage-{{ turn.number }}" data-first="{{ turn.first }}"><span class="passage-head"><span class="passage-number">{{ turn.number }}</span> {{ words.LABEL_WORDS[turn.speaker] }}</span>
+      {% if player.available and turn.play_s is not none and turn.end_s is not none %}<button type="button" class="play-stretch passage-play" data-start="{{ turn.play_s }}" data-end="{{ turn.end_s }}" aria-label="{{ words.PLAY_TURN }}" title="{{ words.PLAY_TURN }}">&#9654;</button>{% endif %}
+      <span class="passage-text">{% for line in turn.lines %}<span class="passage-line" id="passage-line-{{ line.n }}" data-part>{% for piece, mark in line.reading %}{% if mark %}<a class="passage-doubt" href="#drug-mark-{{ mark }}" title="{{ words.CHECK_THIS_NAME }}"><mark class="doubted">{{ piece }}</mark></a>{% else %}{{ piece }}{% endif %}{% endfor %}</span> {% endfor %}</span>
+    </p>
+    {% endfor %}
+  </div>
   <div class="pane-body" id="final-transcript">
     {# The reading view (15.10 rulings 35 and 42 to 44): one entry for each turn of speech, the browser's own disclosure
        element, sent closed. Closed, its summary shows the speaker, the numbers of its first and last line and the turn's
@@ -211,7 +231,8 @@
     {% if turns %}<p id="turn-says" hidden>{{ words.TURN_PRESS }}</p>{% endif %}
     {% for turn in turns %}
     <details class="turn" id="turn-{{ turn.first }}"{% if turn.open %} open{% endif %}>
-      <summary aria-describedby="turn-says"><span class="speaker">[{{ turn.first }}{% if turn.last != turn.first %}–{{ turn.last }}{% endif %}] {{ words.LABEL_WORDS[turn.speaker] }}</span>
+      {# The turn's number (step 9f), the one its passage shows: here for a screen reader and for a chip's press, not for the eye. #}
+      <summary aria-describedby="turn-says"><span class="turn-number" id="turn-number-{{ turn.number }}">{{ words.TURN_NUMBER.format(n=turn.number) }}</span><span class="speaker">[{{ turn.first }}{% if turn.last != turn.first %}–{{ turn.last }}{% endif %}] {{ words.LABEL_WORDS[turn.speaker] }}</span>
         {% if player.available and turn.play_s is not none and turn.end_s is not none %}<button type="button" class="play-stretch turn-play" data-start="{{ turn.play_s }}" data-end="{{ turn.end_s }}" aria-label="{{ words.PLAY_TURN }}" title="{{ words.PLAY_TURN }}">&#9654;</button>{% endif %}
         <span class="turn-text">{% for line in turn.lines %}<span class="turn-line{% if line.changed_by_check %} changed{% endif %}" id="turn-line-{{ line.n }}" data-part>{% if line.changed_by_check %}<span class="changed-words">{{ words.LABEL_CHANGED }}</span> {% if not transcript_read_only %}<button class="turn-undo" id="turn-undo-{{ line.n }}" form="turn-undo-form-{{ line.n }}">{{ words.UNDO_LABEL }}</button> {% endif %}{% endif %}{% for piece, mark in line.reading %}{% if mark %}<a class="turn-doubt" href="#drug-mark-{{ mark }}" title="{{ words.CHECK_THIS_NAME }}"><mark class="doubted">{{ piece }}</mark></a>{% else %}{{ piece }}{% endif %}{% endfor %}{% if line.unsure %}<span class="mark"> ({{ words.LABEL_UNSURE }})</span>{% endif %}{% if line.set_by_doctor %}<span class="mark"> ({{ words.LABEL_SET_BY_YOU }})</span>{% endif %}{% if line.revised_by_service %}<span class="mark"> ({{ words.LABEL_REVISED }})</span>{% endif %}{% if line.low_confidence %}<span class="mark"> ({{ line.low_confidence }})</span>{% endif %}</span> {% endfor %}</span>
       </summary>
