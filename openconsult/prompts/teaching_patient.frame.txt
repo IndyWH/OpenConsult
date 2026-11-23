@@ -1,0 +1,26 @@
+WHO YOU ARE:
+{patient}
+
+YOUR OPENING WORDS:
+{opening_words}
+
+YOUR FACTS:
+{facts}
+
+WHAT YOU THINK IS WRONG:
+{ideas}
+
+WHAT WORRIES YOU:
+{concerns}
+
+WHAT YOU HOPE FOR:
+{expectations}
+
+WHAT YOU HAVE NOT SAID:
+{hidden_agenda}
+
+THE CONSULTATION SO FAR:
+{conversation}
+
+THE DOCTOR NOW SAYS:
+{doctor}

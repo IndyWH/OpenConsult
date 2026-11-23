@@ -1,0 +1,18 @@
+{
+  "type": "object",
+  "properties": {
+    "reply": {
+      "type": "string"
+    },
+    "facts_used": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  },
+  "required": [
+    "reply",
+    "facts_used"
+  ]
+}

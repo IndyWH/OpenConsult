@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 from pathlib import Path
 
 FOLDER = Path(__file__).parent
@@ -57,6 +58,21 @@ APPROVED_BYTES = {
     "drug_name.form": "4574f7e5c6da63a82e9a67299d4fa3b76fefe84ac7dac1dfc3f5faa575f505b8",
     "drug_name.frame": "44f10e089af2ab4b4df272002604d35b0a678df6472949b193ba183bac1e0637",
     "label_check.frame": "44f10e089af2ab4b4df272002604d35b0a678df6472949b193ba183bac1e0637",
+    # The thirteen files of teaching (15.14, rulings 10 to 13 and the details of run 10a): for each of the four
+    # jobs its prompt, its frame and its form, and the one file of layouts by which a scenario is written into a frame.
+    "teaching_case": "9b2f69bf784d5efede474d938b52df05d7b41d62e76df171e1b730a83f2bcbdc",
+    "teaching_case.frame": "67b3c7995b61a29c4d4bd877fe42399dd3f8afeab7bcd79a1600323972418173",
+    "teaching_case.form": "19dff9f5a29aeeb737675d0843b96e3883a382a600acbea0b91ff29fe754f8b3",
+    "teaching_patient": "0da417e11f3f0ec8a64e5e665108232bb44a0a90894afa79e4daec70f2ec6f91",
+    "teaching_patient.frame": "d6d9e6123cda044df97358b47e7129c18de43d02ebafabb631fcd2889be4ccc2",
+    "teaching_patient.form": "125e7a1d0ac47d9e6d38892e738339ba19de9c5f8ce8b9989dcda345274c87b3",
+    "teaching_examination": "f7f55378be26cb7a2140ba9172efeba6825603582763b8e630fe6379184b799d",
+    "teaching_examination.frame": "a72b30bb29938f465f9ecc3b8196d588490bd4629c30950b1e5c28831730b837",
+    "teaching_examination.form": "f78b0d586b5d13b04bb2f4ca168ce9a7e0eb8f87cf888e5786bdfbe6a58ff609",
+    "teaching_feedback": "80a7797520dc7f0dba25caa6860d4eb4c47dc45833cc0de73761f1f065284626",
+    "teaching_feedback.frame": "b968304515fe601e996a0b094af61af33f90d25480dc53680b5ef730d0078738",
+    "teaching_feedback.form": "4a2aff46f4001194e6e2cdf557fc6f1ff17a11babf0ed02ed46384321b355012",
+    "teaching.layout": "cc8051d49d1dcb1c84a171ff68a2db8e72c888a5e40972fc0c9fe24178d4af26",
 }
 
 
@@ -94,12 +110,33 @@ def form_bytes(name: str) -> bytes:
     return (FOLDER / f"{name}.form.json").read_bytes()
 
 
+def layout(name: str) -> dict:
+    """A file of layouts (teaching.layout.json): every pattern by which a
+    part is written into a frame, so that none is typed in the code."""
+    return json.loads(_text(FOLDER / f"{name}.layout.json"))
+
+
+def layout_bytes(name: str) -> bytes:
+    return (FOLDER / f"{name}.layout.json").read_bytes()
+
+
 def fill(frame_text: str, **slots: str) -> str:
     """Put the words into the slots. Plain replacement, so braces in a
     transcript are never read as slots."""
     for slot, value in slots.items():
         frame_text = frame_text.replace("{" + slot + "}", value)
     return frame_text
+
+
+def fill_once(pattern: str, **slots) -> str:
+    """Put the words into the slots in one pass: each slot named is
+    replaced where the pattern holds it, and a value is never read again.
+    A frame of teaching has many slots and holds what a learner typed, so
+    braces in a value must never be taken for a later slot."""
+    if not slots:
+        return pattern
+    names = "|".join(re.escape(name) for name in slots)
+    return re.sub(r"\{(" + names + r")\}", lambda found: str(slots[found.group(1)]), pattern)
 
 
 def sha256(text: str) -> str:

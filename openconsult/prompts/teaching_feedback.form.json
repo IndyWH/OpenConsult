@@ -1,0 +1,137 @@
+{
+  "type": "object",
+  "properties": {
+    "reasoning": {
+      "type": "string"
+    },
+    "points": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "met": {
+            "type": "boolean"
+          },
+          "turns": {
+            "type": "array",
+            "items": {
+              "type": "integer"
+            }
+          }
+        },
+        "required": [
+          "number",
+          "met",
+          "turns"
+        ]
+      }
+    },
+    "differential": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "named": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "named"
+        ]
+      }
+    },
+    "differential_extra": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "investigations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "named": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "named"
+        ]
+      }
+    },
+    "investigations_extra": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "plan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "number": {
+            "type": "integer"
+          },
+          "named": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "number",
+          "named"
+        ]
+      }
+    },
+    "plan_extra": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "most_important_missed": {
+      "type": "integer"
+    },
+    "done_well": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "signposted": {
+      "type": "boolean"
+    },
+    "signpost_turns": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    }
+  },
+  "required": [
+    "reasoning",
+    "points",
+    "differential",
+    "differential_extra",
+    "investigations",
+    "investigations_extra",
+    "plan",
+    "plan_extra",
+    "most_important_missed",
+    "done_well",
+    "signposted",
+    "signpost_turns"
+  ]
+}

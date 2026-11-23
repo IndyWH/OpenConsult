@@ -13,5 +13,19 @@ openconsult/prompts/label_check.prompt.txt -text
 openconsult/bench/speech/prompts/*.form.json text eol=lf
 # The lists of the searches of 5d are hashed by a test: Git never changes a byte of them.
 openconsult/bench/shared/searches.json -text
+# The thirteen files of teaching are hashed byte for byte (15.14, rulings 10 to 13 and the details of run 10a): Git never changes a byte of them.
+openconsult/prompts/teaching.layout.json -text
+openconsult/prompts/teaching_case.form.json -text
+openconsult/prompts/teaching_case.frame.txt -text
+openconsult/prompts/teaching_case.prompt.txt -text
+openconsult/prompts/teaching_examination.form.json -text
+openconsult/prompts/teaching_examination.frame.txt -text
+openconsult/prompts/teaching_examination.prompt.txt -text
+openconsult/prompts/teaching_feedback.form.json -text
+openconsult/prompts/teaching_feedback.frame.txt -text
+openconsult/prompts/teaching_feedback.prompt.txt -text
+openconsult/prompts/teaching_patient.form.json -text
+openconsult/prompts/teaching_patient.frame.txt -text
+openconsult/prompts/teaching_patient.prompt.txt -text
 # The account Why this model is hashed byte for byte by a test (15.13, ruling 30): Git never changes a byte of it.
 openconsult/web/why_this_model.md -text

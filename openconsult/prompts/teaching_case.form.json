@@ -1,0 +1,220 @@
+{
+  "type": "object",
+  "properties": {
+    "reasoning": {
+      "type": "string"
+    },
+    "patient": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "age": {
+          "type": "integer"
+        },
+        "sex": {
+          "type": "string"
+        },
+        "occupation": {
+          "type": "string"
+        },
+        "manner": {
+          "type": "string"
+        },
+        "parent": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "age",
+        "sex",
+        "occupation",
+        "manner",
+        "parent"
+      ]
+    },
+    "opening_words": {
+      "type": "string"
+    },
+    "facts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "fact": {
+            "type": "string"
+          },
+          "tells": {
+            "type": "string",
+            "enum": [
+              "open",
+              "asked"
+            ]
+          }
+        },
+        "required": [
+          "fact",
+          "tells"
+        ]
+      }
+    },
+    "ideas": {
+      "type": "string"
+    },
+    "concerns": {
+      "type": "string"
+    },
+    "expectations": {
+      "type": "string"
+    },
+    "hidden_agenda": {
+      "type": "string"
+    },
+    "examination": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "examination": {
+            "type": "string"
+          },
+          "finding": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "examination",
+          "finding"
+        ]
+      }
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "test": {
+            "type": "string"
+          },
+          "result": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "test",
+          "result"
+        ]
+      }
+    },
+    "differential": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "diagnosis": {
+            "type": "string"
+          },
+          "must_not_miss": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "diagnosis",
+          "must_not_miss"
+        ]
+      }
+    },
+    "investigations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "investigation": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "investigation",
+          "reason"
+        ]
+      }
+    },
+    "plan": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "step": {
+            "type": "string"
+          },
+          "urgency": {
+            "type": "string",
+            "enum": [
+              "emergency today",
+              "urgent",
+              "routine",
+              "none"
+            ]
+          }
+        },
+        "required": [
+          "step",
+          "urgency"
+        ]
+      }
+    },
+    "safety_net": {
+      "type": "string"
+    },
+    "marking_points": {
+      "type": "object",
+      "properties": {
+        "data_gathering": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "management": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "relating": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "data_gathering",
+        "management",
+        "relating"
+      ]
+    }
+  },
+  "required": [
+    "reasoning",
+    "patient",
+    "opening_words",
+    "facts",
+    "ideas",
+    "concerns",
+    "expectations",
+    "hidden_agenda",
+    "examination",
+    "results",
+    "differential",
+    "investigations",
+    "plan",
+    "safety_net",
+    "marking_points"
+  ]
+}

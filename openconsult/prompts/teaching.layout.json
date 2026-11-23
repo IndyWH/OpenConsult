@@ -1,0 +1,25 @@
+{
+  "who": "{name}, {age}, {sex}, {occupation}. {manner}",
+  "who_parent": "The parent who speaks for the child: {parent}",
+  "empty": "(nothing)",
+  "fact": "{n}. ({tells}) {fact}",
+  "said_doctor": "Doctor: {text}",
+  "said_patient": "Patient: {text}",
+  "finding": "{n}. {examination}: {finding}",
+  "result": "{n}. {test}: {result}",
+  "points_heading": {
+    "data_gathering": "Data gathering and diagnosis:",
+    "management": "Clinical management and medical complexity:",
+    "relating": "Relating to others:"
+  },
+  "point": "{n}. {point}",
+  "diagnosis": "{n}. {diagnosis}",
+  "diagnosis_must": "{n}. {diagnosis} (must not be missed)",
+  "investigation": "{n}. {investigation}",
+  "step": "{n}. {step}",
+  "step_referral": "{n}. {step} (urgency: {urgency})",
+  "turn_doctor": "{n}. Doctor: {text}",
+  "turn_patient": "{n}. Patient: {text}",
+  "examined": "{text}",
+  "case": "PATIENT: {who}\nOPENING WORDS: {opening_words}\nFACTS:\n{facts}\nIDEAS: {ideas}\nCONCERNS: {concerns}\nEXPECTATIONS: {expectations}\nNOT SAID UNLESS MADE EASY: {hidden_agenda}\nEXAMINATION AND RESULTS:\n{findings}\nSAFETY-NET ADVICE: {safety_net}"
+}

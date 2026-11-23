@@ -1,0 +1,36 @@
+You write a practice case for a doctor who is learning to consult in general practice. A computer will play the patient from what you write, and the learner's work will be marked against it. A learner is harmed by a case that is wrong. So write only medicine that is well established, and choose a presentation that is common in general practice.
+
+You are given a TOPIC and a LEVEL.
+
+The three levels:
+- straightforward: the story points to the diagnosis. Red flags, if the case has any, come out when the doctor asks about them.
+- hidden: the diagnosis that must not be missed is not the first thing the story suggests. The patient never volunteers the red flag. It comes out only if the doctor asks the right question.
+- noisy: the patient has a wrong idea of what is wrong, or raises another worry first, or has a second illness that distracts. The real problem is still there to be found.
+
+Write the case in two parts.
+
+PART ONE, the patient's side. This is all that the computer playing the patient will see. Write it in the words this person would use. It must not give the diagnosis away, and it uses no medical word this person would not know. The patient may have an idea of what is wrong, right or wrong.
+- patient: name, age, sex, occupation, and one sentence on how this person talks. Invent the name. If the patient is a child, a parent speaks for the child: give the parent's name too, and write the facts as the parent would say them.
+- opening_words: what the patient says first, in one or two sentences.
+- facts: everything the patient knows that matters: the symptoms, when they started and how they have changed, what makes them better or worse, past illnesses, medicines, allergies, family history, work, home, smoking and alcohol. One fact in each entry. For each fact set tells to open if the patient says it when asked an open question, or to asked if the patient says it only when asked about it directly. Include the things that are absent and matter, such as no weight loss, as facts with tells set to asked.
+- ideas: what the patient thinks is wrong.
+- concerns: what the patient is worried about.
+- expectations: what the patient hopes to get from the visit, such as a test, a treatment, a certificate or reassurance. A patient who would ask for it outright says so in the opening words.
+- hidden_agenda: something the patient has not said and will say only if the doctor makes it easy. Leave it empty if there is none.
+
+PART TWO, for the examiner only. The examiner reads both parts: the history is in part one and is not written again here. This part holds what the patient does not know. The computer playing the patient never sees it.
+- examination: what a doctor would find, each entry an examination and its finding. Include the normal findings that matter. Give measurements as numbers.
+- results: the results of tests already available at this visit. Usually there are none.
+- differential: the diagnoses a good doctor would consider, the most likely first, three to five of them. Set must_not_miss to true for any that is dangerous to miss.
+- investigations: what a good doctor would order, each with a reason in one line.
+- plan: what a good doctor would do, one step in each entry: treatment, referral with its urgency (emergency today, urgent, routine or none), follow-up. Name a medicine by its name or its class. Do not give a dose.
+- safety_net: what the patient should be told to watch for, and what to do if it happens.
+- marking_points: what a good consultation of this case contains, under three headings. data_gathering: the questions and examinations that matter, and the red flags to ask about. management: the steps of the plan that matter. relating: what this patient needs from the doctor as a person, such as the idea, concern, expectation or hidden agenda to find and respond to. Three to six points under each heading, each one short sentence.
+
+Rules:
+- The two parts must agree. Every question a marking point expects has its answer among the facts. Every examination a marking point expects has its finding in examination.
+- State each fact once. Nothing in the case contradicts anything else in it.
+- Keep the case to one visit to a general practitioner.
+- Never write a double quote mark anywhere in your answer; to quote a word, use single quotes.
+
+Fill the reasoning field first (under 80 words): the diagnosis, why it suits the topic and the level, and the one thing a learner is most likely to miss. Output JSON only.

@@ -1,0 +1,21 @@
+{
+  "type": "object",
+  "properties": {
+    "asked": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "not_in_case": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": [
+    "asked",
+    "not_in_case"
+  ]
+}

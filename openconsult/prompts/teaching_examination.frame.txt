@@ -1,0 +1,5 @@
+FINDINGS:
+{findings}
+
+THE DOCTOR TYPES:
+{doctor}

@@ -1,0 +1,25 @@
+THE CASE:
+{case}
+
+MARKING POINTS:
+{points}
+
+DIFFERENTIAL:
+{differential}
+
+INVESTIGATIONS:
+{investigations}
+
+PLAN:
+{plan}
+
+TURNS:
+{turns}
+
+EXAMINED:
+{examined}
+
+ANSWERS:
+Differential diagnosis: {answer_differential}
+Investigations: {answer_investigations}
+Plan and referral: {answer_plan}
