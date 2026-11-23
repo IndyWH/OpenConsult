@@ -58,8 +58,9 @@ class Door:
 
     def call_for(self, job_name: str, user: str, sampling: Sampling | None = None) -> Call:
         """The parts of a call, as the engine will see them. The sampling
-        override is for the bench's chains only; the app takes the
-        profile's steady values (spec 10.4)."""
+        override is for the bench's chains and for a fresh teaching case
+        (15.14, the details of run 10a); every other call of the app takes
+        the profile's steady values (spec 10.4)."""
         job = job_named(job_name)
         sampling = sampling or self.profile.sampling
         return Call(job=job.name, tag=self.profile.tag_for(job.name), system=loader.prompt(job.prompt),
