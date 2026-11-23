@@ -3,8 +3,8 @@ prompt file, its answer form, the frames around the transcript, its
 limit on length, its limit on time, and what happens when it fails.
 Stage 3 filled two; stage 6a added the label check (15.9 ruling 17;
 15.10 ruling 7); stage 6b adds the note (15.10 rulings 3, 5 and 8);
-step 6c the drug-name call; the others of spec 10.2 arrive with their
-stages."""
+step 6c the drug-name call; run 10a the four of teaching (15.14); the
+others of spec 10.2 arrive with their stages."""
 
 from __future__ import annotations
 
@@ -87,6 +87,32 @@ JOBS = {
         max_tokens=1000, timeout_s=60.0,
         on_failure="The panel says the summary could not be made and why; the pass and the alarm are untouched; "
                    "the next change of the top two differentials asks again.",
+    ),
+    # The four jobs of teaching (15.14, rulings 10 to 13 and the details of run 10a; R30). The limits are design
+    # choices until the bench of run 10a has measured them; the sentences are drafts, and no page shows them before 10b.
+    "teaching_case": Job(
+        name="teaching_case", prompt="teaching_case", form="teaching_case", frames=("teaching_case",),
+        max_tokens=4000, timeout_s=180.0,
+        on_failure="The page says that the case could not be written and why, and offers to write it again; no patient "
+                   "appears. Nothing is asked a second time by itself.",
+    ),
+    "teaching_patient": Job(
+        name="teaching_patient", prompt="teaching_patient", form="teaching_patient", frames=("teaching_patient",),
+        max_tokens=300, timeout_s=30.0,
+        on_failure="The page says that the patient's reply did not come and why; what the learner typed stays in its box "
+                   "and can be sent again. No reply is made up.",
+    ),
+    "teaching_examination": Job(
+        name="teaching_examination", prompt="teaching_examination", form="teaching_examination", frames=("teaching_examination",),
+        max_tokens=300, timeout_s=30.0,
+        on_failure="The page says that the examination could not be read and why, and the learner can send it again; no "
+                   "finding is shown for it, and never the sentence that nothing abnormal was found.",
+    ),
+    "teaching_feedback": Job(
+        name="teaching_feedback", prompt="teaching_feedback", form="teaching_feedback", frames=("teaching_feedback",),
+        max_tokens=2500, timeout_s=120.0,
+        on_failure="The page says that the feedback could not be made and why, and offers to make it again; the "
+                   "consultation and the three answers are kept. Nothing is asked a second time by itself.",
     ),
     # The note (15.10, The note): the transcript alone, no patient line (D3).
     "note": Job(
