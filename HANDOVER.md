@@ -14,15 +14,44 @@ is bac1b98 (sha256 2f9e3558...), the stage prompt 0ff23a0
 (stage-prompts/STAGE_10A.md). The private report is STAGE10A_REPORT.md
 in the log folder. Eleven commits to the first report, none pushed,
 the last of them the move of the entry of run 9c to the archive, so
-that this file stays under 500 lines; five more by mail 3, this
-entry's lines among them. The suite: 1480 passed in about 153 s, none
-skipped (1420 at the start, 1470 at the first report). OpenConsult is
-a research and education prototype; every scenario is made up.
+that this file stays under 500 lines; five more by mail 3 and three
+by mail 4, this entry's lines among them. The suite: 1477 passed in
+about 152 s, none skipped (1420 at the start, 1470 at the first
+report, 1480 after mail 3). OpenConsult is a research and education
+prototype; every scenario is made up.
+
+BY MAIL 4 (24 Nov 2026, the owner's okay at 12:24 UTC): THE FEEDBACK
+HAS ITS ORIGINAL PROMPT AND FORM AGAIN, by the owner's word: the work
+does not stay on this point at this stage, and the build moves on. The
+private report is STAGE10A_REPORT_3.md. This paragraph is how things
+stand; mail 3's below is what was tried.
+- The two handed files of the brainstorm are back byte for byte
+  (sha256 80a77975... and 4a2aff46..., no shown_by); the prompts
+  folder holds, file for file, the bytes it held before mail 3.
+  Ruling 13 of spec 15.14 names these two checksums and is true again.
+- What of the rule stays (openconsult/teaching/shown.py): a number
+  that is not a turn of the doctor's is dropped from every list of
+  turns and from the signposting; signposting is false when no turn
+  is left; a marking point that did not come back is not met, and one
+  that came back twice only if every entry is; nothing is ever turned
+  from not met to met. Dropping a turn never changes met: the form
+  cannot tell a point shown by an answer from one shown in the
+  consultation. Run 10b's page shows by this rule.
+- THE KNOWN FAULT, carried forward. On Gemma the feedback credits a
+  red flag the learner did not ask about: hard mark five stands. The
+  first bench scored again by the rule as it is now (the stored
+  replies untouched; a red flag not asked about, shown as met): Gemma
+  on vLLM 8 of 36 feedbacks, Gemma on Ollama 5 of 18, Claude Haiku 0
+  of 36. A turn that is not the doctor's, which the rule drops before
+  a learner sees it: 2 of 36, 2 of 18 and 18 of 36. A point that was
+  met and is shown as not met: 0, 0 and 2 of 36. WHAT IS OFFERED IS
+  THE OWNER'S TO RULE BEFORE ANYONE BUT HIM USES TEACHING.
 
 BY MAIL 3 (24 Nov 2026, the owner's okay at 11:39 UTC): THE FEEDBACK
 TIGHTENED AND BENCHED AGAIN. The private report is
-STAGE10A_REPORT_2.md. What follows below this paragraph is the first
-bench, as it stood.
+STAGE10A_REPORT_2.md. It was undone in its prompt, its form and two
+parts of its rule by mail 4, above; the counts of its bench stand as
+measured. Below it is the first bench, as it stood.
 - The feedback's prompt and form are the owner's of 11:34 UTC: only a
   turn that begins with Doctor may be listed, a point that says to
   ask is met only by a question about that very thing, and each point
