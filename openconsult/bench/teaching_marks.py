@@ -7,7 +7,11 @@ clinically right, are Cowork's to read and are never judged here.
 
 What the README leaves unclear is counted apart and never as a hard mark
 (the plan of run 10a, item 11, as mail 2 settled it). A reply that is
-not the form is counted there and in no other count."""
+not the form is counted there and in no other count.
+
+The feedback is counted twice (mail 3 of the run): RAW, on the answer as
+the model gave it, and SHOWN, on what a learner would be shown by the
+rule of teaching/shown.py. Hard mark five is judged on SHOWN."""
 
 from __future__ import annotations
 
@@ -20,7 +24,7 @@ from openconsult.bench import teaching
 from openconsult.bench.writer import ResultWriter
 from openconsult.llm.jobs import job as job_named
 from openconsult.prompts import loader
-from openconsult.teaching import frames
+from openconsult.teaching import frames, shown
 
 NUMBER = r"(?<![\w.,])\d+(?:[.,]\d+)?\s*"
 # Hard mark six as the README writes it: a number followed by one of these six, as whole words.
@@ -103,21 +107,42 @@ def feedback_marks(row: dict, case: dict) -> dict:
     for point in answer["points"]:
         verdicts.setdefault(point["number"], []).append(point["met"])
     points = sum(len(case["scenario"]["marking_points"][heading]) for heading in frames.HEADINGS)
-    not_met, asserted = set(transcript.get("expects_not_met", [])), transcript.get("expects_most_important_missed")
-    doctors = set(range(1, 2 * len(transcript["lines"]), 2))       # each line is followed by its reply: the doctor's turns are the odd ones
+    spoken = teaching.conversation(case, transcript["lines"])
+    doctors = shown.doctors_turns(spoken)
+    # SHOWN: what a learner would be shown, by the rule that stands between the answer and the page (mail 3).
+    seen = {point["number"]: point["met"] for point in shown.shown(answer, spoken, points)["points"]}
+    expects_met, not_met = transcript.get("expects_met", []), set(transcript.get("expects_not_met", []))
+    asserted, red = transcript.get("expects_most_important_missed"), set(bench.get("red_flag_points", [])) & not_met
     returned = [turn for point in answer["points"] for turn in point["turns"]] + list(answer["signpost_turns"])
-    marks = {"HARD_MARK_FIVE_a_red_flag_credited": sorted(p for p in set(bench.get("red_flag_points", [])) & not_met if any(verdicts.get(p, []))),
-             "HARD_MARK_FIVE_a_turn_that_is_not_the_doctors": sorted({turn for turn in returned if turn not in doctors}),
-             "F1_expected_met_returned_not_met": sorted(p for p in transcript.get("expects_met", []) if not (verdicts.get(p) and all(verdicts[p]))),
-             "F2_expected_not_met_returned_met": sorted(p for p in not_met if any(verdicts.get(p, []))),
+    raw_missed = sorted(p for p in expects_met if not (verdicts.get(p) and all(verdicts[p])))
+    shown_missed = sorted(p for p in expects_met if not seen[p])
+    marks = {"HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met": sorted(p for p in red if seen[p]),
+             "RAW_a_red_flag_returned_met": sorted(p for p in red if any(verdicts.get(p, []))),
+             "RAW_ONLY_a_turn_that_is_not_the_doctors": sorted({turn for turn in returned if turn not in doctors}),
+             "F1_RAW_expected_met_returned_not_met": raw_missed,
+             "F1_SHOWN_expected_met_shown_not_met": shown_missed,
+             "F1_of_which_made_by_the_rule": sorted(set(shown_missed) - set(raw_missed)),
+             "F2_RAW_expected_not_met_returned_met": sorted(p for p in not_met if any(verdicts.get(p, []))),
+             "F2_SHOWN_expected_not_met_shown_met": sorted(p for p in not_met if seen[p]),
              "F3_most_important_missed_differs": asserted is not None and answer["most_important_missed"] not in {asserted, *bench.get("points_not_asserted", [])},
-             "apart_points_not_returned": sorted(set(range(1, points + 1)) - set(verdicts)),
-             "apart_points_returned_twice": sorted(p for p, found in verdicts.items() if len(found) > 1),
-             "apart_points_the_case_does_not_have": sorted(p for p in verdicts if p < 1 or p > points)}
+             "RAW_met_by_turns_with_an_empty_list": sorted(p["number"] for p in answer["points"] if p["met"] and p["shown_by"] == shown.BY_TURNS and not p["turns"]),
+             "RAW_points_not_returned": sorted(set(range(1, points + 1)) - set(verdicts)),
+             "RAW_points_returned_twice": sorted(p for p, found in verdicts.items() if len(found) > 1),
+             "RAW_points_the_case_does_not_have": sorted(p for p in verdicts if p < 1 or p > points),
+             "SHOWN_signposting_taken_away": bool(answer["signposted"]) and not any(turn in doctors for turn in answer["signpost_turns"])}
     for name in LISTS:
         named = {entry["number"] for entry in answer[name] if entry["named"]}
         marks[f"F4_{name}_named_differs"] = named != set(answers[f"expects_{name}"])
     return marks
+
+
+def shown_by(rows: list[dict]) -> dict:
+    """How often a point came back with each of the form's four words for where it is shown: of every entry, and
+    of the entries that came back met."""
+    words = ("turns", "examined", "answers", "none")
+    entries = [point for row in rows if row["ok"] for point in row["answer"]["points"]]
+    return {"entries": len(entries), "every_entry": {word: sum(point["shown_by"] == word for point in entries) for word in words},
+            "entries_met": {word: sum(point["shown_by"] == word and bool(point["met"]) for point in entries) for word in words}}
 
 
 def writer_marks(row: dict) -> dict:
@@ -241,6 +266,7 @@ def arm_marks(rows: list[dict], cases: dict) -> dict:
             "actor": counted(of["actor"], lambda row: actor_marks(row, cases[row["case"]])),
             "examination": counted(of["examination"], lambda row: examination_marks(row, cases[row["case"]])),
             "feedback": counted(of["feedback"], lambda row: feedback_marks(row, cases[row["case"]])),
+            "feedback_shown_by": shown_by(of["feedback"]),
             "writer": counted(of["writer"], writer_marks),
             "fresh": [fresh_row(row) for row in of["writer"]],
             "times": timed, "rounds": rounds(rows),
@@ -272,7 +298,9 @@ def words(arms: dict[str, list[dict]]) -> dict:
 # ------------------------------------------------------------ all arms
 
 HARD = {"four": ("examination", ("HARD_MARK_FOUR",)),
-        "five": ("feedback", ("HARD_MARK_FIVE_a_red_flag_credited", "HARD_MARK_FIVE_a_turn_that_is_not_the_doctors")),
+        # Judged on what a learner would be shown (the owner's ruling of 24 Nov 2026): a turn that is not the doctor's
+        # cannot reach a learner by the rule of teaching/shown.py, and is counted RAW only.
+        "five": ("feedback", ("HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met",)),
         "six_the_counted_part": ("writer", ("HARD_MARK_SIX_a_dose_in_the_plan",))}
 
 
@@ -310,6 +338,10 @@ def as_markdown(marked: dict) -> str:
         names = sorted({name for arm in arms for name in marked["arms"][arm][part] if name != "calls"})
         out += ["", f"## {part}", ""] + _table(["count", *arms], [["calls", *[marked["arms"][arm][part]["calls"] for arm in arms]]] + [
             [name, *[_by_round(marked["arms"][arm][part].get(name, {})) for arm in arms]] for name in names])
+    out += ["", "## Where the feedback's points are shown", ""] + _table(
+        ["arm", "entries", *[f"{word} (met)" for word in ("turns", "examined", "answers", "none")]],
+        [[arm, by["entries"], *[f"{by['every_entry'][word]} ({by['entries_met'][word]})" for word in ("turns", "examined", "answers", "none")]]
+         for arm in arms for by in [marked["arms"][arm]["feedback_shown_by"]]])
     out += ["", "## The seconds and the tokens", ""] + _table(
         ["arm", "job", "calls", "the form", "typical s", "slowest s", "limit s", "read (mean)", "written (mean)", "longest reply", "limit"],
         [[arm, job, t["calls"], t["the_form"], round(t["wall_ms_median"] / 1000, 1), round(t["wall_ms_slowest"] / 1000, 1), t["limit_s"],
