@@ -36,8 +36,16 @@ jobs:
         run: uv sync --locked
 
       # pytest's own list of the slowest tests, on every system, so that a slow check can be read and not guessed at.
+      # The times of every test also go to suite.xml, which the next step reads.
       - name: Run the suite (a skipped test fails it)
-        run: uv run pytest -rs --durations=40 --durations-min=1.0
+        run: uv run pytest -rs --durations=40 --durations-min=1.0 --junitxml=suite.xml
+
+      # Where the time of the slowest tests goes (15.14, the details of run 10a): the twelve slowest tests of the run
+      # above are run once more, alone. For each the log shows its set-up, its call and its tear-down, every process it
+      # started with its seconds, and the functions that held most of the call. It measures; it mends nothing.
+      - name: Show where the time of the twelve slowest tests goes
+        if: always()
+        run: uv run python .github/scripts/where_time_goes.py suite.xml 12
 
       - name: Start the app with a temporary data folder, check that it answers, stop it
         run: uv run python .github/scripts/start_check.py
