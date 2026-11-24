@@ -1,17 +1,19 @@
 """What a learner is shown of a feedback (spec 15.14; the owner's rule of
-24 Nov 2026, mail 3 of run 10a): no learner's line, no credit. The model
-matches what the learner did against the scenario and answers with
-numbers; this is the rule by code that stands between that answer and
-the page, so that credit never rests on a turn of the patient's or on a
-line that is not there. The bench counts by it, and the page of run 10b
-will show by it.
+24 Nov 2026, mails 3 and 4 of run 10a): no learner's line that is not
+the learner's. The model matches what the learner did against the
+scenario and answers with numbers; this is the rule by code that stands
+between that answer and the page. The bench counts by it, and the page
+of run 10b will show by it.
 
-It only ever takes credit away: nothing is turned from not met to met.
-It writes no word a person reads."""
+A number that is not a turn of the doctor's never reaches a learner, as
+a quoted line or as signposting. Dropping a turn never changes whether
+a point is met: the form cannot tell a point shown by an examination or
+an answer from one shown in the consultation, so a point that came back
+met stays met with whatever turns of the doctor's are left. A marking
+point that did not come back is not met. Nothing is ever turned from
+not met to met. It writes no word a person reads."""
 
 from __future__ import annotations
-
-BY_TURNS, BY_NONE = "turns", "none"      # two of the form's four words for where a point is shown
 
 
 def doctors_turns(conversation: list[tuple[str, str]]) -> set[int]:
@@ -19,27 +21,20 @@ def doctors_turns(conversation: list[tuple[str, str]]) -> set[int]:
     return {n for n, (speaker, _) in enumerate(conversation, 1) if speaker == "doctor"}
 
 
-def _entry(point: dict, doctors: set[int]) -> dict:
-    """One entry as it came back, with only the doctor's turns left; met stays met only where it is shown by an
-    examination or an answer, or by a turn of the doctor's that is left."""
-    turns = [turn for turn in point["turns"] if turn in doctors]
-    met = bool(point["met"]) and point["shown_by"] != BY_NONE and (point["shown_by"] != BY_TURNS or bool(turns))
-    return {**point, "met": met, "turns": turns}
-
-
 def shown(answer: dict, conversation: list[tuple[str, str]], points: int) -> dict:
     """The model's answer as a learner would be shown it: one entry for each of the case's marking points, in
-    their order. A point that did not come back is not met; one that came back more than once is met only if
-    every one of its entries is. A number the case does not have is dropped. Signposting stands only on a turn of
-    the doctor's. Every other part of the answer is given back as it came."""
+    their order, with only the doctor's turns left in its list. A point that did not come back is not met; one
+    that came back more than once is met only if every one of its entries is. A number the case does not have is
+    dropped. Signposting stands only on a turn of the doctor's. Every other part of the answer is given back as
+    it came."""
     doctors, back = doctors_turns(conversation), {}
     for point in answer["points"]:
-        back.setdefault(point["number"], []).append(_entry(point, doctors))
+        back.setdefault(point["number"], []).append({**point, "turns": [turn for turn in point["turns"] if turn in doctors]})
     listed = []
     for number in range(1, points + 1):
         entries = back.get(number)
         if not entries:
-            listed.append({"number": number, "met": False, "shown_by": BY_NONE, "turns": []})
+            listed.append({"number": number, "met": False, "turns": []})
         elif len(entries) == 1:
             listed.append(entries[0])
         else:

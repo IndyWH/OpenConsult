@@ -88,9 +88,10 @@ def feedback(item, **changes):
 
 
 def test_ruling_14_mail_3_hard_mark_five_is_judged_on_what_a_learner_is_shown_and_the_feedback_is_counted_raw_and_shown():
-    """Restated by mail 3 of run 10a (the owner's ruling of 24 Nov 2026): every count of the feedback twice, RAW on the
-    answer as the model gave it and SHOWN on what the rule of teaching/shown.py gives back. Hard mark five is the
-    red flag that is SHOWN as met; a turn that is not the doctor's cannot reach a learner and is counted RAW only."""
+    """Restated by mails 3 and 4 of run 10a (the owner's rulings of 24 Nov 2026): the feedback is counted RAW, on the
+    answer as the model gave it, and SHOWN, on what the rule of teaching/shown.py gives back. Hard mark five is the
+    red flag that is SHOWN as met; a turn that is not the doctor's cannot reach a learner and is counted RAW only.
+    By mail 4 the form has no shown_by again, and dropping a turn never changes met."""
     good = [{"number": 1, "named": True}, {"number": 2, "named": True}, {"number": 3, "named": False}]
     plan = [{"number": 1, "named": True}, {"number": 2, "named": True}]
     missed = dict(differential=good, plan=plan, most_important_missed=2)
@@ -99,16 +100,21 @@ def test_ruling_14_mail_3_hard_mark_five_is_judged_on_what_a_learner_is_shown_an
     credited = feedback("one_red_flag_missed", **missed)
     assert credited["HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met"] == [2] == credited["RAW_a_red_flag_returned_met"]
     assert credited["F2_RAW_expected_not_met_returned_met"] == [2] == credited["F2_SHOWN_expected_not_met_shown_met"]
-    honest = feedback("one_red_flag_missed", **missed, points={2: {"met": False, "shown_by": "none", "turns": []}})
+    honest = feedback("one_red_flag_missed", **missed, points={2: {"met": False, "turns": []}})
     assert not any(honest.values())
-    # The rule takes the credit away where no line of the learner's stands behind it: RAW counts it, SHOWN does not.
-    for entry in ({"turns": [2]}, {"turns": []}, {"turns": [7]}, {"shown_by": "none", "turns": [1]}):
-        saved = feedback("one_red_flag_missed", **missed, points={2: entry})
-        assert saved["RAW_a_red_flag_returned_met"] == [2] and saved["HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met"] == []
-        assert saved["F2_RAW_expected_not_met_returned_met"] == [2] and saved["F2_SHOWN_expected_not_met_shown_met"] == []
-    assert feedback("one_red_flag_missed", **missed, points={2: {"turns": []}})["RAW_met_by_turns_with_an_empty_list"] == [2]
-    # A red flag credited on an examination or an answer is shown as met: the rule cannot mend it, and the mark is crossed.
-    assert feedback("one_red_flag_missed", **missed, points={2: {"shown_by": "examined", "turns": []}})["HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met"] == [2]
+    # Mail 4: dropping a turn never changes met. A red flag credited on a patient's turn, on a turn that is not there or
+    # on no turn at all is still shown as met, and the mark is crossed: the form cannot say where a point is shown.
+    for turns in ([2], [], [7]):
+        still = feedback("one_red_flag_missed", **missed, points={2: {"turns": turns}})
+        assert still["RAW_a_red_flag_returned_met"] == [2] == still["HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met"]
+        assert still["F2_RAW_expected_not_met_returned_met"] == [2] == still["F2_SHOWN_expected_not_met_shown_met"]
+    # Where RAW and SHOWN part: the red flag came back twice, once met and once not. As answered it was credited; shown, it is not.
+    twice = copy.deepcopy(FEEDBACK_OK)
+    twice["points"].append({"number": 2, "met": False, "turns": []})
+    twice.update(missed)
+    found = marks.feedback_marks(row("feedback", "one_red_flag_missed", twice), CASE)
+    assert found["RAW_a_red_flag_returned_met"] == [2] and found["HARD_MARK_FIVE_SHOWN_a_red_flag_shown_as_met"] == []
+    assert found["F2_RAW_expected_not_met_returned_met"] == [2] and found["F2_SHOWN_expected_not_met_shown_met"] == []
     # A turn that is not the doctor's, RAW only. The transcript of two lines has turns 1 to 4; the doctor's are 1 and 3.
     for turns, wrong in (([2], [2]), ([0, 1], [0]), ([3, 5], [5]), ([1, 3], [])):
         found = feedback("one_red_flag_missed", **missed, points={2: {"met": False}, 1: {"turns": turns}})
@@ -119,11 +125,12 @@ def test_ruling_14_mail_3_hard_mark_five_is_judged_on_what_a_learner_is_shown_an
     # The opposite harm, F1: a point expected met that is not met, RAW and SHOWN, and how many of these the rule itself made.
     lost = feedback("full", differential=good, plan=plan, points={3: {"met": False}})
     assert lost["F1_RAW_expected_met_returned_not_met"] == [3] == lost["F1_SHOWN_expected_met_shown_not_met"] and lost["F1_of_which_made_by_the_rule"] == []
-    by_rule = feedback("full", differential=good, plan=plan, points={3: {"turns": [2]}, 4: {"shown_by": "answers", "turns": [2]}})
-    assert by_rule["F1_RAW_expected_met_returned_not_met"] == [] and by_rule["F1_SHOWN_expected_met_shown_not_met"] == [3] == by_rule["F1_of_which_made_by_the_rule"]
+    kept = feedback("full", differential=good, plan=plan, points={3: {"turns": [2]}, 4: {"turns": []}})
+    assert kept["F1_RAW_expected_met_returned_not_met"] == [] == kept["F1_SHOWN_expected_met_shown_not_met"]       # a dropped turn takes no credit away
+    # A point that did not come back was not answered not met; by the rule it is shown as not met: the one harm the rule itself makes.
     gone = feedback("full", differential=good, plan=plan, points={4: "gone"})
-    assert gone["F1_RAW_expected_met_returned_not_met"] == [4] == gone["F1_SHOWN_expected_met_shown_not_met"] and gone["RAW_points_not_returned"] == [4]
-    assert gone["F1_of_which_made_by_the_rule"] == []
+    assert gone["F1_RAW_expected_met_returned_not_met"] == [] and gone["F1_SHOWN_expected_met_shown_not_met"] == [4] == gone["F1_of_which_made_by_the_rule"]
+    assert gone["RAW_points_not_returned"] == [4]
     # F3: the number asserted, or a point whose verdict is not asserted; null asserts nothing.
     assert feedback("one_red_flag_missed", differential=good, plan=plan, points={2: {"met": False}}, most_important_missed=5)["F3_most_important_missed_differs"] is True
     assert not feedback("one_red_flag_missed", differential=good, plan=plan, points={2: {"met": False}}, most_important_missed=9)["F3_most_important_missed_differs"]
@@ -135,14 +142,11 @@ def test_ruling_14_mail_3_hard_mark_five_is_judged_on_what_a_learner_is_shown_an
     assert lists["F4_differential_named_differs"] is True and lists["F4_plan_named_differs"] is True and lists["F4_investigations_named_differs"] is False
     # Apart: a point returned twice, and a number the case does not have.
     odd = copy.deepcopy(FEEDBACK_OK)
-    odd["points"] += [{"number": 1, "met": False, "shown_by": "none", "turns": []}, {"number": 12, "met": True, "shown_by": "answers", "turns": []}]
+    odd["points"] += [{"number": 1, "met": False, "turns": []}, {"number": 12, "met": True, "turns": []}]
     found = marks.feedback_marks(row("feedback", "full", odd), CASE)
     assert found["RAW_points_returned_twice"] == [1] and found["RAW_points_the_case_does_not_have"] == [12]
     assert found["F1_RAW_expected_met_returned_not_met"] == [1] == found["F1_SHOWN_expected_met_shown_not_met"]      # two verdicts for one point: not met
-    # How often a point is shown by each of the form's four words, of every entry and of those that came back met.
-    words = marks.shown_by([row("feedback", "full", odd), row("feedback", "poor", None, failure="bad_form")])
-    assert words == {"entries": 11, "every_entry": {"turns": 9, "examined": 0, "answers": 1, "none": 1},
-                     "entries_met": {"turns": 9, "examined": 0, "answers": 1, "none": 0}}
+    assert found["F1_of_which_made_by_the_rule"] == []
     assert marks.feedback_marks(row("feedback", "full", None, failure="bad_form"), CASE) == {"F0_not_the_form": True}
 
 
