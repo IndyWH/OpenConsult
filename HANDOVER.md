@@ -4,6 +4,103 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-24. Run 10a: the four prompts of teaching as files, their jobs in the door, and the bench of teaching on both models. Report only: nothing a learner can see
+
+Run on 23 and 24 Nov 2026 by the mailbox (a usage limit stood between
+the two days). Mail 1 (the owner's okay at 09:03 UTC on 23 Nov): his
+own change to CLAUDE.md and the bench-commands skill are committed
+first. Mail 2 (11:35 UTC): Approved. Go., the plan as written. The spec
+is bac1b98 (sha256 2f9e3558...), the stage prompt 0ff23a0
+(stage-prompts/STAGE_10A.md). The private report is STAGE10A_REPORT.md
+in the log folder. Ten commits, none pushed. The suite: 1470 passed
+in about 152 s, none skipped (1420 at the start). OpenConsult is a
+research and education prototype; every scenario is made up.
+
+For the learner. A learner who is taught something wrong is harmed
+(12.3), so both models were put through the same test before any page
+stands on the prompts, with six hard marks set before any run (15.14,
+ruling 14). Code can count three of them. Hard mark four (the
+examination never says nothing is there where the scenario holds a
+finding): crossed by no arm. The counted part of hard mark six (no
+dose in the plan of a fresh case): crossed by no arm. HARD MARK FIVE
+(the feedback never credits a red flag that was not asked about, and
+never points to a line that does not exist) IS CROSSED ON EVERY ARM,
+as the bench's README counts it:
+- Gemma 4 QAT on vLLM: 10 of 36 feedback replies. A red flag credited
+  though the learner never asked about it in 8; a turn number that
+  does not exist in 2.
+- Gemma 4 QAT on Ollama (one round): 6 of 18. A red flag credited in
+  5; a turn that does not exist in 1, a patient's turn in 1.
+- Claude Haiku 5.5: 18 of 36. No red flag credited. In all 18 a
+  point's turns name a turn of the patient, not of the doctor; every
+  such turn exists in the consultation.
+So by ruling 14 no model is offered for the feedback as the prompts
+stand. That is the owner's to rule on; nothing was changed to make a
+mark hold. Hard marks one to three (the actor) and whether a fresh
+case is clinically right are Cowork's to read from the stored files:
+535 replies of the actor and 78 fresh cases.
+
+- The words (15.14, rulings 10 to 13; 15.8, ruling 1): thirteen files
+  in the prompts folder byte for byte, pinned by the sha256 of their
+  bytes: a prompt, a frame and a form for teaching_case,
+  teaching_patient, teaching_examination and teaching_feedback, and
+  teaching.layout.json, every pattern by which a part of a scenario is
+  written into a frame. No older prompt, frame or form changed.
+- The loader gains layout() and fill_once(): a fill in one pass, so
+  braces a learner typed are never taken for a later slot. The older
+  fill is left alone.
+- The four jobs (R30): 4,000 tokens and 180 s; 300 and 30 s twice;
+  2,500 and 120 s. Measured beside them: the longest case 3,073
+  tokens (Claude; 1,683 on Ollama), the longest patient's reply 131,
+  the longest feedback 1,037; no call cut, none over its time. The
+  four sentences for a failed job are drafts.
+- openconsult/teaching/frames.py (R24) builds the words of each job.
+  The actor is given part one of a scenario alone (ruling 10), pinned
+  on a made scenario. Nothing else of teaching is built: no page,
+  route, table or setting (R31), pinned for this run.
+- THE SAMPLING OF A FRESH CASE DEPARTS FROM SPEC 10.4, by the details
+  of run 10a; the owner was told on 23 Nov 2026. On a local model the
+  case is asked at temperature 0.7 with a seed drawn afresh, kept in
+  the stored request; every other job keeps 0 and 42. Claude is sent
+  neither.
+- The bench (openconsult-bench teaching, teaching-score; their line
+  is in the bench-commands skill): Cowork's six scenarios with fixed
+  learner lines and 26 fresh cases, private, never in the repo. 340
+  calls on vLLM, 185 on Ollama, 340 on Claude; no failed call, no
+  reply with thinking, no form refused. The proof of the words: 853
+  stored requests, each holds its prompt file letter for letter, and
+  the arms were sent the same words (336 calls compared).
+- The learner's wait, a patient's reply, typical and slowest: vLLM
+  0.2 and 0.5 s; Ollama 0.4 and 1.9 s; Claude 1.3 and 2.4 s. A fresh
+  case: 6.4, 8.7 and 13.4 s typical. A feedback: 2.7, 5.1 and 3.6 s.
+- Counted, not hard marks: an absent line answered with a fact in 5
+  of 214 replies on vLLM and 13 of 214 on Claude; the first line
+  saying the opening words again in 4 on vLLM and none on Claude; a
+  point expected met that came back not met: none on Gemma, 2 on
+  Claude. The two rounds: on vLLM 22 of 107 patient's replies and 17
+  of 18 feedbacks differ at temperature 0 and seed 42; why is not
+  measured.
+- Claude's cost at 0.10 and 0.50 US dollars a million tokens (the
+  spec's figures of 6 and 14 Nov 2026): the arm 0.13 dollars; one
+  whole teaching case (one case, 30 replies, 3 examinations, one
+  feedback) 76,165 tokens read and 5,504 written, about 1.0 US cent
+  by the bench's means, 1.1 by a straight line to 30 lines.
+- Six older tests restated, by mail 2: the door's refusal now pinned
+  on a made name; the two lists of the app's jobs; in test_prompts.py
+  the counts 22 to 30 and 30 to 43 and 46 new capital words.
+- GitHub's check gains a step that shows, for its twelve slowest
+  tests, the three phases, the processes started and the functions
+  that held most of the call. It measures and mends nothing.
+- The engines: vLLM started and stopped by the owner's script, the
+  model unloaded from Ollama at the end; left as found.
+
+Made untrue by this run. Spec 10.4 (temperature 0 and seed 42 with no
+exception): Cowork amends it. The details of run 10a under Documents
+(CLAUDE.md gains the bench's line): overtaken by mail 1, the line is in
+the skill. CLAUDE.md's run line no longer walks through the pages: the
+owner's cut of 23 Nov, kept. The README is not changed: teaching mode
+is still to come.
+
 ## 2026-11-21. Step 9f: the review page opens in a simple view of the note and of the transcript, an edited entry is marked, two lines for two things in the cloud
 
 Run on 21 Nov 2026 by the mailbox, one plan gate (the owner's okay at
