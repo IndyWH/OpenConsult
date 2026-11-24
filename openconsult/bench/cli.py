@@ -14,7 +14,7 @@ import sys
 from pathlib import Path
 
 import openconsult
-from openconsult.bench import background, export, figures, guideline_commands, letter_marks, letters, score, wordcheck
+from openconsult.bench import background, export, figures, guideline_commands, letter_marks, letters, score, teaching_commands, wordcheck
 from openconsult.bench.cases import load_cases
 from openconsult.bench.llamacpp import LlamaCppEngine
 from openconsult.bench import claude, deepinfra
@@ -561,6 +561,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--chains", nargs="*", help="only these chains, for a check")
     p.add_argument("--letter", action="append", help="CASE=SPECIALTY, the specialty a case that states no referral drafts to")
     guideline_commands.add_guideline_commands(sub, command)
+    teaching_commands.add_teaching_commands(sub, command)
     add_cloud_arguments(sub)
     p = command("letters-score", cmd_letters_score)
     p.add_argument("--write", required=True, help="where marks.json and marks.md go; never written over")
