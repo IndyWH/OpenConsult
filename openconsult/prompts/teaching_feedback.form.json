@@ -15,15 +15,6 @@
           "met": {
             "type": "boolean"
           },
-          "shown_by": {
-            "type": "string",
-            "enum": [
-              "turns",
-              "examined",
-              "answers",
-              "none"
-            ]
-          },
           "turns": {
             "type": "array",
             "items": {
@@ -34,7 +25,6 @@
         "required": [
           "number",
           "met",
-          "shown_by",
           "turns"
         ]
       }

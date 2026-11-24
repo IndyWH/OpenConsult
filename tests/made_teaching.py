@@ -34,7 +34,7 @@ SCENARIO = {
 # One reply that fits each form.
 PATIENT_OK = {"reply": "A made-up reply.", "facts_used": [1]}
 EXAMINATION_OK = {"asked": [1, 2], "not_in_case": []}
-FEEDBACK_OK = {"reasoning": "made up", "points": [{"number": n, "met": True, "shown_by": "turns", "turns": [1]} for n in range(1, 10)],
+FEEDBACK_OK = {"reasoning": "made up", "points": [{"number": n, "met": True, "turns": [1]} for n in range(1, 10)],
                "differential": [{"number": 1, "named": True}, {"number": 2, "named": False}, {"number": 3, "named": False}],
                "differential_extra": [], "investigations": [{"number": 1, "named": True}], "investigations_extra": [],
                "plan": [{"number": 1, "named": True}, {"number": 2, "named": False}], "plan_extra": [],

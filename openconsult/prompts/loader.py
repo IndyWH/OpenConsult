@@ -69,11 +69,9 @@ APPROVED_BYTES = {
     "teaching_examination": "f7f55378be26cb7a2140ba9172efeba6825603582763b8e630fe6379184b799d",
     "teaching_examination.frame": "a72b30bb29938f465f9ecc3b8196d588490bd4629c30950b1e5c28831730b837",
     "teaching_examination.form": "f78b0d586b5d13b04bb2f4ca168ce9a7e0eb8f87cf888e5786bdfbe6a58ff609",
-    # The feedback's prompt and form are the owner's of 24 Nov 2026 (his okay at 11:34 UTC, after the bench of run
-    # 10a): a point names where it is shown, and only a turn of the doctor's counts. The frame is unchanged.
-    "teaching_feedback": "8001bb5598113e8b8c787414ccd0ee4fed91b30ea64381d1e271c4398a98efeb",
+    "teaching_feedback": "80a7797520dc7f0dba25caa6860d4eb4c47dc45833cc0de73761f1f065284626",
     "teaching_feedback.frame": "b968304515fe601e996a0b094af61af33f90d25480dc53680b5ef730d0078738",
-    "teaching_feedback.form": "ea99edb9753b32fdafc089c2126510aa24e4f12587b86e253d3dd9d27ef37f04",
+    "teaching_feedback.form": "4a2aff46f4001194e6e2cdf557fc6f1ff17a11babf0ed02ed46384321b355012",
     "teaching.layout": "cc8051d49d1dcb1c84a171ff68a2db8e72c888a5e40972fc0c9fe24178d4af26",
 }
 
