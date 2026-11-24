@@ -64,6 +64,8 @@ def without(answer: dict, *path):
     ("teaching_examination", (("asked", "1 and 2"),), "answer.asked is not a array"),
     ("teaching_examination", ("not_in_case",), "answer lacks not_in_case"),
     ("teaching_feedback", ("points", 0, "turns"), "answer.points[0] lacks turns"),
+    ("teaching_feedback", ("points", 2, "shown_by"), "answer.points[2] lacks shown_by"),          # the owner's form of 24 Nov 2026: where a point is shown
+    ("teaching_feedback", ("points", 1, ("shown_by", "the patient")), "answer.points[1].shown_by is not one of ['turns', 'examined', 'answers', 'none']"),
     ("teaching_feedback", (("most_important_missed", True),), "answer.most_important_missed is a boolean, not a integer"),
     ("teaching_case", ("plan", 0, ("urgency", "soon")), "answer.plan[0].urgency is not one of ['emergency today', 'urgent', 'routine', 'none']"),
     ("teaching_case", ("facts", 1, ("tells", "never")), "answer.facts[1].tells is not one of ['open', 'asked']"),
