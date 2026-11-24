@@ -136,14 +136,15 @@ def items(material: Material, parts: tuple[str, ...] = PARTS, only: list[str] | 
     return found
 
 
-def trial_items(material: Material) -> list[Item]:
-    """The four calls sent before any bench, one of each job: the writer's first run; and, of the first case,
-    the patient at line 3, the first examination request and the first transcript."""
+def trial_items(material: Material, parts: tuple[str, ...] = PARTS) -> list[Item]:
+    """The calls sent before any bench, one of each job asked for: the writer's first run; and, of the first
+    case, the patient at line 3, the first examination request and the first transcript."""
     case = material.cases[0]
     sha = material.sha256[case["file"]]
     line = next(found for found in case["bench"]["lines"] if found["n"] == 3)
-    return [writer_item(material.runs[0], material.sha256["writer_runs.json"]), actor_item(case, line, sha),
+    four = [writer_item(material.runs[0], material.sha256["writer_runs.json"]), actor_item(case, line, sha),
             examination_item(case, 1, sha), feedback_item(case, case["bench"]["transcripts"][0], sha)]
+    return [item for item in four if item.part in parts]
 
 
 def name_of(item: Item, round_: int, arm: str) -> str:
@@ -246,7 +247,7 @@ def run(door: Door, record: ModelCalls, writer: ResultWriter, material: Material
     """Every call that has no file yet: round 1 whole, then the next; the writer once. With trial, the four
     calls of the trial alone. A call the service refused for the key or the credit never reached a model: it is
     written apart, to be sent when the bench is carried on. Every other failed call is stored and stands."""
-    plan = [(0, item) for item in trial_items(material)] if trial else [
+    plan = [(0, item) for item in trial_items(material, parts)] if trial else [
         (round_, item) for round_ in range(1, rounds + 1) for item in items(material, parts, only)
         if item.part != "writer" or round_ == 1]
     done = kept = failed = 0
@@ -279,10 +280,10 @@ def run(door: Door, record: ModelCalls, writer: ResultWriter, material: Material
     return {**summary, "stopped": door.stopped} if door.stopped else summary
 
 
-def trial_holds(writer: ResultWriter) -> list[str]:
-    """Why the bench may not start after the trial: a call that was not the form, a reply that held thinking, a
-    reply cut at its limit. Empty when the four hold."""
-    held = [row for (folder, _), row in sorted(writer.read_all().items()) if folder == TRIAL]
+def trial_holds(writer: ResultWriter, parts: tuple[str, ...] = PARTS) -> list[str]:
+    """Why the bench of these parts may not start after the trial: a call that was not the form, a reply that
+    held thinking, a reply cut at its limit, a part with no trial call. Empty when the trial of each part holds."""
+    held = [row for (folder, _), row in sorted(writer.read_all().items()) if folder == TRIAL and row["part"] in parts]
     why = [f"{row['job']}: {row['failure']}: {str(row['detail'])[:200]}" for row in held if not row["ok"]]
     why += [f"{row['job']}: the reply held thinking" for row in held if row["thinking"]]
-    return why + ([] if len(held) == 4 else [f"the trial holds {len(held)} calls, not 4"])
+    return why + ([] if len(held) == len(parts) else [f"the trial holds {len(held)} calls, not {len(parts)}"])

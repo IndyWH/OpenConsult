@@ -236,3 +236,16 @@ def test_rule_8_of_run_9d_three_refusals_for_rate_in_a_row_stop_the_arm_each_sto
     assert main(args) == 0
     assert len(messages(server)) == 4 + 3 + 1 + (2 * ROUND + WRITER - 3)     # the three refused for rate are never sent again; the one apart is
     assert stored(out, "actor")["actor__01_made__line04__r1__made-claude"]["ok"] and MADE_KEY not in capsys.readouterr().out
+
+
+def test_mail_3_a_trial_of_one_part_is_one_call_and_opens_the_bench_of_that_part_alone(server, folders, capsys):
+    # The feedback benched again alone (mail 3 of run 10a): its trial is the one call of that job, and no other part may start on it.
+    material, out = folders
+    args = vllm_args(server, material, out, "--part", "feedback")
+    assert main([*args, "--trial"]) == 0
+    assert [body["response_format"]["json_schema"]["name"] for body in server.chats()] == ["teaching_feedback"]
+    assert sorted(stored(out, "trial")) == ["feedback__01_made__full__r0__made-vllm"]
+    assert main(args) == 0 and len(server.chats()) == 1 + 2 * 4
+    assert len(stored(out, "feedback")) == 8 and not stored(out, "actor") and not stored(out, "writer")
+    assert main(vllm_args(server, material, out)) == 4 and len(server.chats()) == 1 + 2 * 4
+    assert "the trial holds 1 calls, not 4" in capsys.readouterr().out

@@ -28,18 +28,18 @@ def cmd_teaching(args) -> int:
     if isinstance(opened, int):
         return opened
     door, record, writer = opened
-    why = [] if args.trial else teaching.trial_holds(writer)
+    parts = tuple(part for part in teaching.PARTS if not args.part or part in args.part)
+    why = [] if args.trial else teaching.trial_holds(writer, parts)
     if why:
         say("STOP: the trial has not held in this folder, so nothing is sent: " + "; ".join(why))
         return 4
-    parts = tuple(part for part in teaching.PARTS if not args.part or part in args.part)
     summary = teaching.run(door, record, writer, material, args.arm, parts, args.rounds, args.case, args.trial,
                            args.max_dollars if args.kind in CLOUD else None, log=say)
     say(f"done: sent {summary['run']} calls, kept {summary['kept']}, failed {summary['failed']}"
         + (f"; {summary['dollars']:.3f} US dollars at {teaching.PRICE_READ} and {teaching.PRICE_WRITTEN} a million tokens "
            f"(the prices of {teaching.PRICES_OF})" if args.kind in CLOUD else ""))
     code = stopped(summary)
-    why = teaching.trial_holds(writer) if args.trial and not code else []
+    why = teaching.trial_holds(writer, parts) if args.trial and not code else []
     if why:
         say("STOP: the trial did not hold: " + "; ".join(why))
         return 4
@@ -71,7 +71,8 @@ def add_teaching_commands(sub, command) -> None:
     p.add_argument("--part", action="append", choices=teaching.PARTS, help="only this part; may be given more than once; all four when not given")
     p.add_argument("--rounds", type=int, default=2, help="the rounds of the actor, the examination and the feedback; the writer runs once")
     p.add_argument("--case", nargs="*", help="only these cases, by id")
-    p.add_argument("--trial", action="store_true", help="the four calls of the trial alone, one of each job, judged by the door's own check")
+    p.add_argument("--trial", action="store_true", help="the calls of the trial alone, one of each job (of each --part asked for), "
+                                                         "judged by the door's own check")
     p.add_argument("--engine", default=DEFAULT_ADDRESS, help="the engine's address")
     p.add_argument("--kind", choices=sorted(KINDS), default="ollama", help="the kind of engine at that address")
     p.add_argument("--data-folder", help="an app data folder results may not go under, beside the real one")
