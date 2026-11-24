@@ -12,11 +12,48 @@ own change to CLAUDE.md and the bench-commands skill are committed
 first. Mail 2 (11:35 UTC): Approved. Go., the plan as written. The spec
 is bac1b98 (sha256 2f9e3558...), the stage prompt 0ff23a0
 (stage-prompts/STAGE_10A.md). The private report is STAGE10A_REPORT.md
-in the log folder. Eleven commits, none pushed, the last of them the
-move of the entry of run 9c to the archive, so that this file stays
-under 500 lines (221 now). The suite: 1470 passed
-in about 152 s, none skipped (1420 at the start). OpenConsult is a
-research and education prototype; every scenario is made up.
+in the log folder. Eleven commits to the first report, none pushed,
+the last of them the move of the entry of run 9c to the archive, so
+that this file stays under 500 lines; five more by mail 3, this
+entry's lines among them. The suite: 1480 passed in about 153 s, none
+skipped (1420 at the start, 1470 at the first report). OpenConsult is
+a research and education prototype; every scenario is made up.
+
+BY MAIL 3 (24 Nov 2026, the owner's okay at 11:39 UTC): THE FEEDBACK
+TIGHTENED AND BENCHED AGAIN. The private report is
+STAGE10A_REPORT_2.md. What follows below this paragraph is the first
+bench, as it stood.
+- The feedback's prompt and form are the owner's of 11:34 UTC: only a
+  turn that begins with Doctor may be listed, a point that says to
+  ask is met only by a question about that very thing, and each point
+  names where it is shown (shown_by: turns, examined, answers, none).
+  The two files replace the pinned ones byte for byte. SPEC 15.14,
+  RULING 13, NAMES THE OLD sha256 OF BOTH AND IS UNTRUE IN THAT; Cowork
+  amends it after the run. The frame and the layouts are unchanged.
+- The rule by code, the owner's: no learner's line, no credit
+  (openconsult/teaching/shown.py). Between the model's answer and the
+  page: a number that is not a turn of the doctor's is dropped; a
+  point met by its turns with none left, or shown by nothing, is not
+  met; a point that did not come back is not met; nothing is ever
+  turned from not met to met. Run 10b's page shows by it.
+- The scoring counts the feedback RAW (as the model answered) and
+  SHOWN (by that rule). Hard mark five is judged on SHOWN. A part of
+  the bench can be tried and benched alone (--part with --trial).
+- The feedback alone, the same cases, transcripts and marks: 36 calls
+  on vLLM, 18 on Ollama, 36 on Claude, none failed, no thinking.
+  HARD MARK FIVE, SHOWN (a red flag the learner did not ask about,
+  shown as met): Gemma on vLLM 6 of 36 (RAW 7), Gemma on Ollama 4 of
+  18 (RAW 6), Claude Haiku 1 of 36 (RAW 1). Before: 8 of 36, 5 of 18
+  and 0 of 36 as red flags credited. Where it still crosses, the model
+  names a real line of the learner's that asks something wider, or
+  says the point is shown by an answer: the rule cannot mend that.
+- A turn that is not the doctor's, RAW only, which the rule drops:
+  vLLM 0, Ollama 3 of 18, Claude 9 of 36 (18 of 36 before).
+- The opposite harm, a point that was met and is shown as not met:
+  Gemma none; Claude 7 of 36 replies (2 before), RAW and SHOWN alike;
+  the rule itself made none of them.
+- A feedback takes 3.4 s typical on vLLM, 6.1 on Ollama, 3.9 on
+  Claude; the Claude arm cost 0.03 US dollars.
 
 For the learner. A learner who is taught something wrong is harmed
 (12.3), so both models were put through the same test before any page
