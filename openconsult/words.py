@@ -1028,6 +1028,8 @@ CLOUD_SENT_AGE = "The patient's age and sex."
 CLOUD_SENT_EARLIER = "The earlier notes of a patient seen before, when they are switched on."
 CLOUD_SENT_NOTE = "The note, when a letter is drafted from it."
 CLOUD_SENT_PASSAGES = "Passages from your guideline documents, when the panel searches them."
+# THE OWNER'S, letter for letter (15.14, ruling 15): the last line of the list whenever the language model is in the cloud.
+CLOUD_SENT_TEACHING = "What you type in a teaching case. It goes to the language model service."
 CLOUD_SENT_RECORDING = "The recording of the whole consultation, once, after you press Stop. It goes to the transcription service."
 CLOUD_STAYS_HEADING = "What stays on this computer"
 CLOUD_STAYS_NAME = "The patient's name and date of birth as you typed them."

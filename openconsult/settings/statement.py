@@ -4,8 +4,9 @@ for the whole setup, from the owner's words alone, which stand in the
 file of words letter for letter. A line shows only when it is true for
 the path: the sound as it is spoken and the live part for Speechmatics
 only when Speechmatics writes the live text; the words, the age and
-sex, the earlier notes, the note for a letter, the guideline passages
-and the part for Claude only when Claude is the language model; the
+sex, the earlier notes, the note for a letter, the guideline passages,
+what is typed in a teaching case (15.14, ruling 15) and the part for
+Claude only when Claude is the language model; the
 lines of ruling 33 only when the whole recording is sent after Stop.
 The doctor ticks the text as shown, and its checksum is kept: a path
 whose statement no longer has that checksum has not been ticked."""
@@ -53,7 +54,9 @@ def _sent(path: ChosenPath, recording: bool) -> tuple[str, ...]:
     if path.claude:
         # Ruling 5: with transcription on this computer the words that name the second service are left out.
         said = words.CLOUD_SENT_WORDS if path.speechmatics_live else words.CLOUD_SENT_WORDS.removesuffix(words.CLOUD_SENT_WORDS_GO)
-        lines += [said, words.CLOUD_SENT_AGE, words.CLOUD_SENT_EARLIER, words.CLOUD_SENT_NOTE, words.CLOUD_SENT_PASSAGES]
+        # The line of teaching stands last and whole on every path with Claude (15.14, ruling 15 and the details of run 10b).
+        lines += [said, words.CLOUD_SENT_AGE, words.CLOUD_SENT_EARLIER, words.CLOUD_SENT_NOTE, words.CLOUD_SENT_PASSAGES,
+                  words.CLOUD_SENT_TEACHING]
     return tuple(lines)
 
 

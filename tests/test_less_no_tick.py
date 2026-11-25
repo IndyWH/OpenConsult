@@ -59,7 +59,8 @@ def test_15_13_ruling_48_for_every_pair_of_paths_whether_the_tick_is_asked(tmp_p
 def test_15_13_ruling_48_what_is_kept_with_a_tick_is_the_two_lists_as_sentences_and_no_heading_no_stays_and_no_tick(tmp_path, clock):
     both = statement_for(PATHS["CS"])
     kept = sentences_of(both)
-    assert len(kept) == 28 and all(s.endswith(".") for s in kept)
+    # Restated in run 10b (15.14, ruling 15). OLD: len(kept) == 28. NEW: 30, with the two sentences of the line for teaching.
+    assert len(kept) == 30 and all(s.endswith(".") for s in kept)
     lines = (*both.sent, *(line for _, part in both.parts for line in part))
     assert all(any(line.startswith(sentence) for sentence in kept) for line in lines)      # every line begins with a kept sentence
     assert all(any(sentence in line for line in lines) for sentence in kept)               # and every kept sentence stands in a line
