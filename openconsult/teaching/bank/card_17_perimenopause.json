@@ -1,0 +1,222 @@
+{
+  "id": "17_perimenopause",
+  "source": "mock_consultations/17_perimenopause_auto.md on main",
+  "topic": "Gynaecology and breast health",
+  "level": "noisy",
+  "label": "script",
+  "not_in_script": [
+    "examination: the script is an actor's brief that ends when the doctor examines; it lists what to examine and gives NO finding, so the card holds none",
+    "safety_net: the script gives none beyond a review at three months",
+    "must_not_miss marks thyroid disease and iron deficiency: the script says both must stay on the list; neither is an emergency",
+    "no swelling in the neck and no trouble swallowing: from the script's marking scheme, not from its background paragraph",
+    "the opening words are the first sentences of the script's read-aloud part"
+  ],
+  "left_out": [
+    "the script's marking scheme names diabetes as a lesser possibility; it is not among the card's five diagnoses"
+  ],
+  "scenario": {
+    "reasoning": "A woman of 48 with a year of broken sleep, night sweats, erratic heavy periods, low mood, lost words, aching joints and exhaustion, told as separate complaints: the perimenopause, with thyroid disease and iron deficiency kept on the list. She thinks it is her thyroid and fears something worse. A learner is most likely to miss the past migraine with aura, which changes the safe route for hormone replacement.",
+    "patient": {
+      "name": "Ms Sarah Whitfield",
+      "age": 48,
+      "sex": "female",
+      "occupation": "deputy head teacher",
+      "manner": "Capable and articulate, apologises for taking up time, and understates what embarrasses her unless she is asked directly and without fuss.",
+      "parent": ""
+    },
+    "opening_words": "I'm not really sure where to start, so I'll just go from the beginning. For about a year now I haven't been sleeping.",
+    "facts": [
+      {
+        "fact": "I go off to sleep fine, and then I am awake at three, wide awake, and soaked through. I have to change my top. Then I lie there until the alarm goes.",
+        "tells": "open"
+      },
+      {
+        "fact": "My periods have gone completely haywire. Sometimes three weeks apart, sometimes seven, and far heavier than they ever used to be.",
+        "tells": "open"
+      },
+      {
+        "fact": "I am just not myself. I snapped at my daughter last week over absolutely nothing and she cried.",
+        "tells": "open"
+      },
+      {
+        "fact": "I have started losing words. In a meeting I could not remember the name of a colleague I have worked with for nine years. I write everything down now.",
+        "tells": "open"
+      },
+      {
+        "fact": "My hands ache in the mornings, and my knees as well.",
+        "tells": "open"
+      },
+      {
+        "fact": "I am exhausted all the time, even on the days I have slept.",
+        "tells": "open"
+      },
+      {
+        "fact": "Things with my husband, that side of things, has rather stopped, and I do not really know how to talk about it.",
+        "tells": "open"
+      },
+      {
+        "fact": "I saw somebody about eighteen months ago and they offered me antidepressants. I did not take them, because I do not think I am depressed.",
+        "tells": "open"
+      },
+      {
+        "fact": "My mum had a thyroid thing.",
+        "tells": "open"
+      },
+      {
+        "fact": "It has all come on gradually, over twelve to eighteen months.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have drenching night sweats four or five nights a week, and six to eight hot flushes in the day. They are worst while I am working.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My last period was five weeks ago, and the one before came after a three-week gap. On the second day I flood, I use two forms of protection, and I once had to leave work because of it.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have had no bleeding between periods and none after sex. My smear eighteen months ago was normal.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My mood is irritable and tearful, with a flat sense of dread in the mornings. I still enjoy things when I get to them. I have no thoughts of harming myself.",
+        "tells": "asked"
+      },
+      {
+        "fact": "Losing words and forgetting names is worse when I am tired.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My fingers and knees are stiff for twenty to thirty minutes each morning. There is no swelling or redness.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have vaginal dryness and sex is uncomfortable. I have urinary urgency, and I have had two urine infections in the past year.",
+        "tells": "asked"
+      },
+      {
+        "fact": "In my twenties I had migraines with visual aura. They stopped in my thirties.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no other medical history. I take nothing regularly apart from occasional ibuprofen. I have no allergies.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I need no contraception. My husband had a vasectomy eight years ago.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My mother had an underactive thyroid and went through the menopause at fifty. Her mother broke a hip at seventy. There is no breast cancer in the family.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have two children, fourteen and eleven. I drink a glass of wine on four evenings a week, rather more lately. I have never smoked. I stopped running about a year ago.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have put on around five kilograms in the past year, mostly around my middle.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no swelling in my neck and no trouble swallowing.",
+        "tells": "asked"
+      }
+    ],
+    "ideas": "I think it may be my thyroid, because of my mother. I do not think I am depressed. I think something is actually wrong.",
+    "concerns": "I feel like I am going a bit mad. The losing of words is what frightens me most.",
+    "expectations": "I want to know whether this is the menopause and whether anything can be done. I have read contradictory things about HRT and breast cancer and I do not know what to believe.",
+    "hidden_agenda": "I have been reading about early dementia. That is what I am frightened of.",
+    "examination": [],
+    "results": [],
+    "differential": [
+      {
+        "diagnosis": "Perimenopause",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Hypothyroidism",
+        "must_not_miss": true
+      },
+      {
+        "diagnosis": "Iron deficiency anaemia from heavy periods",
+        "must_not_miss": true
+      },
+      {
+        "diagnosis": "A depressive or anxiety disorder",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "A primary sleep disorder",
+        "must_not_miss": false
+      }
+    ],
+    "investigations": [
+      {
+        "investigation": "Full blood count and ferritin",
+        "reason": "Heavy bleeding makes iron deficiency likely."
+      },
+      {
+        "investigation": "Thyroid function",
+        "reason": "The family history, and symptoms that overlap."
+      },
+      {
+        "investigation": "HbA1c and lipids",
+        "reason": "A reasonable check at her age."
+      }
+    ],
+    "plan": [
+      {
+        "step": "Name the perimenopause and explain it in plain words",
+        "urgency": "none"
+      },
+      {
+        "step": "Discuss hormone replacement: because of the past migraine with aura, by the skin (transdermal) route, with a progestogen because she has a uterus",
+        "urgency": "none"
+      },
+      {
+        "step": "Vaginal oestrogen for the dryness and the urinary symptoms",
+        "urgency": "none"
+      },
+      {
+        "step": "Address the heavy bleeding in its own right",
+        "urgency": "none"
+      },
+      {
+        "step": "Cover sleep, alcohol, exercise and bone health",
+        "urgency": "none"
+      },
+      {
+        "step": "Answer the fear of dementia directly",
+        "urgency": "none"
+      },
+      {
+        "step": "Review at three months",
+        "urgency": "none"
+      }
+    ],
+    "safety_net": "Review at three months.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask about hot flushes and night sweats.",
+        "Ask about the pattern of the periods, and about bleeding between periods or after sex.",
+        "Ask about mood, and about thoughts of self-harm.",
+        "Ask about vaginal dryness, discomfort with sex and urinary symptoms.",
+        "Ask about past migraine.",
+        "Ask about the family: thyroid disease, fractures and breast cancer."
+      ],
+      "management": [
+        "Name the perimenopause and explain it.",
+        "Check a blood count with ferritin, and thyroid function.",
+        "Do not order an FSH: it is not needed over 45 with typical symptoms.",
+        "Discuss hormone replacement by the skin route because of the migraine with aura, with a progestogen.",
+        "Offer vaginal oestrogen for the dryness and the urinary symptoms."
+      ],
+      "relating": [
+        "Find out that she fears early dementia, and answer it.",
+        "Make it easy for her to talk about sex.",
+        "Take seriously that she does not think she is depressed."
+      ]
+    }
+  }
+}

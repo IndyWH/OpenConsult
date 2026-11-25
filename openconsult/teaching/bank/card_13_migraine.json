@@ -1,0 +1,80 @@
+{
+  "id": "13_migraine",
+  "source": "mock_consultations/13_migraine_uk.md on main",
+  "topic": "Neurology",
+  "level": "straightforward",
+  "label": "script",
+  "not_in_script": [
+    "expectations: written from her opening words, that she came to get it looked at properly",
+    "no tenderness of the scalp or temples: from the script's marking scheme, not from its conversation",
+    "investigations: the script orders none, and says that emergency imaging here is a fault"
+  ],
+  "left_out": [],
+  "scenario": {
+    "reasoning": "A woman of 29 with years of one-sided throbbing headaches, nausea, dislike of light and sound, and a zig-zag visual warning of twenty minutes that clears completely; clear triggers, a mother with migraine, every red flag absent and a normal examination. This is migraine with aura, and here it is right to say so with confidence. A learner is most likely to miss asking the red-flag questions that make that confidence safe.",
+    "patient": {"name": "Ms Priya Sharma", "age": 29, "sex": "female", "occupation": "graphic designer", "manner": "Clear and matter-of-fact, describes things well, and is quietly worried.", "parent": ""},
+    "opening_words": "Hi doctor. It's my headaches. I've had them for years, but they've been more frequent lately and I thought I'd finally get it looked at properly.",
+    "facts": [
+      {"fact": "It is usually one side, around my temple and behind the eye. Throbbing. When it is bad I cannot really work through it.", "tells": "open"},
+      {"fact": "It is mostly the right side, but sometimes the left. It moves around between attacks.", "tells": "asked"},
+      {"fact": "About twenty minutes before the pain, I get zig-zag lines in my vision. Shimmering, like a broken bit in the corner of my sight. Then it fades and the headache comes.", "tells": "asked"},
+      {"fact": "The lines in my vision go away completely, within half an hour.", "tells": "asked"},
+      {"fact": "I feel sick with it, and light and sound make it worse. I have to close the curtains and lie down in the dark.", "tells": "asked"},
+      {"fact": "An attack lasts several hours, sometimes most of a day if I cannot lie down.", "tells": "asked"},
+      {"fact": "I get two or three a month now. It used to be once a month, if that.", "tells": "asked"},
+      {"fact": "Stress sets them off, and work has been mad. So does skipping lunch, a bad night's sleep, and red wine almost every time.", "tells": "asked"},
+      {"fact": "My mum had migraines when she was younger. She always said mine sounded the same.", "tells": "asked"},
+      {"fact": "It has never come on instantly, like a thunderclap. It always builds up over twenty minutes or so.", "tells": "asked"},
+      {"fact": "I have no fever and no stiff neck with them.", "tells": "asked"},
+      {"fact": "I have no lasting weakness, numbness or trouble speaking. Once it is over, I am completely back to normal.", "tells": "asked"},
+      {"fact": "They never wake me from sleep, and they are not worse when I cough, strain or bend forward.", "tells": "asked"}
+    ],
+    "ideas": "My mum always said my headaches sounded the same as her migraines.",
+    "concerns": "I had half-convinced myself it was something awful.",
+    "expectations": "I want to get it looked at properly at last.",
+    "hidden_agenda": "",
+    "examination": [
+      {"examination": "Pupils", "finding": "react normally"},
+      {"examination": "Eye movements", "finding": "full"},
+      {"examination": "Power in the limbs", "finding": "no weakness anywhere"},
+      {"examination": "Backs of the eyes (fundi)", "finding": "healthy"},
+      {"examination": "Neck", "finding": "no stiffness"},
+      {"examination": "Scalp and temples", "finding": "not tender"}
+    ],
+    "results": [],
+    "differential": [
+      {"diagnosis": "Migraine with aura", "must_not_miss": false},
+      {"diagnosis": "Tension-type headache", "must_not_miss": false}
+    ],
+    "investigations": [],
+    "plan": [
+      {"step": "Name migraine with aura and explain it", "urgency": "none"},
+      {"step": "A triptan (sumatriptan) to take as soon as the aura starts, with an anti-inflammatory such as ibuprofen or paracetamol, and a medicine for sickness if needed", "urgency": "none"},
+      {"step": "A headache diary for a couple of months, and work on the triggers", "urgency": "none"},
+      {"step": "Consider a daily preventer if the attacks become very frequent", "urgency": "none"}
+    ],
+    "safety_net": "A headache that is different from her usual pattern, such as an instant thunderclap, the worst ever, one with a fever and a stiff neck, or an aura that does not clear within an hour or leaves weakness behind, needs urgent assessment, at A&E if need be.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask what a typical attack is like.",
+        "Ask about a warning before the pain, and whether it clears completely.",
+        "Ask whether a headache has ever come on like a thunderclap.",
+        "Ask about fever or a stiff neck.",
+        "Ask about lasting weakness, numbness or trouble speaking.",
+        "Examine the nervous system and look at the backs of the eyes."
+      ],
+      "management": [
+        "Name migraine with aura, with confidence.",
+        "Prescribe a triptan with an anti-inflammatory, to take early.",
+        "Ask for a headache diary and discuss the triggers.",
+        "Order no scan.",
+        "Tell her which change of headache needs urgent assessment."
+      ],
+      "relating": [
+        "Find out that she feared something awful, and reassure her.",
+        "Explain why a pattern that has stayed the same for years is reassuring.",
+        "Agree with her where to start on the triggers."
+      ]
+    }
+  }
+}

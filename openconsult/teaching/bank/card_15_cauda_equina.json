@@ -1,0 +1,143 @@
+{
+  "id": "15_cauda_equina",
+  "source": "mock_consultations/15_cauda_equina_uk.md on main",
+  "topic": "Musculoskeletal health",
+  "level": "hidden",
+  "label": "script",
+  "not_in_script": [
+    "expectations: the script gives none in so many words; written from what its doctor says he will not do (painkillers, physiotherapy and home)",
+    "examination: the script's doctor examines the legs, the reflexes and straight leg raising and gives one finding only, the saddle sensation; the card holds that one",
+    "the bladder: the script asks for a check of the bladder and gives no result, so the card holds none",
+    "no injury apart from the lift: from the script's marking scheme"
+  ],
+  "left_out": [],
+  "scenario": {
+    "reasoning": "Low back pain and sciatica a week after heavy lifting, the commonest and most harmless-sounding story in general practice. Hidden in it: numbness of the saddle area, trouble passing urine and pins and needles in both feet, each mentioned with embarrassment and explained away. This is cauda equina syndrome until excluded, and hours matter. A learner is most likely to miss asking about the bladder.",
+    "patient": {
+      "name": "Mr Tom Bradley",
+      "age": 40,
+      "sex": "male",
+      "occupation": "personal trainer",
+      "manner": "Easy-going and jokey, a bit embarrassed, and explains each symptom away.",
+      "parent": ""
+    },
+    "opening_words": "Cheers, doc. I've done my back in. Classic, really. I was deadlifting last week, felt something go, and it's been bad since. I'm a trainer, so it's a bit embarrassing.",
+    "facts": [
+      {
+        "fact": "The pain is low down, across my back.",
+        "tells": "open"
+      },
+      {
+        "fact": "It shoots down the back of my right leg, almost to the foot. That is the worst bit.",
+        "tells": "open"
+      },
+      {
+        "fact": "Over the week the back is maybe a touch easier, but the leg stuff has been spreading if anything.",
+        "tells": "open"
+      },
+      {
+        "fact": "I was going to give it another few days, but my wife told me to come.",
+        "tells": "open"
+      },
+      {
+        "fact": "At first it was just the right leg. In the last day or two I have had pins and needles in both feet.",
+        "tells": "asked"
+      },
+      {
+        "fact": "Down below, when I went to the loo and wiped, I could not feel it properly. The area has gone a bit numb.",
+        "tells": "asked"
+      },
+      {
+        "fact": "It has been taking me a while to start passing water, the stream is a bit feeble, and it does not feel finished.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have had no accidents. I have not wet or soiled myself.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no fever and do not feel unwell. I have never had cancer and I have not lost weight.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have had no injury apart from the lift.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I put the numbness down to sitting too long, and the waterworks down to not drinking much water this week.",
+        "tells": "asked"
+      }
+    ],
+    "ideas": "I think it is a slipped disc from the lifting.",
+    "concerns": "I did not think it was anything much. I thought I might be wasting your time.",
+    "expectations": "I expected painkillers, perhaps some physiotherapy, and to be sent home to rest it.",
+    "hidden_agenda": "",
+    "examination": [
+      {
+        "examination": "Sensation around the saddle area",
+        "finding": "reduced"
+      }
+    ],
+    "results": [],
+    "differential": [
+      {
+        "diagnosis": "Cauda equina syndrome",
+        "must_not_miss": true
+      },
+      {
+        "diagnosis": "Acute lumbar disc prolapse with sciatica",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Mechanical low back pain",
+        "must_not_miss": false
+      }
+    ],
+    "investigations": [
+      {
+        "investigation": "Emergency MRI of the whole spine, today, at the hospital",
+        "reason": "To look for pressure on the nerves at the bottom of the spine."
+      },
+      {
+        "investigation": "Bladder scan after passing urine, now",
+        "reason": "To look for retention."
+      }
+    ],
+    "plan": [
+      {
+        "step": "Send to hospital: the emergency department and the on-call spinal or neurosurgical team",
+        "urgency": "emergency today"
+      },
+      {
+        "step": "Telephone the on-call team so that he is expected",
+        "urgency": "none"
+      },
+      {
+        "step": "He does not drive himself: someone takes him, or transport is arranged",
+        "urgency": "none"
+      }
+    ],
+    "safety_net": "If on the way he cannot pass urine at all, or loses control of his bowels, that is a 999 call.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask about numbness around the saddle area or the back passage.",
+        "Ask about trouble passing urine.",
+        "Ask whether the leg symptoms are on one side or both.",
+        "Ask about loss of control of the bladder or the bowels.",
+        "Ask about fever, weight loss or a history of cancer.",
+        "Test the sensation around the saddle area."
+      ],
+      "management": [
+        "Treat this as an emergency and send him to hospital today.",
+        "Ask for an emergency MRI of the spine.",
+        "Check the bladder for retention.",
+        "Tell him to call 999 if he cannot pass urine at all or loses control of his bowels."
+      ],
+      "relating": [
+        "Make it easy for him to say what he finds embarrassing.",
+        "Explain why this is not an ordinary bad back.",
+        "Tell him he was right to come."
+      ]
+    }
+  }
+}

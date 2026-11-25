@@ -1,0 +1,32 @@
+{
+  "clinical": [
+    "Allergy and clinical immunology",
+    "Cardiovascular health",
+    "Dermatology",
+    "Ear, nose and throat, speech and hearing",
+    "Eyes and vision",
+    "Gastroenterology",
+    "Genomic medicine",
+    "Gynaecology and breast health",
+    "Haematology",
+    "Infectious diseases and travel health",
+    "Learning disability",
+    "Maternity and reproductive health",
+    "Mental health",
+    "Metabolic problems and endocrinology",
+    "Musculoskeletal health",
+    "Neurodevelopmental conditions and neurodiversity",
+    "Neurology",
+    "Renal and urology",
+    "Respiratory health",
+    "Sexual health",
+    "Smoking, alcohol and substance misuse",
+    "Urgent and unscheduled care"
+  ],
+  "life_stage": [
+    "Children and young people",
+    "People living with long-term conditions including cancer",
+    "Older adults",
+    "People at the end of life"
+  ]
+}

@@ -1,0 +1,156 @@
+{
+  "id": "14_giant_cell_arteritis",
+  "source": "mock_consultations/14_giant_cell_arteritis_uk.md on main",
+  "topic": "Musculoskeletal health",
+  "level": "hidden",
+  "label": "script",
+  "not_in_script": [
+    "expectations: the script gives none in so many words; written from her opening words, that she expects it to be nothing",
+    "visual acuity: the script's doctor checks it and gives no figure, so the card holds no finding for it",
+    "the three absent things (sudden start, fever or stiff neck, weakness of a limb) are from the script's marking scheme, not from its conversation"
+  ],
+  "left_out": [
+    "the script's marking scheme also names aspirin on the specialists' advice, and steroid into a vein to be weighed by the specialists because vision was involved; neither is a step of the card"
+  ],
+  "scenario": {
+    "reasoning": "A new temporal headache in a woman of 71, with a tender scalp, a jaw that tires on chewing and one brief loss of vision in one eye, each played down as getting old: giant cell arteritis, which can blind within days. A learner is most likely to miss asking about vision.",
+    "patient": {
+      "name": "Mrs Margaret Ellison",
+      "age": 71,
+      "sex": "female",
+      "occupation": "retired barrister",
+      "manner": "Articulate and apologetic, plays everything down and puts it all down to getting old.",
+      "parent": ""
+    },
+    "opening_words": "Oh, I feel a bit silly taking up your time, doctor. I've just had this headache that won't quite settle. I expect it's nothing, getting old, probably.",
+    "facts": [
+      {
+        "fact": "The headache is at the side of my head, the temple. I have had it about three weeks. It is a dull, boring ache.",
+        "tells": "open"
+      },
+      {
+        "fact": "I have never really been a headache person, so it is unlike me.",
+        "tells": "open"
+      },
+      {
+        "fact": "My daughter nagged me to come. She says I have been off.",
+        "tells": "open"
+      },
+      {
+        "fact": "It is there most of the time, some days worse than others, and paracetamol does not do a great deal.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have been run down and tired, with no appetite to speak of.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My shoulders and hips are terribly stiff in the mornings. It takes me a good hour to get going.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My scalp is tender on that side. Combing my hair there is horrible, and I have started parting it the other way.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My jaw gets tired when I chew. Last week I had to give up on a steak.",
+        "tells": "asked"
+      },
+      {
+        "fact": "A few days ago my right eye went dim, like a shade coming down, for a minute or two. Then it cleared. It has not happened since.",
+        "tells": "asked"
+      },
+      {
+        "fact": "It was only the right eye, the side the headache is worse on. I have had no double vision.",
+        "tells": "asked"
+      },
+      {
+        "fact": "The headache did not start suddenly.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have had no fever and no stiff neck.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no weakness in my arms or legs.",
+        "tells": "asked"
+      }
+    ],
+    "ideas": "I expect it is nothing, just getting old.",
+    "concerns": "The moment with my eye frightened me a little at the time. Then it passed and I put it out of my mind.",
+    "expectations": "I rather expect to be told it is nothing.",
+    "hidden_agenda": "",
+    "examination": [
+      {
+        "examination": "Right temporal artery",
+        "finding": "tender on pressing, firm and cord-like, with no normal pulse; the left is normal"
+      },
+      {
+        "examination": "Scalp over the right temple",
+        "finding": "tender"
+      }
+    ],
+    "results": [],
+    "differential": [
+      {
+        "diagnosis": "Giant cell arteritis (temporal arteritis)",
+        "must_not_miss": true
+      },
+      {
+        "diagnosis": "Polymyalgia rheumatica, together with it",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Tension-type or another primary headache",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Trigeminal neuralgia",
+        "must_not_miss": false
+      }
+    ],
+    "investigations": [
+      {
+        "investigation": "Urgent ESR and CRP, today",
+        "reason": "Markers of inflammation; treatment does not wait for them."
+      },
+      {
+        "investigation": "Temporal artery biopsy or ultrasound, arranged by the specialists",
+        "reason": "To confirm the diagnosis; it does not delay the steroid."
+      }
+    ],
+    "plan": [
+      {
+        "step": "Start a high-dose corticosteroid (oral prednisolone 40 to 60 mg) today, before any test result",
+        "urgency": "none"
+      },
+      {
+        "step": "Refer to ophthalmology and rheumatology, by the giant cell arteritis pathway",
+        "urgency": "emergency today"
+      }
+    ],
+    "safety_net": "If her vision dims again, or goes and does not come back, before she is seen, she goes straight to eye casualty or calls 999.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask whether the scalp is tender.",
+        "Ask whether the jaw aches or tires on chewing.",
+        "Ask about any change in vision, however brief.",
+        "Ask about stiffness of the shoulders and hips.",
+        "Ask how she has been in herself.",
+        "Feel the temporal arteries."
+      ],
+      "management": [
+        "Start a high-dose steroid today, without waiting for tests.",
+        "Refer the same day to ophthalmology or rheumatology.",
+        "Send urgent ESR and CRP.",
+        "Tell her to go to eye casualty or call 999 if her vision dims again."
+      ],
+      "relating": [
+        "Take seriously what she plays down as getting old.",
+        "Explain why treatment starts before the diagnosis is confirmed.",
+        "Find out that the moment with her eye frightened her."
+      ]
+    }
+  }
+}

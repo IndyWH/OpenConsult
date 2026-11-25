@@ -1,0 +1,221 @@
+{
+  "id": "16_urti_antibiotic_demand",
+  "source": "mock_consultations/16_urti_antibiotic_demand_auto.md on main",
+  "topic": "Infectious diseases and travel health",
+  "level": "noisy",
+  "label": "script",
+  "not_in_script": [
+    "examination: the script lists what to examine and gives no finding; the nine findings are the owner's own, given on 24 Nov 2026",
+    "investigations: the script asks for none",
+    "the opening words are put together from sentences of the script's read-aloud part, none changed"
+  ],
+  "left_out": [
+    "the script gives his alcohol as about thirty units in a normal week, which he says only if pressed; the card holds what he says first",
+    "the script's note that an output naming pneumonia as the leading diagnosis has failed is for the AI, not for the card"
+  ],
+  "scenario": {
+    "reasoning": "A day and a half of sore throat, blocked and running nose, sneezing, dry cough and aching, with ill contacts and no feature of a chest infection: a common cold. The noise is the patient, who demands the strongest antibiotic before a flight and a meeting, and who has a penicillin allergy he will not mention. A learner is most likely to miss asking about allergies.",
+    "patient": {
+      "name": "Mr Julian Ashworth-Bell",
+      "age": 47,
+      "sex": "male",
+      "occupation": "director at an investment bank",
+      "manner": "Brisk and impatient, used to being deferred to, not abusive. He says so when he thinks a question is beside the point.",
+      "parent": ""
+    },
+    "opening_words": "Look, I've got about ten minutes, so let's be efficient. I've come down with something. So what I need is a course of antibiotics. The strong ones.",
+    "facts": [
+      {
+        "fact": "It started yesterday morning with a scratchy throat, and by last night I was blocked solid, sneezing, streaming, the whole business.",
+        "tells": "open"
+      },
+      {
+        "fact": "My head is pounding, I ache all over, and I feel absolutely wretched.",
+        "tells": "open"
+      },
+      {
+        "fact": "I am on a flight to New York tonight and I am in front of the board at nine tomorrow morning.",
+        "tells": "open"
+      },
+      {
+        "fact": "I had something in Dubai a few years ago, big white tablets, and it cleared up in two days.",
+        "tells": "open"
+      },
+      {
+        "fact": "I do not want to be told to rest and drink fluids. Resting is not on the table this week.",
+        "tells": "open"
+      },
+      {
+        "fact": "A dry, tickly cough started last night.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I feel hot and cold in turns, but I have not taken my temperature and I have had no shivering attacks.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I am not breathless, I have no chest pain, I am not coughing anything up and I have no wheeze.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no ear pain, no stiff neck and no rash.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My voice is a little hoarse. I am eating less but drinking normally.",
+        "tells": "asked"
+      },
+      {
+        "fact": "Two colleagues and my fourteen-year-old daughter had the same thing last week.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My only ongoing condition is high blood pressure, diagnosed three years ago. I take lisinopril 10 mg once a day. I have no asthma or other chest disease.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I am recorded as allergic to penicillin. I was given it as a small child and came out in a rash. I was six, it was probably measles. Put me down as fine.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I took paracetamol and ibuprofen yesterday, which helped a little.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I stopped smoking twelve years ago, after about ten years of fifteen a day.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I drink two or three glasses of wine most evenings, and considerably more when I am entertaining clients.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I had a flu jab at the office in October. No recent Covid vaccination. No travel beyond the usual business trips.",
+        "tells": "asked"
+      },
+      {
+        "fact": "My father had a heart attack at sixty-two. My mother is alive and well.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I am married with two children. I work seventy-hour weeks and sleep about five hours a night.",
+        "tells": "asked"
+      }
+    ],
+    "ideas": "I believe this is a chest infection, and antibiotics are the obvious answer.",
+    "concerns": "I cannot do this meeting sounding like this, and I do not have the luxury of waiting it out.",
+    "expectations": "A course of antibiotics, the strong ones, today. Not a leaflet.",
+    "hidden_agenda": "I was passed over for promotion last year. This meeting is the one that decides the next one. I am frightened of standing up tomorrow and being visibly diminished.",
+    "examination": [
+      {
+        "examination": "Temperature",
+        "finding": "36.8"
+      },
+      {
+        "examination": "Pulse",
+        "finding": "66 a minute"
+      },
+      {
+        "examination": "Breathing rate",
+        "finding": "12 a minute"
+      },
+      {
+        "examination": "Oxygen level",
+        "finding": "99%"
+      },
+      {
+        "examination": "Blood pressure",
+        "finding": "130/85"
+      },
+      {
+        "examination": "Throat",
+        "finding": "Slightly red. Normal tonsils, no exudate."
+      },
+      {
+        "examination": "Glands in the neck",
+        "finding": "None."
+      },
+      {
+        "examination": "Ears",
+        "finding": "Nothing abnormal detected."
+      },
+      {
+        "examination": "Chest",
+        "finding": "Clear."
+      }
+    ],
+    "results": [],
+    "differential": [
+      {
+        "diagnosis": "Viral upper respiratory tract infection (the common cold)",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Influenza",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "COVID-19",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Acute bacterial sinusitis",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Streptococcal sore throat",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Community-acquired pneumonia, considered and excluded on the history",
+        "must_not_miss": true
+      }
+    ],
+    "investigations": [],
+    "plan": [
+      {
+        "step": "No antibiotic, with a plain explanation that antibiotics do not shorten a viral illness",
+        "urgency": "none"
+      },
+      {
+        "step": "Symptomatic treatment: regular paracetamol and ibuprofen, fluids, a decongestant, saline or steam for the nose",
+        "urgency": "none"
+      },
+      {
+        "step": "Advice for the flight: a decongestant before descent, and swallowing or the Valsalva manoeuvre",
+        "urgency": "none"
+      },
+      {
+        "step": "If a back-up or delayed prescription is agreed, it must not be a penicillin",
+        "urgency": "none"
+      },
+      {
+        "step": "Record the request for antibiotics, the decision not to prescribe and the reason given",
+        "urgency": "none"
+      }
+    ],
+    "safety_net": "A high fever, breathlessness, chest pain, coughing up blood, symptoms that worsen after day five or have not settled by day ten: he should be seen, wherever he is.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask about breathlessness, chest pain and coughing anything up.",
+        "Ask about allergies to medicines.",
+        "Ask about fever, and whether he has measured his temperature.",
+        "Ask about other illnesses and regular medicines.",
+        "Ask whether anyone around him has been ill.",
+        "Examine: temperature, pulse, breathing rate, oxygen level and the chest."
+      ],
+      "management": [
+        "Do not prescribe an antibiotic on this history.",
+        "Explain that an antibiotic would not make him better by tomorrow.",
+        "Give advice on treating the symptoms, and for the flight.",
+        "If a back-up prescription is given, it is not a penicillin.",
+        "Tell him exactly what should make him seek help."
+      ],
+      "relating": [
+        "Find the worry behind the demand.",
+        "Stay courteous under pressure and do not give way.",
+        "Say honestly how the illness will run."
+      ]
+    }
+  }
+}

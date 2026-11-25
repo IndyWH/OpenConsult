@@ -27,5 +27,15 @@ openconsult/prompts/teaching_feedback.prompt.txt -text
 openconsult/prompts/teaching_patient.form.json -text
 openconsult/prompts/teaching_patient.frame.txt -text
 openconsult/prompts/teaching_patient.prompt.txt -text
+# The nine files of the teaching bank are hashed byte for byte (15.14, rulings 1, 2 and 17 and the details of run 10b): Git never changes a byte of them.
+openconsult/teaching/bank/card_11_tired_all_the_time.json -text
+openconsult/teaching/bank/card_12_dizziness.json -text
+openconsult/teaching/bank/card_13_migraine.json -text
+openconsult/teaching/bank/card_14_giant_cell_arteritis.json -text
+openconsult/teaching/bank/card_15_cauda_equina.json -text
+openconsult/teaching/bank/card_16_urti_antibiotic_demand.json -text
+openconsult/teaching/bank/card_17_perimenopause.json -text
+openconsult/teaching/bank/card_18_ectopic_pregnancy.json -text
+openconsult/teaching/bank/topics.json -text
 # The account Why this model is hashed byte for byte by a test (15.13, ruling 30): Git never changes a byte of it.
 openconsult/web/why_this_model.md -text

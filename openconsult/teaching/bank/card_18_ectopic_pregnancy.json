@@ -1,0 +1,224 @@
+{
+  "id": "18_ectopic_pregnancy",
+  "source": "mock_consultations/18_ectopic_pregnancy_auto.md on main",
+  "topic": "Maternity and reproductive health",
+  "level": "hidden",
+  "label": "script",
+  "not_in_script": [
+    "examination and the urine pregnancy test: the script is an actor's brief and gives no finding; the pulse, the blood pressure lying and standing, the temperature, the abdomen and the result of the pregnancy test were given by the owner on 24 Nov 2026, in his words (the side of the tenderness confirmed by him as the left)",
+    "expectations: the script gives none; written from her own framing, that she expects to be told it is a bug",
+    "the opening words are the first sentences of the script's read-aloud part"
+  ],
+  "left_out": [],
+  "scenario": {
+    "reasoning": "A woman of 31 with two weeks of what she calls a stomach bug, a dragging ache low on the left, a pain at the tip of the left shoulder and dizziness on standing. She reassures herself that she had a period; it was a week late, light, brown and lasted two days. Her last normal period was seven weeks ago and she has never done a test. This is an ectopic pregnancy until excluded, and it may be bleeding. A learner is most likely to miss asking whether she could be pregnant.",
+    "patient": {
+      "name": "Ms Chloe Meadows",
+      "age": 31,
+      "sex": "female",
+      "occupation": "graphic designer",
+      "manner": "Apologetic and self-deprecating, a little embarrassed to be here, under-reports, and waves each symptom away as she mentions it.",
+      "parent": ""
+    },
+    "opening_words": "I feel a bit silly being here, to be honest. My flatmate made me come.",
+    "facts": [
+      {
+        "fact": "I have been off for about two weeks. It started like a stomach bug: a bit queasy, off my food, going to the loo more than usual. It has not really shifted.",
+        "tells": "open"
+      },
+      {
+        "fact": "I have an ache low down on the left. It is not agony, it comes and goes, it is sort of dragging, and it has been there the whole time. Last night it woke me up.",
+        "tells": "open"
+      },
+      {
+        "fact": "I am tired, more tired than I should be.",
+        "tells": "open"
+      },
+      {
+        "fact": "Yesterday I got a pain right at the top of my left shoulder, like a strain. I assumed I had pulled something at the gym, although I have not lifted anything.",
+        "tells": "open"
+      },
+      {
+        "fact": "I did have a period. It came about a week late and it was much lighter than usual, just a brownish thing for a couple of days. But it came.",
+        "tells": "open"
+      },
+      {
+        "fact": "I keep going dizzy when I stand up, which is new.",
+        "tells": "open"
+      },
+      {
+        "fact": "My sister had an ovarian cyst.",
+        "tells": "open"
+      },
+      {
+        "fact": "My last normal period was about seven weeks ago. My cycle is usually regular, twenty-eight to thirty days.",
+        "tells": "asked"
+      },
+      {
+        "fact": "The bleed two weeks ago was a light brown loss for two days, with no clots, nothing like my usual flow. I have spotted brown again on and off since yesterday.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I suppose I could be pregnant. But I had a period.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have never done a pregnancy test.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I came off the combined pill about four months ago because it was giving me headaches. We have used condoms since, mostly.",
+        "tells": "asked"
+      },
+      {
+        "fact": "The pain is in the lower left of my tummy. It has been worse over the last three days, five out of ten at its worst. It does not go through to my back, and eating or going to the loo makes no difference.",
+        "tells": "asked"
+      },
+      {
+        "fact": "The shoulder pain is worse when I lie flat.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I nearly went at the sink this morning, but I did not actually faint.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I feel sick but I have not been sick. My appetite is poor. My bowels were loose at first and are settled now.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I am passing urine more often, with no stinging and no blood.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have had no fever.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have never been pregnant, I have had no operations and I have no coil.",
+        "tells": "asked"
+      },
+      {
+        "fact": "When I was twenty-two I was treated for chlamydia.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I take no medicines and I have no allergies.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I live with a flatmate and have been with my partner for eight months. I do not smoke, I drink socially and I use no drugs.",
+        "tells": "asked"
+      }
+    ],
+    "ideas": "I think it is a bug, or possibly a cyst like my sister's.",
+    "concerns": "I had decided it was nothing, but it has not shifted and last night it woke me.",
+    "expectations": "I expect to be told it is a bug.",
+    "hidden_agenda": "I have not let myself think about pregnancy. We have not used condoms every time, and I am embarrassed about that. I am frightened of being told off.",
+    "examination": [
+      {
+        "examination": "Pulse",
+        "finding": "90 a minute"
+      },
+      {
+        "examination": "Blood pressure, lying",
+        "finding": "110/70"
+      },
+      {
+        "examination": "Blood pressure, standing",
+        "finding": "100/60"
+      },
+      {
+        "examination": "Temperature",
+        "finding": "36.6"
+      },
+      {
+        "examination": "Abdomen",
+        "finding": "tender over the left iliac fossa and the suprapubic area"
+      }
+    ],
+    "results": [
+      {
+        "test": "Urine pregnancy test",
+        "result": "positive"
+      }
+    ],
+    "differential": [
+      {
+        "diagnosis": "Ectopic pregnancy",
+        "must_not_miss": true
+      },
+      {
+        "diagnosis": "Miscarriage or threatened miscarriage",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "A ruptured or bleeding ovarian cyst",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Ovarian torsion",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Pelvic inflammatory disease",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Appendicitis",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Urinary tract infection",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Gastroenteritis",
+        "must_not_miss": false
+      }
+    ],
+    "investigations": [
+      {
+        "investigation": "A urine pregnancy test in the surgery, now",
+        "reason": "Seven weeks since the last normal period with pain on one side means early pregnancy until a test says otherwise."
+      }
+    ],
+    "plan": [
+      {
+        "step": "If the test is positive or cannot be done, treat as an ectopic pregnancy until proven otherwise: refer to the early pregnancy assessment unit, or to the emergency department and the on-call gynaecology team",
+        "urgency": "emergency today"
+      },
+      {
+        "step": "She does not drive herself",
+        "urgency": "none"
+      },
+      {
+        "step": "Tell her plainly that she was right to come",
+        "urgency": "none"
+      }
+    ],
+    "safety_net": "If the pain worsens sharply, if she feels faint or collapses, or if she bleeds heavily, that is a 999 call.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask when her last normal period was.",
+        "Ask whether she could be pregnant.",
+        "Ask whether she has done a pregnancy test.",
+        "Ask what the recent bleed was really like.",
+        "Ask about contraception, and how consistently it was used.",
+        "Examine: pulse, blood pressure lying and standing, temperature and the abdomen."
+      ],
+      "management": [
+        "Do a urine pregnancy test now.",
+        "Refer within the hour to early pregnancy assessment or the emergency department.",
+        "Do not arrange a scan for next week, treat it as a urine infection or a cyst, or send her home to see how it goes.",
+        "Make sure she does not drive herself.",
+        "Tell her to call 999 if the pain worsens sharply, she feels faint or she bleeds heavily."
+      ],
+      "relating": [
+        "Ask about contraception and past infections without judgement.",
+        "Do not accept her own explanation of a bug, a cyst or a period.",
+        "Tell her she was right to come."
+      ]
+    }
+  }
+}

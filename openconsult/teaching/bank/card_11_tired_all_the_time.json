@@ -1,0 +1,99 @@
+{
+  "id": "11_tired_all_the_time",
+  "source": "mock_consultations/11_tired_all_the_time_uk.md on main",
+  "topic": "Metabolic problems and endocrinology",
+  "level": "straightforward",
+  "label": "script",
+  "not_in_script": [
+    "normal appetite, no breathlessness or chest pain, no thoughts of self-harm, a clear chest and a normal body mass index: from the script's marking scheme, not from its conversation",
+    "the reasons of the investigations: one line each, in the script's own sense"
+  ],
+  "left_out": [],
+  "scenario": {
+    "reasoning": "Three months of tiredness in a woman of 34 with poor sleep, a heavy workload, a great deal of coffee, heavy periods and a mother with thyroid disease, and nothing sinister. There is no single diagnosis to reach: the right answer is a broad list and a sensible set of blood tests. A learner is most likely to settle on one label, such as thyroid or low mood.",
+    "patient": {"name": "Ms Charlotte Hughes", "age": 34, "sex": "female", "occupation": "marketing manager", "manner": "Friendly and open, tired, a little worried that it is all in her head.", "parent": ""},
+    "opening_words": "Morning, doctor. Honestly, I'm just exhausted all the time. I thought I should get checked, maybe get some bloods done. I don't know what's wrong with me.",
+    "facts": [
+      {"fact": "It has been a few months now, maybe three. It crept up. I wake up and I already feel like I need to go back to bed.", "tells": "open"},
+      {"fact": "I sleep, but I never feel I have actually rested. I am probably on my phone too late, work emails and then scrolling. I get maybe six hours.", "tells": "asked"},
+      {"fact": "Work is full on. We had a restructure and I am covering two roles. I am coping, but I am running on coffee.", "tells": "asked"},
+      {"fact": "I drink four or five cups of coffee a day, more on a bad day.", "tells": "asked"},
+      {"fact": "My mood is a bit flat, not depressed exactly. I still enjoy things when I get to them. I have not been to the gym in weeks.", "tells": "asked"},
+      {"fact": "My focus on my work is fine. It just takes more out of me than it used to.", "tells": "asked"},
+      {"fact": "My weight is about the same.", "tells": "asked"},
+      {"fact": "I have had no night sweats and no fevers.", "tells": "asked"},
+      {"fact": "I have found no lumps, and my bowels are normal.", "tells": "asked"},
+      {"fact": "My periods are regular but on the heavier side. They always have been.", "tells": "asked"},
+      {"fact": "I am no more thirsty than normal and I do not pass urine more than normal.", "tells": "asked"},
+      {"fact": "I have a couple of glasses of wine at the weekend and nothing in the week.", "tells": "asked"},
+      {"fact": "My mum is on thyroid tablets, I think for an underactive thyroid.", "tells": "asked"},
+      {"fact": "My appetite is normal.", "tells": "asked"},
+      {"fact": "I have no breathlessness and no chest pain.", "tells": "asked"},
+      {"fact": "I have no thoughts of harming myself.", "tells": "asked"}
+    ],
+    "ideas": "I do not know what is wrong with me.",
+    "concerns": "I have wondered whether it is just in my head.",
+    "expectations": "I thought I should get checked, and maybe have some blood tests.",
+    "hidden_agenda": "",
+    "examination": [
+      {"examination": "Pulse", "finding": "72 a minute"},
+      {"examination": "Blood pressure", "finding": "118/74"},
+      {"examination": "Thyroid", "finding": "feels normal, no swelling"},
+      {"examination": "Glands in the neck", "finding": "none enlarged"},
+      {"examination": "Abdomen", "finding": "soft, nothing to feel"},
+      {"examination": "Pallor", "finding": "does not look pale"},
+      {"examination": "Chest", "finding": "clear"},
+      {"examination": "Body mass index", "finding": "normal"}
+    ],
+    "results": [],
+    "differential": [
+      {"diagnosis": "Iron-deficiency anaemia", "must_not_miss": false},
+      {"diagnosis": "Hypothyroidism", "must_not_miss": false},
+      {"diagnosis": "Poor or insufficient sleep", "must_not_miss": false},
+      {"diagnosis": "Work-related stress or low mood", "must_not_miss": false},
+      {"diagnosis": "Vitamin D deficiency", "must_not_miss": false},
+      {"diagnosis": "Coeliac disease", "must_not_miss": false},
+      {"diagnosis": "Type 2 diabetes", "must_not_miss": false},
+      {"diagnosis": "Obstructive sleep apnoea", "must_not_miss": false},
+      {"diagnosis": "Post-viral or chronic fatigue", "must_not_miss": false}
+    ],
+    "investigations": [
+      {"investigation": "Full blood count and ferritin", "reason": "Heavy periods can drain iron."},
+      {"investigation": "Thyroid function", "reason": "Her mother has thyroid disease."},
+      {"investigation": "HbA1c", "reason": "To rule out a sugar problem."},
+      {"investigation": "Kidney and liver function", "reason": "Part of a baseline screen."},
+      {"investigation": "Coeliac serology", "reason": "To rule out coeliac disease."},
+      {"investigation": "Vitamin D", "reason": "To rule out a deficiency."},
+      {"investigation": "CRP", "reason": "A marker of inflammation."}
+    ],
+    "plan": [
+      {"step": "Advice on sleep: the phone out of the bedroom", "urgency": "none"},
+      {"step": "Cut the coffee from five cups to two, before midday", "urgency": "none"},
+      {"step": "Review with the results in about two weeks", "urgency": "none"},
+      {"step": "Keep an eye on her mood, with a questionnaire if anything more develops", "urgency": "none"}
+    ],
+    "safety_net": "If she starts losing weight without trying, has drenching night sweats, finds a lump or becomes breathless, she comes back sooner and does not wait for the appointment.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask about sleep.",
+        "Ask about mood.",
+        "Ask about weight loss, night sweats, fevers and lumps.",
+        "Ask about her periods.",
+        "Ask about thyroid disease, anaemia, diabetes or coeliac disease in the family.",
+        "Examine: pulse, blood pressure, the neck and the abdomen."
+      ],
+      "management": [
+        "Keep the differential broad and name no single cause.",
+        "Send a baseline set of blood tests: blood count and ferritin, thyroid, HbA1c, kidney and liver, a coeliac screen, vitamin D and CRP.",
+        "Advise on sleep and on coffee.",
+        "Review with the results in about two weeks.",
+        "Tell her what should bring her back sooner."
+      ],
+      "relating": [
+        "Find out that she wonders whether it is all in her head, and answer it.",
+        "Say honestly that there is no single label today.",
+        "Agree a plan with her."
+      ]
+    }
+  }
+}

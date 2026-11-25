@@ -1,0 +1,198 @@
+{
+  "id": "12_dizziness",
+  "source": "mock_consultations/12_dizziness_uk.md on main",
+  "topic": "Neurology",
+  "level": "straightforward",
+  "label": "script",
+  "not_in_script": [
+    "ideas: the script gives none beyond his being confused by it; written so",
+    "expectations: the script gives none; written as wanting to know what it is and what to do",
+    "heart sounds and pallor: from the script's marking scheme, not from its conversation",
+    "no recent head injury: from the script's marking scheme"
+  ],
+  "left_out": [
+    "the script's list of causes also names an effect of medicines, screened and absent here; it is not among the card's six diagnoses"
+  ],
+  "scenario": {
+    "reasoning": "Three weeks of brief lightheaded spells in a man of 45 with long hours, poor sleep, missed meals and a great deal of coffee, and every red flag absent. The honest answer stays broad: several causes, none dominant, with a rhythm problem of the heart kept on the list. A learner is most likely to settle on one label too early.",
+    "patient": {
+      "name": "Mr David Okafor",
+      "age": 45,
+      "sex": "male",
+      "occupation": "accountant",
+      "manner": "Friendly and direct, a little worried, answers plainly.",
+      "parent": ""
+    },
+    "opening_words": "Thanks, doctor. It's this dizziness. It keeps coming and going and it's starting to worry me a bit.",
+    "facts": [
+      {
+        "fact": "It feels lightheaded, woozy, as if for a second the ground is not quite solid. Not the room spinning, exactly. Just off.",
+        "tells": "open"
+      },
+      {
+        "fact": "A spell lasts seconds, sometimes up to a minute. Then it passes and I am fine.",
+        "tells": "open"
+      },
+      {
+        "fact": "It started about three weeks ago. It is not every day, but a few times a week now.",
+        "tells": "open"
+      },
+      {
+        "fact": "Sometimes it comes when I stand up from the desk, but sometimes I am just sitting there working.",
+        "tells": "asked"
+      },
+      {
+        "fact": "The room never truly spins. Nothing so strong that I would have to hold on.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no ringing in my ears and my hearing is fine.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have never fainted or blacked out.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no chest pain, and I do not notice my heart racing or thumping.",
+        "tells": "asked"
+      },
+      {
+        "fact": "It does not come on with exertion. It comes when I am doing nothing much.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have no headaches, no double vision, no slurred words, no weakness or numbness, and I walk fine.",
+        "tells": "asked"
+      },
+      {
+        "fact": "Work is brutal, it is year-end. I am doing long hours and sleeping badly.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I often skip lunch and power through on coffee, five or six espressos some days.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I probably do not drink enough water.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I take no medicines at all, nothing new.",
+        "tells": "asked"
+      },
+      {
+        "fact": "I have had no recent injury to my head.",
+        "tells": "asked"
+      }
+    ],
+    "ideas": "I cannot tie it to anything. That is what confuses me.",
+    "concerns": "It is starting to worry me. I want to know it is not something serious.",
+    "expectations": "I want to know what it is and what to do about it.",
+    "hidden_agenda": "",
+    "examination": [
+      {
+        "examination": "Blood pressure and pulse, lying",
+        "finding": "128/80, pulse 68 and regular"
+      },
+      {
+        "examination": "Blood pressure and pulse, standing",
+        "finding": "122/78, no real drop, pulse steady"
+      },
+      {
+        "examination": "Heart sounds",
+        "finding": "normal"
+      },
+      {
+        "examination": "Eye movements",
+        "finding": "normal"
+      },
+      {
+        "examination": "Gait",
+        "finding": "normal, steady on his feet"
+      },
+      {
+        "examination": "Pallor",
+        "finding": "not pale"
+      }
+    ],
+    "results": [],
+    "differential": [
+      {
+        "diagnosis": "Dehydration, missed meals or low blood sugar",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Postural (orthostatic) hypotension",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Benign positional vertigo or another inner-ear cause",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Anxiety or hyperventilation",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "Anaemia",
+        "must_not_miss": false
+      },
+      {
+        "diagnosis": "A cardiac arrhythmia",
+        "must_not_miss": true
+      }
+    ],
+    "investigations": [
+      {
+        "investigation": "Lying and standing blood pressure",
+        "reason": "To look for a postural drop."
+      },
+      {
+        "investigation": "ECG",
+        "reason": "To make sure the heart's rhythm is normal."
+      },
+      {
+        "investigation": "Blood tests: full blood count, glucose or HbA1c, and kidney function",
+        "reason": "To look for anaemia, a sugar problem or a kidney problem."
+      }
+    ],
+    "plan": [
+      {
+        "step": "Advise water through the day, regular meals and much less coffee",
+        "urgency": "none"
+      },
+      {
+        "step": "Review with the results of the tests",
+        "urgency": "none"
+      },
+      {
+        "step": "No referral on this evidence",
+        "urgency": "none"
+      }
+    ],
+    "safety_net": "If it changes: if he faints, has chest pain or a racing heart with it, double vision, slurred speech, weakness, or cannot walk straight, he goes to the emergency department or calls 999 and does not wait.",
+    "marking_points": {
+      "data_gathering": [
+        "Ask what the dizziness feels like, and whether the room spins.",
+        "Ask about fainting or blacking out.",
+        "Ask about chest pain or palpitations with the dizziness.",
+        "Ask about double vision, slurred speech, weakness or unsteadiness.",
+        "Ask about sleep, meals, coffee and water.",
+        "Measure the blood pressure lying and standing."
+      ],
+      "management": [
+        "Keep the differential broad and do not settle on one cause.",
+        "Keep a heart rhythm problem on the list and do an ECG.",
+        "Send a blood count, a glucose and kidney function.",
+        "Advise on water, meals and coffee.",
+        "Tell him what change would mean going to the emergency department."
+      ],
+      "relating": [
+        "Find out that he is worried it is something serious.",
+        "Say honestly that the cause cannot be narrowed to one thing yet.",
+        "Agree the plan with him."
+      ]
+    }
+  }
+}
