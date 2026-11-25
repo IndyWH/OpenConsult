@@ -98,8 +98,12 @@ def test_15_14_after_the_third_answer_the_feedback_is_made_once_by_frames_alone_
     answer_all(client)
     # Being made beside the page: the page says so and asks again by itself; there is no box and no press.
     raw = client.get("/teaching/cases/1").text
-    assert '<p class="waiting" id="feedback-making" role="status">The feedback is being made. This usually takes a few seconds, at most 2 minutes.</p>' in raw
-    assert '<meta http-equiv="refresh" content="2;url=/teaching/cases/1?quiet#questions">' in raw       # asked again at the questions, not at the page's top
+    assert ('<p class="waiting" id="feedback-making" role="status" tabindex="-1" autofocus>The feedback is being made. This usually takes a few '
+            'seconds, at most 2 minutes.</p>') in raw
+    # Restated by mail 2 (the owner's room check of 25 Nov 2026). OLD: the page asked again at ...?quiet#questions, an
+    # address with a # part, which a browser asked a second time takes for a place in the page it has, and loads
+    # nothing. NEW: an address with no # part, which says that it is the wait's own ask.
+    assert '<meta http-equiv="refresh" content="2;url=/teaching/cases/1?quiet&amp;waits=feedback">' in raw
     assert 'id="answer-box"' not in raw and 'id="feedback-again"' not in raw and 'id="feedback-failed"' not in raw
     assert t.STALE in text_of(client.post("/teaching/cases/1/again"))                  # a press from an older page: nothing a second time
     assert len(works) == 1 and engine.calls_for("teaching_feedback") == []
@@ -153,3 +157,76 @@ def test_R30_a_making_that_the_apps_stop_cut_short_is_said_plainly_and_made_agai
     assert client.post("/teaching/cases/1/again").status_code == 303 and len(works) == 1
     works.pop()()
     assert teaching.cases.get(1)["step"] == "done"
+
+
+WAIT = "/teaching/cases/1?quiet&waits=feedback"       # the address a page that waits for its feedback asks again at
+
+
+def asks_again_at(raw: str) -> str | None:
+    """The address a page moves to by itself, or None where it does not."""
+    import html
+    import re
+    found = re.search(r'<meta http-equiv="refresh" content="\d+;url=([^"]+)">', raw)
+    return html.unescape(found.group(1)) if found else None
+
+
+def test_room_check_of_25_nov_a_page_that_waits_for_its_feedback_asks_at_an_address_with_no_hash_part_and_is_sent_on_to_the_feedback(
+        tmp_path, clock, machine):
+    # The owner's room check of 25 Nov 2026: the feedback was made after 3.6 s and the page went on saying, for more
+    # than two minutes, that it was being made. The page asked again at an address with a # part; asked a second time,
+    # a browser takes that for a place inside the page it has and loads nothing (measured in Chrome, mail 2).
+    app, client, engine, works = at_the_questions(tmp_path, clock, machine, [made_teaching.FEEDBACK_OK], held=True)
+    answer_all(client)
+    first = client.get("/teaching/cases/1").text                                       # the page after the third answer
+    assert asks_again_at(first) == WAIT and "#" not in WAIT
+    # The sentence asks for the keyboard, so that a browser brings it into the window at each ask, with no # part.
+    assert '<p class="waiting" id="feedback-making" role="status" tabindex="-1" autofocus>' in first
+    # While the feedback is made every ask is answered with the page, which asks again at that same address.
+    for _ in range(3):
+        asked = client.get(WAIT)
+        assert asked.status_code == 200 and asks_again_at(asked.text) == WAIT and 'id="feedback-making"' in asked.text
+    works.pop()()                                                                      # the feedback is made
+    # The next ask of the waiting page is sent on to the feedback's own place in the page: with no press and no reload
+    # the learner is looking at it. That address is another address, so the browser loads it.
+    sent_on = client.get(WAIT)
+    assert sent_on.status_code == 303 and sent_on.headers["location"] == "/teaching/cases/1#feedback"
+    shown = client.get("/teaching/cases/1").text
+    assert '<section class="pane" id="feedback">' in shown and asks_again_at(shown) is None and 'id="feedback-making"' not in shown
+    assert client.get(WAIT).status_code == 303                                         # an older waiting page, asking late, is sent on too
+    # The page's ordinary timed check, which names no wait, is never sent anywhere: a learner reading is left where they read.
+    assert client.get("/teaching/cases/1?quiet").status_code == 200
+    assert len(engine.calls_for("teaching_feedback")) == 1                             # asking made nothing a second time
+
+
+def test_room_check_of_25_nov_a_waiting_page_is_sent_on_to_the_sentence_of_a_feedback_that_did_not_come(tmp_path, clock, machine):
+    app, client, engine, works = at_the_questions(tmp_path, clock, machine, [EngineTimeout("made-up: no answer")], held=True)
+    answer_all(client)
+    assert client.get(WAIT).status_code == 200                                         # still being made
+    works.pop()()                                                                      # it fails
+    sent_on = client.get(WAIT)
+    assert sent_on.status_code == 303 and sent_on.headers["location"] == "/teaching/cases/1#feedback-failed"
+    shown = client.get("/teaching/cases/1").text
+    assert 'id="feedback-failed"' in shown and 'id="feedback-again"' in shown and asks_again_at(shown) is None
+    assert len(engine.calls_for("teaching_feedback")) == 1                             # nothing is asked again by itself (R30)
+    # Made again by the press: the page waits again, at the same address with no # part.
+    engine.script["teaching_feedback"].append(made_teaching.FEEDBACK_OK)
+    client.post("/teaching/cases/1/again")
+    assert asks_again_at(client.get("/teaching/cases/1").text) == WAIT and client.get(WAIT).status_code == 200
+    works.pop()()
+    assert client.get(WAIT).headers["location"] == "/teaching/cases/1#feedback"
+
+
+def test_room_check_of_25_nov_no_waiting_page_asks_again_at_an_address_with_a_hash_part_and_a_wait_that_is_not_one_changes_nothing(
+        tmp_path, clock, machine):
+    # The writing of a fresh scenario waits the same way; its address never had a # part (proven in Chrome, mail 2).
+    from tests.test_teaching_fresh import fresh_app, write
+    app, client, engine, works = fresh_app(tmp_path / "fresh", clock, machine, [SCENARIO], held=True)
+    write(client)
+    again = asks_again_at(client.get("/teaching/cases/1").text)
+    assert again == "/teaching/cases/1?quiet" and "#" not in again
+    assert client.get(again).status_code == 200 and asks_again_at(client.get(again).text) == again
+    # The wait's address asked of a case that is not waiting for its feedback: the page where the case stands, no more.
+    assert client.get(WAIT).status_code == 200 and 'id="case-writing"' in client.get(WAIT).text
+    works.pop()()
+    assert client.get(WAIT).status_code == 200 and 'id="say-box"' in client.get(WAIT).text
+    assert client.get("/teaching/cases/9?quiet&waits=feedback").headers["location"] == "/teaching"

@@ -33,6 +33,7 @@ SETTINGS_STATEMENT = "/settings#cloud-statement"
 # A page that waits for work the app does beside it asks again by itself, this often, with no script.
 WAIT_ASKS_EVERY_S = 2
 SURPRISE = "surprise"              # the value of Surprise me in the menu: no title of a topic
+WAITS = "waits"                    # in the address of a waiting page's own ask: what the page waits for
 
 
 def bank_rows(teaching) -> list[dict]:
@@ -273,8 +274,12 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
     context = dict(user=user, active="teaching", t=t, case=view, typed=typed or {}, notice=notice, line_most=room.LINE_MOST,
                    answer_most=room.ANSWER_MOST, mark=cloud_lines() if in_cloud else None,
                    page_path=f"/teaching/cases/{case_id}", timed_by_script=True, refresh_every=WAIT_ASKS_EVERY_S if view.get("making") else None,
-                   # While the feedback is made the page asks again at the questions, where it says so, and not at its top.
-                   refresh_to=f"/teaching/cases/{case_id}?quiet#questions" if row["step"] == FEEDBACK else None)
+                   # A page that waits for its feedback asks again at an address with no # part: an address with one,
+                   # asked a second time, is a place inside the page the browser has, and it loads nothing (the owner's
+                   # room check of 25 Nov 2026: the feedback was made and the page went on saying that it was being
+                   # made). The address says that it is the wait's own ask, so that the app can send the browser on to
+                   # the feedback when it has come (case_page).
+                   refresh_to=f"/teaching/cases/{case_id}?quiet&{WAITS}={FEEDBACK}" if row["step"] == FEEDBACK else None)
     if refused:
         return refuse(request, "teaching_case.html", refused[0], refused[1], **context)
     return render(request, "teaching_case.html", **context)
@@ -294,6 +299,18 @@ def _stale(request: Request, user, case_id: int, box_step: str, box: str, text: 
 
 @router.get("/teaching/cases/{case_id}")
 async def case_page(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """The case where it stands. Where this is the own ask of a page that
+    waits for its feedback, and the wait is over, the browser is sent on
+    to the place of the page that shows what came: the feedback, or the
+    sentence that it did not come with its press. So a learner who left
+    the page alone is looking at the feedback when it is there."""
+    if request.query_params.get(WAITS) == FEEDBACK:
+        teaching = parts(request).teaching
+        row = teaching.cases.get(case_id)
+        if row is not None and row["step"] == DONE_STEP:
+            raise Redirect(f"/teaching/cases/{case_id}#feedback")
+        if row is not None and row["step"] == FEEDBACK and not teaching.making(case_id):
+            raise Redirect(f"/teaching/cases/{case_id}#feedback-failed")
     return _case_page(request, user, case_id)
 
 
