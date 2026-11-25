@@ -28,10 +28,10 @@ from openconsult.bench.writer import ResultWriter
 from openconsult.llm.jobs import job as job_named
 from openconsult.prompts import loader
 from openconsult.teaching import frames, shown
+# Hard mark six, a dose in the plan, is counted by the teaching package's own function, which the app also asks
+# before a fresh patient appears (run 10b): one function, so the bench and the app can never count differently.
+from openconsult.teaching.checks import DOSE, NUMBER, plan_doses
 
-NUMBER = r"(?<![\w.,])\d+(?:[.,]\d+)?\s*"
-# Hard mark six as the README writes it: a number followed by one of these six, as whole words.
-DOSE = re.compile(NUMBER + r"(?:mg|microgram|g|ml|unit|units)\b", re.IGNORECASE)
 # Near forms, counted apart and never as the mark.
 NEAR = re.compile(NUMBER + r"(?:micrograms|mcg|µg|μg|grams?|milligrams?|millilitres?|milliliters?|iu|international units?)\b", re.IGNORECASE)
 PIECES = re.compile(r"[,;()/]|\bor\b|\band\b", re.IGNORECASE)
@@ -148,7 +148,7 @@ def writer_marks(row: dict) -> dict:
               and any(len(plain(piece)) >= 4 and plain(piece) in one for piece in PIECES.split(found["diagnosis"]))]
     elsewhere = [where for where, text in texts_in({key: value for key, value in case.items() if key != "plan"})
                  if DOSE.search(text) or NEAR.search(text)]
-    return {"HARD_MARK_SIX_a_dose_in_the_plan": [n for n, step in enumerate(case["plan"], 1) if DOSE.search(step["step"])],
+    return {"HARD_MARK_SIX_a_dose_in_the_plan": plan_doses(case),
             "apart_a_near_form_of_a_dose_in_the_plan": [n for n, step in enumerate(case["plan"], 1) if NEAR.search(step["step"])],
             "apart_a_dose_elsewhere_in_the_case": elsewhere,
             "W1_a_diagnosis_whole_in_part_one": whole,
