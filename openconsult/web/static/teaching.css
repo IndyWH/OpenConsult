@@ -1,0 +1,22 @@
+/* The pages of teaching mode (spec 15.14, the details of run 10b). Linked by the teaching pages alone, and every
+   rule begins with .teaching, so nothing here can reach a page of the clinic (the rule of 21 Nov 2026). */
+
+/* Who the patient is, in the head of the pane: read as a name, not as a small heading. */
+.teaching #presented { font-size: 1.05rem; text-transform: none; letter-spacing: 0; color: var(--ink); }
+
+/* The history: the patient's lines to the left, the learner's own set in, each with the learner's number. A line is
+   told apart by its speaker's word and its place, not by its ground alone. */
+.teaching .turns { margin: .5rem 0 1rem; }
+.teaching .turn { margin: .4rem 0; padding: .5rem .8rem; border-radius: 8px; max-width: 46rem; overflow-wrap: anywhere; }
+.teaching .turn.patient { background: #F4EEE7; }
+.teaching .turn.doctor { margin-left: 2rem; background: var(--panel); border: 1px solid var(--line); }
+.teaching .turn.pending { border-style: dashed; color: var(--ink-soft); }
+.teaching .speaker { font-weight: 600; margin-right: .35rem; }
+.teaching .line-number { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+
+/* The box of the next line, and under it, apart, the press that ends the step. */
+.teaching #say { max-width: 46rem; scroll-margin-top: 5rem; }
+.teaching #say-box { width: 100%; }
+.teaching .waiting:empty { display: none; }
+.teaching .ending { margin-top: 1.6rem; padding-top: .9rem; border-top: 1px solid var(--line); }
+.teaching .ending .mark { margin: .4rem 0 0; }

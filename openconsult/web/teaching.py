@@ -18,7 +18,9 @@ from openconsult import words
 from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.settings.path import CLAUDE
 from openconsult.settings.statement import statement_for
-from openconsult.teaching import words as t
+from openconsult.teaching import room, words as t
+from openconsult.teaching.cases import HISTORY
+from openconsult.teaching.play import DONE, REFUSED
 from openconsult.teaching.scenario import speaks_for
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
@@ -121,12 +123,80 @@ def case_view(row: dict) -> dict:
             "speaks_for": t.SPEAKS_FOR.format(parent=parent) if parent else None, "opening_words": scenario["opening_words"]}
 
 
-@router.get("/teaching/cases/{case_id}")
-async def case_page(request: Request, case_id: int, user=Depends(guards.logged_in)):
-    """The case where it stands. The mark Cloud stands on it while its own
-    language model is Claude, whatever Settings says by now."""
-    row = parts(request).teaching.cases.get(case_id)
+def turns_view(turns: list[dict]) -> list[dict]:
+    """The history as the page shows it. The learner's lines carry the
+    learner's own count, 1, 2, 3: the model's turn 2k-1 is the learner's
+    line k, since a line is stored only with its reply. The patient's
+    replies carry no number, and facts_used is never given to a page."""
+    return [{"doctor": turn["speaker"] == "doctor", "line": (turn["n"] + 1) // 2, "text": turn["text"]} for turn in turns]
+
+
+def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | None = None, typed: dict | None = None,
+               notice: str | None = None):
+    """The case where it stands: one address for every step, and the row's
+    step decides what is shown. typed: words that were sent with a press
+    and not stored, put back into their box. The mark Cloud stands on it
+    while its own language model is Claude, whatever Settings says by now."""
+    teaching = parts(request).teaching
+    row = teaching.cases.get(case_id)
     if row is None:
         raise Redirect("/teaching")
-    return render(request, "teaching_case.html", user=user, active="teaching", t=t, case=case_view(row),
-                  mark=cloud_lines() if row["language_model"] == CLAUDE else None, page_path=f"/teaching/cases/{case_id}")
+    turns = teaching.cases.turns(case_id)
+    view = {**case_view(row), "step": row["step"], "turns": turns_view(turns), "next_line": len(turns) // 2 + 1}
+    if row["step"] == HISTORY and room.getting_long(row["scenario"], [(turn["speaker"], turn["text"]) for turn in turns]):
+        view["long"] = t.HISTORY_LONG
+    context = dict(user=user, active="teaching", t=t, case=view, typed=typed or {}, notice=notice, line_most=room.LINE_MOST,
+                   mark=cloud_lines() if row["language_model"] == CLAUDE else None, page_path=f"/teaching/cases/{case_id}",
+                   timed_by_script=True)
+    if refused:
+        return refuse(request, "teaching_case.html", refused[0], refused[1], **context)
+    return render(request, "teaching_case.html", **context)
+
+
+def _stale(request: Request, user, case_id: int, box_step: str, box: str, text: str):
+    """A press from a page that was no longer up to date: nothing was
+    stored, and the page comes back where the case stands and says so
+    (R15). What was typed goes back into its box; where that box is no
+    longer on the page, the words are said beside the notice."""
+    row = parts(request).teaching.cases.get(case_id)
+    same_box = row is not None and row["step"] == box_step
+    lost = text.strip() and not same_box
+    return _case_page(request, user, case_id, typed={box: text} if same_box else None,
+                      notice=t.STALE + (" " + t.STALE_TYPED.format(text=text.strip()) if lost else ""))
+
+
+@router.get("/teaching/cases/{case_id}")
+async def case_page(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    return _case_page(request, user, case_id)
+
+
+def _number(fields: dict, name: str) -> int:
+    return int(fields[name]) if fields.get(name, "").isdigit() else 0
+
+
+@router.post("/teaching/cases/{case_id}/say")
+async def say(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """A line of the history, with the number it will get. Stored with the
+    patient's reply, or not at all: a refusal comes back on the Send
+    control with the line still in its box."""
+    fields = await form_fields(request)
+    text = fields.get("text", "")
+    outcome = await asyncio.to_thread(parts(request).teaching.say, case_id, _number(fields, "line"), text)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}#say")
+    if outcome.state == REFUSED:
+        return _case_page(request, user, case_id, refused=("say-send", outcome.problem), typed={"say": text})
+    return _stale(request, user, case_id, HISTORY, "say", text)
+
+
+@router.post("/teaching/cases/{case_id}/end-history")
+async def end_history(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """End the history: one press, no way back. The box travels with the
+    press, so a line typed and not sent refuses it."""
+    text = (await form_fields(request)).get("text", "")
+    outcome = parts(request).teaching.end_history(case_id, text)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}")
+    if outcome.state == REFUSED:
+        return _case_page(request, user, case_id, refused=("end-history", outcome.problem), typed={"say": text})
+    return _stale(request, user, case_id, HISTORY, "say", text)

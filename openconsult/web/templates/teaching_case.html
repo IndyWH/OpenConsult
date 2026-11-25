@@ -1,12 +1,16 @@
 {% extends "base.html" %}
 {% from "_parts.html" import refusal, cloud_mark with context %}
 {% set title = case.heading %}
+{% block head %}<link rel="stylesheet" href="{{ static('teaching.css') }}">{% endblock %}
 {% block main %}
 {# One teaching case, where it stands (15.14, the details of run 10b). The page is given what may be shown at this
    step and nothing else of the scenario: until the feedback has been made, that is who the patient is, the opening
-   words and what the patient has said. The label stands at the top of every page of the case (ruling 3). #}
-<div class="teaching" id="teaching-case">
+   words and what the patient has said. The label stands at the top of every page of the case (ruling 3).
+   data-use: typing here is use, and the page's own timed move never comes while a box holds words (15.10, ruling 12).
+   data-part: what teaching.js puts in place from the app's answer when a line is sent without a load. #}
+<div class="teaching" id="teaching-case" data-case="{{ case.id }}" data-use data-seconds-left="{{ seconds_left }}" data-path="/teaching/cases/{{ case.id }}">
 <h1 class="page">{{ case.heading }}</h1>
+<p class="mark" id="no-script" data-no-script>{{ t.NO_SCRIPT }}</p>
 <table class="plain facts" id="case-facts">
   <tr><th>{{ t.COL_TOPIC }}</th><td>{{ case.topic }}</td></tr>
   <tr><th>{{ t.COL_LEVEL }}</th><td>{{ case.level }}</td></tr>
@@ -15,15 +19,46 @@
 {% if mark %}{{ cloud_mark(mark) }}{% endif %}
 
 {# The patient is presented (12.1, step 2): the name, the age and the sex, and the opening words as the patient's
-   first lines. Not the occupation and not the manner: they are for the actor, and a learner asks. #}
+   first lines. Not the occupation and not the manner: they are for the actor, and a learner asks. Then the history:
+   the learner's lines as typed, each with the learner's own number, and the patient's reply under each. #}
 <section class="pane" id="patient">
   <div class="pane-head"><h2 id="presented">{{ case.presented }}</h2></div>
   <div class="pane-body">
     {% if case.speaks_for %}<p class="mark" id="speaks-for">{{ case.speaks_for }}</p>{% endif %}
-    <div class="turns" id="turns">
+    <div class="turns" id="turns" data-part="turns">
       <p class="turn patient" id="opening-words"><span class="speaker">{{ t.PATIENT }}</span> <span class="said">{{ case.opening_words }}</span></p>
+      {% for turn in case.turns %}
+      {% if turn.doctor %}<p class="turn doctor" id="line-{{ turn.line }}"><span class="line-number">{{ turn.line }}.</span> <span class="speaker">{{ t.YOU }}</span> <span class="said">{{ turn.text }}</span></p>
+      {% else %}<p class="turn patient"><span class="speaker">{{ t.PATIENT }}</span> <span class="said">{{ turn.text }}</span></p>{% endif %}
+      {% endfor %}
+    </div>
+
+    <div id="step" data-part="step">
+    {% if notice %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    {% if case.step == "history" %}
+    {# One form, two presses. Send is the first, so Enter in the box sends the line; End the history goes to its own
+       address with the box, so a line typed and not sent refuses it and is not lost. The box is one line: Enter sends
+       with no script. data-send: teaching.js sends the line without a load and shows it at once with data-number. #}
+    <form method="post" action="/teaching/cases/{{ case.id }}/say" id="say" data-send data-number="{{ case.next_line }}" data-you="{{ t.YOU }}"
+          data-pending-class="turn doctor" data-waiting="{{ t.PATIENT_ANSWERING }}" data-login-ended="{{ t.LOGIN_ENDED }}" data-no-answer="{{ t.NO_ANSWER }}">
+      <input type="hidden" name="line" value="{{ case.next_line }}">
+      <label for="say-box">{{ t.NEXT_LINE }}</label>
+      <input type="text" id="say-box" name="text" value="{{ typed.say }}" maxlength="{{ line_most }}" autocomplete="off" autofocus data-keep="say" aria-describedby="say-send-refusal">
+      <button class="primary" id="say-send" aria-describedby="say-send-refusal" data-send-press>{{ t.SEND }}</button>
+      {{ refusal("say-send") }}
+      <p class="waiting" id="say-status" role="status" data-status></p>
+      {% if case.long %}<p class="mark" id="history-long" role="status">{{ case.long }}</p>{% endif %}
+      <div class="ending">
+        <button id="end-history" formaction="/teaching/cases/{{ case.id }}/end-history" aria-describedby="end-history-refusal">{{ t.END_HISTORY }}</button>
+        <p class="mark" id="end-history-line">{{ t.END_HISTORY_LINE }}</p>
+        {{ refusal("end-history") }}
+      </div>
+    </form>
+    {% endif %}
     </div>
   </div>
 </section>
 </div>
+<script src="{{ static('use.js') }}"></script>
+<script src="{{ static('teaching.js') }}"></script>
 {% endblock %}

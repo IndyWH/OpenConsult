@@ -11,6 +11,8 @@ The rest are drafts of the build, for him to correct on screen. No
 sentence here is read by a model: the three questions are fixed words
 of the page and go to no model (ruling 13)."""
 
+from openconsult import words
+
 # ------------------------------------------------------------ the teaching page
 
 TITLE = "Teaching"
@@ -61,6 +63,37 @@ NEW_CASE = "A new case"                                    # the heading of a ca
 PRESENTED = "{name}, {age}, {sex}"                         # the patient is presented (12.1, step 2)
 SPEAKS_FOR = "Speaking for the child: {parent}"            # the details': a parent who speaks for a child
 PATIENT, YOU = "Patient", "You"
+# Served for a page whose script has not run; the script takes the line away.
+NO_SCRIPT = "This page's script did not run. Send each line before you leave the page."
+# A press from a page that was no longer up to date: nothing is stored, and the page says so (R15).
+STALE = "That press came from a page that was no longer up to date. This is where the case stands now."
+STALE_TYPED = "You had typed: {text}"                      # where the box those words were typed in is no longer there
+
+# The history (the details: The history).
+NEXT_LINE = "Your next line"
+SEND = "Send"
+TYPE_A_LINE = "Type a line first."
+PATIENT_ANSWERING = "The patient is answering..."
+END_HISTORY = "End the history"                            # the details'
+END_HISTORY_LINE = "After this the patient cannot be asked more."
+END_WITH_WORDS = "You have typed a line and not sent it. Send it, or clear the box, before you end the history."
+HISTORY_LONG = "This history is getting long. Only a few more lines fit. Then end the history."
+HISTORY_FULL = "This history is full: the language model cannot read more. End the history to go on."
+LINE_TOO_LONG = "This line is too long. Shorten it to {most} characters or fewer."
+# A call that failed, as a learner reads the sentence of its job (R30): nothing is asked a second time by itself.
+REPLY_FAILED = "The patient's reply did not come: {reason}. Your line is still in the box. Send it again when you are ready."
+# Said by the page's script, which holds no sentence of its own.
+LOGIN_ENDED = "Your login has ended. Your words are still in the box. Log in again in another tab, then send them."
+NO_ANSWER = "OpenConsult did not answer. Your words are still in the box."
+
+
+def reason(failure: str) -> str:
+    """Why a model call failed, in the words the page of calls already uses for the door's outcomes."""
+    return words.CALL_OUTCOMES[failure]
+
+
+def most(number: int) -> str:
+    return f"{number:,}"
 
 
 def bank_unread(count: int) -> str | None:
