@@ -66,7 +66,7 @@ def test_15_14_ruling_12_a_finding_asked_for_is_shown_in_the_scenarios_own_words
     assert "Type what you would examine. You may send more than once." in text_of(client.get("/teaching/cases/1"))
     assert "qfindone" not in raw and "qfindtwo" not in raw and "qresultone" not in raw       # nothing before it is asked for
     sent = examine(client, 1, "  I would look at made-up one.  ")
-    assert sent.status_code == 303 and sent.headers["location"] == "/teaching/cases/1#examine"
+    assert sent.status_code == 303 and sent.headers["location"] == "/teaching/cases/1"
     # The request is built by frames and by nothing else.
     call, = engine.calls_for("teaching_examination")
     assert call.system == loader.prompt("teaching_examination") and call.user == frames.examination_message(SCENARIO, "I would look at made-up one.")
@@ -129,7 +129,7 @@ def test_D10_finish_the_examination_shows_the_rest_under_its_own_heading_and_bri
     assert refusal_on(refused.text, "finish-examination") == (
         "You have typed something and not sent it. Send it, or clear the box, before you finish the examination.")
     done = client.post("/teaching/cases/1/finish-examination", data={"text": ""})
-    assert done.status_code == 303 and done.headers["location"] == "/teaching/cases/1#examination"
+    assert done.status_code == 303 and done.headers["location"] == "/teaching/cases/1"
     cases = app.state.parts.teaching.cases
     assert cases.get(1)["step"] == "question_1" and cases.get(1)["examination_finished_at"]
     raw = client.get("/teaching/cases/1").text

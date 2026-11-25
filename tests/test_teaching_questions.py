@@ -61,7 +61,9 @@ def test_12_1_step_5_the_three_questions_are_the_owners_words_one_at_a_time_and_
         assert not [q for q in later if q in page]                                     # one at a time: the later ones are not on the page
         assert raw.count('id="answer-box"') == 1 and 'maxlength="1500"' in raw
         sent = answer(client, n, f"  A made-up answer {n}.\nOn two lines.  ")
-        assert sent.status_code == 303 and sent.headers["location"] == "/teaching/cases/1#questions"
+        # After the first and the second the next question's box takes the keyboard; after the third the page comes back
+        # at the questions, where it says that the feedback is being made.
+        assert sent.status_code == 303 and sent.headers["location"] == "/teaching/cases/1" + ("#questions" if n == 3 else "")
         # Answered, it stands above with the learner's answer as typed.
         raw = client.get("/teaching/cases/1").text
         assert f'id="answered-{n}"' in raw and f"A made-up answer {n}.\nOn two lines." in raw
@@ -97,7 +99,7 @@ def test_15_14_after_the_third_answer_the_feedback_is_made_once_by_frames_alone_
     # Being made beside the page: the page says so and asks again by itself; there is no box and no press.
     raw = client.get("/teaching/cases/1").text
     assert '<p class="waiting" id="feedback-making" role="status">The feedback is being made. This usually takes a few seconds, at most 2 minutes.</p>' in raw
-    assert '<meta http-equiv="refresh" content="2;url=/teaching/cases/1?quiet">' in raw
+    assert '<meta http-equiv="refresh" content="2;url=/teaching/cases/1?quiet#questions">' in raw       # asked again at the questions, not at the page's top
     assert 'id="answer-box"' not in raw and 'id="feedback-again"' not in raw and 'id="feedback-failed"' not in raw
     assert t.STALE in text_of(client.post("/teaching/cases/1/again"))                  # a press from an older page: nothing a second time
     assert len(works) == 1 and engine.calls_for("teaching_feedback") == []

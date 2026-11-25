@@ -51,7 +51,8 @@ def test_15_14_rulings_10_and_21_a_line_is_sent_by_frames_alone_stored_with_its_
     app, client, engine = playing(tmp_path, clock, machine, [reply("A made-up first reply."), reply("A made-up second reply.", [1, 2])])
     cases = app.state.parts.teaching.cases
     sent = say(client, 1, "  Tell me about the made-up ache.  ")
-    assert sent.status_code == 303 and sent.headers["location"] == "/teaching/cases/1#say"
+    # To the page with no place named in the address: the box asks for the keyboard itself, and a browser gives it only then.
+    assert sent.status_code == 303 and sent.headers["location"] == "/teaching/cases/1"
     assert say(client, 2, "Any made-up fever?").status_code == 303
     # Every request is built by frames and by nothing else: the job's prompt file, and the frame filled from part one.
     first, second = engine.calls_for("teaching_patient")

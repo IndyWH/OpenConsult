@@ -272,7 +272,9 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
     in_cloud = row["language_model"] == CLAUDE and row["step"] != DONE_STEP
     context = dict(user=user, active="teaching", t=t, case=view, typed=typed or {}, notice=notice, line_most=room.LINE_MOST,
                    answer_most=room.ANSWER_MOST, mark=cloud_lines() if in_cloud else None,
-                   page_path=f"/teaching/cases/{case_id}", timed_by_script=True, refresh_every=WAIT_ASKS_EVERY_S if view.get("making") else None)
+                   page_path=f"/teaching/cases/{case_id}", timed_by_script=True, refresh_every=WAIT_ASKS_EVERY_S if view.get("making") else None,
+                   # While the feedback is made the page asks again at the questions, where it says so, and not at its top.
+                   refresh_to=f"/teaching/cases/{case_id}?quiet#questions" if row["step"] == FEEDBACK else None)
     if refused:
         return refuse(request, "teaching_case.html", refused[0], refused[1], **context)
     return render(request, "teaching_case.html", **context)
@@ -308,7 +310,9 @@ async def say(request: Request, case_id: int, user=Depends(guards.logged_in)):
     text = fields.get("text", "")
     outcome = await asyncio.to_thread(parts(request).teaching.say, case_id, _number(fields, "line"), text)
     if outcome.state == DONE:
-        raise Redirect(f"/teaching/cases/{case_id}#say")
+        # To the page with no place named: the box of the next line asks for the keyboard itself, and a browser gives
+        # it, and brings it into the window, only where the address names no other place (seen with scripts off).
+        raise Redirect(f"/teaching/cases/{case_id}")
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("say-send", outcome.problem), typed={"say": text})
     return _stale(request, user, case_id, HISTORY, "say", text)
@@ -335,7 +339,7 @@ async def examine(request: Request, case_id: int, user=Depends(guards.logged_in)
     text = fields.get("text", "")
     outcome = await asyncio.to_thread(parts(request).teaching.examine, case_id, _number(fields, "n"), text)
     if outcome.state == DONE:
-        raise Redirect(f"/teaching/cases/{case_id}#examine")
+        raise Redirect(f"/teaching/cases/{case_id}")
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("examine-send", outcome.problem), typed={"examine": text})
     return _stale(request, user, case_id, EXAMINATION, "examine", text)
@@ -347,7 +351,7 @@ async def finish_examination(request: Request, case_id: int, user=Depends(guards
     text = (await form_fields(request)).get("text", "")
     outcome = parts(request).teaching.finish_examination(case_id, text)
     if outcome.state == DONE:
-        raise Redirect(f"/teaching/cases/{case_id}#examination")
+        raise Redirect(f"/teaching/cases/{case_id}")       # the box of the first question takes the keyboard
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("finish-examination", outcome.problem), typed={"examine": text})
     return _stale(request, user, case_id, EXAMINATION, "examine", text)
@@ -361,7 +365,9 @@ async def answer(request: Request, case_id: int, user=Depends(guards.logged_in))
     text, question = fields.get("text", ""), _number(fields, "question")
     outcome = parts(request).teaching.answer(case_id, question, text)
     if outcome.state == DONE:
-        raise Redirect(f"/teaching/cases/{case_id}#questions")
+        # The next question's box takes the keyboard; after the third there is no box, and the page comes back at the
+        # questions, where it says that the feedback is being made.
+        raise Redirect(f"/teaching/cases/{case_id}" + ("#questions" if question == len(QUESTIONS) else ""))
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("answer-send", outcome.problem), typed={"answer": text})
     return _stale(request, user, case_id, QUESTIONS[question - 1] if 1 <= question <= len(QUESTIONS) else "", "answer", text)
