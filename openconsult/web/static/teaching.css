@@ -23,6 +23,12 @@
 .teaching .findings { margin: .3rem 0 .6rem; padding-left: 1.2rem; }
 .teaching h3 { font-size: 1rem; margin: 1.2rem 0 .4rem; }
 
+/* The three questions: the question in the page's own voice, the learner's answer under it as typed. */
+.teaching .question { font-weight: 600; font-size: 1rem; color: var(--ink); margin: .8rem 0 .3rem; }
+.teaching .answered .answer { margin: 0 0 .8rem 2rem; white-space: pre-wrap; overflow-wrap: anywhere; max-width: 46rem; }
+.teaching #answer { max-width: 46rem; scroll-margin-top: 5rem; }
+.teaching #answer-box { display: block; width: 100%; font-family: var(--sans); font-size: .95rem; line-height: 1.5; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .7rem; }
+
 /* The box of the next line, and under it, apart, the press that ends the step. */
 .teaching #say, .teaching #examine { max-width: 46rem; scroll-margin-top: 5rem; }
 .teaching #say-box, .teaching #examine-box { width: 100%; }

@@ -19,9 +19,13 @@ from typing import Callable
 from openconsult.patients.audit import Audit
 from openconsult.teaching import frames, room, words as t
 from openconsult.teaching.bank import Bank
-from openconsult.teaching.cases import EXAMINATION, HISTORY, Cases
+from openconsult.teaching.cases import EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, Cases
 
 DONE, STALE, REFUSED = "done", "stale", "refused"
+
+
+def _beside(work: Callable) -> None:
+    threading.Thread(target=work, name="teaching", daemon=True).start()
 
 
 @dataclass(frozen=True)
@@ -44,6 +48,9 @@ class Teaching:
         self._audit = audit
         self._starting = threading.Lock()
         self._locks: dict[int, threading.Lock] = {}
+        self._making: set[int] = set()      # the cases whose feedback is being made at this moment
+        # How work that takes a model's time is run beside the page: a thread of its own. A test puts its own way here.
+        self.run: Callable[[Callable], None] = _beside
 
     def _lock(self, case_id: int) -> threading.Lock:
         """One lock a case: two presses on one case are taken one after the other."""
@@ -149,3 +156,69 @@ class Teaching:
             if typed.strip():
                 return Outcome(REFUSED, t.FINISH_WITH_WORDS)
             return Outcome(DONE if self.cases.finish_examination(case_id) else STALE)
+
+    # ------------------------------------ the three questions, the feedback
+
+    def answer(self, case_id: int, question: int, text: str) -> Outcome:
+        """The answer to question 1, 2 or 3, at that question alone. The
+        questions go to no model. After the third the feedback is made,
+        once, beside the page."""
+        text = text.strip()
+        with self._lock(case_id):
+            row = self.cases.get(case_id)
+            if row is None or question not in (1, 2, 3) or row["step"] != QUESTIONS[question - 1]:
+                return Outcome(STALE)
+            if not text:
+                return Outcome(REFUSED, t.TYPE_AN_ANSWER)
+            if len(text) > room.ANSWER_MOST:
+                return Outcome(REFUSED, t.ANSWER_TOO_LONG.format(most=t.most(room.ANSWER_MOST)))
+            if not self.cases.answer(case_id, question, text):
+                return Outcome(STALE)
+        if question == len(QUESTIONS):
+            self._begin_feedback(case_id)      # outside the case's lock, which the making takes itself
+        return Outcome(DONE)
+
+    def making(self, case_id: int) -> bool:
+        """Whether the feedback of this case is being made at this moment."""
+        return case_id in self._making
+
+    def _begin_feedback(self, case_id: int) -> None:
+        self._making.add(case_id)
+        self.run(lambda: self._make_feedback(case_id))
+
+    def _make_feedback(self, case_id: int) -> None:
+        """The feedback, once: the whole scenario, the numbered turns, what
+        was asked at the examination and the three answers, by frames
+        alone. What the model answers is stored as the door held it to
+        its form; the page builds what a learner sees from it by the rule
+        of openconsult/teaching/shown.py, every time. A failed call
+        leaves its reason and everything the learner did; nothing is
+        asked again by itself (R30)."""
+        try:
+            with self._lock(case_id):
+                row = self.cases.get(case_id)
+                if row is None or row["step"] != FEEDBACK:
+                    return
+                said, examined = self.cases.conversation(case_id), self.cases.examined(case_id)
+                result = self._ask(row, "teaching_feedback", frames.feedback_message(
+                    row["scenario"], said, [request["text"] for request in examined], self.cases.answers(row)))
+                if not result.ok:
+                    self.cases.failed(case_id, FEEDBACK, result.failure)
+                elif self.cases.fed_back(case_id, result.answer):
+                    self._audit.record("teaching.finished", f"case {case_id}: {len(said) // 2} lines, {len(examined)} examination "
+                                                            "requests, feedback made")
+        finally:
+            self._making.discard(case_id)
+
+    def again(self, case_id: int) -> Outcome:
+        """Make the feedback again, by a press alone, after one that did
+        not come. A press while one is being made, or for a case that is
+        not waiting for its feedback, changes nothing."""
+        with self._lock(case_id):
+            row = self.cases.get(case_id)
+            if row is None or row["step"] != FEEDBACK or self.making(case_id):
+                return Outcome(STALE)
+            self.cases.trying(case_id, FEEDBACK)
+            self._making.add(case_id)
+        self._begin_feedback(case_id)
+        return Outcome(DONE)

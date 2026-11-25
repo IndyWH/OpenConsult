@@ -19,7 +19,7 @@ from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.settings.path import CLAUDE
 from openconsult.settings.statement import statement_for
 from openconsult.teaching import room, words as t
-from openconsult.teaching.cases import EXAMINATION, HISTORY, WRITING
+from openconsult.teaching.cases import ANSWERS, EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, WRITING
 from openconsult.teaching.play import DONE, REFUSED
 from openconsult.teaching.scenario import examined_blocks, findings, other_findings, speaks_for
 from openconsult.web import guards
@@ -28,6 +28,8 @@ from openconsult.web.pages import form_fields, refuse, render
 
 router = APIRouter()
 SETTINGS_STATEMENT = "/settings#cloud-statement"
+# A page that waits for work the app does beside it asks again by itself, this often, with no script.
+WAIT_ASKS_EVERY_S = 2
 
 
 def bank_rows(teaching) -> list[dict]:
@@ -131,6 +133,18 @@ def turns_view(turns: list[dict]) -> list[dict]:
     return [{"doctor": turn["speaker"] == "doctor", "line": (turn["n"] + 1) // 2, "text": turn["text"]} for turn in turns]
 
 
+def questions_view(row: dict) -> dict:
+    """The three questions as the page shows them (12.1, step 5): those
+    answered, each with the learner's answer as typed, and the one that
+    stands now, alone. The words of the questions are the page's own."""
+    step, answers = row["step"], {name: row[f"answer_{name}"] for name in ANSWERS}
+    asked = QUESTIONS.index(step) if step in QUESTIONS else len(QUESTIONS)
+    view = {"answered": [{"question": t.QUESTIONS[i], "answer": answers[ANSWERS[i]]} for i in range(asked)]}
+    if step in QUESTIONS:
+        view["question"] = {"n": asked + 1, "words": t.QUESTIONS[asked], "of": t.QUESTION_OF.format(n=asked + 1)}
+    return view
+
+
 def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | None = None, typed: dict | None = None,
                notice: str | None = None):
     """The case where it stands: one address for every step, and the row's
@@ -151,9 +165,15 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
         if row["step"] != EXAMINATION:
             # The rest of the scenario's findings reach the page only once the examination is finished (D10).
             view.update(no_findings=not findings(row["scenario"]), other_findings=other_findings(row["scenario"], examined))
+            view.update(questions_view(row))
+    if row["step"] == FEEDBACK:
+        # Being made beside the page, which asks again by itself; or it did not come, and one press makes it again.
+        view["making"] = teaching.making(case_id)
+        if not view["making"]:
+            view["feedback_failed"] = t.FEEDBACK_FAILED.format(reason=t.reason(row["failure"] or t.STOPPED))
     context = dict(user=user, active="teaching", t=t, case=view, typed=typed or {}, notice=notice, line_most=room.LINE_MOST,
-                   mark=cloud_lines() if row["language_model"] == CLAUDE else None, page_path=f"/teaching/cases/{case_id}",
-                   timed_by_script=True)
+                   answer_most=room.ANSWER_MOST, mark=cloud_lines() if row["language_model"] == CLAUDE else None,
+                   page_path=f"/teaching/cases/{case_id}", timed_by_script=True, refresh_every=WAIT_ASKS_EVERY_S if view.get("making") else None)
     if refused:
         return refuse(request, "teaching_case.html", refused[0], refused[1], **context)
     return render(request, "teaching_case.html", **context)
@@ -232,3 +252,26 @@ async def finish_examination(request: Request, case_id: int, user=Depends(guards
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("finish-examination", outcome.problem), typed={"examine": text})
     return _stale(request, user, case_id, EXAMINATION, "examine", text)
+
+
+@router.post("/teaching/cases/{case_id}/answer")
+async def answer(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """The answer to the question that stands, by its number. An empty
+    answer is not taken. After the third the feedback is made, once."""
+    fields = await form_fields(request)
+    text, question = fields.get("text", ""), _number(fields, "question")
+    outcome = parts(request).teaching.answer(case_id, question, text)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}#questions")
+    if outcome.state == REFUSED:
+        return _case_page(request, user, case_id, refused=("answer-send", outcome.problem), typed={"answer": text})
+    return _stale(request, user, case_id, QUESTIONS[question - 1] if 1 <= question <= len(QUESTIONS) else "", "answer", text)
+
+
+@router.post("/teaching/cases/{case_id}/again")
+async def again(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """Make again what did not come, by this press alone: nothing is asked a second time by itself (R30)."""
+    outcome = parts(request).teaching.again(case_id)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}#questions")
+    return _stale(request, user, case_id, "", "", "")

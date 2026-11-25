@@ -104,7 +104,39 @@
   </div>
 </section>
 {% endif %}
-{% if notice and case.step not in ("history", "examination") %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+
+{# The three questions (12.1, step 5), the owner's words, one at a time, each with a box; they go to no model. Those
+   answered stand above with the learner's answer as typed. After the third the feedback is made, once: the page says
+   so and asks again by itself; where it did not come, the page says why and one press makes it again. #}
+{% if case.answered is defined %}
+<section class="pane" id="questions">
+  <div class="pane-head"><h2>{{ t.QUESTIONS_HEADING }}</h2></div>
+  <div class="pane-body">
+    {% for done in case.answered %}
+    <div class="answered" id="answered-{{ loop.index }}">
+      <p class="question">{{ done.question }}</p>
+      <p class="answer said">{{ done.answer }}</p>
+    </div>
+    {% endfor %}
+    {% if notice %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    {% if case.question %}
+    <form method="post" action="/teaching/cases/{{ case.id }}/answer" id="answer">
+      <input type="hidden" name="question" value="{{ case.question.n }}">
+      <p class="mark" id="question-of">{{ case.question.of }}</p>
+      <label for="answer-box" class="question" id="question">{{ case.question.words }}</label>
+      <textarea id="answer-box" name="text" rows="4" maxlength="{{ answer_most }}" autofocus data-keep="answer-{{ case.question.n }}" aria-describedby="answer-send-refusal">{{ typed.answer }}</textarea>
+      <button class="primary" id="answer-send" aria-describedby="answer-send-refusal">{{ t.SEND_ANSWER }}</button>
+      {{ refusal("answer-send") }}
+    </form>
+    {% endif %}
+    {% if case.making %}<p class="waiting" id="feedback-making" role="status">{{ t.FEEDBACK_MAKING }}</p>{% endif %}
+    {% if case.feedback_failed %}
+    <p class="refusal" id="feedback-failed" role="alert">{{ case.feedback_failed }}</p>
+    <form method="post" action="/teaching/cases/{{ case.id }}/again"><button class="primary" id="feedback-again">{{ t.FEEDBACK_AGAIN }}</button></form>
+    {% endif %}
+  </div>
+</section>
+{% endif %}
 </div>
 <script src="{{ static('use.js') }}"></script>
 <script src="{{ static('teaching.js') }}"></script>

@@ -110,9 +110,29 @@ EXAMINATION_FAILED = ("The examination could not be read: {reason}. Your words a
                       "for them.")
 
 
+# The three questions (12.1, step 5). THE OWNER'S, letter for letter, one at a time. They are fixed words of the page
+# and go to no model (ruling 13).
+QUESTIONS = (
+    "What is your differential diagnosis?",
+    "What investigations would you order?",
+    "What is your plan, and does this patient need a referral?",
+)
+QUESTIONS_HEADING = "The three questions"
+QUESTION_OF = "Question {n} of 3"
+SEND_ANSWER = "Send answer"
+TYPE_AN_ANSWER = "Type an answer, even a short one."       # the details'
+ANSWER_TOO_LONG = "This answer is too long. Shorten it to {most} characters or fewer."
+FEEDBACK_MAKING = "The feedback is being made. This usually takes a few seconds, at most 2 minutes."
+FEEDBACK_FAILED = "The feedback could not be made: {reason}. Your lines and your three answers are kept."
+FEEDBACK_AGAIN = "Make the feedback again"
+# A making that the app's own stop cut short: no call failed, and none is asked again by itself.
+STOPPED = "stopped"
+REASON_STOPPED = "OpenConsult was closed before the answer came"
+
+
 def reason(failure: str) -> str:
     """Why a model call failed, in the words the page of calls already uses for the door's outcomes."""
-    return words.CALL_OUTCOMES[failure]
+    return REASON_STOPPED if failure == STOPPED else words.CALL_OUTCOMES[failure]
 
 
 def most(number: int) -> str:
