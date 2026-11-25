@@ -45,9 +45,30 @@ def write_chains(folder: Path, start_epoch: float, chains=("A1", "A2", "A3"), pa
     writer = ResultWriter(folder)
     db = open_database(folder / "calls.db")
     moment = {"epoch": start_epoch}
-    record = ModelCalls(db, clock=lambda: dt.datetime.fromtimestamp(moment["epoch"], ZONE))
     first = start_epoch
     try:
+        _write_chains(db, writer, moment, chains, passes, wall_ms, ectopic, test, fail_at, chain_failed, alarm_ms)
+    finally:
+        db.close()
+    return first, moment["epoch"]
+
+
+class _InOneGo:
+    """The record's own writes, on the connection of one open transaction. On GitHub's Windows a write to this small
+    database took about 21 ms, and a made-up run wrote several hundred rows one at a time, each with a commit of its
+    own: the judging tests took 13 to 26 s each there (measured by the check's own step, 24 Nov 2026). The rows, their
+    order, their numbers and their times are what they were; one commit holds them."""
+
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, sql: str, params: tuple = ()):
+        return self._connection.execute(sql, params)
+
+
+def _write_chains(db, writer, moment, chains, passes, wall_ms, ectopic, test, fail_at, chain_failed, alarm_ms) -> None:
+    with db.transaction() as connection:
+        record = ModelCalls(_InOneGo(connection), clock=lambda: dt.datetime.fromtimestamp(moment["epoch"], ZONE))
         for chain in chains:
             rows = []
             for point in range(1, passes + 1):
@@ -66,9 +87,6 @@ def write_chains(folder: Path, start_epoch: float, chains=("A1", "A2", "A3"), pa
             writer.write("495", chain, {"case": "495", "group": "495", "chain": chain, "temperature": 0.0, "seed": 42,
                                         "failed": chain_failed if chain == "A1" else None, "passes": rows,
                                         "engine": "made-up", "model_tag": LM})
-    finally:
-        db.close()
-    return first, moment["epoch"]
 
 
 def speech_result(t0: float, arm: str, lines, stop_t=315.0, failure=None, pause=None) -> dict:
