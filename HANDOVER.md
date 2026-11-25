@@ -4,6 +4,19 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
+## 2026-11-25. Run 10b: the pages of teaching mode, typed. In work: the first half stands
+
+THE HALF (25 Nov 2026; mail 1, the owner's okay at 07:51 UTC: Approved.
+Go.): a learner can work through one case of the bank by typing, from
+the patient's first words to the feedback and the whole scenario. The
+first half stands by itself, the suite green on each commit's own tree:
+the line of the cloud statement, the tables of version 14, the bank of
+eight scenarios, the tab and the teaching page, the start of a case
+with the mark Cloud, the history, the examination, the three questions,
+the feedback, the whole scenario. Still to come in this run: a fresh
+scenario, the list of kept cases and their delete, the flag, the
+section Teaching of Settings, the mend of the slow Windows tests.
+
 ## 2026-11-24. Run 10a: the four prompts of teaching as files, their jobs in the door, and the bench of teaching on both models. Report only: nothing a learner can see
 
 Run on 23 and 24 Nov 2026 by the mailbox (a usage limit stood between
