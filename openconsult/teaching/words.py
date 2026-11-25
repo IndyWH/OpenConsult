@@ -59,6 +59,13 @@ LEVEL_LINES = {
 }
 
 
+# Your cases (ruling 22): every case begun on this computer, kept apart from the clinic's patients.
+YOUR_CASES = "Your cases"                                  # the details'
+COL_DATE, COL_STATE = "Date", "State"
+FINISHED, NOT_FINISHED = "Finished", "Not finished"
+OPEN, GO_ON = "Open", "Go on"
+NO_CASES = "No case has been started on this computer."
+
 START = "Start"
 NOT_IN_LIST = "That case is not in the list."
 # Why the press that starts a case does not start one, said on the control itself (R15; 10.4).

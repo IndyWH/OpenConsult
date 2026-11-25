@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import secrets
+from datetime import datetime
 
 from fastapi import APIRouter, Depends, Request
 
@@ -90,12 +91,25 @@ def new_case_view(teaching, chosen: dict | None = None) -> dict:
             "press": secrets.token_urlsafe(12)}
 
 
+def your_cases(teaching) -> list[dict]:
+    """Every case begun on this computer, newest first (ruling 22): its
+    date, its topic, its level, its label, whether it is finished, and
+    the press that opens it or goes on with it where it stands."""
+    rows = []
+    for case in teaching.cases.listed():
+        finished = case["step"] == DONE_STEP
+        rows.append({"id": case["id"], "date": words.plain_date(datetime.fromisoformat(case["started_at"])), "topic": case["topic"],
+                     "level": t.LEVEL_NAMES[case["level"]], "label": t.LABELS[case["label"]],
+                     "state": t.FINISHED if finished else t.NOT_FINISHED, "press": t.OPEN if finished else t.GO_ON})
+    return rows
+
+
 def _teaching_page(request: Request, user, refused: tuple[str, str] | None = None, lead: str | None = None,
                    chosen: dict | None = None):
     """lead: where the reason of a refusal is mended, drawn as a link beside it."""
     p = parts(request)
     context = dict(user=user, active="teaching", t=t, bank=bank_rows(p.teaching), unread=t.bank_unread(p.teaching.bank.unread),
-                   new_case=new_case_view(p.teaching, chosen),
+                   new_case=new_case_view(p.teaching, chosen), cases=your_cases(p.teaching),
                    mark=cloud_lines() if language_model(p) == CLAUDE else None, lead=lead, page_path="/teaching")
     if refused:
         return refuse(request, "teaching.html", refused[0], refused[1], **context)

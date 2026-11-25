@@ -58,5 +58,22 @@
     {% if unread %}<p class="mark" id="bank-unread">{{ unread }}</p>{% endif %}
   </div>
 </section>
+
+{# Your cases (ruling 22): every case begun on this computer, newest first, listed here and never among the clinic's
+   patients (R24). A case that was left is gone on with from where it stood; a finished one opens as it was. #}
+<section class="pane" id="your-cases">
+  <div class="pane-head"><h2>{{ t.YOUR_CASES }}</h2></div>
+  <div class="pane-body">
+    {% if cases %}
+    <table class="plain" id="kept-cases">
+      <tr><th>{{ t.COL_DATE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th><th>{{ t.COL_STATE }}</th><th></th></tr>
+      {% for case in cases %}
+      <tr data-kept="{{ case.id }}"><td>{{ case.date }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td><td>{{ case.state }}</td>
+        <td><a class="button" id="open-{{ case.id }}" href="/teaching/cases/{{ case.id }}">{{ case.press }}</a></td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="mark" id="no-cases">{{ t.NO_CASES }}</p>{% endif %}
+  </div>
+</section>
 </div>
 {% endblock %}
