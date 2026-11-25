@@ -63,7 +63,7 @@
 /* A sentence or a heading that takes the keyboard only so that the browser brings it into the window: no ring. */
 .teaching [tabindex="-1"]:focus { outline: none; }
 /* Places of the page that an address names: they come to stand clear of the app's bar, which stays at the window's top. */
-.teaching #feedback, .teaching #feedback-failed, .teaching #questions { scroll-margin-top: 5rem; }
+.teaching #feedback, .teaching #feedback-failed, .teaching #questions, .teaching tr[data-kept] { scroll-margin-top: 5rem; }
 
 /* The box of the next line, and under it, apart, the press that ends the step. */
 .teaching #say, .teaching #examine { max-width: 46rem; scroll-margin-top: 5rem; }

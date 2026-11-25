@@ -34,6 +34,7 @@ SETTINGS_STATEMENT = "/settings#cloud-statement"
 WAIT_ASKS_EVERY_S = 2
 SURPRISE = "surprise"              # the value of Surprise me in the menu: no title of a topic
 WAITS = "waits"                    # in the address of a waiting page's own ask: what the page waits for
+GONE = "/teaching?gone=yes#your-cases"      # a press for a kept case that is no longer there: the list, which says so
 
 
 def bank_rows(teaching) -> list[dict]:
@@ -131,11 +132,14 @@ def _teaching_page(request: Request, user, refused: tuple[str, str] | None = Non
     shows the one question, with what goes and that it cannot be undone."""
     p = parts(request)
     cases = your_cases(p.teaching)
+    asked = request.query_params.get("asking", "")
+    asking = int(asked) if asking is None and asked.isdigit() else asking
     for case in cases:
         if case["id"] == asking:
             case["question"] = t.DELETE_QUESTION.format(date=case["date"])
-    if request.query_params.get("deleted") == "yes" and notice is None and not refused:
-        notice = t.CASE_DELETED
+    if notice is None and not refused:
+        said = {"deleted": t.CASE_DELETED, "gone": t.STALE}
+        notice = next((words_ for name, words_ in said.items() if request.query_params.get(name) == "yes"), None)
     context = dict(user=user, active="teaching", t=t, bank=bank_rows(p.teaching), unread=t.bank_unread(p.teaching.bank.unread),
                    new_case=new_case_view(p, chosen), cases=cases, notice=notice,
                    mark=cloud_lines() if language_model(p) == CLAUDE else None, lead=lead, page_path="/teaching")
@@ -408,18 +412,24 @@ async def flag_case(request: Request, case_id: int, user=Depends(guards.logged_i
 async def delete_case(request: Request, case_id: int, user=Depends(guards.logged_in)):
     """Delete a kept case (ruling 22): the question once, at its row, then
     the deletion: the case with every line, reply, finding shown, answer
-    and feedback, and every stored model call of it, in one go."""
+    and feedback, and every stored model call of it, in one go.
+
+    The question must stand where the learner is looking (R15; 15.10,
+    ruling 34; the owner's room check of 25 Nov 2026, where the page
+    went to its top and the question was out of sight). So the first
+    press leads to the teaching page at that row: with no script by the
+    row's own place in the address; with the page's script, which keeps
+    the window where it was, by no place at all."""
     teaching = parts(request).teaching
+    fields = await form_fields(request)
     if teaching.cases.get(case_id) is None:
-        return _teaching_page(request, user, notice=t.STALE)
-    if (await form_fields(request)).get("confirm") != "yes":
-        return _teaching_page(request, user, asking=case_id)
+        raise Redirect(GONE)
+    if fields.get("confirm") != "yes":
+        raise Redirect(f"/teaching?asking={case_id}" + ("" if fields.get("place") == "keep" else f"#kept-{case_id}"))
     outcome = await asyncio.to_thread(teaching.delete, case_id)
     if outcome.state == REFUSED:
         return _teaching_page(request, user, refused=(f"delete-{case_id}", outcome.problem))
-    if outcome.state == DONE:
-        raise Redirect("/teaching?deleted=yes#your-cases")
-    return _teaching_page(request, user, notice=t.STALE)
+    raise Redirect("/teaching?deleted=yes#your-cases" if outcome.state == DONE else GONE)
 
 
 @router.get("/teaching/flags/{flag_id}")

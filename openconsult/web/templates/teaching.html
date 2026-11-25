@@ -1,12 +1,13 @@
 {% extends "base.html" %}
 {% from "_parts.html" import refusal, cloud_mark with context %}
 {% set title = t.TITLE %}
+{% block head %}<link rel="stylesheet" href="{{ static('teaching.css') }}">{% endblock %}
 {% block main %}
 {# The teaching page (15.14, the details of run 10b), in this order: the line of no affiliation (ruling 1; 12.5), the
    line on a real patient's details (ruling 22), then the cases. A case of the bank is known here by its number: the
    name of its file and the id inside it name the diagnosis and never reach a page or an address. In cloud mode the
    mark Cloud stands at the top with the owner's sentence and the cost (ruling 15). #}
-<div class="teaching" id="teaching-page">
+<div class="teaching" id="teaching-page" data-keeps-place data-path="/teaching">
 <h1 class="page">{{ t.TITLE }}</h1>
 {% if mark %}{{ cloud_mark(mark) }}{% endif %}
 <p class="mark" id="not-affiliated">{{ t.NOT_AFFILIATED }}</p>
@@ -66,19 +67,22 @@
   <div class="pane-body">
     {% if notice %}<p class="notice" id="{{ 'case-deleted' if notice == t.CASE_DELETED else 'cases-notice' }}" role="status">{{ notice }}</p>{% endif %}
     {% if cases %}
-    {# Delete (ruling 22; R15): the question once, at the row, then the deletion. It cannot be undone. #}
+    {# Delete (ruling 22; R15): the question once, at the row, then the deletion. It cannot be undone. The question
+       stands where the learner pressed: data-stay, place.js keeps the window where it was over the load that the
+       press makes (15.10, ruling 34); with no script the app sends the browser to the row's own place, and Keep
+       leads back to it. #}
     <table class="plain" id="kept-cases">
       <tr><th>{{ t.COL_DATE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th><th>{{ t.COL_STATE }}</th><th></th><th></th></tr>
       {% for case in cases %}
-      <tr data-kept="{{ case.id }}"><td>{{ case.date }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td><td>{{ case.state }}</td>
+      <tr data-kept="{{ case.id }}" id="kept-{{ case.id }}"><td>{{ case.date }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td><td>{{ case.state }}</td>
         <td><a class="button" id="open-{{ case.id }}" href="/teaching/cases/{{ case.id }}">{{ case.press }}</a></td>
         <td>{% if case.question %}
           <p class="statement" id="delete-question-{{ case.id }}">{{ case.question }}</p>
           <form method="post" action="/teaching/cases/{{ case.id }}/delete" class="control-row"><input type="hidden" name="confirm" value="yes">
             <button class="primary danger" id="confirm-delete-{{ case.id }}">{{ words.YES_DELETE }}</button>
-            <a class="button" id="keep-{{ case.id }}" href="/teaching#your-cases">{{ words.KEEP }}</a></form>
+            <a class="button" id="keep-{{ case.id }}" href="/teaching#kept-{{ case.id }}">{{ words.KEEP }}</a></form>
           {% else %}
-          <form method="post" action="/teaching/cases/{{ case.id }}/delete"><button id="delete-{{ case.id }}" aria-describedby="delete-{{ case.id }}-refusal">{{ t.DELETE }}</button>{{ refusal("delete-" ~ case.id) }}</form>
+          <form method="post" action="/teaching/cases/{{ case.id }}/delete" data-stay><button id="delete-{{ case.id }}" aria-describedby="delete-{{ case.id }}-refusal">{{ t.DELETE }}</button>{{ refusal("delete-" ~ case.id) }}</form>
           {% endif %}</td></tr>
       {% endfor %}
     </table>
@@ -86,4 +90,5 @@
   </div>
 </section>
 </div>
+<script src="{{ static('place.js') }}"></script>
 {% endblock %}
