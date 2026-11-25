@@ -34,7 +34,7 @@
     </div>
 
     <div id="step" data-part="step">
-    {% if notice %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    {% if notice and case.step == "history" %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
     {% if case.step == "history" %}
     {# One form, two presses. Send is the first, so Enter in the box sends the line; End the history goes to its own
        address with the box, so a line typed and not sent refuses it and is not lost. The box is one line: Enter sends
@@ -58,6 +58,53 @@
     </div>
   </div>
 </section>
+
+{# The examination (12.1, step 4; D10; rulings 12, 16 and 21). The learner types what they would examine and may send
+   more than once. Each request is a block: the words as typed, then the scenario's own findings for it, the owner's
+   sentence for what the case does not hold, or the sentence for something that is no examination. No finding is a
+   model's words. The rest of the findings are given to this page only after Finish the examination. #}
+{% if case.examined is defined %}
+<section class="pane" id="examination" data-part="examination">
+  <div class="pane-head"><h2>{{ t.EXAMINATION }}</h2></div>
+  <div class="pane-body">
+    {% for block in case.examined %}
+    <div class="examined" id="examined-{{ block.n }}">
+      <p class="typed"><span class="speaker">{{ t.YOU_TYPED }}</span> <span class="said">{{ block.typed }}</span></p>
+      {% for finding in block.found %}<p class="finding">{{ finding }}</p>
+      {% endfor %}
+      {% for own in block.not_held %}<p class="not-held"><span class="said">{{ own }}</span>: <span class="no-finding">{{ t.NO_FINDING }}</span></p>
+      {% endfor %}
+      {% if block.no_examination %}<p class="not-held">{{ t.NOT_AN_EXAMINATION }}</p>{% endif %}
+      {% if block.nothing %}<p class="not-held">{{ t.NOTHING_TO_SHOW }}</p>{% endif %}
+    </div>
+    {% endfor %}
+    {% if case.step == "examination" %}
+    {% if notice %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    <form method="post" action="/teaching/cases/{{ case.id }}/examine" id="examine" data-send
+          data-waiting="{{ t.EXAMINATION_WAITING }}" data-login-ended="{{ t.LOGIN_ENDED }}" data-no-answer="{{ t.NO_ANSWER }}">
+      <input type="hidden" name="n" value="{{ case.next_request }}">
+      <p class="mark" id="examination-intro">{{ t.EXAMINATION_INTRO }}</p>
+      <label for="examine-box">{{ t.EXAMINE_BOX }}</label>
+      <input type="text" id="examine-box" name="text" value="{{ typed.examine }}" maxlength="{{ line_most }}" autocomplete="off" autofocus data-keep="examine" aria-describedby="examine-send-refusal">
+      <button class="primary" id="examine-send" aria-describedby="examine-send-refusal" data-send-press>{{ t.SEND }}</button>
+      {{ refusal("examine-send") }}
+      <p class="waiting" id="examine-status" role="status" data-status></p>
+      <div class="ending">
+        <button id="finish-examination" formaction="/teaching/cases/{{ case.id }}/finish-examination" aria-describedby="finish-examination-refusal">{{ t.FINISH_EXAMINATION }}</button>
+        <p class="mark" id="finish-examination-line">{{ t.FINISH_LINE }}</p>
+        {{ refusal("finish-examination") }}
+      </div>
+    </form>
+    {% else %}
+    <h3 id="other-findings">{{ t.OTHER_FINDINGS }}</h3>
+    {% if case.no_findings %}<p class="not-held" id="no-finding-at-all">{{ t.NO_FINDING_AT_ALL }}</p>
+    {% elif case.other_findings %}<ul class="findings" id="the-rest">{% for finding in case.other_findings %}<li class="finding">{{ finding }}</li>{% endfor %}</ul>
+    {% else %}<p class="not-held" id="no-other-finding">{{ t.NO_OTHER_FINDING }}</p>{% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endif %}
+{% if notice and case.step not in ("history", "examination") %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
 </div>
 <script src="{{ static('use.js') }}"></script>
 <script src="{{ static('teaching.js') }}"></script>

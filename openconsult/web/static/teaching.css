@@ -14,9 +14,18 @@
 .teaching .speaker { font-weight: 600; margin-right: .35rem; }
 .teaching .line-number { color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 
+/* The examination: each request a block, the words as typed and under them what the case holds for it. */
+.teaching .examined { margin: .5rem 0 1rem; padding-left: .9rem; border-left: 3px solid var(--line); max-width: 46rem; overflow-wrap: anywhere; }
+.teaching .examined p { margin: .25rem 0; }
+.teaching .examined .typed { color: var(--ink-soft); }
+.teaching .finding { font-weight: 600; }
+.teaching .not-held { font-style: italic; }
+.teaching .findings { margin: .3rem 0 .6rem; padding-left: 1.2rem; }
+.teaching h3 { font-size: 1rem; margin: 1.2rem 0 .4rem; }
+
 /* The box of the next line, and under it, apart, the press that ends the step. */
-.teaching #say { max-width: 46rem; scroll-margin-top: 5rem; }
-.teaching #say-box { width: 100%; }
+.teaching #say, .teaching #examine { max-width: 46rem; scroll-margin-top: 5rem; }
+.teaching #say-box, .teaching #examine-box { width: 100%; }
 .teaching .waiting:empty { display: none; }
 .teaching .ending { margin-top: 1.6rem; padding-top: .9rem; border-top: 1px solid var(--line); }
 .teaching .ending .mark { margin: .4rem 0 0; }

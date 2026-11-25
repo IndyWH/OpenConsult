@@ -19,9 +19,9 @@ from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.settings.path import CLAUDE
 from openconsult.settings.statement import statement_for
 from openconsult.teaching import room, words as t
-from openconsult.teaching.cases import HISTORY
+from openconsult.teaching.cases import EXAMINATION, HISTORY, WRITING
 from openconsult.teaching.play import DONE, REFUSED
-from openconsult.teaching.scenario import speaks_for
+from openconsult.teaching.scenario import examined_blocks, findings, other_findings, speaks_for
 from openconsult.web import guards
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
@@ -145,6 +145,12 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
     view = {**case_view(row), "step": row["step"], "turns": turns_view(turns), "next_line": len(turns) // 2 + 1}
     if row["step"] == HISTORY and room.getting_long(row["scenario"], [(turn["speaker"], turn["text"]) for turn in turns]):
         view["long"] = t.HISTORY_LONG
+    if row["step"] not in (WRITING, HISTORY):
+        examined = teaching.cases.examined(case_id)
+        view.update(examined=examined_blocks(row["scenario"], examined), next_request=len(examined) + 1)
+        if row["step"] != EXAMINATION:
+            # The rest of the scenario's findings reach the page only once the examination is finished (D10).
+            view.update(no_findings=not findings(row["scenario"]), other_findings=other_findings(row["scenario"], examined))
     context = dict(user=user, active="teaching", t=t, case=view, typed=typed or {}, notice=notice, line_most=room.LINE_MOST,
                    mark=cloud_lines() if row["language_model"] == CLAUDE else None, page_path=f"/teaching/cases/{case_id}",
                    timed_by_script=True)
@@ -200,3 +206,29 @@ async def end_history(request: Request, case_id: int, user=Depends(guards.logged
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("end-history", outcome.problem), typed={"say": text})
     return _stale(request, user, case_id, HISTORY, "say", text)
+
+
+@router.post("/teaching/cases/{case_id}/examine")
+async def examine(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """What the learner would examine, with the number the request will
+    get. The page then shows the scenario's own findings for it."""
+    fields = await form_fields(request)
+    text = fields.get("text", "")
+    outcome = await asyncio.to_thread(parts(request).teaching.examine, case_id, _number(fields, "n"), text)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}#examine")
+    if outcome.state == REFUSED:
+        return _case_page(request, user, case_id, refused=("examine-send", outcome.problem), typed={"examine": text})
+    return _stale(request, user, case_id, EXAMINATION, "examine", text)
+
+
+@router.post("/teaching/cases/{case_id}/finish-examination")
+async def finish_examination(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """Finish the examination: one press. The rest of the findings are shown and the first question comes."""
+    text = (await form_fields(request)).get("text", "")
+    outcome = parts(request).teaching.finish_examination(case_id, text)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}#examination")
+    if outcome.state == REFUSED:
+        return _case_page(request, user, case_id, refused=("finish-examination", outcome.problem), typed={"examine": text})
+    return _stale(request, user, case_id, EXAMINATION, "examine", text)

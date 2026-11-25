@@ -19,7 +19,7 @@ from typing import Callable
 from openconsult.patients.audit import Audit
 from openconsult.teaching import frames, room, words as t
 from openconsult.teaching.bank import Bank
-from openconsult.teaching.cases import HISTORY, Cases
+from openconsult.teaching.cases import EXAMINATION, HISTORY, Cases
 
 DONE, STALE, REFUSED = "done", "stale", "refused"
 
@@ -111,3 +111,41 @@ class Teaching:
             if typed.strip():
                 return Outcome(REFUSED, t.END_WITH_WORDS)
             return Outcome(DONE if self.cases.end_history(case_id) else STALE)
+
+    # ------------------------------------------------------ the examination
+
+    def examine(self, case_id: int, n: int, text: str) -> Outcome:
+        """What the learner would examine, by the number the request will
+        get. The model writes no finding: it says which findings of the
+        scenario were asked for (ruling 12), and what came back is stored
+        as it came. A failed call stores nothing, so no finding and no
+        sentence about a finding is shown for it."""
+        text = text.strip()
+        with self._lock(case_id):
+            row = self.cases.get(case_id)
+            before = self.cases.examined(case_id) if row else []
+            if row is None or row["step"] != EXAMINATION or n != len(before) + 1:
+                return Outcome(STALE)
+            if not text:
+                return Outcome(REFUSED, t.TYPE_A_REQUEST)
+            if len(text) > room.LINE_MOST:
+                return Outcome(REFUSED, t.REQUEST_TOO_LONG.format(most=t.most(room.LINE_MOST)))
+            if not room.examination_fits([request["text"] for request in before], text):
+                return Outcome(REFUSED, t.EXAMINATION_FULL)
+            result = self._ask(row, "teaching_examination", frames.examination_message(row["scenario"], text))
+            if not result.ok:
+                return Outcome(REFUSED, t.EXAMINATION_FAILED.format(reason=t.reason(result.failure)))
+            stored = self.cases.add_examined(case_id, n, text, result.answer["asked"], result.answer["not_in_case"])
+            return Outcome(DONE if stored else STALE)
+
+    def finish_examination(self, case_id: int, typed: str) -> Outcome:
+        """The one press that ends the examination: the rest of the
+        scenario's findings may then be shown, and the first question
+        comes. A request typed and not sent refuses it."""
+        with self._lock(case_id):
+            row = self.cases.get(case_id)
+            if row is None or row["step"] != EXAMINATION:
+                return Outcome(STALE)
+            if typed.strip():
+                return Outcome(REFUSED, t.FINISH_WITH_WORDS)
+            return Outcome(DONE if self.cases.finish_examination(case_id) else STALE)

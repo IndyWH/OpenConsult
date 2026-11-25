@@ -87,6 +87,29 @@ LOGIN_ENDED = "Your login has ended. Your words are still in the box. Log in aga
 NO_ANSWER = "OpenConsult did not answer. Your words are still in the box."
 
 
+# The examination (12.1, step 4; D10; the details: The examination).
+EXAMINATION = "Examination"
+EXAMINATION_INTRO = "Type what you would examine. You may send more than once."
+EXAMINE_BOX = "What would you examine?"
+TYPE_A_REQUEST = "Type what you would examine first."
+EXAMINATION_WAITING = "The case's findings are being looked up..."
+YOU_TYPED = "You typed:"
+# THE OWNER'S, letter for letter (rulings 16 and 21): beside an examination or a test that the case does not hold.
+NO_FINDING = "The case gives no finding for this."
+NOT_AN_EXAMINATION = "That is not an examination or a bedside test. Investigations come next."      # the details'
+NOTHING_TO_SHOW = "Nothing could be shown for this request. Try it in other words."
+FINISH_EXAMINATION = "Finish the examination"              # the details'
+FINISH_LINE = "This shows the case's other findings and brings the first question."
+FINISH_WITH_WORDS = "You have typed something and not sent it. Send it, or clear the box, before you finish the examination."
+OTHER_FINDINGS = "The case's other findings"
+NO_OTHER_FINDING = "The case holds no other finding."      # the details'
+NO_FINDING_AT_ALL = "This case holds no examination finding."      # the details'
+REQUEST_TOO_LONG = "This request is too long. Shorten it to {most} characters or fewer."
+EXAMINATION_FULL = "No more requests can be read for this case. Finish the examination to go on."
+EXAMINATION_FAILED = ("The examination could not be read: {reason}. Your words are still in the box, and no finding is shown "
+                      "for them.")
+
+
 def reason(failure: str) -> str:
     """Why a model call failed, in the words the page of calls already uses for the door's outcomes."""
     return words.CALL_OUTCOMES[failure]
