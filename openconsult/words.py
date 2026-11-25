@@ -731,6 +731,7 @@ EVENTS = {
     # Teaching mode (15.14, ruling 22): each line holds counts and never a word that was typed.
     "teaching.started": "Teaching case started",
     "teaching.finished": "Teaching case finished",
+    "teaching.deleted": "Teaching case deleted",
     "user.set_up": "User set up",
     "login": "Logged in",
     "login.wrong_password": "Wrong password",

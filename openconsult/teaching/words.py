@@ -65,6 +65,12 @@ COL_DATE, COL_STATE = "Date", "State"
 FINISHED, NOT_FINISHED = "Finished", "Not finished"
 OPEN, GO_ON = "Open", "Go on"
 NO_CASES = "No case has been started on this computer."
+DELETE = "Delete"
+# The one question before a delete: what goes, and that it cannot be undone (ruling 22).
+DELETE_QUESTION = ("Delete this case of {date}? Its lines, the patient's replies, the findings shown, your answers, the "
+                   "feedback and the stored model calls of the case all go. This cannot be undone.")
+CASE_DELETED = "The case was deleted."
+DELETE_WAITING = "This case is waiting for the language model. Delete it when the answer has come."
 
 START = "Start"
 NOT_IN_LIST = "That case is not in the list."

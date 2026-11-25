@@ -23,11 +23,12 @@ def scripted() -> FakeEngine:
 
 
 def rows(raw: str) -> list[list[str]]:
-    """The rows of Your cases as a reader meets them: the words of each cell."""
+    """The rows of Your cases as a reader meets them: the words of each cell, from the date to the press that opens
+    the case. The cell after it holds the delete."""
     table = raw.split('id="kept-cases"', 1)[1].split("</table>", 1)[0]
     found = []
     for row in table.split("<tr data-kept=")[1:]:
-        found.append([text_of_cell(cell) for cell in re.findall(r"<td>(.*?)</td>", row, flags=re.S)])
+        found.append([text_of_cell(cell) for cell in re.findall(r"<td>(.*?)</td>", row, flags=re.S)][:6])
     return found
 
 

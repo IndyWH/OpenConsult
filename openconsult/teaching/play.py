@@ -22,6 +22,8 @@ from openconsult.teaching.bank import Bank
 from openconsult.teaching.cases import EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, WRITING, Cases
 
 DONE, STALE, REFUSED = "done", "stale", "refused"
+# How long a delete waits for a call of the case that is in flight before it says that the case is waiting.
+DELETE_WAITS_S = 5.0
 
 
 def _beside(work: Callable) -> None:
@@ -247,6 +249,29 @@ class Teaching:
                                                             "requests, feedback made")
         finally:
             self._making.discard(case_id)
+
+    # ------------------------------------------------------------ the delete
+
+    def delete(self, case_id: int) -> Outcome:
+        """One case removed with every line, reply, finding shown, answer
+        and feedback, and every stored model call of it, in one go
+        (ruling 22), and one audit line of counts. A case whose answer
+        from the model is still awaited is not deleted under it: the
+        press says so, and nothing is removed. A flag stays."""
+        lock = self._lock(case_id)
+        if not lock.acquire(timeout=DELETE_WAITS_S):
+            return Outcome(REFUSED, t.DELETE_WAITING)
+        try:
+            counts = self.cases.delete(case_id)
+        finally:
+            lock.release()
+        if counts is None:
+            return Outcome(STALE)
+        kept = f", {counts['flags_kept']} flag kept" if counts["flags_kept"] else ""
+        self._audit.record("teaching.deleted", f"case {case_id} of {counts['date']}: {counts['turns']} turns, "
+                           f"{counts['examination_requests']} examination requests, {counts['answers']} answers, "
+                           f"{counts['feedback']} feedback, {counts['model_calls']} model calls{kept}")
+        return Outcome(DONE)
 
     def again(self, case_id: int) -> Outcome:
         """Write the scenario or make the feedback again, by a press

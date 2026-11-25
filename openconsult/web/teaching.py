@@ -105,11 +105,19 @@ def your_cases(teaching) -> list[dict]:
 
 
 def _teaching_page(request: Request, user, refused: tuple[str, str] | None = None, lead: str | None = None,
-                   chosen: dict | None = None):
-    """lead: where the reason of a refusal is mended, drawn as a link beside it."""
+                   chosen: dict | None = None, asking: int | None = None, notice: str | None = None):
+    """lead: where the reason of a refusal is mended, drawn as a link beside it.
+    asking: the kept case whose delete has been pressed once: its row
+    shows the one question, with what goes and that it cannot be undone."""
     p = parts(request)
+    cases = your_cases(p.teaching)
+    for case in cases:
+        if case["id"] == asking:
+            case["question"] = t.DELETE_QUESTION.format(date=case["date"])
+    if request.query_params.get("deleted") == "yes" and notice is None and not refused:
+        notice = t.CASE_DELETED
     context = dict(user=user, active="teaching", t=t, bank=bank_rows(p.teaching), unread=t.bank_unread(p.teaching.bank.unread),
-                   new_case=new_case_view(p.teaching, chosen), cases=your_cases(p.teaching),
+                   new_case=new_case_view(p.teaching, chosen), cases=cases, notice=notice,
                    mark=cloud_lines() if language_model(p) == CLAUDE else None, lead=lead, page_path="/teaching")
     if refused:
         return refuse(request, "teaching.html", refused[0], refused[1], **context)
@@ -337,6 +345,24 @@ async def answer(request: Request, case_id: int, user=Depends(guards.logged_in))
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("answer-send", outcome.problem), typed={"answer": text})
     return _stale(request, user, case_id, QUESTIONS[question - 1] if 1 <= question <= len(QUESTIONS) else "", "answer", text)
+
+
+@router.post("/teaching/cases/{case_id}/delete")
+async def delete_case(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """Delete a kept case (ruling 22): the question once, at its row, then
+    the deletion: the case with every line, reply, finding shown, answer
+    and feedback, and every stored model call of it, in one go."""
+    teaching = parts(request).teaching
+    if teaching.cases.get(case_id) is None:
+        return _teaching_page(request, user, notice=t.STALE)
+    if (await form_fields(request)).get("confirm") != "yes":
+        return _teaching_page(request, user, asking=case_id)
+    outcome = await asyncio.to_thread(teaching.delete, case_id)
+    if outcome.state == REFUSED:
+        return _teaching_page(request, user, refused=(f"delete-{case_id}", outcome.problem))
+    if outcome.state == DONE:
+        raise Redirect("/teaching?deleted=yes#your-cases")
+    return _teaching_page(request, user, notice=t.STALE)
 
 
 @router.post("/teaching/cases/{case_id}/again")

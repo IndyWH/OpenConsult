@@ -64,12 +64,22 @@
 <section class="pane" id="your-cases">
   <div class="pane-head"><h2>{{ t.YOUR_CASES }}</h2></div>
   <div class="pane-body">
+    {% if notice %}<p class="notice" id="{{ 'case-deleted' if notice == t.CASE_DELETED else 'cases-notice' }}" role="status">{{ notice }}</p>{% endif %}
     {% if cases %}
+    {# Delete (ruling 22; R15): the question once, at the row, then the deletion. It cannot be undone. #}
     <table class="plain" id="kept-cases">
-      <tr><th>{{ t.COL_DATE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th><th>{{ t.COL_STATE }}</th><th></th></tr>
+      <tr><th>{{ t.COL_DATE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th><th>{{ t.COL_STATE }}</th><th></th><th></th></tr>
       {% for case in cases %}
       <tr data-kept="{{ case.id }}"><td>{{ case.date }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td><td>{{ case.state }}</td>
-        <td><a class="button" id="open-{{ case.id }}" href="/teaching/cases/{{ case.id }}">{{ case.press }}</a></td></tr>
+        <td><a class="button" id="open-{{ case.id }}" href="/teaching/cases/{{ case.id }}">{{ case.press }}</a></td>
+        <td>{% if case.question %}
+          <p class="statement" id="delete-question-{{ case.id }}">{{ case.question }}</p>
+          <form method="post" action="/teaching/cases/{{ case.id }}/delete" class="control-row"><input type="hidden" name="confirm" value="yes">
+            <button class="primary danger" id="confirm-delete-{{ case.id }}">{{ words.YES_DELETE }}</button>
+            <a class="button" id="keep-{{ case.id }}" href="/teaching#your-cases">{{ words.KEEP }}</a></form>
+          {% else %}
+          <form method="post" action="/teaching/cases/{{ case.id }}/delete"><button id="delete-{{ case.id }}" aria-describedby="delete-{{ case.id }}-refusal">{{ t.DELETE }}</button>{{ refusal("delete-" ~ case.id) }}</form>
+          {% endif %}</td></tr>
       {% endfor %}
     </table>
     {% else %}<p class="mark" id="no-cases">{{ t.NO_CASES }}</p>{% endif %}
