@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% set title = t.TITLE %}
+{% block main %}
+{# The teaching page (15.14, the details of run 10b), in this order: the line of no affiliation (ruling 1; 12.5), the
+   line on a real patient's details (ruling 22), then the cases. A case of the bank is known here by its number: the
+   name of its file and the id inside it name the diagnosis and never reach a page or an address. #}
+<div class="teaching" id="teaching-page">
+<h1 class="page">{{ t.TITLE }}</h1>
+<p class="mark" id="not-affiliated">{{ t.NOT_AFFILIATED }}</p>
+<p class="sentence" id="no-real-patient">{{ t.NO_REAL_PATIENT }}</p>
+
+<section class="pane" id="bank">
+  <div class="pane-head"><h2>{{ t.BANK_HEADING }}</h2></div>
+  <div class="pane-body">
+    <table class="plain" id="bank-cases">
+      <tr><th>{{ t.COL_CASE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th></tr>
+      {% for case in bank %}
+      <tr data-case="{{ case.number }}"><td>{{ case.name }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td></tr>
+      {% endfor %}
+    </table>
+    {% if unread %}<p class="mark" id="bank-unread">{{ unread }}</p>{% endif %}
+  </div>
+</section>
+</div>
+{% endblock %}

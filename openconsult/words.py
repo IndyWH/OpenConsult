@@ -1,7 +1,9 @@
 """Every sentence the app shows to the user, in one place, so the owner
 can correct the wording here and nowhere else. Tests take a sentence
 from this file; none holds its own copy, so a wording change is one
-change (spec 5.2).
+change (spec 5.2). Teaching mode is kept apart (R24): its sentences are
+in openconsult/teaching/words.py, but for the tab's name, the line of
+the cloud statement and the lines of the log, which stand here.
 
 The statement, the tick and the three This machine sentences are the
 owner's side's words, used exactly. The rest are drafts for him to
@@ -76,6 +78,8 @@ NAV_SETTINGS = "Settings"
 NAV_LOG = "Log"
 NAV_LOGOUT = "Log out"
 NAV_NEW_PATIENT = "New patient"
+# The tab of teaching mode (15.14, the details of run 10b). Every other sentence of teaching is in openconsult/teaching/words.py.
+NAV_TEACHING = "Teaching"
 HOME_TITLE = "Home"
 HOME_SO_FAR = (
     "So far this version runs acted consultations from a patient list to an approved note: find a patient seen "

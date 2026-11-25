@@ -47,6 +47,10 @@ from openconsult.settings.stored import Stored
 from openconsult.speech.choices import CHOICES, WHISPERX_PYANNOTE
 from openconsult.speech.door import Door as SpeechDoor, make_door
 from openconsult.speech.selftest import SelfTests
+from openconsult.teaching.bank import Bank, read_bank
+from openconsult.teaching.cases import Cases
+from openconsult.teaching.play import Teaching
+from openconsult.web import teaching as teaching_web
 from openconsult.web import panel as panel_web, review_edits, settings_local, steps as steps_web
 from openconsult.web import calls as calls_web, cloud as cloud_web, consult, guards, guidelines as guidelines_web, letters as letters_web, live, pages, patients as patients_web, review, routes, who_check as who_check_web
 from openconsult.web.first_run import FirstRun
@@ -115,6 +119,7 @@ class Parts:
     self_testing: object = None                    # the self-test asked for from its first-run step, while it runs (9b)
     start_tests: StartTests = None                 # the tests that run beside a view of the Start screen (9c)
     sizes: Sizes = None                            # the sizes of what is installed in the data folder, measured once (9c)
+    teaching: Teaching = None                      # teaching mode: its bank and its own rows, kept apart (R24; 10b)
     clock: Clock = now_local
     finaliser: Callable | None = None              # Stop in order (stop.py), given to each consultation
 
@@ -136,12 +141,14 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
               engines: dict | None = None, speech: SpeechDoor | None = None,
               doors: dict | None = None, card_programs: Callable | None = None,
               find_converter: Callable | None = None, embedder=None, secure_store=None, testers: dict | None = None,
-              claude_engine: Callable | None = None, upload_send: Callable | None = None) -> FastAPI:
+              claude_engine: Callable | None = None, upload_send: Callable | None = None, bank: Bank | None = None) -> FastAPI:
     """engines, speech, doors, card_programs, find_converter, embedder and
     secure_store are passed in by tests, and testers, the tests of the
     two cloud connections, so the suite needs no vLLM, no Ollama, no
     speech worker, no card, no converter, no embedding worker, no secure
     store and no cloud service (spec 15.7, 15.8, 15.9, 15.11, 15.12, 15.13).
+    bank is a made bank of teaching scenarios; with none the app reads
+    its own, once, here (15.14).
     Building a store asks nothing of the system. Building a
     door starts nothing and reads nothing but a path. The engine is chosen
     here, once, the room on the card is read once, the converter is found
@@ -208,6 +215,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         converter=converter,
         store=secure_store,
         start_tests=StartTests(),
+        teaching=Teaching(bank if bank is not None else read_bank(), Cases(db, clock)),
         sizes=Sizes(),
         clock=clock,
         finaliser=_finalise,
@@ -231,7 +239,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
     guards.install(app, settings.port, settings.address)
     app.mount("/static", pages.AskedEachTime(directory=pages.STATIC), name="static")
     for module in (routes, consult, live, review, review_edits, who_check_web, patients_web, letters_web, guidelines_web, calls_web, cloud_web, steps_web,
-                   settings_local):
+                   settings_local, teaching_web):
         app.include_router(module.router)
     return app
 

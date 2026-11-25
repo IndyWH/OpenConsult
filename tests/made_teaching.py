@@ -77,6 +77,19 @@ RUNS = [{"n": 1, "topic": "A made-up topic", "level": "straightforward"}, {"n": 
         {"n": 3, "topic": "A third made-up topic", "level": "noisy"}]
 
 
+TOPICS = ("A made-up topic", "Another made-up topic", "A third made-up topic")
+
+
+def made_bank(unread: int = 0):
+    """A made bank as the app holds one after its start (run 10b): two cases, the second approved and with no
+    finding at all. Nothing of a file's name or id is in it, as in the app's own."""
+    from openconsult.teaching.bank import Bank, BankCase
+    second = copy.deepcopy(SCENARIO)
+    second.update(examination=[], results=[])
+    return Bank(TOPICS, (BankCase(1, TOPICS[0], "straightforward", "script", copy.deepcopy(SCENARIO)),
+                         BankCase(2, TOPICS[1], "hidden", "approved", second)), unread)
+
+
 def case(case_id: str = "01_made") -> dict:
     return {"id": case_id, "source": "made up", "topic": "A made-up topic", "level": "straightforward", "label": "script",
             "not_in_script": [], "left_out": [], "scenario": copy.deepcopy(SCENARIO), "bench": copy.deepcopy(BENCH)}
