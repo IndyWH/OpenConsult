@@ -19,7 +19,7 @@ from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.settings.path import CLAUDE
 from openconsult.settings.statement import statement_for
 from openconsult.teaching import feedback, room, words as t
-from openconsult.teaching.cases import ANSWERS, EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, WRITING
+from openconsult.teaching.cases import ANSWERS, EXAMINATION, FEEDBACK, HISTORY, LEVELS, QUESTIONS, WRITING
 from openconsult.teaching.cases import DONE as DONE_STEP
 from openconsult.teaching.play import DONE, REFUSED
 from openconsult.teaching.scenario import examined_blocks, findings, other_findings, speaks_for
@@ -31,6 +31,7 @@ router = APIRouter()
 SETTINGS_STATEMENT = "/settings#cloud-statement"
 # A page that waits for work the app does beside it asks again by itself, this often, with no script.
 WAIT_ASKS_EVERY_S = 2
+SURPRISE = "surprise"              # the value of Surprise me in the menu: no title of a topic
 
 
 def bank_rows(teaching) -> list[dict]:
@@ -75,10 +76,26 @@ def cannot_start(p) -> tuple[str, str | None] | None:
     return None
 
 
-def _teaching_page(request: Request, user, refused: tuple[str, str] | None = None, lead: str | None = None):
+DEFAULT_LEVEL = LEVELS[0]          # straightforward (ruling 5)
+
+
+def new_case_view(teaching, chosen: dict | None = None) -> dict:
+    """The form of a new case: the 26 topics of the menu after Surprise me,
+    and the three levels, each with its line. chosen: what a refused
+    press had picked, kept as picked."""
+    chosen = chosen or {}
+    level = chosen.get("level") if chosen.get("level") in LEVELS else DEFAULT_LEVEL
+    return {"topics": [{"title": topic, "chosen": topic == chosen.get("topic")} for topic in teaching.bank.topics],
+            "levels": [{"value": name, "line": t.LEVEL_LINES[name], "chosen": name == level} for name in LEVELS],
+            "press": secrets.token_urlsafe(12)}
+
+
+def _teaching_page(request: Request, user, refused: tuple[str, str] | None = None, lead: str | None = None,
+                   chosen: dict | None = None):
     """lead: where the reason of a refusal is mended, drawn as a link beside it."""
     p = parts(request)
     context = dict(user=user, active="teaching", t=t, bank=bank_rows(p.teaching), unread=t.bank_unread(p.teaching.bank.unread),
+                   new_case=new_case_view(p.teaching, chosen),
                    mark=cloud_lines() if language_model(p) == CLAUDE else None, lead=lead, page_path="/teaching")
     if refused:
         return refuse(request, "teaching.html", refused[0], refused[1], **context)
@@ -94,11 +111,14 @@ async def teaching_page(request: Request, user=Depends(guards.logged_in)):
 
 @router.post("/teaching/cases")
 async def start_case(request: Request, user=Depends(guards.logged_in)):
-    """The press that starts a case of the bank, by its number. Where no
-    model can be reached, or in cloud mode without the tick, it says so
-    on the control and starts nothing."""
+    """The press that starts a case: one of the bank, by its number, or a
+    fresh one for a topic and a level. Where no model can be reached, or
+    in cloud mode without the tick, it says so on the control and
+    starts nothing."""
     p = parts(request)
     fields = await form_fields(request)
+    if "topic" in fields:
+        return await _start_fresh(request, user, p, fields)
     number = fields.get("number", "")
     case = p.teaching.bank.case(int(number)) if number.isdigit() else None
     if case is None:
@@ -113,16 +133,41 @@ async def start_case(request: Request, user=Depends(guards.logged_in)):
     raise Redirect(f"/teaching/cases/{started}")
 
 
+async def _start_fresh(request: Request, user, p, fields: dict):
+    """A fresh scenario for the topic and the level picked (ruling 10).
+    Surprise me draws one of the 26 here, by chance. The case's row is
+    made at once and the page of the case says that it is being written."""
+    topic, level = fields.get("topic", ""), fields.get("level", "")
+    chosen = {"topic": topic, "level": level}
+    if topic != SURPRISE and topic not in p.teaching.bank.topics:
+        return _teaching_page(request, user, ("start-fresh", t.PICK_A_TOPIC), chosen=chosen)
+    if level not in LEVELS:
+        return _teaching_page(request, user, ("start-fresh", t.PICK_A_LEVEL), chosen=chosen)
+    press = fields.get("press") or secrets.token_urlsafe(12)
+    started = p.teaching.cases.by_press(press)
+    if started is None:
+        problem = await asyncio.to_thread(cannot_start, p)
+        if problem is not None:
+            return _teaching_page(request, user, ("start-fresh", problem[0]), lead=problem[1], chosen=chosen)
+        if topic == SURPRISE:
+            topic = secrets.choice(p.teaching.bank.topics)
+        started = p.teaching.start_fresh(topic, level, press, language_model(p))
+    raise Redirect(f"/teaching/cases/{started}")
+
+
 def case_view(row: dict) -> dict:
     """What every page of a case shows at its top: the case's name, its
-    topic, its level and its label, and the patient as presented: the
-    name, the age and the sex, a parent who speaks for a child, and the
-    opening words. Not the occupation and not the manner."""
+    topic, its level and its label; and, once there is a scenario, the
+    patient as presented: the name, the age and the sex, a parent who
+    speaks for a child, and the opening words. Not the occupation and
+    not the manner."""
+    view = {"id": row["id"], "heading": t.CASE_NUMBER.format(n=row["bank_number"]) if row["source"] == "bank" else t.NEW_CASE,
+            "topic": row["topic"], "level": t.LEVEL_NAMES[row["level"]], "label": t.LABELS[row["label"]]}
     scenario = row["scenario"]
+    if scenario is None:
+        return view
     patient, parent = scenario["patient"], speaks_for(scenario)
-    return {"id": row["id"], "heading": t.CASE_NUMBER.format(n=row["bank_number"]) if row["source"] == "bank" else t.NEW_CASE,
-            "topic": row["topic"], "level": t.LEVEL_NAMES[row["level"]], "label": t.LABELS[row["label"]],
-            "presented": t.PRESENTED.format(name=patient["name"], age=patient["age"], sex=patient["sex"]),
+    return {**view, "presented": t.PRESENTED.format(name=patient["name"], age=patient["age"], sex=patient["sex"]),
             "speaks_for": t.SPEAKS_FOR.format(parent=parent) if parent else None, "opening_words": scenario["opening_words"]}
 
 
@@ -167,11 +212,12 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
             # The rest of the scenario's findings reach the page only once the examination is finished (D10).
             view.update(no_findings=not findings(row["scenario"]), other_findings=other_findings(row["scenario"], examined))
             view.update(questions_view(row))
-    if row["step"] == FEEDBACK:
+    if row["step"] in (WRITING, FEEDBACK):
         # Being made beside the page, which asks again by itself; or it did not come, and one press makes it again.
         view["making"] = teaching.making(case_id)
         if not view["making"]:
-            view["feedback_failed"] = t.FEEDBACK_FAILED.format(reason=t.reason(row["failure"] or t.STOPPED))
+            sentence = t.CASE_NOT_WRITTEN if row["step"] == WRITING else t.FEEDBACK_FAILED
+            view["write_failed" if row["step"] == WRITING else "feedback_failed"] = sentence.format(reason=t.reason(row["failure"] or t.STOPPED))
     if row["step"] == DONE_STEP:
         # Built from the stored answer by the rule, at every view; no model is asked again (ruling 22).
         view["feedback"] = feedback.built(row["scenario"], [(turn["speaker"], turn["text"]) for turn in turns],

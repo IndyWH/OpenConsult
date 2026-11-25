@@ -22,6 +22,22 @@ NOT_AFFILIATED = ("The topics are the titles of the RCGP's topic guides. "
 # Ruling 22: the page says not to type a real patient's details. A draft.
 NO_REAL_PATIENT = "Do not type a real patient's details. Every case here is made up."
 
+# A new case: a fresh scenario written by the model for a topic of the menu and a level (rulings 1, 2, 5 and 10).
+NEW_CASE_HEADING = "A new case"
+SURPRISE_ME = "Surprise me"                                # the details': the first entry of the menu, one of the 26 by chance
+WRITE_NEW_CASE = "Write a new case"
+NEW_CASE_LINE = ("The case is written by the language model for this topic and level. "
+                 "It is AI-written and not reviewed by a clinician.")
+PICK_A_TOPIC = "Pick a topic."
+PICK_A_LEVEL = "Pick a level."
+CASE_WRITING = "The case is being written. This usually takes about 10 seconds, at most 3 minutes."
+CASE_NOT_WRITTEN = "The case could not be written: {reason}."
+WRITE_AGAIN = "Write it again"
+# Why a fresh scenario that came back to its form is still not shown (ruling 10; mark six; the owner's okay of 25 Nov 2026).
+DOSE, INCOMPLETE = "dose", "incomplete"
+REASON_DOSE = "its plan held a dose, and a dose written by a model is not shown"
+REASON_INCOMPLETE = "it came back incomplete"
+
 BANK_HEADING = "Cases from a clinician's scripts"
 COL_CASE, COL_TOPIC, COL_LEVEL, COL_LABEL = "Case", "Topic", "Level", "Label"
 CASE_NUMBER = "Case {n}"                                   # the details': a case of the bank is Case 1 to Case 8
@@ -185,7 +201,8 @@ NONE = "None."
 
 def reason(failure: str) -> str:
     """Why a model call failed, in the words the page of calls already uses for the door's outcomes."""
-    return REASON_STOPPED if failure == STOPPED else words.CALL_OUTCOMES[failure]
+    own = {STOPPED: REASON_STOPPED, DOSE: REASON_DOSE, INCOMPLETE: REASON_INCOMPLETE}
+    return own[failure] if failure in own else words.CALL_OUTCOMES[failure]
 
 
 def most(number: int) -> str:

@@ -12,6 +12,32 @@
 <p class="mark" id="not-affiliated">{{ t.NOT_AFFILIATED }}</p>
 <p class="sentence" id="no-real-patient">{{ t.NO_REAL_PATIENT }}</p>
 
+{# A new case (rulings 1, 2, 5 and 10): the model writes a fresh scenario for the topic and the level picked. The
+   menu is the 26 titles, with Surprise me first; the level is one of three, each with its line. The label of such a
+   case says that it is AI-written and not reviewed by a clinician (12.3, rule 5), and this form says so before. #}
+<section class="pane" id="new-case">
+  <div class="pane-head"><h2>{{ t.NEW_CASE_HEADING }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/teaching/cases" id="start-fresh-form">
+      <input type="hidden" name="press" value="{{ new_case.press }}">
+      <label for="topic">{{ t.COL_TOPIC }}</label>
+      <select id="topic" name="topic" aria-describedby="start-fresh-refusal">
+        <option value="surprise">{{ t.SURPRISE_ME }}</option>
+        {% for topic in new_case.topics %}<option value="{{ topic.title }}"{% if topic.chosen %} selected{% endif %}>{{ topic.title }}</option>
+        {% endfor %}
+      </select>
+      <div role="radiogroup" aria-label="{{ t.COL_LEVEL }}" id="levels">
+        {% for level in new_case.levels %}<label class="tick"><input type="radio" name="level" value="{{ level.value }}"{% if level.chosen %} checked{% endif %}> {{ level.line }}</label>
+        {% endfor %}
+      </div>
+      <button class="primary" id="start-fresh" aria-describedby="start-fresh-refusal">{{ t.WRITE_NEW_CASE }}</button>
+      {{ refusal("start-fresh") }}
+      {% if lead and refused and refused.control == "start-fresh" %}<a id="start-lead" href="{{ lead }}">{{ words.NAV_SETTINGS if lead.startswith("/settings") else words.CONNECT_CLAUDE_TITLE }}</a>{% endif %}
+      <p class="mark" id="new-case-line">{{ t.NEW_CASE_LINE }}</p>
+    </form>
+  </div>
+</section>
+
 <section class="pane" id="bank">
   <div class="pane-head"><h2>{{ t.BANK_HEADING }}</h2></div>
   <div class="pane-body">

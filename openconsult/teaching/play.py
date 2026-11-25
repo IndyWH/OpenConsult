@@ -17,9 +17,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 from openconsult.patients.audit import Audit
-from openconsult.teaching import frames, room, words as t
+from openconsult.teaching import checks, frames, room, words as t
 from openconsult.teaching.bank import Bank
-from openconsult.teaching.cases import EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, Cases
+from openconsult.teaching.cases import EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, WRITING, Cases
 
 DONE, STALE, REFUSED = "done", "stale", "refused"
 
@@ -80,6 +80,48 @@ class Teaching:
             self._audit.record("teaching.started", f"case {case_id}: bank case {case.number}, level {case.level}, "
                                                    f"language model {language_model}")
         return case_id
+
+    def start_fresh(self, topic: str, level: str, press: str, language_model: str) -> int:
+        """A fresh case begins: its row, with no scenario yet and the label
+        of a scenario a model writes, one audit line, and the writing
+        beside the page. The same press a second time gives the case it
+        started and asks for nothing."""
+        with self._starting:
+            before = self.cases.by_press(press)
+            if before is not None:
+                return before
+            case_id = self.cases.start(press, "fresh", topic, level, "ai", language_model)
+            self._audit.record("teaching.started", f"case {case_id}: a fresh scenario, level {level}, language model {language_model}")
+        self._begin(case_id, self._write)
+        return case_id
+
+    def _begin(self, case_id: int, work: Callable) -> None:
+        self._making.add(case_id)
+        self.run(lambda: work(case_id))
+
+    def _write(self, case_id: int) -> None:
+        """The scenario of a fresh case, by the job of ruling 10, with its
+        own sampling so that one topic and one level do not give every
+        learner the same patient. A patient appears only when the door
+        held the reply to the form and code finds no dose in the plan
+        and nothing missing; whether it is clinically right code cannot
+        check, and the label says so. Nothing is asked again by itself."""
+        try:
+            with self._lock(case_id):
+                row = self.cases.get(case_id)
+                if row is None or row["step"] != WRITING:
+                    return
+                result = self._ask(row, "teaching_case", frames.case_message(row["topic"], row["level"]), frames.case_sampling())
+                if not result.ok:
+                    self.cases.failed(case_id, WRITING, result.failure)
+                elif checks.plan_doses(result.answer):
+                    self.cases.failed(case_id, WRITING, t.DOSE)
+                elif checks.incomplete(result.answer):
+                    self.cases.failed(case_id, WRITING, t.INCOMPLETE)
+                else:
+                    self.cases.written(case_id, result.answer)
+        finally:
+            self._making.discard(case_id)
 
     # ---------------------------------------------------------- the history
 
@@ -175,16 +217,12 @@ class Teaching:
             if not self.cases.answer(case_id, question, text):
                 return Outcome(STALE)
         if question == len(QUESTIONS):
-            self._begin_feedback(case_id)      # outside the case's lock, which the making takes itself
+            self._begin(case_id, self._make_feedback)      # outside the case's lock, which the making takes itself
         return Outcome(DONE)
 
     def making(self, case_id: int) -> bool:
-        """Whether the feedback of this case is being made at this moment."""
+        """Whether the scenario or the feedback of this case is being made at this moment."""
         return case_id in self._making
-
-    def _begin_feedback(self, case_id: int) -> None:
-        self._making.add(case_id)
-        self.run(lambda: self._make_feedback(case_id))
 
     def _make_feedback(self, case_id: int) -> None:
         """The feedback, once: the whole scenario, the numbered turns, what
@@ -211,14 +249,14 @@ class Teaching:
             self._making.discard(case_id)
 
     def again(self, case_id: int) -> Outcome:
-        """Make the feedback again, by a press alone, after one that did
-        not come. A press while one is being made, or for a case that is
-        not waiting for its feedback, changes nothing."""
+        """Write the scenario or make the feedback again, by a press
+        alone, after one that did not come. A press while one is being
+        made, or for a case that waits for neither, changes nothing."""
         with self._lock(case_id):
             row = self.cases.get(case_id)
-            if row is None or row["step"] != FEEDBACK or self.making(case_id):
+            if row is None or row["step"] not in (WRITING, FEEDBACK) or self.making(case_id):
                 return Outcome(STALE)
-            self.cases.trying(case_id, FEEDBACK)
+            self.cases.trying(case_id, row["step"])
             self._making.add(case_id)
-        self._begin_feedback(case_id)
+        self._begin(case_id, self._write if row["step"] == WRITING else self._make_feedback)
         return Outcome(DONE)

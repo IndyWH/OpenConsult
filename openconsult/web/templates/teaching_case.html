@@ -23,6 +23,20 @@
 {# The patient is presented (12.1, step 2): the name, the age and the sex, and the opening words as the patient's
    first lines. Not the occupation and not the manner: they are for the actor, and a learner asks. Then the history:
    the learner's lines as typed, each with the learner's own number, and the patient's reply under each. #}
+{% if case.step == "writing" %}
+{# A fresh scenario being written (ruling 10): the page says so and asks again by itself. Where it did not come, or
+   came with a dose in its plan or incomplete, no patient appears: the page says why, and one press writes it again. #}
+<section class="pane" id="writing">
+  <div class="pane-body">
+    {% if notice %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    {% if case.making %}<p class="waiting" id="case-writing" role="status">{{ t.CASE_WRITING }}</p>{% endif %}
+    {% if case.write_failed %}
+    <p class="refusal" id="write-failed" role="alert">{{ case.write_failed }}</p>
+    <form method="post" action="/teaching/cases/{{ case.id }}/again"><button class="primary" id="write-again">{{ t.WRITE_AGAIN }}</button></form>
+    {% endif %}
+  </div>
+</section>
+{% else %}
 <section class="pane" id="patient">
   <div class="pane-head"><h2 id="presented">{{ case.presented }}</h2></div>
   <div class="pane-body">
@@ -60,6 +74,7 @@
     </div>
   </div>
 </section>
+{% endif %}
 
 {# The examination (12.1, step 4; D10; rulings 12, 16 and 21). The learner types what they would examine and may send
    more than once. Each request is a block: the words as typed, then the scenario's own findings for it, the owner's
