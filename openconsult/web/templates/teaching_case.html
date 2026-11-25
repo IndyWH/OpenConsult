@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% from "_parts.html" import refusal, cloud_mark with context %}
+{% import "_teaching_parts.html" as parts with context %}
 {% set title = case.heading %}
 {% block head %}<link rel="stylesheet" href="{{ static('teaching.css') }}">{% endblock %}
 {% block main %}
@@ -137,6 +138,7 @@
   </div>
 </section>
 {% endif %}
+{% if case.feedback %}{{ parts.feedback(case.feedback) }}{% endif %}
 </div>
 <script src="{{ static('use.js') }}"></script>
 <script src="{{ static('teaching.js') }}"></script>

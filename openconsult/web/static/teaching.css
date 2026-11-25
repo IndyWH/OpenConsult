@@ -29,6 +29,28 @@
 .teaching #answer { max-width: 46rem; scroll-margin-top: 5rem; }
 .teaching #answer-box { display: block; width: 100%; font-family: var(--sans); font-size: .95rem; line-height: 1.5; color: var(--ink); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: .5rem .7rem; }
 
+/* The feedback. The scenario's own words stand upright; the learner's own lines are set in under a point, each with
+   its number. A state is a word with a sign in a small frame: Met with a whole border, Not met with a heavy one, Not
+   judged with a dashed one, so that the three differ without colour. */
+.teaching #feedback h3 { margin-top: 1.5rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+.teaching #feedback h3:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.teaching #feedback h4 { font-size: .9rem; margin: 1rem 0 .3rem; color: var(--ink-soft); }
+.teaching .scenario-words { font-weight: 600; }
+.teaching .plain-sentence { margin: .3rem 0; }
+.teaching .items, .teaching .done-well { margin: .3rem 0 .5rem; padding-left: 1.2rem; max-width: 46rem; }
+.teaching .items li, .teaching .done-well li { margin: .3rem 0; }
+.teaching .state { display: inline-block; margin-left: .4rem; padding: 0 .5rem; border-radius: 999px; font-size: .8rem; font-weight: 600; white-space: nowrap; border: 1px solid var(--ink-soft); color: var(--ink); background: var(--panel); }
+.teaching .state.met, .teaching .state.named { border-color: var(--green); }
+.teaching .state.not-met, .teaching .state.not-named { border-width: 2px; border-color: var(--ink); }
+.teaching .state.not-judged { border-style: dashed; color: var(--ink-soft); }
+.teaching .must, .teaching .urgency { margin-left: .4rem; font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--ink-soft); }
+.teaching .point { margin: .5rem 0 .8rem; max-width: 46rem; }
+.teaching .point p { margin: .2rem 0; }
+.teaching .quoted, .teaching .no-line { margin-left: 1.6rem; padding-left: .7rem; border-left: 3px solid var(--line); overflow-wrap: anywhere; }
+.teaching .no-line { font-style: italic; border-left-style: dashed; border-left-color: var(--ink-soft); }
+.teaching .your-answer, .teaching .also-named { margin: .3rem 0; max-width: 46rem; overflow-wrap: anywhere; }
+.teaching .your-answer .said { white-space: pre-wrap; }
+
 /* The box of the next line, and under it, apart, the press that ends the step. */
 .teaching #say, .teaching #examine { max-width: 46rem; scroll-margin-top: 5rem; }
 .teaching #say-box, .teaching #examine-box { width: 100%; }

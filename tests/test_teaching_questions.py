@@ -23,16 +23,17 @@ SAID = [("doctor", "A made-up line."), ("patient", "A made-up reply.")]
 THE_ANSWERS = {"differential": "A made-up differential.", "investigations": "A made-up investigation.", "plan": "A made-up plan."}
 
 
-def at_the_questions(tmp_path, clock, machine, feedback, held: bool = False, number: int = 1):
+def at_the_questions(tmp_path, clock, machine, feedback, held: bool = False, number: int = 1, lines=("A made-up line.",)):
     """A case of the made bank at its first question: one line, one examination request. The feedback is made at
     once where the app would make it beside the page; with held, the work is kept in a list for the test to run."""
-    engine = FakeEngine(script={"teaching_patient": [reply("A made-up reply.")], "teaching_examination": [came(asked=[1])],
+    engine = FakeEngine(script={"teaching_patient": [reply("A made-up reply.")] * len(lines), "teaching_examination": [came(asked=[1])],
                                 "teaching_feedback": list(feedback)})
     app, client = teaching_app(tmp_path, clock, machine, engine)
     works = []
     app.state.parts.teaching.run = works.append if held else (lambda work: work())
     start(client, number)
-    client.post("/teaching/cases/1/say", data={"line": "1", "text": "A made-up line."})
+    for n, line in enumerate(lines, 1):
+        client.post("/teaching/cases/1/say", data={"line": str(n), "text": line})
     client.post("/teaching/cases/1/end-history", data={"text": ""})
     client.post("/teaching/cases/1/examine", data={"n": "1", "text": "Made-up one."})
     client.post("/teaching/cases/1/finish-examination", data={"text": ""})

@@ -130,6 +130,59 @@ STOPPED = "stopped"
 REASON_STOPPED = "OpenConsult was closed before the answer came"
 
 
+# The feedback, in the order of 12.4. Every finding and every word of it on the page is the scenario's own; every
+# quoted line is the learner's own. No grade, no pass or fail, no count (D5).
+FEEDBACK = "Feedback"
+MISSED_HEADING = "The most important thing missed"
+NONE_MISSED = "No marking point was marked as missed."     # the details'
+NO_SINGLE_POINT = "The feedback named no single most important point."      # the details'
+MISSED_SENTENCES = {"none_missed": NONE_MISSED, "no_single_point": NO_SINGLE_POINT}
+DONE_WELL = "Done well"
+NOTHING_LISTED = "Nothing is listed here."
+AGAINST_THE_CASE = "Your differential, investigations and plan, set against the case"
+LIST_NAMES = {"differential": "Differential", "investigations": "Investigations", "plan": "Plan"}
+NAMED, NOT_NAMED, NOT_JUDGED = "Named", "Not named", "Not judged"      # the details'
+MUST_NOT_MISS = "Must not be missed"
+URGENCY = "Urgency: {urgency}"
+YOUR_ANSWER = "Your answer:"
+ALSO_NAMED = "You also named"                              # the details'
+CASE_LISTS_NONE = "The case lists none."
+POINTS_HEADING = "The marking points"
+# The known fault on the page (ruling 20), the details': above the marking points on every feedback.
+CHECK_EACH_MET = "The feedback is made by a language model and can be wrong. Check each Met against your own line beside it."
+NOT_JUDGED_LINE = "Not judged: the model's answer left this out."
+# The three headings the RCGP uses in the SCA (12.4).
+POINT_HEADINGS = {"data_gathering": "Data gathering and diagnosis", "management": "Clinical management and medical complexity",
+                  "relating": "Relating to others"}
+MET, NOT_MET = "Met", "Not met"                            # the details'
+# Each state is told by its word and by a sign, never by colour alone.
+STATE_WORDS = {"met": MET, "not_met": NOT_MET, "not_judged": NOT_JUDGED, "named": NAMED, "not_named": NOT_NAMED}
+STATE_SIGNS = {"met": "✓", "not_met": "✗", "not_judged": "–", "named": "✓", "not_named": "✗"}
+YOUR_LINE = "Your line {n}:"
+NO_LINE_QUOTED = "No line of yours is quoted for this point. Check it yourself."      # the details'
+SIGNPOSTING = "Signposting"
+SIGNPOSTED = "The feedback found signposting in these lines of yours:"
+NOT_SIGNPOSTED = "The feedback found no signposting."
+
+
+# After the feedback (ruling 8): one press shows the whole scenario, both parts, in the scenario's own words.
+AFTER_FEEDBACK = "After the feedback"
+SHOW_SCENARIO = "Show the whole scenario"                  # the details'
+WHOLE_SCENARIO = "The whole scenario"
+IN_SHORT = "The case in short"                             # the owner's okay of 25 Nov 2026: the scenario's reasoning, first
+PATIENT_SIDE = "The patient's side"
+EXAMINER_SIDE = "The examiner's side"
+WHO, OCCUPATION, MANNER = "Who", "Occupation", "Manner"
+OPENING_WORDS = "Opening words"
+FACTS = "Facts"
+TELLS = {"open": "told at an open question", "asked": "told only when asked"}
+IDEAS, CONCERNS, EXPECTATIONS = "Ideas", "Concerns", "Expectations"
+NOT_SAID = "Not said unless made easy"
+RESULTS = "Results"
+SAFETY_NET = "Safety-net advice"
+NONE = "None."
+
+
 def reason(failure: str) -> str:
     """Why a model call failed, in the words the page of calls already uses for the door's outcomes."""
     return REASON_STOPPED if failure == STOPPED else words.CALL_OUTCOMES[failure]

@@ -18,8 +18,9 @@ from openconsult import words
 from openconsult.llm.choose import SHORT_WAIT_S
 from openconsult.settings.path import CLAUDE
 from openconsult.settings.statement import statement_for
-from openconsult.teaching import room, words as t
+from openconsult.teaching import feedback, room, words as t
 from openconsult.teaching.cases import ANSWERS, EXAMINATION, FEEDBACK, HISTORY, QUESTIONS, WRITING
+from openconsult.teaching.cases import DONE as DONE_STEP
 from openconsult.teaching.play import DONE, REFUSED
 from openconsult.teaching.scenario import examined_blocks, findings, other_findings, speaks_for
 from openconsult.web import guards
@@ -171,8 +172,15 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
         view["making"] = teaching.making(case_id)
         if not view["making"]:
             view["feedback_failed"] = t.FEEDBACK_FAILED.format(reason=t.reason(row["failure"] or t.STOPPED))
+    if row["step"] == DONE_STEP:
+        # Built from the stored answer by the rule, at every view; no model is asked again (ruling 22).
+        view["feedback"] = feedback.built(row["scenario"], [(turn["speaker"], turn["text"]) for turn in turns],
+                                          teaching.cases.answers(row), row["feedback"])
+    # The mark stands on a case until its feedback has been made: after it nothing typed there goes to Claude
+    # (the owner's okay of 25 Nov 2026).
+    in_cloud = row["language_model"] == CLAUDE and row["step"] != DONE_STEP
     context = dict(user=user, active="teaching", t=t, case=view, typed=typed or {}, notice=notice, line_most=room.LINE_MOST,
-                   answer_most=room.ANSWER_MOST, mark=cloud_lines() if row["language_model"] == CLAUDE else None,
+                   answer_most=room.ANSWER_MOST, mark=cloud_lines() if in_cloud else None,
                    page_path=f"/teaching/cases/{case_id}", timed_by_script=True, refresh_every=WAIT_ASKS_EVERY_S if view.get("making") else None)
     if refused:
         return refuse(request, "teaching_case.html", refused[0], refused[1], **context)

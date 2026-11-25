@@ -1,0 +1,66 @@
+{# The parts of a finished teaching case (15.14, the details of run 10b). #}
+
+{# One state, told by its word and a sign, never by colour alone. #}
+{% macro state(name) -%}
+<span class="state {{ name|replace('_', '-') }}"><span class="sign" aria-hidden="true">{{ t.STATE_SIGNS[name] }}</span> {{ t.STATE_WORDS[name] }}</span>
+{%- endmacro %}
+
+{# The learner's own lines, each with the learner's own number. #}
+{% macro quoted(lines) -%}
+{% for line in lines %}<p class="quoted"><span class="line-number">{{ t.YOUR_LINE.format(n=line.line) }}</span> <span class="said">{{ line.text }}</span></p>
+{% endfor %}
+{%- endmacro %}
+
+{# The feedback, in the order of 12.4. Built by openconsult/teaching/feedback.py from the model's answer after the
+   rule of shown.py: every word of a point, a diagnosis, an investigation or a step is the scenario's own, and every
+   quoted line is the learner's own. No grade, no pass or fail and no count (D5). A point that came back met with no
+   line of the learner's left to quote says so, so that a learner can check every credit (ruling 20). #}
+{% macro feedback(f) -%}
+<section class="pane" id="feedback">
+  <div class="pane-head"><h2>{{ t.FEEDBACK }}</h2></div>
+  <div class="pane-body">
+    <h3 id="feedback-missed">{{ t.MISSED_HEADING }}</h3>
+    {% if f.missed.words %}<p class="scenario-words" id="missed">{{ f.missed.words }}</p>
+    {% else %}<p class="plain-sentence" id="missed">{{ t.MISSED_SENTENCES[f.missed.sentence] }}</p>{% endif %}
+
+    <h3 id="feedback-done-well">{{ t.DONE_WELL }}</h3>
+    {% if f.done_well %}<ul class="done-well" id="done-well">{% for words in f.done_well %}<li class="scenario-words">{{ words }}</li>{% endfor %}</ul>
+    {% else %}<p class="plain-sentence" id="done-well">{{ t.NOTHING_LISTED }}</p>{% endif %}
+
+    <h3 id="feedback-lists">{{ t.AGAINST_THE_CASE }}</h3>
+    {% for list in f.lists %}
+    <div class="against" id="against-{{ list.name }}">
+      <h4>{{ t.LIST_NAMES[list.name] }}</h4>
+      {% if list["items"] %}
+      <ul class="items">{% for item in list["items"] %}
+        <li><span class="scenario-words">{{ item.words }}</span>{% if item.must_not_miss %} <span class="must">{{ t.MUST_NOT_MISS }}</span>{% endif %}{% if item.urgency %} <span class="urgency">{{ t.URGENCY.format(urgency=item.urgency) }}</span>{% endif %} {{ state(item.state) }}</li>{% endfor %}
+      </ul>
+      {% else %}<p class="plain-sentence">{{ t.CASE_LISTS_NONE }}</p>{% endif %}
+      <p class="your-answer"><span class="speaker">{{ t.YOUR_ANSWER }}</span> <span class="said">{{ list.answer }}</span></p>
+      {% if list.also_named %}<p class="also-named"><span class="speaker">{{ t.ALSO_NAMED }}</span> {% for own in list.also_named %}<span class="said">{{ own }}</span>{% if not loop.last %}; {% endif %}{% endfor %}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+    <h3 id="feedback-points">{{ t.POINTS_HEADING }}</h3>
+    <p class="sentence" id="check-each-met">{{ t.CHECK_EACH_MET }}</p>
+    {% if f.any_not_judged %}<p class="mark" id="not-judged-line">{{ t.NOT_JUDGED_LINE }}</p>{% endif %}
+    {% for group in f.headings %}
+    <div class="points" id="points-{{ group.heading|replace('_', '-') }}">
+      <h4>{{ t.POINT_HEADINGS[group.heading] }}</h4>
+      {% if group.points %}
+      {% for point in group.points %}
+      <div class="point {{ point.state|replace('_', '-') }}" id="point-{{ point.n }}">
+        <p class="point-words"><span class="scenario-words">{{ point.words }}</span> {{ state(point.state) }}</p>
+        {% if point.state == "met" %}{% if point.lines %}{{ quoted(point.lines) }}{% else %}<p class="no-line">{{ t.NO_LINE_QUOTED }}</p>{% endif %}{% endif %}
+      </div>
+      {% endfor %}
+      {% else %}<p class="plain-sentence">{{ t.CASE_LISTS_NONE }}</p>{% endif %}
+    </div>
+    {% endfor %}
+
+    <h3 id="feedback-signposting">{{ t.SIGNPOSTING }}</h3>
+    {% if f.signposted %}<p class="plain-sentence" id="signposting">{{ t.SIGNPOSTED }}</p>{{ quoted(f.signpost_lines) }}
+    {% else %}<p class="plain-sentence" id="signposting">{{ t.NOT_SIGNPOSTED }}</p>{% endif %}
+  </div>
+</section>
+{%- endmacro %}
