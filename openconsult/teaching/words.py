@@ -41,6 +41,28 @@ LEVEL_LINES = {
 }
 
 
+START = "Start"
+NOT_IN_LIST = "That case is not in the list."
+# Why the press that starts a case does not start one, said on the control itself (R15; 10.4).
+CANNOT_START = "A case cannot start: {reason}"
+CANNOT_START_NO_ANSWER = "A case cannot start: the language model does not answer on {engine}."
+CANNOT_START_NOT_CONNECTED = "A case cannot start: Claude is not connected. Connect it in Settings."
+CANNOT_START_NO_TICK = ("A case cannot start in cloud mode: the statement for your choices is not ticked. "
+                        "Read and tick it in Settings.")
+
+# Under the mark Cloud at the top of a teaching page, in cloud mode. THE OWNER'S, letter for letter (ruling 15):
+CLOUD_TYPED = "What you type goes to Claude."
+# and under it the cost, the details' draft, from the bench of run 10a (ruling 19).
+CLOUD_COST = "A teaching case costs about 1 US cent."
+
+# ------------------------------------------------------------------- a case
+
+NEW_CASE = "A new case"                                    # the heading of a case that is not of the bank
+PRESENTED = "{name}, {age}, {sex}"                         # the patient is presented (12.1, step 2)
+SPEAKS_FOR = "Speaking for the child: {parent}"            # the details': a parent who speaks for a child
+PATIENT, YOU = "Patient", "You"
+
+
 def bank_unread(count: int) -> str | None:
     """What the page says of files of the bank that did not hold, or None when every one was read."""
     if not count:

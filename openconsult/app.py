@@ -215,7 +215,7 @@ def build_app(settings: Settings, machine: Machine | None = None, clock: Clock =
         converter=converter,
         store=secure_store,
         start_tests=StartTests(),
-        teaching=Teaching(bank if bank is not None else read_bank(), Cases(db, clock)),
+        teaching=Teaching(bank if bank is not None else read_bank(), Cases(db, clock), audit, door_of=lambda model: parts.door_of(model)),
         sizes=Sizes(),
         clock=clock,
         finaliser=_finalise,

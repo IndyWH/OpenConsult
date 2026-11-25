@@ -55,6 +55,11 @@ class Cases:
              WRITING if scenario is None else HISTORY, None if scenario is None else json.dumps(scenario, ensure_ascii=False)))
         return int(self._db.query_one("SELECT id FROM teaching_case WHERE press = ?", (press,))["id"])
 
+    def by_press(self, press: str) -> int | None:
+        """The case a press has already started, or None."""
+        row = self._db.query_one("SELECT id FROM teaching_case WHERE press = ?", (press,))
+        return int(row["id"]) if row else None
+
     def get(self, case_id: int) -> dict | None:
         row = self._db.query_one("SELECT * FROM teaching_case WHERE id = ?", (case_id,))
         if row is None:

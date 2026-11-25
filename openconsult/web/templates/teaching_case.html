@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% from "_parts.html" import refusal, cloud_mark with context %}
+{% set title = case.heading %}
+{% block main %}
+{# One teaching case, where it stands (15.14, the details of run 10b). The page is given what may be shown at this
+   step and nothing else of the scenario: until the feedback has been made, that is who the patient is, the opening
+   words and what the patient has said. The label stands at the top of every page of the case (ruling 3). #}
+<div class="teaching" id="teaching-case">
+<h1 class="page">{{ case.heading }}</h1>
+<table class="plain facts" id="case-facts">
+  <tr><th>{{ t.COL_TOPIC }}</th><td>{{ case.topic }}</td></tr>
+  <tr><th>{{ t.COL_LEVEL }}</th><td>{{ case.level }}</td></tr>
+  <tr><th>{{ t.COL_LABEL }}</th><td id="case-label">{{ case.label }}</td></tr>
+</table>
+{% if mark %}{{ cloud_mark(mark) }}{% endif %}
+
+{# The patient is presented (12.1, step 2): the name, the age and the sex, and the opening words as the patient's
+   first lines. Not the occupation and not the manner: they are for the actor, and a learner asks. #}
+<section class="pane" id="patient">
+  <div class="pane-head"><h2 id="presented">{{ case.presented }}</h2></div>
+  <div class="pane-body">
+    {% if case.speaks_for %}<p class="mark" id="speaks-for">{{ case.speaks_for }}</p>{% endif %}
+    <div class="turns" id="turns">
+      <p class="turn patient" id="opening-words"><span class="speaker">{{ t.PATIENT }}</span> <span class="said">{{ case.opening_words }}</span></p>
+    </div>
+  </div>
+</section>
+</div>
+{% endblock %}

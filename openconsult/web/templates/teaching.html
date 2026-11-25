@@ -1,23 +1,34 @@
 {% extends "base.html" %}
+{% from "_parts.html" import refusal, cloud_mark with context %}
 {% set title = t.TITLE %}
 {% block main %}
 {# The teaching page (15.14, the details of run 10b), in this order: the line of no affiliation (ruling 1; 12.5), the
    line on a real patient's details (ruling 22), then the cases. A case of the bank is known here by its number: the
-   name of its file and the id inside it name the diagnosis and never reach a page or an address. #}
+   name of its file and the id inside it name the diagnosis and never reach a page or an address. In cloud mode the
+   mark Cloud stands at the top with the owner's sentence and the cost (ruling 15). #}
 <div class="teaching" id="teaching-page">
 <h1 class="page">{{ t.TITLE }}</h1>
+{% if mark %}{{ cloud_mark(mark) }}{% endif %}
 <p class="mark" id="not-affiliated">{{ t.NOT_AFFILIATED }}</p>
 <p class="sentence" id="no-real-patient">{{ t.NO_REAL_PATIENT }}</p>
 
 <section class="pane" id="bank">
   <div class="pane-head"><h2>{{ t.BANK_HEADING }}</h2></div>
   <div class="pane-body">
+    {# Each row has its own press and its own slot for a refusal: where no model can be reached the press says so
+       there and no case starts (R15). press is the token of this row on this view: the same press twice is one case. #}
+    <div id="start-bank" role="group" aria-label="{{ t.BANK_HEADING }}" aria-describedby="start-bank-refusal">
     <table class="plain" id="bank-cases">
-      <tr><th>{{ t.COL_CASE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th></tr>
+      <tr><th>{{ t.COL_CASE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th><th></th></tr>
       {% for case in bank %}
-      <tr data-case="{{ case.number }}"><td>{{ case.name }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td></tr>
+      <tr data-case="{{ case.number }}"><td>{{ case.name }}</td><td>{{ case.topic }}</td><td>{{ case.level }}</td><td>{{ case.label }}</td>
+        <td><form method="post" action="/teaching/cases" id="start-form-{{ case.number }}"><input type="hidden" name="number" value="{{ case.number }}"><input type="hidden" name="press" value="{{ case.press }}">
+          <button id="start-{{ case.number }}" aria-describedby="start-{{ case.number }}-refusal" aria-label="{{ t.START }}: {{ case.name }}">{{ t.START }}</button>{{ refusal("start-" ~ case.number) }}
+          {% if lead and refused and refused.control == "start-" ~ case.number %}<a id="start-lead" href="{{ lead }}">{{ words.NAV_SETTINGS if lead.startswith("/settings") else words.CONNECT_CLAUDE_TITLE }}</a>{% endif %}</form></td></tr>
       {% endfor %}
     </table>
+    </div>
+    {{ refusal("start-bank") }}
     {% if unread %}<p class="mark" id="bank-unread">{{ unread }}</p>{% endif %}
   </div>
 </section>
