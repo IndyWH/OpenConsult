@@ -125,6 +125,8 @@ mark on every teaching page (it is not on a finished case), and do not
 hold the third check of a fresh scenario or The case in short. No help
 page exists.
 
+Mail 2 (the owner's room check of 25 Nov, his okay at 12:47 UTC): two faults of a page mended. 51b9437: a page that waited for its feedback asked again at an address with a # part, so the browser loaded nothing and the feedback never showed by itself (brought in by fd73468). f38df71: after Delete the question was out of sight at the page's top. Suite 1589; STAGE10B_REPORT_2.md.
+
 Next: the owner's room check of run 10b, one sitting.
 
 ## 2026-11-24. Run 10a: the four prompts of teaching as files, their jobs in the door, and the bench of teaching on both models. Report only: nothing a learner can see
