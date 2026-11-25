@@ -4,18 +4,128 @@ The record for OpenConsult v2: decisions and measurements, newest first.
 It stays under 500 lines. Older entries move to HANDOVER_ARCHIVE.md.
 The spec is V2_SPEC.md. The record for v1 is the HANDOVER.md on the main branch.
 
-## 2026-11-25. Run 10b: the pages of teaching mode, typed. In work: the first half stands
+## 2026-11-25. Run 10b: the pages of teaching mode, typed: a learner works through a case from the patient's first words to the feedback
 
-THE HALF (25 Nov 2026; mail 1, the owner's okay at 07:51 UTC: Approved.
-Go.): a learner can work through one case of the bank by typing, from
-the patient's first words to the feedback and the whole scenario. The
-first half stands by itself, the suite green on each commit's own tree:
-the line of the cloud statement, the tables of version 14, the bank of
-eight scenarios, the tab and the teaching page, the start of a case
-with the mark Cloud, the history, the examination, the three questions,
-the feedback, the whole scenario. Still to come in this run: a fresh
-scenario, the list of kept cases and their delete, the flag, the
-section Teaching of Settings, the mend of the slow Windows tests.
+Run on 25 Nov 2026 by the mailbox. Mail 1 (the owner's okay at 07:51
+UTC): Approved. Go., the plan with nine points. The spec is 9e5ab33
+(sha256 f744710e...), the stage prompt 4d4e399
+(stage-prompts/STAGE_10B.md). The private report is STAGE10B_REPORT.md
+in the log folder. Twenty commits of the build and this entry's, none
+pushed. The suite: 1585 passed in about 165 s, none skipped (1477 at
+the start); each commit's suite ran on exactly its own tree.
+OpenConsult is a research and education prototype, not a medical
+device; every scenario is made up. AWAITING THE OWNER'S ROOM CHECK: one
+case of the bank, typed, in one sitting.
+
+For the learner. A learner who is taught something wrong is harmed
+(12.3). So no page shows a sentence a model wrote as if it were fact:
+- A tab Teaching, after New patient. Its page says that OpenConsult is
+  not affiliated with or endorsed by the RCGP, and not to type a real
+  patient's details. Then a new case (26 topics, Surprise me, three
+  levels), the eight cases of the bank, and your cases.
+- A case: the patient is presented by name, age, sex and opening
+  words. The learner types; the actor answers from the patient's side
+  of the scenario alone; each line stands as typed with the learner's
+  own number, 1, 2, 3. End the history: one press, no way back.
+- The examination: the scenario's own findings for what was asked, and
+  the owner's sentence, The case gives no finding for this., where the
+  case holds none. Finish the examination shows the rest (D10).
+- The owner's three questions, one at a time; they go to no model.
+- The feedback, in the order of 12.4, built by code from the model's
+  numbers after the rule of teaching/shown.py: every word of a point
+  is the scenario's, every quoted line the learner's. No grade, no
+  count (D5).
+- THE KNOWN FAULT ON THE PAGE (15.14, ruling 20): on Gemma the
+  feedback credits a red flag that was not asked about in about one
+  feedback in five. The page cannot cure that. One line above the
+  marking points tells the learner to check each Met against their
+  own line beside it; a point met with no line left says: No line of
+  yours is quoted for this point. Check it yourself. What the model's
+  answer left out is shown as Not judged, never as not met.
+- After the feedback: Show the whole scenario, and Flag this case as
+  wrong. Before the feedback nothing of the examiner's side, and
+  nothing unsaid of the patient's, is in any page, script or address:
+  a test reads every byte served for a made case at each step.
+
+What stands in the repo.
+- Version 14 of the tables: five tables of teaching's own
+  (teaching_case, _turn, _examined, _call, _flag). A case holds its
+  scenario as it stood at the start; teaching_call ties a row of the
+  shared record of model calls to its case. A delete removes a case
+  with every row and every stored call of it in one transaction; a
+  flag stays, with its own copy of the scenario.
+- The bank: nine files of Cowork's in openconsult/teaching/bank, byte
+  for byte, pinned by sha256. The file's name and id name the
+  diagnosis and never leave bank.py: a case is Case 1 to Case 8.
+- openconsult/teaching: bank, cases (the rows), play (the steps and
+  the calls), feedback, scenario, checks, room, words. One module of
+  pages, web/teaching.py. Teaching's sentences are in
+  teaching/words.py, not in words.py.
+- NO WORD A MODEL READS CHANGED: the prompts folder is file for file
+  what it was at 69135bb. Every request is built by teaching/frames.py.
+- The cloud statement holds the owner's line for teaching, last in
+  What is sent whenever Claude is the model; a tick given before it
+  stood is asked for once more. The mark Cloud stands on the teaching
+  page and on a case until its feedback is made, with What you type
+  goes to Claude. and the cost. No case starts in cloud mode without
+  the tick, or where no model can be reached (R15; 10.4).
+- A fresh scenario is shown only when the door held it to the form
+  and code finds no dose in the plan (one function for the app and the
+  bench, teaching/checks.py) and nothing missing.
+- HOW LONG A HISTORY MAY GROW (teaching/room.py), counted from the
+  stored calls of run 10a: the feedback's request stays within the
+  window on every engine at 33,000 characters, about 130 lines of mean
+  length on the longest scenario. The page says so before and refuses
+  a line at the bound. NOT MEASURED: a feedback on a history longer
+  than the bench's longest, about 21 lines.
+- Settings, Teaching: the default level, which saves by itself, and
+  the flagged cases. Five audit lines of teaching, counts only.
+- The slow Windows tests: tests/made_up_run.py writes the rows of a
+  made-up run in one transaction (12 commits where there were 704);
+  the rows are byte for byte the same. The proof is GitHub's Windows
+  after the push.
+
+Measured. THE ONE CASE ON THE LOCAL MODEL, through the pages, on vLLM
+0.31.0 (the owner's word of 07:51): Case 2, 17 lines, 6 examination
+requests, the feedback; 24 stored calls, none failed. By code: 24 of
+24 requests hold their prompt file letter for letter and exactly what
+frames builds; 17 of 17 requests of the patient hold no entry of the
+examiner's side. A reply typically 0.20 s, slowest 0.79; the feedback
+2.83 s. The feedback credited 14 of 14 points, 8 with a line of the
+learner's and 6 with none quoted. No reply was judged. NO TEACHING
+CASE HAS YET BEEN PLAYED ON CLAUDE THROUGH THE PAGES: cloud mode is
+built and tested against a made service; nothing left this computer.
+
+Seen in a real browser (this machine's Chrome, cut off, a profile that
+had seen 69135bb; it ran the built scripts): every page; a case at 3
+lines and at 130; a second press; a failed reply; a load, an ended
+login and a stale page with typed words kept; scripts off; 420 px. Two
+faults found there, each mended in a commit of its own: the box moved
+down the window at each send; with no script the box lost the cursor.
+
+Older tests restated, old and new in each: three that read the
+statement's lines or sentences; the test of version 12 (13 to 14); run
+10a's test of no table and no route; and one the plan did not name,
+the list of the forms of Settings that save by themselves.
+
+Flags for the owner, each in the report. A SLIP OF MINE BROKE A RULE:
+one private check script built the app outside the suite's guard and
+asked the system's secure store (6 connections to the session bus);
+nothing was printed, sent or written; mended before it ran again.
+Drafts he meets on screen: every sentence of teaching but his six.
+Not ruled: which model is offered for which job. The perimenopause
+case (Case 7) still holds no examination finding. words.py (1,341
+lines) and schema.py (727) are over their targets.
+
+Made untrue, and not mine to change: the README says that the
+teaching mode comes later (the details: it waits for the owner's
+ruling on which model is offered). The spec's details of 10b say the
+default level is saved by a press (ruling 47 won, by mail 1), put the
+mark on every teaching page (it is not on a finished case), and do not
+hold the third check of a fresh scenario or The case in short. No help
+page exists.
+
+Next: the owner's room check of run 10b, one sitting.
 
 ## 2026-11-24. Run 10a: the four prompts of teaching as files, their jobs in the door, and the bench of teaching on both models. Report only: nothing a learner can see
 
