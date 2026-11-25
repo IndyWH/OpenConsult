@@ -173,6 +173,37 @@
   </div>
 </section>
 
+{# Teaching (7.3; 15.13, ruling 55; 15.14, rulings 5 and 6): the default level of a new case, which saves by itself as
+   every choice here does (ruling 47), and the cases a learner has flagged as wrong (12.3, rule 7), each with a press
+   that shows its scenario and a press that removes the flag. No timer: it arrives with spoken teaching. #}
+<section class="pane" id="teaching">
+  <div class="pane-head"><h2>{{ t.TITLE }}</h2></div>
+  <div class="pane-body">
+    <form method="post" action="/settings/teaching-level" id="teaching-level" data-saves data-stay>
+      <div role="radiogroup" aria-labelledby="teaching-level-legend" aria-describedby="save-teaching-level-refusal">
+      <p class="mark" id="teaching-level-legend">{{ t.DEFAULT_LEVEL }}</p>
+      {% for level in teaching.levels %}<label class="tick"><input type="radio" name="level" value="{{ level.value }}"{% if level.chosen %} checked{% endif %}> {{ level.line }}</label>
+      {% endfor %}
+      </div>
+      <button class="primary" id="save-teaching-level" aria-describedby="save-teaching-level-refusal" data-save>{{ words.SAVE }}</button>
+      {{ refusal("save-teaching-level") }}
+      {% if done == "teaching-level" %}<p class="notice" id="saved-teaching-level" role="status">{{ words.SAVED }}</p>{% endif %}
+    </form>
+    <h3>{{ t.FLAGGED_CASES }}</h3>
+    {% if done == "flag-removed" %}<p class="notice" id="flag-removed" role="status">{{ t.FLAG_REMOVED }}</p>{% endif %}
+    {% if teaching.flags %}
+    <table class="plain" id="flagged-cases">
+      <tr><th>{{ t.COL_DATE }}</th><th>{{ t.COL_TOPIC }}</th><th>{{ t.COL_LEVEL }}</th><th>{{ t.COL_LABEL }}</th><th>{{ t.COL_NOTE }}</th><th></th><th></th></tr>
+      {% for flag in teaching.flags %}
+      <tr data-flag="{{ flag.id }}"><td>{{ flag.date }}</td><td>{{ flag.topic }}</td><td>{{ flag.level }}</td><td>{{ flag.label }}</td><td>{% if flag.note %}{{ flag.note }}{% else %}{{ t.NO_NOTE }}{% endif %}</td>
+        <td><a class="button" id="show-flag-{{ flag.id }}" href="/teaching/flags/{{ flag.id }}">{{ t.SHOW_THE_SCENARIO }}</a></td>
+        <td><form method="post" action="/teaching/flags/{{ flag.id }}/remove"><button id="remove-flag-{{ flag.id }}">{{ t.REMOVE_FLAG }}</button></form></td></tr>
+      {% endfor %}
+    </table>
+    {% else %}<p class="mark" id="no-flags">{{ t.NO_FLAGS }}</p>{% endif %}
+  </div>
+</section>
+
 <section class="pane" id="thresholds">
   <div class="pane-head"><h2>{{ words.SECTION_THRESHOLDS }}</h2></div>
   <div class="pane-body">

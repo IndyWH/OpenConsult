@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% import "_teaching_scenario.html" as whole with context %}
+{% set title = t.FLAGGED_CASE %}
+{% block head %}<link rel="stylesheet" href="{{ static('teaching.css') }}">{% endblock %}
+{% block main %}
+{# A case a learner flagged as wrong (12.3, rule 7; ruling 8), reached from the section Teaching of Settings: when it
+   was flagged, its topic, its level and its label, the learner's note, and the scenario as it stood when the case
+   was played, whole. The flag holds its own copy, so it is here whether or not its case was deleted since. #}
+<div class="teaching" id="teaching-flag">
+<h1 class="page">{{ t.FLAGGED_CASE }}</h1>
+<table class="plain facts" id="flag-facts">
+  <tr><th>{{ t.COL_DATE }}</th><td>{{ flag.date }}</td></tr>
+  <tr><th>{{ t.COL_TOPIC }}</th><td>{{ flag.topic }}</td></tr>
+  <tr><th>{{ t.COL_LEVEL }}</th><td>{{ flag.level }}</td></tr>
+  <tr><th>{{ t.COL_LABEL }}</th><td>{{ flag.label }}</td></tr>
+  <tr><th>{{ t.COL_NOTE }}</th><td id="flag-note">{% if flag.note %}{{ flag.note }}{% else %}{{ t.NO_NOTE }}{% endif %}</td></tr>
+</table>
+<p><a class="button" id="back-to-settings" href="/settings#teaching">{{ t.BACK_TO_SETTINGS }}</a></p>
+{{ whole.scenario(flag.scenario, flag.speaks_for) }}
+</div>
+{% endblock %}

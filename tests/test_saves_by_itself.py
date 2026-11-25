@@ -148,10 +148,12 @@ def test_15_13_ruling_47_a_typed_field_keeps_its_save_and_is_not_saved_by_the_ch
     app, client, store, testers = made_app(tmp_path, clock, machine=SUITABLE, store=MadeStore(BOTH_KEYS))
     p = app.state.parts
     page = client.get("/settings").text
-    # The forms that save by themselves, and no other: the two choices, the speech model of this computer and the
-    # tick for better accuracy.
+    # The forms that save by themselves, and no other: the two choices, the speech model of this computer, the tick
+    # for better accuracy, and the default level of teaching.
+    # Restated in run 10b, which adds the section Teaching: its default level is a choice, and a choice saves by itself
+    # (ruling 47; the owner's okay of 25 Nov 2026). OLD: the first four. NEW: the four and /settings/teaching-level.
     assert forms_that_save(page) == ["/settings/path/language-model", "/settings/path/transcription", "/settings/speech-model",
-                                     "/settings/better-accuracy"]
+                                     "/settings/better-accuracy", "/settings/teaching-level"]
     for action, save in (("/settings/retention", "save-retention"), ("/settings/you", "save-you"), ("/settings/password", "change-password"),
                          ("/settings/guidelines/add", "add-guideline")):
         form = page.split(f'action="{action}"', 1)[1].split("</form>", 1)[0]

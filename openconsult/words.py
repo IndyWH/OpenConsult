@@ -733,6 +733,7 @@ EVENTS = {
     "teaching.finished": "Teaching case finished",
     "teaching.flagged": "Teaching case flagged as wrong",
     "teaching.deleted": "Teaching case deleted",
+    "teaching.flag_removed": "Flag of a teaching case removed",
     "user.set_up": "User set up",
     "login": "Logged in",
     "login.wrong_password": "Wrong password",

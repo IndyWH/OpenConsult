@@ -265,6 +265,13 @@ class Teaching:
             self._audit.record("teaching.flagged", f"case {case_id}: " + (f"a note of {len(note)} characters" if note else "no note"))
             return Outcome(DONE)
 
+    def remove_flag(self, flag_id: int) -> bool:
+        """A flag taken out of the list in Settings, with its copy of the scenario and its note; audited by its number."""
+        if not self.cases.remove_flag(flag_id):
+            return False
+        self._audit.record("teaching.flag_removed", f"flag {flag_id}")
+        return True
+
     # ------------------------------------------------------------ the delete
 
     def delete(self, case_id: int) -> Outcome:

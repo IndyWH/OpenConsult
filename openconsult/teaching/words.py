@@ -218,6 +218,20 @@ SAFETY_NET = "Safety-net advice"
 NONE = "None."
 
 
+# The section Teaching of Settings (7.3; 15.13, ruling 55; rulings 5 and 6): the default level, which saves by itself
+# (ruling 47), and the flagged cases. No timer: it arrives with spoken teaching.
+DEFAULT_LEVEL = "Default level"
+FLAGGED_CASES = "Flagged cases"
+COL_NOTE = "Note"
+NO_FLAGS = "No case is flagged."
+SHOW_THE_SCENARIO = "Show the scenario"
+REMOVE_FLAG = "Remove the flag"
+FLAG_REMOVED = "The flag was removed."
+FLAGGED_CASE = "A flagged case"
+NO_NOTE = "No note was typed."
+BACK_TO_SETTINGS = "Back to Settings"
+
+
 def reason(failure: str) -> str:
     """Why a model call failed, in the words the page of calls already uses for the door's outcomes."""
     own = {STOPPED: REASON_STOPPED, DOSE: REASON_DOSE, INCOMPLETE: REASON_INCOMPLETE}

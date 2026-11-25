@@ -77,18 +77,37 @@ def cannot_start(p) -> tuple[str, str | None] | None:
     return None
 
 
-DEFAULT_LEVEL = LEVELS[0]          # straightforward (ruling 5)
+def levels_view(chosen: str) -> list[dict]:
+    """The three levels, each with its line, and which one is picked."""
+    return [{"value": name, "line": t.LEVEL_LINES[name], "chosen": name == chosen} for name in LEVELS]
 
 
-def new_case_view(teaching, chosen: dict | None = None) -> dict:
+def new_case_view(p, chosen: dict | None = None) -> dict:
     """The form of a new case: the 26 topics of the menu after Surprise me,
-    and the three levels, each with its line. chosen: what a refused
-    press had picked, kept as picked."""
+    and the three levels, each with its line; the level picked is the
+    default of Settings, straightforward until it is changed (ruling 5).
+    chosen: what a refused press had picked, kept as picked."""
     chosen = chosen or {}
-    level = chosen.get("level") if chosen.get("level") in LEVELS else DEFAULT_LEVEL
-    return {"topics": [{"title": topic, "chosen": topic == chosen.get("topic")} for topic in teaching.bank.topics],
-            "levels": [{"value": name, "line": t.LEVEL_LINES[name], "chosen": name == level} for name in LEVELS],
-            "press": secrets.token_urlsafe(12)}
+    level = chosen.get("level") if chosen.get("level") in LEVELS else p.stored.teaching_level
+    return {"topics": [{"title": topic, "chosen": topic == chosen.get("topic")} for topic in p.teaching.bank.topics],
+            "levels": levels_view(level), "press": secrets.token_urlsafe(12)}
+
+
+def _day(stamp: str) -> str:
+    return words.plain_date(datetime.fromisoformat(stamp))
+
+
+def flag_view(flag: dict) -> dict:
+    return {"id": flag["id"], "date": _day(flag["flagged_at"]), "topic": flag["topic"], "level": t.LEVEL_NAMES[flag["level"]],
+            "label": t.LABELS[flag["label"]], "note": flag["note"]}
+
+
+def settings_view(p) -> dict:
+    """The section Teaching of Settings (7.3; 15.13, ruling 55): the
+    default level, and the cases a learner has flagged as wrong, each
+    with the day it was flagged, its topic, its level, its label and the
+    learner's note. No timer: it arrives with spoken teaching (ruling 6)."""
+    return {"levels": levels_view(p.stored.teaching_level), "flags": [flag_view(flag) for flag in p.teaching.cases.flags()]}
 
 
 def your_cases(teaching) -> list[dict]:
@@ -117,7 +136,7 @@ def _teaching_page(request: Request, user, refused: tuple[str, str] | None = Non
     if request.query_params.get("deleted") == "yes" and notice is None and not refused:
         notice = t.CASE_DELETED
     context = dict(user=user, active="teaching", t=t, bank=bank_rows(p.teaching), unread=t.bank_unread(p.teaching.bank.unread),
-                   new_case=new_case_view(p.teaching, chosen), cases=cases, notice=notice,
+                   new_case=new_case_view(p, chosen), cases=cases, notice=notice,
                    mark=cloud_lines() if language_model(p) == CLAUDE else None, lead=lead, page_path="/teaching")
     if refused:
         return refuse(request, "teaching.html", refused[0], refused[1], **context)
@@ -378,6 +397,39 @@ async def delete_case(request: Request, case_id: int, user=Depends(guards.logged
     if outcome.state == DONE:
         raise Redirect("/teaching?deleted=yes#your-cases")
     return _teaching_page(request, user, notice=t.STALE)
+
+
+@router.get("/teaching/flags/{flag_id}")
+async def flag_page(request: Request, flag_id: int, user=Depends(guards.logged_in)):
+    """A flagged case, from Settings: its facts, the learner's note, and
+    the scenario as it stood when the case was played, whole."""
+    flag = parts(request).teaching.cases.flag_row(flag_id)
+    if flag is None:
+        raise Redirect("/settings#teaching")
+    parent = speaks_for(flag["scenario"])
+    view = {**flag_view(flag), "scenario": flag["scenario"], "speaks_for": t.SPEAKS_FOR.format(parent=parent) if parent else None}
+    return render(request, "teaching_flag.html", user=user, active="settings", t=t, flag=view)
+
+
+@router.post("/teaching/flags/{flag_id}/remove")
+async def remove_flag(request: Request, flag_id: int, user=Depends(guards.logged_in)):
+    """Remove the flag, in Settings: the flag goes, with its copy of the scenario and its note."""
+    removed = parts(request).teaching.remove_flag(flag_id)
+    raise Redirect("/settings?done=flag-removed#teaching" if removed else "/settings#teaching")
+
+
+@router.post("/settings/teaching-level")
+async def save_level(request: Request, user=Depends(guards.logged_in)):
+    """The default level of a new case. A choice in Settings saves by
+    itself (15.13, ruling 47): the page's script sends this form when the
+    choice changes; with no script its Save does. Audited from what to what."""
+    from openconsult.web import routes
+    p = parts(request)
+    fields = await form_fields(request)
+    if fields.get("level") not in LEVELS:
+        return routes._settings_page(request, user, ("save-teaching-level", t.PICK_A_LEVEL))
+    p.stored.set_teaching_level(fields["level"])
+    raise Redirect("/settings?done=teaching-level" + ("" if fields.get("place") == "keep" else "#teaching"))
 
 
 @router.post("/teaching/cases/{case_id}/again")

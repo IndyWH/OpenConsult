@@ -31,6 +31,10 @@ STATEMENT_KEPT = "statement_ticked_kept"
 SPEECH_MODEL = "speech_model"
 LOCAL_SPEECH_MODELS = ("nemotron", "whisperx_pyannote")
 ON, OFF = "on", "off"
+# The section Teaching of Settings (7.3; 15.13, ruling 55; 15.14, rulings 5 and 6): the default level of a new case.
+# The three levels are the study's; the first is the default. The timer arrives with spoken teaching, at stage 14.
+TEACHING_LEVEL = "teaching_level"
+TEACHING_LEVELS = ("straightforward", "hidden", "noisy")
 # v1's default (its retention module; V1_LESSONS 10.5).
 DEFAULT_RETENTION_DAYS = 90
 
@@ -122,6 +126,22 @@ class Stored:
             self._set(TRANSCRIPTION, path.transcription, was=before.transcription)
         if path.better_accuracy != before.better_accuracy:
             self._set(BETTER_ACCURACY, ON if path.better_accuracy else OFF, was=ON if before.better_accuracy else OFF)
+
+    # ------------------------------------ the default level of teaching (10b)
+
+    @property
+    def teaching_level(self) -> str:
+        """The level a new teaching case begins at (7.3; 15.14, ruling 5):
+        straightforward until the learner changes it."""
+        value = self._get(TEACHING_LEVEL)
+        return value if value in TEACHING_LEVELS else TEACHING_LEVELS[0]
+
+    def set_teaching_level(self, level: str) -> None:
+        """Written and audited, from what to what (7.3, rule 4); one that stays is not written."""
+        if level not in TEACHING_LEVELS:
+            raise ValueError("not a level of teaching")
+        if level != self.teaching_level:
+            self._set(TEACHING_LEVEL, level, was=self.teaching_level)
 
     # ------------------------------- the speech model of this computer (9c)
 

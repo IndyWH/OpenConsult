@@ -13,6 +13,7 @@ from openconsult.settings.stored import DEFAULT_RETENTION_DAYS, retention_proble
 from openconsult.settings.connections import SERVICES
 from openconsult.settings.path import CLAUDE
 from openconsult.web import cloud as cloud_web, guards, guidelines as guidelines_web, panel as panel_web, settings_local, steps as steps_web
+from openconsult.web import teaching as teaching_web
 from openconsult.web.guards import Redirect, parts
 from openconsult.web.pages import form_fields, refuse, render
 
@@ -223,6 +224,8 @@ def _settings_page(request: Request, user, refused=None, pending=None, from_pane
                    retention_days=parts(request).stored.audio_retention_days, retention_default=DEFAULT_RETENTION_DAYS,
                    thresholds=thresholds_view(parts(request)),
                    guidelines=guidelines_web.section_data(request), page_path="/settings",
+                   # The section Teaching (7.3; 15.13, ruling 55): teaching's own words and what its own module gives.
+                   t=teaching_web.t, teaching=teaching_web.settings_view(parts(request)),
                    connections=[cloud_web.connection_view(parts(request), service) for service in SERVICES],
                    path_sections=cloud_web.path_sections(parts(request), pending),
                    better_accuracy=cloud_web.better_accuracy_view(parts(request), pending),
