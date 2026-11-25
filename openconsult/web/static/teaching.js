@@ -76,9 +76,7 @@
     return line;
   }
   // The app's page in place of this one's, part by part; the window moved by what was added above the box.
-  function putInPlace(theirs, name) {
-    const before = page.querySelector('[data-keep="' + name + '"]');
-    const top = before ? before.getBoundingClientRect().top : null;
+  function putInPlace(theirs, name, top) {
     Array.from(page.querySelectorAll('[data-part]')).forEach(function (mine) {
       const fresh = theirs.querySelector('[data-part="' + mine.dataset.part + '"]');
       if (fresh) mine.replaceWith(document.importNode(fresh, true)); else mine.remove();
@@ -88,9 +86,11 @@
     });
     if (theirs.dataset.secondsLeft && window.pageFields) window.pageFields.left(theirs.dataset.secondsLeft);
     const after = page.querySelector('[data-keep="' + name + '"]');
-    if (after && top !== null) window.scrollBy(0, after.getBoundingClientRect().top - top);
+    if (after) stay(after, top);
     return after;
   }
+  // The window moved so that a box stands as far from its top as it stood when the line was sent.
+  function stay(box, top) { window.scrollBy(0, box.getBoundingClientRect().top - top); }
 
   let waiting = false;
   page.addEventListener('submit', function (event) {
@@ -104,7 +104,9 @@
     const name = box.dataset.keep, typed = box.value;
     const body = new URLSearchParams(new FormData(form));
     waiting = true;
+    const top = box.getBoundingClientRect().top;          // where the box stands in the window now: it stays there
     const line = typed.trim() ? pending(form, typed) : null;
+    stay(box, top);
     box.value = '';
     const send = form.querySelector('[data-send-press]');
     if (send) send.disabled = true;
@@ -113,7 +115,7 @@
       // Nothing came of it: the words go back into their box, before anything typed since.
       const now = page.querySelector('[data-keep="' + name + '"]');
       if (line) line.remove();
-      if (now) { now.value = typed + (now.value ? ' ' + now.value : ''); keep(name, now.value); now.focus(); }
+      if (now) { now.value = typed + (now.value ? ' ' + now.value : ''); keep(name, now.value); stay(now, top); now.focus(); }
       if (send) send.disabled = false;
       says(form, words, true);
       waiting = false;
@@ -124,7 +126,7 @@
         const theirs = new DOMParser().parseFromString(got.html, 'text/html').getElementById('teaching-case');
         if (!theirs || (got.status !== 200 && got.status !== 400)) { back(form.dataset.loginEnded); return; }
         const since = (page.querySelector('[data-keep="' + name + '"]') || {value: ''}).value;      // typed while the answer was awaited
-        const fresh = putInPlace(theirs, name);
+        const fresh = putInPlace(theirs, name, top);
         waiting = false;
         if (fresh) {
           // The app's box: empty when it took the words, holding them when it did not. What was typed since follows.
