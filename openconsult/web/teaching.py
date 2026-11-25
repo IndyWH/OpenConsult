@@ -244,6 +244,7 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
         # Built from the stored answer by the rule, at every view; no model is asked again (ruling 22).
         view["feedback"] = feedback.built(row["scenario"], [(turn["speaker"], turn["text"]) for turn in turns],
                                           teaching.cases.answers(row), row["feedback"])
+        view["flag"] = teaching.cases.flag_of(case_id)
         if request.query_params.get("whole") == "yes":
             # The whole scenario, by one press, and only now that the feedback has been made (ruling 8).
             view["whole"] = row["scenario"]
@@ -345,6 +346,20 @@ async def answer(request: Request, case_id: int, user=Depends(guards.logged_in))
     if outcome.state == REFUSED:
         return _case_page(request, user, case_id, refused=("answer-send", outcome.problem), typed={"answer": text})
     return _stale(request, user, case_id, QUESTIONS[question - 1] if 1 <= question <= len(QUESTIONS) else "", "answer", text)
+
+
+@router.post("/teaching/cases/{case_id}/flag")
+async def flag_case(request: Request, case_id: int, user=Depends(guards.logged_in)):
+    """Flag this case as wrong (12.3, rule 7), after its feedback, with a
+    note that may be left empty. The flag is kept with the scenario and
+    listed in Settings."""
+    note = (await form_fields(request)).get("note", "")
+    outcome = parts(request).teaching.flag(case_id, note)
+    if outcome.state == DONE:
+        raise Redirect(f"/teaching/cases/{case_id}#after-feedback")
+    if outcome.state == REFUSED:
+        return _case_page(request, user, case_id, refused=("flag", outcome.problem), typed={"flag": note})
+    return _case_page(request, user, case_id, notice=t.STALE)
 
 
 @router.post("/teaching/cases/{case_id}/delete")

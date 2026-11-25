@@ -197,6 +197,12 @@ NOT_SIGNPOSTED = "The feedback found no signposting."
 # After the feedback (ruling 8): one press shows the whole scenario, both parts, in the scenario's own words.
 AFTER_FEEDBACK = "After the feedback"
 SHOW_SCENARIO = "Show the whole scenario"                  # the details'
+# The flag (12.3, rule 7; ruling 8): beside the press for the whole scenario, with a box that may be left empty.
+FLAG_THIS_CASE = "Flag this case as wrong"                 # the details'
+FLAG_BOX = "What is wrong? You may leave this empty."
+FLAG_NOTE_STAYS = "This note stays on this computer."      # the owner's okay of 25 Nov 2026, a draft
+FLAGGED = "This case is flagged as wrong. The flag is listed in Settings."
+NOTE_TOO_LONG = "This note is too long. Shorten it to {most} characters or fewer."
 WHOLE_SCENARIO = "The whole scenario"
 IN_SHORT = "The case in short"                             # the owner's okay of 25 Nov 2026: the scenario's reasoning, first
 PATIENT_SIDE = "The patient's side"

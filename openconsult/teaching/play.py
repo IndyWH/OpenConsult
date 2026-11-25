@@ -250,6 +250,21 @@ class Teaching:
         finally:
             self._making.discard(case_id)
 
+    # -------------------------------------------------------------- the flag
+
+    def flag(self, case_id: int, note: str) -> Outcome:
+        """The learner's flag on a finished case (12.3, rule 7): once a
+        case, with a note that may be empty, kept with a copy of the
+        scenario. The audit line holds the note's length, never its words."""
+        note = note.strip()
+        with self._lock(case_id):
+            if len(note) > room.LINE_MOST:
+                return Outcome(REFUSED, t.NOTE_TOO_LONG.format(most=t.most(room.LINE_MOST)))
+            if self.cases.flag(case_id, note) is None:
+                return Outcome(STALE)
+            self._audit.record("teaching.flagged", f"case {case_id}: " + (f"a note of {len(note)} characters" if note else "no note"))
+            return Outcome(DONE)
+
     # ------------------------------------------------------------ the delete
 
     def delete(self, case_id: int) -> Outcome:

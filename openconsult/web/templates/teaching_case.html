@@ -135,7 +135,7 @@
       <p class="answer said">{{ done.answer }}</p>
     </div>
     {% endfor %}
-    {% if notice %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    {% if notice and case.step != "done" %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
     {% if case.question %}
     <form method="post" action="/teaching/cases/{{ case.id }}/answer" id="answer">
       <input type="hidden" name="question" value="{{ case.question.n }}">
@@ -161,8 +161,22 @@
 <section class="pane" id="after-feedback">
   <div class="pane-head"><h2>{{ t.AFTER_FEEDBACK }}</h2></div>
   <div class="pane-body">
-    <div class="control-row">
+    {# Two presses side by side: the whole scenario, and the flag (12.3, rule 7), with a box for what is wrong that
+       may be left empty. A case is flagged once; then the page says so and the press is gone. #}
+    {% if notice and case.step == "done" %}<p class="notice" id="case-notice" role="status">{{ notice }}</p>{% endif %}
+    <div class="control-row" id="after-presses">
       <a class="button" id="show-scenario" href="/teaching/cases/{{ case.id }}?whole=yes#whole-scenario">{{ t.SHOW_SCENARIO }}</a>
+      {% if case.flag %}
+      <p class="sentence" id="flagged">{{ t.FLAGGED }}</p>
+      {% else %}
+      <form method="post" action="/teaching/cases/{{ case.id }}/flag" id="flag-form">
+        <label for="flag-note">{{ t.FLAG_BOX }}</label>
+        <input type="text" id="flag-note" name="note" value="{{ typed.flag }}" maxlength="{{ line_most }}" autocomplete="off" data-keep="flag" aria-describedby="flag-refusal">
+        <p class="mark" id="flag-note-stays">{{ t.FLAG_NOTE_STAYS }}</p>
+        <button id="flag" aria-describedby="flag-refusal">{{ t.FLAG_THIS_CASE }}</button>
+        {{ refusal("flag") }}
+      </form>
+      {% endif %}
     </div>
   </div>
 </section>
