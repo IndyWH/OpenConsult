@@ -144,13 +144,22 @@ def test_15_14_the_case_alone_has_its_own_temperature_and_a_seed_drawn_afresh(mo
     assert frames.case_sampling() == Sampling(0.7, 7) and frames.case_sampling() == Sampling(0.7, 2 ** 31 - 1)
 
 
-def test_R24_R31_run_10a_builds_the_words_alone_no_route_and_no_table_of_teaching(app, tmp_path):
+def test_R24_the_words_are_built_by_frames_alone_and_teachings_tables_are_its_own(tmp_path):
+    # Restated in run 10b, where stage 10's pages and tables arrive. OLD (run 10a, R31): the first assertion below,
+    # then no route whose address holds teach and no table whose name holds teach. NEW: the first assertion as it
+    # was, then the tables of teaching kept apart by construction (R24; 12.7).
     # The module reaches the loader and the profile's sampling, and nothing of the clinic (R24).
     reached = {value.__name__ for value in vars(frames).values() if isinstance(value, types.ModuleType)}
     assert reached == {"secrets", "openconsult.prompts.loader"} and frames.Sampling.__module__ == "openconsult.llm.profile"
-    # Nothing a learner can see is built in run 10a (R31): no page or route, and no table.
-    paths = list(app.openapi()["paths"])
-    assert "/settings" in paths and not [path for path in paths if "teach" in path.lower()]
     db = open_database(tmp_path / "made.db")
-    assert not [row["name"] for row in db.query("SELECT name FROM sqlite_master") if "teach" in row["name"].lower()]
+    tables = [row["name"] for row in db.query("SELECT name FROM sqlite_master WHERE type = 'table'")]
+    points_to = {table: {row["table"] for row in db.query(f"PRAGMA foreign_key_list({table})")} for table in tables}
+    teaching = {table for table in tables if "teach" in table.lower()}
+    # Every table of teaching says so in its name, and five of them stand.
+    assert len(teaching) == 5 and all(table.startswith("teaching_") for table in teaching)
+    # No table of the clinic points to one of teaching's.
+    assert not [table for table in tables if table not in teaching and points_to[table] & teaching]
+    # Teaching's tables point to each other and to nothing of the clinic but the shared record of model calls.
+    assert {name for table in teaching for name in points_to[table]} - teaching == {"model_call"}
+    assert points_to["teaching_call"] == {"model_call", "teaching_case"} and points_to["teaching_flag"] == set()
     db.close()

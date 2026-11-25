@@ -5,7 +5,7 @@ one, so an existing data folder is brought forward step by step.
 Each stage makes only the tables it uses (spec 15.6).
 """
 
-VERSION = 13
+VERSION = 14
 
 MIGRATIONS = {
     1: """
@@ -655,6 +655,73 @@ CREATE TABLE IF NOT EXISTS recording_left (
     job_id TEXT PRIMARY KEY,
     delete_status INTEGER,
     asks TEXT NOT NULL DEFAULT '[]'
+);
+""",
+    # Run 10b: teaching mode's own tables (12.7; R24; 15.14, ruling 22 and the details of run 10b). Nothing here points
+    # to a table of the clinic, and no table of the clinic points here. The one tie outside is teaching_call, which
+    # names a row of the shared record of model calls, so that a case's calls go when the case goes. A case holds its
+    # scenario as it stood at the start, so a kept case opens as it was whatever becomes of the bank's file. press is
+    # the token of the press that started the case: the same press twice starts one case (R15). The turns are numbered
+    # as the bench numbered them: the opening words are no turn, the learner's first line is turn 1. A flag holds its
+    # own copy of the scenario and outlives its case (12.3, rule 7).
+    14: """
+CREATE TABLE teaching_case (
+    id INTEGER PRIMARY KEY,
+    press TEXT NOT NULL UNIQUE,
+    started_at TEXT NOT NULL,
+    source TEXT NOT NULL CHECK (source IN ('bank', 'fresh')),
+    bank_number INTEGER,
+    topic TEXT NOT NULL,
+    level TEXT NOT NULL CHECK (level IN ('straightforward', 'hidden', 'noisy')),
+    label TEXT NOT NULL CHECK (label IN ('ai', 'script', 'approved')),
+    language_model TEXT NOT NULL CHECK (language_model IN ('this_computer', 'claude')),
+    step TEXT NOT NULL CHECK (step IN ('writing', 'history', 'examination', 'question_1', 'question_2', 'question_3',
+                                       'feedback', 'done')),
+    scenario TEXT,
+    failure TEXT,
+    history_ended_at TEXT,
+    examination_finished_at TEXT,
+    answer_differential TEXT,
+    answer_investigations TEXT,
+    answer_plan TEXT,
+    feedback TEXT,
+    finished_at TEXT
+);
+CREATE TABLE teaching_turn (
+    id INTEGER PRIMARY KEY,
+    case_id INTEGER NOT NULL REFERENCES teaching_case(id),
+    n INTEGER NOT NULL,
+    speaker TEXT NOT NULL CHECK (speaker IN ('doctor', 'patient')),
+    text TEXT NOT NULL,
+    facts_used TEXT,
+    at TEXT NOT NULL,
+    UNIQUE (case_id, n)
+);
+CREATE TABLE teaching_examined (
+    id INTEGER PRIMARY KEY,
+    case_id INTEGER NOT NULL REFERENCES teaching_case(id),
+    n INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    asked TEXT NOT NULL,
+    not_in_case TEXT NOT NULL,
+    at TEXT NOT NULL,
+    UNIQUE (case_id, n)
+);
+CREATE TABLE teaching_call (
+    call_id INTEGER PRIMARY KEY REFERENCES model_call(id),
+    case_id INTEGER NOT NULL REFERENCES teaching_case(id)
+);
+CREATE TABLE teaching_flag (
+    id INTEGER PRIMARY KEY,
+    case_id INTEGER UNIQUE,
+    flagged_at TEXT NOT NULL,
+    source TEXT NOT NULL,
+    bank_number INTEGER,
+    topic TEXT NOT NULL,
+    level TEXT NOT NULL,
+    label TEXT NOT NULL,
+    note TEXT NOT NULL,
+    scenario TEXT NOT NULL
 );
 """,
 }

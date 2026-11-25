@@ -281,7 +281,8 @@ def test_6_5_a_folder_that_met_the_table_under_version_12_on_20_nov_comes_forwar
 
 def test_6_5_version_12_is_again_what_a_folder_met_before_20_nov_no_table_of_a_job_kept_apart(tmp_path, monkeypatch):
     # The script of version 12 is never changed again once a folder may have met it: it makes no recording_left.
-    assert "recording_left" not in schema.MIGRATIONS[12] and "recording_left" in schema.MIGRATIONS[13] and max(schema.MIGRATIONS) == schema.VERSION == 13
+    # Restated in run 10b, which adds version 14, teaching's own tables. OLD: ... == schema.VERSION == 13. The number alone changes.
+    assert "recording_left" not in schema.MIGRATIONS[12] and "recording_left" in schema.MIGRATIONS[13] and max(schema.MIGRATIONS) == schema.VERSION == 14
     # Its bytes are those of 62e7c0a, the code the app was started from on 19 Nov 2026.
     import hashlib
     assert hashlib.sha256(schema.MIGRATIONS[12].encode("utf-8")).hexdigest() == SCRIPT_12_AT_62E7C0A
