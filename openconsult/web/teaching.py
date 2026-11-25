@@ -176,6 +176,9 @@ def _case_page(request: Request, user, case_id: int, refused: tuple[str, str] | 
         # Built from the stored answer by the rule, at every view; no model is asked again (ruling 22).
         view["feedback"] = feedback.built(row["scenario"], [(turn["speaker"], turn["text"]) for turn in turns],
                                           teaching.cases.answers(row), row["feedback"])
+        if request.query_params.get("whole") == "yes":
+            # The whole scenario, by one press, and only now that the feedback has been made (ruling 8).
+            view["whole"] = row["scenario"]
     # The mark stands on a case until its feedback has been made: after it nothing typed there goes to Claude
     # (the owner's okay of 25 Nov 2026).
     in_cloud = row["language_model"] == CLAUDE and row["step"] != DONE_STEP

@@ -1,0 +1,55 @@
+{# The whole scenario, both parts, in the scenario's own words (15.14, ruling 8). It is given to a page only after the
+   feedback has been made, by one press. First what the case is in short, the scenario's own first field (the owner's
+   okay of 25 Nov 2026); then the patient's side, which the actor was given; then the examiner's side. #}
+
+{% macro said(words) -%}{% if words and words|string|trim %}{{ words }}{% else %}{{ t.NONE }}{% endif %}{%- endmacro %}
+
+{% macro scenario(s, speaks_for=None) -%}
+<section class="pane" id="whole-scenario">
+  <div class="pane-head"><h2>{{ t.WHOLE_SCENARIO }}</h2></div>
+  <div class="pane-body">
+    <h3 id="in-short">{{ t.IN_SHORT }}</h3>
+    <p class="scenario-text">{{ said(s.reasoning) }}</p>
+
+    <h3 id="patients-side">{{ t.PATIENT_SIDE }}</h3>
+    <table class="plain facts">
+      <tr><th>{{ t.WHO }}</th><td>{{ t.PRESENTED.format(name=s.patient.name, age=s.patient.age, sex=s.patient.sex) }}{% if speaks_for %}. {{ speaks_for }}{% endif %}</td></tr>
+      <tr><th>{{ t.OCCUPATION }}</th><td>{{ said(s.patient.occupation) }}</td></tr>
+      <tr><th>{{ t.MANNER }}</th><td>{{ said(s.patient.manner) }}</td></tr>
+      <tr><th>{{ t.OPENING_WORDS }}</th><td>{{ said(s.opening_words) }}</td></tr>
+      <tr><th>{{ t.IDEAS }}</th><td>{{ said(s.ideas) }}</td></tr>
+      <tr><th>{{ t.CONCERNS }}</th><td>{{ said(s.concerns) }}</td></tr>
+      <tr><th>{{ t.EXPECTATIONS }}</th><td>{{ said(s.expectations) }}</td></tr>
+      <tr><th>{{ t.NOT_SAID }}</th><td>{{ said(s.hidden_agenda) }}</td></tr>
+    </table>
+    <h4>{{ t.FACTS }}</h4>
+    {% if s.facts %}<ol class="scenario-list" id="scenario-facts">{% for fact in s.facts %}<li>{{ fact.fact }} <span class="tells">({{ t.TELLS[fact.tells] }})</span></li>{% endfor %}</ol>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+
+    <h3 id="examiners-side">{{ t.EXAMINER_SIDE }}</h3>
+    <h4>{{ t.EXAMINATION }}</h4>
+    {% if s.examination %}<ul class="scenario-list" id="scenario-examination">{% for found in s.examination %}<li>{{ found.examination }}: {{ found.finding }}</li>{% endfor %}</ul>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+    <h4>{{ t.RESULTS }}</h4>
+    {% if s.results %}<ul class="scenario-list" id="scenario-results">{% for found in s.results %}<li>{{ found.test }}: {{ found.result }}</li>{% endfor %}</ul>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+    <h4>{{ t.LIST_NAMES.differential }}</h4>
+    {% if s.differential %}<ol class="scenario-list" id="scenario-differential">{% for found in s.differential %}<li>{{ found.diagnosis }}{% if found.must_not_miss %} <span class="must">{{ t.MUST_NOT_MISS }}</span>{% endif %}</li>{% endfor %}</ol>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+    <h4>{{ t.LIST_NAMES.investigations }}</h4>
+    {% if s.investigations %}<ol class="scenario-list" id="scenario-investigations">{% for found in s.investigations %}<li>{{ found.investigation }}{% if found.reason %}: {{ found.reason }}{% endif %}</li>{% endfor %}</ol>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+    <h4>{{ t.LIST_NAMES.plan }}</h4>
+    {% if s.plan %}<ol class="scenario-list" id="scenario-plan">{% for found in s.plan %}<li>{{ found.step }}{% if found.urgency and found.urgency != "none" %} <span class="urgency">{{ t.URGENCY.format(urgency=found.urgency) }}</span>{% endif %}</li>{% endfor %}</ol>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+    <h4>{{ t.SAFETY_NET }}</h4>
+    <p class="scenario-text">{{ said(s.safety_net) }}</p>
+    <h4>{{ t.POINTS_HEADING }}</h4>
+    {% for heading in ("data_gathering", "management", "relating") %}
+    <p class="points-heading">{{ t.POINT_HEADINGS[heading] }}</p>
+    {% if s.marking_points[heading] %}<ul class="scenario-list">{% for words in s.marking_points[heading] %}<li>{{ words }}</li>{% endfor %}</ul>
+    {% else %}<p class="plain-sentence">{{ t.NONE }}</p>{% endif %}
+    {% endfor %}
+  </div>
+</section>
+{%- endmacro %}

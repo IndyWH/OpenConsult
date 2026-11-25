@@ -51,6 +51,15 @@
 .teaching .your-answer, .teaching .also-named { margin: .3rem 0; max-width: 46rem; overflow-wrap: anywhere; }
 .teaching .your-answer .said { white-space: pre-wrap; }
 
+/* The whole scenario, after the feedback: read as a document. */
+.teaching #whole-scenario h3 { margin-top: 1.5rem; padding-top: .8rem; border-top: 1px solid var(--line); }
+.teaching #whole-scenario h3:first-child { margin-top: 0; padding-top: 0; border-top: none; }
+.teaching #whole-scenario h4, .teaching .points-heading { font-size: .9rem; font-weight: 600; margin: 1rem 0 .3rem; color: var(--ink-soft); }
+.teaching .scenario-text, .teaching .scenario-list { max-width: 46rem; overflow-wrap: anywhere; }
+.teaching .scenario-list { margin: .3rem 0 .5rem; padding-left: 1.4rem; }
+.teaching .scenario-list li { margin: .2rem 0; }
+.teaching .tells { color: var(--ink-soft); font-size: .85rem; }
+
 /* The box of the next line, and under it, apart, the press that ends the step. */
 .teaching #say, .teaching #examine { max-width: 46rem; scroll-margin-top: 5rem; }
 .teaching #say-box, .teaching #examine-box { width: 100%; }
