@@ -98,6 +98,9 @@ def test_15_14_after_the_third_answer_the_feedback_is_made_once_by_frames_alone_
     answer_all(client)
     # Being made beside the page: the page says so and asks again by itself; there is no box and no press.
     raw = client.get("/teaching/cases/1").text
+    # Restated by mail 2, the sentence's own words unchanged. OLD: '<p class="waiting" id="feedback-making" role="status">The
+    # feedback is being made. ...'. NEW: the sentence also asks for the keyboard, so that the browser brings it into the
+    # window at each ask, now that the address the page asks at names no place.
     assert ('<p class="waiting" id="feedback-making" role="status" tabindex="-1" autofocus>The feedback is being made. This usually takes a few '
             'seconds, at most 2 minutes.</p>') in raw
     # Restated by mail 2 (the owner's room check of 25 Nov 2026). OLD: the page asked again at ...?quiet#questions, an
